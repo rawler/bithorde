@@ -1,7 +1,6 @@
-/*import tango.core.Exception;
-import tango.io.Stdout;*/
+module lib.protobuf;
 
-final class Buffer(T) {
+final class PBuffer(T) {
 private:
     uint pos;
     T[] buf;
@@ -29,7 +28,7 @@ public:
         pos = 0;
     }
 }
-alias Buffer!(ubyte) ByteBuffer;
+alias PBuffer!(ubyte) ByteBuffer;
 
 void enc_wt_ld(T)(T value, ByteBuffer buf) {
     enc_varint(value.length, buf);
@@ -120,7 +119,7 @@ char[] MessageMixin(char[] name, ProtoBufField fields[]) {
     // Create encode-function
     retval ~= "ubyte[] encode(ByteBuffer buf = new ByteBuffer) { \n";
     foreach (f; fields) {
-        retval ~= " enc_varint!(uint)(" ~ protobuf.ItoA((f.id<<3)|cast(uint)f.type.wtype) ~ ", buf);\n";
+        retval ~= " enc_varint!(uint)(" ~ lib.protobuf.ItoA((f.id<<3)|cast(uint)f.type.wtype) ~ ", buf);\n";
         retval ~= " " ~ f.type.enc_func ~ "!(" ~ f.type.dtype ~ ")(this." ~ f.name ~ ", buf);\n";
     }
     retval ~= " return buf.data;\n}\n";
@@ -129,110 +128,10 @@ char[] MessageMixin(char[] name, ProtoBufField fields[]) {
     retval ~= "void decode(ubyte[] buf) {\n";
     retval ~= " while (buf.length > 0) {\n  switch (dec_varint!(uint)(buf)) {\n";
     foreach (f; fields) {
-        retval ~= "   case " ~ protobuf.ItoA((f.id<<3)|cast(uint)f.type.wtype) ~ ": ";
+        retval ~= "   case " ~ lib.protobuf.ItoA((f.id<<3)|cast(uint)f.type.wtype) ~ ": ";
         retval ~= " this." ~ f.name ~ "=" ~ f.type.dec_func ~"!(" ~ f.type.dtype ~ ")(buf); break;\n";
     }
     retval ~= "  }\n }\n \n}";
 
     return retval;
 }
-
-class Person
-{
-    const ProtoBufField[] _fields = [
-        ProtoBufField(5, "id", PBInt32),
-        ProtoBufField(6, "name", PBString),
-        ];
-//    mixin(MessageMixin("Person", _fields));
-int id;
-char[] name;
-ubyte[] encode(ByteBuffer buf = new ByteBuffer) {
- enc_varint!(uint)(40, buf);
- enc_varint!(int)(this.id, buf);
- enc_varint!(uint)(50, buf);
- enc_wt_ld!(char[])(this.name, buf);
- return buf.data;
-}
-void decode(ubyte[] buf) {
- while (buf.length > 0) {
-  switch (dec_varint!(uint)(buf)) {
-   case 40:  this.id=dec_varint!(int)(buf); break;
-   case 50:  this.name=dec_wt_ld!(char[])(buf); break;
-  }
- }
-}
-
-    char[] toString() {
-        return this.classinfo.name ~ "{\n id: "~protobuf.ItoA(this.id)~"\n name: "~this.name~"\n}";
-    }
-}
-
-void main()
-{
-//    test_varintenc;
-//    test_wt_ld_enc;
-//    Stdout(MessageMixin("Person", Person._fields)).newline;
-
-    Person x = new Person;
-    x.name = "apa";
-    x.id = 14;
-//    Stdout(x).newline();
-    auto bb = new ByteBuffer;
-    ubyte[] buf;
-    for (int i=0; i < 10000000; i++) {
-        bb.reset();
-        buf = x.encode(bb);
-    }
-//    Stdout(buf).newline();
-    Person y = new Person;
-//    for (int i=0; i < 10000000; i++)
-        y.decode(buf);
-//    Stdout(y).newline();
-}
-/*
-bool test_varintenc() {
-    Stdout("Testing varint_enc... ");
-    uint i;
-    try {
-        for (i=0; i < 500000; i+=17) {
-            auto middle = new ByteBuffer;
-            enc_varint(i, middle);
-            auto data = middle.data;
-            uint roundtrip = dec_varint!(uint)(data);
-            if (i == roundtrip) {
-                version (Debug) Stdout.format("{} == {} (middle: {})", i, roundtrip, middle).newline;
-            } else {
-                version (Debug) Stdout.format("{} != {} (middle: {})", i, roundtrip, middle).newline;
-                throw new AssertException("Varint_test failed", __LINE__);
-            }
-        }
-        Stdout("[PASS]").newline;
-        return true;
-    } catch (Exception e) {
-        Stdout.format("[FAIL] (on {})", i).newline;
-        throw e;
-    }
-}
-
-bool test_wt_ld_enc() {
-    Stdout("Testing wt_ld_codec... ");
-    ubyte[] testdata = cast(ubyte[])"abcdefgh\0andthensome";
-    try {
-        auto middle = new ByteBuffer;
-        enc_wt_ld(testdata, middle);
-        auto data = middle.data;
-        ubyte[] roundtrip = dec_wt_ld!(ubyte[])(data);
-        if (testdata == roundtrip) {
-            version (Debug) Stdout.format("{} == {} (middle: {})", testdata, roundtrip, middle).newline;
-        } else {
-            version (Debug) Stdout.format("{} != {} (middle: {})", testdata, roundtrip, middle).newline;
-            throw new AssertException("wt_ld_codec failed", __LINE__);
-        }
-        Stdout("[PASS]").newline;
-        return true;
-    } catch (Exception e) {
-        Stdout.format("[FAIL] (on {})", testdata).newline;
-        throw e;
-    }
-}
-*/

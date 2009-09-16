@@ -1,13 +1,10 @@
 module daemon.server;
 
-private import tango.io.Buffer;
-private import tango.io.model.IConduit;
 private import tango.io.selector.SelectSelector;
 private import tango.io.Stdout;
 private import tango.net.ServerSocket;
 private import tango.net.Socket;
 private import tango.net.SocketConduit;
-private import tango.net.SocketListener;
 
 //private import lib.protobuf;
 
