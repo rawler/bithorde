@@ -66,10 +66,12 @@ T dec_varint(T)(ref ubyte[] buf) {
     foreach (b; buf) {
         retval ^= cast(uint)(b & 0b01111111) << (idx++*7);
         if (!(b & 0b10000000))
-            break;
+        {
+            buf = buf[idx .. length];
+            return retval;
+        }
     }
-    buf = buf[idx .. length];
-    return retval;
+    return 0;
 }
 
 enum WireType {
