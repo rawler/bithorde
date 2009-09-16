@@ -5,8 +5,8 @@ private:
     uint pos;
     T[] buf;
 public:
-    this() {
-        buf = new T[16];
+    this(uint size = 16) {
+        buf = new T[size];
     }
     T[] data() {
         return buf[0 .. pos];
@@ -88,8 +88,11 @@ struct PBType {
     WireType wtype;
 };
 
+const PBType PBInt8   = PBType("byte",    "enc_varint", "dec_varint", WireType.varint );
+const PBType PBuInt8  = PBType("ubyte",   "enc_varint", "dec_varint", WireType.varint );
+const PBType PBInt16  = PBType("short",   "enc_varint", "dec_varint", WireType.varint );
+const PBType PBuInt16 = PBType("ushort",  "enc_varint", "dec_varint", WireType.varint );
 const PBType PBInt32  = PBType("int",     "enc_varint", "dec_varint", WireType.varint );
-const PBType PBsInt32 = PBInt32;
 const PBType PBuInt32 = PBType("uint",    "enc_varint", "dec_varint", WireType.varint );
 const PBType PBBool   = PBType("bool",    "enc_varint", "dec_varint", WireType.varint );
 const PBType PBString = PBType("char[]",  "enc_wt_ld" , "dec_wt_ld" , WireType.length_delim );
@@ -104,10 +107,10 @@ struct ProtoBufField {
 char[] ItoA(uint i) {
     char[] digits = "0123456789";
     char[] retval;
-    while (i > 0) {
+    do {
         retval = digits[i%10] ~ retval;
         i /= 10;
-    }
+    } while (i > 0)
     return retval;
 }
 

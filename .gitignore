@@ -5,3 +5,4 @@ dsss.last
 # Built executables
 server
 tests/protobuf
+bhget
