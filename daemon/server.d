@@ -6,7 +6,7 @@ private import tango.net.ServerSocket;
 private import tango.net.Socket;
 private import tango.net.SocketConduit;
 
-private import lib.connection;
+private import daemon.client;
 
 class Server : ServerSocket
 {
@@ -30,7 +30,7 @@ public:
                     removeThese ~= event;
             }
             foreach (event; removeThese) {
-                auto c = cast(Connection)event.attachment;
+                auto c = cast(Client)event.attachment;
                 selector.unregister(event.conduit);
                 c.hangup();
             }
@@ -40,7 +40,7 @@ private:
     void onClientConnect()
     {
         auto s = accept();
-        auto c = new Connection(s);
+        auto c = new Client(s);
         selector.register(s, Event.Read, c);
     }
 
@@ -50,7 +50,7 @@ private:
             assert(event.isReadable);
             onClientConnect();
         } else {
-            auto c = cast(Connection)event.attachment;
+            auto c = cast(Client)event.attachment;
             if (event.isError || event.isHangup || event.isInvalidHandle) {
                 return false;
             } else {

@@ -53,7 +53,7 @@ class BHOpenResponse : ProtoBufMessage {
     const ProtoBufField[] _fields = [
         ProtoBufField(21, "handle", PBuInt16),  // Handle to object, 0 means failure
         ProtoBufField(22, "distance", PBuInt8), // How fast will we be able to deliver on this?
-        ProtoBufField(23, "size", PBuInt8),     // Size of object
+        ProtoBufField(23, "size", PBuInt64),     // Size of object
     ];
     mixin(MessageMixin("BitHordeMessage.OpenResponse", _fields));
 }

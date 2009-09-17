@@ -14,7 +14,7 @@ private:
     ubyte[] frontbuf, backbuf;
     uint remainder;
     ByteBuffer msgbuf, szbuf;
-    BitHordeMessage[uint] inFlightMessages;
+    BitHordeMessage[uint] inFlightRequests;
     LinkedList!(BitHordeMessage) availableRequests;
 public:
     this(SocketConduit s)
@@ -40,7 +40,7 @@ public:
             ubyte[] buf, left = frontbuf[0..remainder + read];
             while (buf != left) {
                 buf = left;
-                left = processMessage(buf);
+                left = decodeMessage(buf);
             }
             remainder = left.length;
             backbuf[0..remainder] = left; // Copy remainder to backbuf
@@ -53,21 +53,12 @@ public:
         }
     }
 
-    void sendRequest(BitHordeMessage.Type t, ProtoBufMessage content)
-    {
-        auto msg = availableRequests.removeHead();
-        inFlightMessages[msg.id] = msg;
-        msg.type = t;
-        msg.content = content.encode();
-        _send(msg);
-    }
-
     void hangup()
     {
         socket.close();
     }
 private:
-    ubyte[] processMessage(ubyte[] data)
+    ubyte[] decodeMessage(ubyte[] data)
     {
         auto buf = data;
         uint msglen = dec_varint!(uint)(buf);
@@ -76,12 +67,30 @@ private:
         } else {
             auto msg = new BitHordeMessage();
             msg.decode(buf[0..msglen]);
-            Stdout(msg).newline;
+            if (msg.isResponse) {
+                auto req = inFlightRequests[msg.id];
+                scope (exit) {
+                    inFlightRequests.remove(req.id);
+                    availableRequests.add(req);
+                }
+                processResponse(req, msg);
+            } else {
+                processRequest(msg);
+            }
             return buf[msglen..length];
         }
     }
 
-    void _send(BitHordeMessage m)
+protected:
+    BitHordeMessage allocRequest(BitHordeMessage.Type t, ProtoBufMessage content)
+    {
+        auto msg = availableRequests.removeHead();
+        inFlightRequests[msg.id] = msg;
+        msg.type = t;
+        msg.content = content.encode();
+        return msg;
+    }
+    void sendMessage(BitHordeMessage m)
     {
         szbuf.reset();
         msgbuf.reset();
@@ -90,4 +99,6 @@ private:
         socket.write(szbuf.data);
         socket.write(msgbuf);
     }
+    abstract void processResponse(BitHordeMessage req, BitHordeMessage response);
+    abstract void processRequest(BitHordeMessage req);
 }
