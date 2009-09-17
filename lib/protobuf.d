@@ -42,6 +42,11 @@ T dec_wt_ld(T)(ref ubyte[] buf) {
     return retval;
 }
 
+interface ProtoBufMessage {
+    ubyte[] encode(ByteBuffer buf = new ByteBuffer);
+    void decode(ubyte[] buf);
+}
+
 void enc_varint(T)(T i, ByteBuffer buffer) {
     ubyte idx;
     auto buf = buffer.alloc((T.sizeof*8)/7 + 1);
@@ -134,7 +139,7 @@ char[] MessageMixin(char[] name, ProtoBufField fields[]) {
     retval ~= " while (buf.length > 0) {\n  switch (dec_varint!(uint)(buf)) {\n";
     foreach (f; fields) {
         retval ~= "   case " ~ lib.protobuf.ItoA((f.id<<3)|cast(uint)f.type.wtype) ~ ": ";
-        retval ~= " this." ~ f.name ~ "=" ~ f.type.dec_func ~"!(" ~ f.type.dtype ~ ")(buf); break;\n";
+        retval ~= "    this." ~ f.name ~ "=" ~ f.type.dec_func ~"!(" ~ f.type.dtype ~ ")(buf); break;\n";
     }
     retval ~= "  }\n }\n \n}";
 

@@ -2,15 +2,16 @@ module lib.message;
 
 private import lib.protobuf;
 
-public class BitHordeMessage {
+public class BitHordeMessage : ProtoBufMessage {
     enum Type
     {
         KeepAlive = 0,
+        Error = 1,
         OpenRequest = 2,
         OpenResponse = 3,
         CloseRequest = 4,
-        ReadRequest = 5,
-        ReadResponse = 6,
+        ReadRequest = 6,
+        ReadResponse = 7,
     }
 
     enum HashType
@@ -27,32 +28,40 @@ public class BitHordeMessage {
         ];
     mixin(MessageMixin("BitHordeMessage", _fields));
 
-    class OpenRequest {
-        const ProtoBufField[] _fields = [
-            ProtoBufField(11, "priority", PBuInt8), // Priority of this request
-            ProtoBufField(12, "hash", PBuInt8),     // Hash-domain to look in
-            ProtoBufField(13, "id", PBBytes),       // ID of object requested
-        ];
-        mixin(MessageMixin("BitHordeMessage.OpenRequest", _fields));
-    }
-
-    class OpenResponse {
-        const ProtoBufField[] _fields = [
-            ProtoBufField(21, "handle", PBuInt16),  // Handle to object, 0 means failure
-            ProtoBufField(22, "distance", PBuInt8), // How fast will we be able to deliver on this?
-            ProtoBufField(23, "size", PBuInt8),     // Size of object
-        ];
-        mixin(MessageMixin("BitHordeMessage.OpenResponse", _fields));
-    }
-
-    class CloseRequest {
-        const ProtoBufField[] _fields = [
-            ProtoBufField(21, "handle", PBuInt16),  // Handle of file to be closed
-        ];
-        mixin(MessageMixin("BitHordeMessage.CloseRequest", _fields));
-    }
-
     char[] toString() {
-        return "<BitHordeMessage type: " ~ ItoA(type) ~ " id: " ~ ItoA(id) ~ ">";
+        auto retval = "<BitHordeMessage type: " ~ ItoA(type) ~ " id: " ~ ItoA(id);
+        if (this.content)
+            retval ~= " content.length: " ~ ItoA(content.length);
+        return retval ~ ">";
+    }
+
+    bool isResponse() {
+        return cast(bool)(this.type & 1);
     }
 }
+
+class BHOpenRequest : ProtoBufMessage {
+    const ProtoBufField[] _fields = [
+        ProtoBufField(11, "priority", PBuInt8), // Priority of this request
+        ProtoBufField(12, "hash", PBuInt8),     // Hash-domain to look in
+        ProtoBufField(13, "id", PBBytes),       // ID of object requested
+    ];
+    mixin(MessageMixin("BitHordeMessage.OpenRequest", _fields));
+}
+
+class BHOpenResponse : ProtoBufMessage {
+    const ProtoBufField[] _fields = [
+        ProtoBufField(21, "handle", PBuInt16),  // Handle to object, 0 means failure
+        ProtoBufField(22, "distance", PBuInt8), // How fast will we be able to deliver on this?
+        ProtoBufField(23, "size", PBuInt8),     // Size of object
+    ];
+    mixin(MessageMixin("BitHordeMessage.OpenResponse", _fields));
+}
+
+class BHCloseRequest : ProtoBufMessage{
+    const ProtoBufField[] _fields = [
+        ProtoBufField(21, "handle", PBuInt16),  // Handle of file to be closed
+    ];
+    mixin(MessageMixin("BitHordeMessage.CloseRequest", _fields));
+}
+

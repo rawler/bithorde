@@ -13,9 +13,9 @@ void main(char[][])
 
     auto c = new Connection(socket);
 
-    auto m = new BitHordeMessage();
-    m.type = BitHordeMessage.Type.KeepAlive;
-    m.id = 133;
-
-    c.send(m);
+    auto r = new BHOpenRequest;
+    r.priority = 128;
+    r.hash = BitHordeMessage.HashType.SHA1;
+    r.id = cast(ubyte[])x"abcf2cde12525134";
+    c.sendRequest(BitHordeMessage.Type.OpenRequest, r);
 }
