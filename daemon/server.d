@@ -6,19 +6,21 @@ private import tango.net.ServerSocket;
 private import tango.net.Socket;
 private import tango.net.SocketConduit;
 
+private import daemon.cache;
 private import daemon.client;
 
 class Server : ServerSocket
 {
-private:
+package:
     ISelector selector;
+    CacheManager cacheMgr;
 public:
     this()
     {
         super(new InternetAddress(IPv4Address.ADDR_ANY, 4567), 32, true);
         this.selector = new SelectSelector;
         selector.register(this, Event.Read);
-        
+        this.cacheMgr = new CacheManager(".");
     }
 
     public void run()
@@ -40,7 +42,7 @@ private:
     void onClientConnect()
     {
         auto s = accept();
-        auto c = new Client(s);
+        auto c = new Client(this, s);
         selector.register(s, Event.Read, c);
     }
 
