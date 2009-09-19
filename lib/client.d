@@ -53,15 +53,11 @@ private:
 protected:
     this(Client c, BitHordeMessage req, BitHordeMessage resp) {
         this.client = c;
-        auto reqData = new BHOpenRequest;
-        reqData.decode(req.content);
-        this.hType = cast(BitHordeMessage.HashType)reqData.hash;
-        this.id = reqData.id.dup;
-        auto respData = new BHOpenResponse;
-        respData.decode(resp.content);
-        this.handle = respData.handle;
-        this.distance = respData.distance;
-        this._size = respData.size;
+        this.hType = cast(BitHordeMessage.HashType)req.hashtype;
+        this.id = req.content.dup;
+        this.handle = resp.handle;
+        this.distance = resp.distance;
+        this._size = resp.size;
     }
 public:
     ubyte[] read(ulong offset, uint size) {
@@ -69,11 +65,11 @@ public:
     }
 
     void aSyncRead(ulong offset, uint size, BHReadCallback readCallback) {
-        auto r = new BHReadRequest;
-        r.handle = handle;
-        r.offset = offset;
-        r.size = size;
-        client._request(BitHordeMessage.Type.ReadRequest, r, Variant(readCallback));
+        auto req = client.allocRequest(BitHordeMessage.Type.ReadRequest);
+        req.handle = handle;
+        req.offset = offset;
+        req.size = size;
+        client._sendRequest(req, Variant(readCallback));
     }
 
     ulong size() {
@@ -91,27 +87,23 @@ public:
         super(s);
     }
     void open(BitHordeMessage.HashType type, ubyte[] id, BHOpenCallback openCallback) {
-        auto r = new BHOpenRequest;
-        r.priority = 128;
-        r.hash = type;
-        r.id = id;
-        _request(BitHordeMessage.Type.OpenRequest, r, Variant(openCallback));
+        auto req = allocRequest(BitHordeMessage.Type.OpenRequest);
+        req.priority = 128;
+        req.hashtype = type;
+        req.content = id;
+        _sendRequest(req, Variant(openCallback));
     }
 protected:
-    void processResponse(BitHordeMessage req, BitHordeMessage response) {
+    void processResponse(BitHordeMessage req, BitHordeMessage resp) {
         scope (exit) callbacks.remove(req.id);
-        switch (response.type) {
+        switch (resp.type) {
         case BitHordeMessage.Type.OpenResponse:
-            auto asset = new RemoteAsset(this, req, response);
+            auto asset = new RemoteAsset(this, req, resp);
             openAssets[asset.handle] = asset;
-            callbacks[req.id].get!(BHOpenCallback)()(asset, response);
+            callbacks[req.id].get!(BHOpenCallback)()(asset, resp);
             break;
         case BitHordeMessage.Type.ReadResponse:
-            auto reqData = new BHReadRequest;
-            reqData.decode(req.content);
-            auto respData = new BHReadResponse;
-            respData.decode(response.content);
-            callbacks[req.id].get!(BHReadCallback)()(openAssets[reqData.handle], respData.offset, respData.content, response);
+            callbacks[req.id].get!(BHReadCallback)()(openAssets[req.handle], resp.offset, resp.content, resp);
             break;
         default:
             Stdout("Unknown response");
@@ -121,8 +113,7 @@ protected:
         Stdout("Danger Danger! This client should not get requests!").newline;
     }
 private:
-    void _request(BitHordeMessage.Type type, ProtoBufMessage content, Variant callback) {
-        auto req = allocRequest(type, content);
+    void _sendRequest(BitHordeMessage req, Variant callback) {
         callbacks[req.id] = callback;
         sendMessage(req);
     }

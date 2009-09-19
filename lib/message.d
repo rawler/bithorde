@@ -22,9 +22,15 @@ public class BitHordeMessage : ProtoBufMessage {
     }
 
     const ProtoBufField[] _fields = [
-        ProtoBufField(1, "type",    PBInt8),    // Type of message
-        ProtoBufField(2, "id",      PBuInt8),   // Local-link-id of message
-        ProtoBufField(4, "content", PBBytes),   // Content of message
+        ProtoBufField(0,  "type",      PBuInt8), // Type of message
+        ProtoBufField(1,  "id",        PBuInt8), // Local-link-id of message
+        ProtoBufField(2,  "priority",  PBuInt8), // Priority of this request
+        ProtoBufField(3,  "content",   PBBytes), // Content of message
+        ProtoBufField(4,  "hashtype",  PBuInt8), // Hash-domain to look in
+        ProtoBufField(5,  "distance",  PBuInt8), // How fast will we be able to deliver on this?
+        ProtoBufField(6,  "size",     PBuInt64), // Size of asset
+        ProtoBufField(7,  "handle",   PBuInt16), // Handle to asset, 0 means failure
+        ProtoBufField(8,  "offset",   PBuInt64), // How fast will we be able to deliver on this?
         ];
     mixin(MessageMixin("BitHordeMessage", _fields));
 
@@ -39,47 +45,3 @@ public class BitHordeMessage : ProtoBufMessage {
         return cast(bool)(this.type & 1);
     }
 }
-
-class BHOpenRequest : ProtoBufMessage {
-    const ProtoBufField[] _fields = [
-        ProtoBufField(11, "priority", PBuInt8), // Priority of this request
-        ProtoBufField(12, "hash", PBuInt8),     // Hash-domain to look in
-        ProtoBufField(13, "id", PBBytes),       // ID of asset requested
-    ];
-    mixin(MessageMixin("BHOpenRequest", _fields));
-}
-
-class BHOpenResponse : ProtoBufMessage {
-    const ProtoBufField[] _fields = [
-        ProtoBufField(21, "handle", PBuInt16),  // Handle to asset, 0 means failure
-        ProtoBufField(22, "distance", PBuInt8), // How fast will we be able to deliver on this?
-        ProtoBufField(23, "size", PBuInt64),    // Size of asset
-    ];
-    mixin(MessageMixin("BHOpenResponse", _fields));
-}
-
-class BHCloseRequest : ProtoBufMessage{
-    const ProtoBufField[] _fields = [
-        ProtoBufField(31, "handle", PBuInt16),  // Handle of asset to be closed
-    ];
-    mixin(MessageMixin("BHCloseRequest", _fields));
-}
-
-class BHReadRequest : ProtoBufMessage {
-    const ProtoBufField[] _fields = [
-        ProtoBufField(41, "handle", PBuInt16),  // Handle to asset
-        ProtoBufField(42, "offset", PBuInt64),  // How fast will we be able to deliver on this?
-        ProtoBufField(43, "size", PBuInt32),    // Size of segment requested
-    ];
-    mixin(MessageMixin("BHReadRequest", _fields));
-}
-
-class BHReadResponse : ProtoBufMessage {
-    const ProtoBufField[] _fields = [
-        ProtoBufField(51, "offset", PBuInt64),  // How fast will we be able to deliver on this?
-        ProtoBufField(53, "content", PBBytes),  // Actual data
-    ];
-    mixin(MessageMixin("BHReadResponse", _fields));
-}
-
-

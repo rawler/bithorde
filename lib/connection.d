@@ -83,12 +83,11 @@ private:
     }
 
 protected:
-    BitHordeMessage allocRequest(BitHordeMessage.Type t, ProtoBufMessage content)
+    BitHordeMessage allocRequest(BitHordeMessage.Type t)
     {
         auto msg = availableRequests.removeHead();
         inFlightRequests[msg.id] = msg;
         msg.type = t;
-        msg.content = content.encode();
         return msg;
     }
     void sendMessage(BitHordeMessage m)

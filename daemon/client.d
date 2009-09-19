@@ -32,39 +32,34 @@ protected:
         }
     }
 private:
-    void sendResponse(BitHordeMessage req, BitHordeMessage.Type type, ProtoBufMessage content)
+    BitHordeMessage createResponse(BitHordeMessage req, BitHordeMessage.Type type)
     {
-        scope auto resp = new BitHordeMessage;
+        auto resp = new BitHordeMessage;
         resp.type = type;
         resp.id = req.id;
-        resp.content = content.encode();
-        sendMessage(resp);
+        return resp;
     }
 
     void processOpenRequest(BitHordeMessage req)
     {
         Stdout("Got open Request").newline;
-        auto reqData = new BHOpenRequest;
-        reqData.decode(req.content);
-        auto asset = cacheMgr.getAsset(cast(BitHordeMessage.HashType)reqData.hash, reqData.id);
+        auto asset = cacheMgr.getAsset(cast(BitHordeMessage.HashType)req.hashtype, req.content);
         auto handle = 0; // FIXME: need to really allocate free handle
         openAssets[handle] = asset;
-        auto respData = new BHOpenResponse;
-        respData.handle = handle;
-        respData.distance = 1;
-        respData.size = asset.size;
-        sendResponse(req, BitHordeMessage.Type.OpenResponse, respData);
+        scope auto resp = createResponse(req, BitHordeMessage.Type.OpenResponse);
+        resp.handle = handle;
+        resp.distance = 1;
+        resp.size = asset.size;
+        sendMessage(resp);
     }
 
     void processReadRequest(BitHordeMessage req)
     {
         Stdout("Got read Request").newline;
-        auto reqData = new BHReadRequest;
-        reqData.decode(req.content);
-        auto asset = openAssets[reqData.handle];
-        auto respData = new BHReadResponse;
-        respData.offset = reqData.offset;
-        respData.content = asset.read(reqData.offset, reqData.size);
-        sendResponse(req, BitHordeMessage.Type.ReadResponse, respData);
+        auto asset = openAssets[req.handle];
+        scope auto resp = createResponse(req, BitHordeMessage.Type.ReadResponse);
+        resp.offset = req.offset;
+        resp.content = asset.read(req.offset, req.size);
+        sendMessage(resp);
     }
 }
