@@ -16,7 +16,7 @@ void main(char[][] args)
     bool doRun = true;
     ulong offset;
 
-    void onRead(RemoteAsset asset, ulong offset, ubyte[] data, BitHordeMessage response) {
+    void onRead(IAsset asset, ulong offset, ubyte[] data, BHStatusCode status) {
         Stdout(cast(char[])data);
         offset += data.length;
         auto length = asset.size - offset;
@@ -29,7 +29,7 @@ void main(char[][] args)
     }
 
     c.open(BitHordeMessage.HashType.SHA1, hexToBytes(args[1]),
-        delegate void(RemoteAsset asset, BitHordeMessage response) {
+        delegate void(IAsset asset, BHStatusCode status) {
             auto length = asset.size - offset;
             if (length > 1024)
                 length = 1024;

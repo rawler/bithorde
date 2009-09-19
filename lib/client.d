@@ -5,7 +5,7 @@ private import tango.io.Stdout;
 private import tango.net.SocketConduit;
 private import tango.core.Variant;
 
-import lib.asset;
+public import lib.asset;
 import lib.connection;
 import lib.protobuf;
 
@@ -39,9 +39,6 @@ ubyte[] hexToBytes(char[] hex) {
 }
 
 alias void delegate(BitHordeMessage) BHMessageCallback;
-alias void delegate(RemoteAsset, BitHordeMessage) BHOpenCallback;
-alias void delegate(RemoteAsset, ulong offset, ubyte[], BitHordeMessage) BHReadCallback;
-
 class RemoteAsset : IAsset {
 private:
     Client client;
@@ -96,14 +93,14 @@ public:
 protected:
     void processResponse(BitHordeMessage req, BitHordeMessage resp) {
         scope (exit) callbacks.remove(req.id);
-        switch (resp.type) {
-        case BitHordeMessage.Type.OpenResponse:
+        switch (req.type) {
+        case BitHordeMessage.Type.OpenRequest:
             auto asset = new RemoteAsset(this, req, resp);
             openAssets[asset.handle] = asset;
-            callbacks[req.id].get!(BHOpenCallback)()(asset, resp);
+            callbacks[req.id].get!(BHOpenCallback)()(asset, BHStatusCode.SUCCESS);
             break;
-        case BitHordeMessage.Type.ReadResponse:
-            callbacks[req.id].get!(BHReadCallback)()(openAssets[req.handle], resp.offset, resp.content, resp);
+        case BitHordeMessage.Type.ReadRequest:
+            callbacks[req.id].get!(BHReadCallback)()(openAssets[req.handle], resp.offset, resp.content, BHStatusCode.SUCCESS);
             break;
         default:
             Stdout("Unknown response");

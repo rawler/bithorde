@@ -21,13 +21,12 @@ public:
         this.id = id.dup;
     }
 
-    ubyte[] read(ulong offset, uint length) {
+    void aSyncRead(ulong offset, uint length, BHReadCallback cb) {
         ubyte[] buf = new ubyte[length];
         seek(offset);
         auto got = super.read(buf);
-        Stdout.format("Wanted: {} | Got: {}", length, got).newline;
         assert(got == length);
-        return buf;
+        cb(this, offset, buf, BHStatusCode.SUCCESS);
     }
 
     ulong size() {

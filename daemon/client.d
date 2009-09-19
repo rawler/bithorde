@@ -42,7 +42,6 @@ private:
 
     void processOpenRequest(BitHordeMessage req)
     {
-        Stdout("Got open Request").newline;
         auto asset = cacheMgr.getAsset(cast(BitHordeMessage.HashType)req.hashtype, req.content);
         auto handle = 0; // FIXME: need to really allocate free handle
         openAssets[handle] = asset;
@@ -55,11 +54,13 @@ private:
 
     void processReadRequest(BitHordeMessage req)
     {
-        Stdout("Got read Request").newline;
         auto asset = openAssets[req.handle];
         scope auto resp = createResponse(req, BitHordeMessage.Type.ReadResponse);
         resp.offset = req.offset;
-        resp.content = asset.read(req.offset, req.size);
+        asset.aSyncRead(req.offset, req.size,
+            delegate void(IAsset asset, ulong offset, ubyte[] content, BHStatusCode status) {
+                resp.content = content;
+        });
         sendMessage(resp);
     }
 }
