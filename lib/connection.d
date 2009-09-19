@@ -31,6 +31,7 @@ public:
             msg.id = i;
             availableRequests.add(msg);
         }
+        this.socket.socket.setNoDelay(true);
     }
 
     bool read()

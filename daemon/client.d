@@ -67,5 +67,4 @@ private:
         respData.content = asset.read(reqData.offset, reqData.size);
         sendResponse(req, BitHordeMessage.Type.ReadResponse, respData);
     }
-
 }
