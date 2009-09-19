@@ -97,10 +97,10 @@ protected:
         case BitHordeMessage.Type.OpenRequest:
             auto asset = new RemoteAsset(this, req, resp);
             openAssets[asset.handle] = asset;
-            callbacks[req.id].get!(BHOpenCallback)()(asset, BHStatusCode.SUCCESS);
+            callbacks[req.id].get!(BHOpenCallback)()(asset, cast(BHStatus)resp.status);
             break;
         case BitHordeMessage.Type.ReadRequest:
-            callbacks[req.id].get!(BHReadCallback)()(openAssets[req.handle], resp.offset, resp.content, BHStatusCode.SUCCESS);
+            callbacks[req.id].get!(BHReadCallback)()(openAssets[req.handle], resp.offset, resp.content, cast(BHStatus)resp.status);
             break;
         default:
             Stdout("Unknown response");

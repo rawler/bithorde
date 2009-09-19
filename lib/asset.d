@@ -1,14 +1,9 @@
 module lib.asset;
 
-enum BHStatusCode {
-    SUCCESS = 1,
-    NOTFOUND = 2,
-}
+import lib.message;
 
-import lib.client;
-
-alias void delegate(IAsset, BHStatusCode status) BHOpenCallback;
-alias void delegate(IAsset, ulong offset, ubyte[], BHStatusCode status) BHReadCallback;
+alias void delegate(IAsset, BHStatus status) BHOpenCallback;
+alias void delegate(IAsset, ulong offset, ubyte[], BHStatus status) BHReadCallback;
 
 interface IAsset {
     void aSyncRead(ulong offset, uint length, BHReadCallback);

@@ -21,16 +21,23 @@ public class BitHordeMessage : ProtoBufMessage {
         SHA256 = 3,
     }
 
+    enum Status {
+        SUCCESS = 1,
+        NOTFOUND = 2,
+        INVALID_HANDLE = 3,
+    }
+
     const ProtoBufField[] _fields = [
         ProtoBufField(0,  "type",      PBuInt8), // Type of message
         ProtoBufField(1,  "id",        PBuInt8), // Local-link-id of message
-        ProtoBufField(2,  "priority",  PBuInt8), // Priority of this request
-        ProtoBufField(3,  "content",   PBBytes), // Content of message
-        ProtoBufField(4,  "hashtype",  PBuInt8), // Hash-domain to look in
-        ProtoBufField(5,  "distance",  PBuInt8), // How fast will we be able to deliver on this?
-        ProtoBufField(6,  "size",     PBuInt64), // Size of asset
-        ProtoBufField(7,  "handle",   PBuInt16), // Handle to asset, 0 means failure
-        ProtoBufField(8,  "offset",   PBuInt64), // How fast will we be able to deliver on this?
+        ProtoBufField(2,  "status",    PBuInt8), // Did some error occurr?
+        ProtoBufField(3,  "priority",  PBuInt8), // Priority of this request
+        ProtoBufField(4,  "content",   PBBytes), // Content of message
+        ProtoBufField(5,  "hashtype",  PBuInt8), // Hash-domain to look in
+        ProtoBufField(6,  "distance",  PBuInt8), // How fast will we be able to deliver on this?
+        ProtoBufField(7,  "size",     PBuInt64), // Size of asset
+        ProtoBufField(8,  "handle",   PBuInt16), // Handle to asset, 0 means failure
+        ProtoBufField(9,  "offset",   PBuInt64), // How fast will we be able to deliver on this?
         ];
     mixin(MessageMixin("BitHordeMessage", _fields));
 
@@ -45,3 +52,5 @@ public class BitHordeMessage : ProtoBufMessage {
         return cast(bool)(this.type & 1);
     }
 }
+alias BitHordeMessage.Status BHStatus;
+

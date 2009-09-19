@@ -1,5 +1,6 @@
 module daemon.client;
 
+private import tango.core.Exception;
 private import tango.io.Stdout;
 private import tango.net.SocketConduit;
 
@@ -42,25 +43,35 @@ private:
 
     void processOpenRequest(BitHordeMessage req)
     {
-        auto asset = cacheMgr.getAsset(cast(BitHordeMessage.HashType)req.hashtype, req.content);
-        auto handle = 0; // FIXME: need to really allocate free handle
-        openAssets[handle] = asset;
         scope auto resp = createResponse(req, BitHordeMessage.Type.OpenResponse);
-        resp.handle = handle;
-        resp.distance = 1;
-        resp.size = asset.size;
+        try {
+            auto asset = cacheMgr.getAsset(cast(BitHordeMessage.HashType)req.hashtype, req.content);
+            auto handle = 0; // FIXME: need to really allocate free handle
+            openAssets[handle] = asset;
+            resp.handle = handle;
+            resp.distance = 1;
+            resp.size = asset.size;
+            resp.status = BHStatus.SUCCESS;
+        } catch (IOException e) {
+            resp.status = BHStatus.NOTFOUND;
+        }
         sendMessage(resp);
     }
 
     void processReadRequest(BitHordeMessage req)
     {
-        auto asset = openAssets[req.handle];
         scope auto resp = createResponse(req, BitHordeMessage.Type.ReadResponse);
-        resp.offset = req.offset;
-        asset.aSyncRead(req.offset, req.size,
-            delegate void(IAsset asset, ulong offset, ubyte[] content, BHStatusCode status) {
-                resp.content = content;
-        });
+        try {
+            auto asset = openAssets[req.handle];
+            resp.status = BHStatus.SUCCESS;
+            resp.offset = req.offset;
+            asset.aSyncRead(req.offset, req.size,
+                delegate void(IAsset asset, ulong offset, ubyte[] content, BHStatus status) {
+                    resp.content = content;
+            });
+        } catch (ArrayBoundsException e) {
+            resp.status = BHStatus.INVALID_HANDLE;
+        }
         sendMessage(resp);
     }
 }
