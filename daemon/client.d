@@ -52,7 +52,7 @@ private:
         auto respData = new BHOpenResponse;
         respData.handle = handle;
         respData.distance = 1;
-        respData.size = asset.length;
+        respData.size = asset.size;
         sendResponse(req, BitHordeMessage.Type.OpenResponse, respData);
     }
 

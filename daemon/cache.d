@@ -18,7 +18,7 @@ public:
     this(CacheManager mgr, HashType hType, ubyte[] id) {
         super(FilePath.join(mgr.assetDir, bytesToHex(id)), File.ReadWriteExisting);
         this.hType = hType;
-        this.id = id;
+        this.id = id.dup;
     }
 
     ubyte[] read(ulong offset, uint length) {
@@ -30,7 +30,7 @@ public:
         return buf;
     }
 
-    long length() {
+    ulong size() {
         return super.length;
     }
 }
