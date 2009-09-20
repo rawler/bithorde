@@ -91,13 +91,6 @@ protected:
         msg.type = t;
         return msg;
     }
-    BitHordeMessage createResponse(ushort id, BitHordeMessage.Type type)
-    {
-        auto resp = new BitHordeMessage;
-        resp.type = type;
-        resp.id = id;
-        return resp;
-    }
     void sendMessage(BitHordeMessage m)
     {
         szbuf.reset();
