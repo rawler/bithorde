@@ -1,6 +1,7 @@
 module daemon.client;
 
 private import tango.core.Exception;
+private import tango.core.Memory;
 private import tango.io.Stdout;
 private import tango.net.SocketConduit;
 
@@ -26,7 +27,7 @@ class OpenRequest : Request {
     this(Client c, ushort id){
         super(c,id);
     }
-    void callback(IAsset asset, BHStatus status) {
+    final void callback(IAsset asset, BHStatus status) {
         scope auto resp = client.createResponse(id, BitHordeMessage.Type.OpenResponse);
         resp.status = status;
         switch (status) {
@@ -45,15 +46,40 @@ class OpenRequest : Request {
 }
 
 class ReadRequest : Request {
+    static ReadRequest _freeList;
+    static uint alloc, reuse;
+    ReadRequest _next;
+    new(size_t sz)
+    {
+        ReadRequest m;
+
+        if (_freeList) {
+            m = _freeList;
+            _freeList = m._next;
+            reuse++;
+        } else {
+            m = cast(ReadRequest)GC.malloc(sz);
+            alloc++;
+        }
+        return cast(void*)m;
+    }
+    delete(void * p)
+    {
+        auto m = cast(ReadRequest)p;
+        m._next = _freeList;
+        _freeList = m;
+    }
+public:
     this(Client c, ushort id){
         super(c,id);
     }
-    void callback(IAsset asset, ulong offset, ubyte[] content, BHStatus status) {
+    final void callback(IAsset asset, ulong offset, ubyte[] content, BHStatus status) {
         scope auto resp = client.createResponse(id, BitHordeMessage.Type.ReadResponse);
         resp.content = content;
         resp.status = status;
         resp.offset = offset;
         client.sendMessage(resp);
+        delete this;
     }
 }
 

@@ -129,7 +129,7 @@ char[] MessageMixin(char[] name, ProtoBufField fields[]) {
     }
 
     // Create encode-function
-    retval ~= "ubyte[] encode(ByteBuffer buf = new ByteBuffer) { \n";
+    retval ~= "final ubyte[] encode(ByteBuffer buf = new ByteBuffer) { \n";
     foreach (f; fields) {
         retval ~= " enc_varint!(uint)(" ~ lib.protobuf.ItoA((f.id<<3)|cast(uint)f.type.wtype) ~ ", buf);\n";
         retval ~= " " ~ f.type.enc_func ~ "!(" ~ f.type.dtype ~ ")(this." ~ f.name ~ ", buf);\n";
@@ -137,7 +137,7 @@ char[] MessageMixin(char[] name, ProtoBufField fields[]) {
     retval ~= " return buf.data;\n}\n";
 
     // Create decode-function
-    retval ~= "void decode(ubyte[] buf) {\n";
+    retval ~= "final void decode(ubyte[] buf) {\n";
     retval ~= " while (buf.length > 0) {\n  switch (dec_varint!(uint)(buf)) {\n";
     foreach (f; fields) {
         retval ~= "   case " ~ lib.protobuf.ItoA((f.id<<3)|cast(uint)f.type.wtype) ~ ": ";
