@@ -11,6 +11,52 @@ import lib.client;
 import lib.message;
 import lib.protobuf;
 
+class Request {
+private:
+    Client client;
+    ushort id;
+public:
+    this(Client c, ushort id) {
+        this.client = c;
+        this.id = id;
+    }
+}
+
+class OpenRequest : Request {
+    this(Client c, ushort id){
+        super(c,id);
+    }
+    void callback(IAsset asset, BHStatus status) {
+        scope auto resp = client.createResponse(id, BitHordeMessage.Type.OpenResponse);
+        resp.status = status;
+        switch (status) {
+        case BHStatus.SUCCESS:
+            auto handle = 0; // FIXME: need to really allocate free handle
+            client.openAssets[handle] = asset;
+            resp.handle = handle;
+            resp.distance = 1;
+            resp.size = asset.size;
+            break;
+        case BHStatus.NOTFOUND:
+            break;
+        }
+        client.sendMessage(resp);
+    }
+}
+
+class ReadRequest : Request {
+    this(Client c, ushort id){
+        super(c,id);
+    }
+    void callback(IAsset asset, ulong offset, ubyte[] content, BHStatus status) {
+        scope auto resp = client.createResponse(id, BitHordeMessage.Type.ReadResponse);
+        resp.content = content;
+        resp.status = status;
+        resp.offset = offset;
+        client.sendMessage(resp);
+    }
+}
+
 class Client : lib.client.Client {
 private:
     Server server;
@@ -33,45 +79,39 @@ protected:
         }
     }
 private:
-    BitHordeMessage createResponse(BitHordeMessage req, BitHordeMessage.Type type)
+    BitHordeMessage createResponse(ushort id, BitHordeMessage.Type type)
     {
         auto resp = new BitHordeMessage;
         resp.type = type;
-        resp.id = req.id;
+        resp.id = id;
         return resp;
     }
 
     void processOpenRequest(BitHordeMessage req)
     {
-        scope auto resp = createResponse(req, BitHordeMessage.Type.OpenResponse);
+        Stdout("Got open request, ");
+        auto r = new OpenRequest(this, req.id);
         try {
             auto asset = cacheMgr.getAsset(cast(BitHordeMessage.HashType)req.hashtype, req.content);
-            auto handle = 0; // FIXME: need to really allocate free handle
-            openAssets[handle] = asset;
-            resp.handle = handle;
-            resp.distance = 1;
-            resp.size = asset.size;
-            resp.status = BHStatus.SUCCESS;
+            Stdout("serving from cache").newline;
+            r.callback(asset, BHStatus.SUCCESS);
         } catch (IOException e) {
-            resp.status = BHStatus.NOTFOUND;
+            Stdout("forwarding...").newline;
+            server.forwardOpenRequest(cast(BitHordeMessage.HashType)req.hashtype, req.content, req.priority, &r.callback, this);
         }
-        sendMessage(resp);
     }
 
     void processReadRequest(BitHordeMessage req)
     {
-        scope auto resp = createResponse(req, BitHordeMessage.Type.ReadResponse);
+        IAsset asset;
         try {
-            auto asset = openAssets[req.handle];
-            resp.status = BHStatus.SUCCESS;
-            resp.offset = req.offset;
-            asset.aSyncRead(req.offset, req.size,
-                delegate void(IAsset asset, ulong offset, ubyte[] content, BHStatus status) {
-                    resp.content = content;
-            });
+            asset = openAssets[req.handle];
         } catch (ArrayBoundsException e) {
+            auto resp = createResponse(req.id, BitHordeMessage.Type.ReadResponse);
             resp.status = BHStatus.INVALID_HANDLE;
+            return sendMessage(resp);
         }
-        sendMessage(resp);
+        auto r = new ReadRequest(this, req.id);
+        asset.aSyncRead(req.offset, req.size, &r.callback);
     }
 }
