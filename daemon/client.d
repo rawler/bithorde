@@ -107,7 +107,7 @@ private:
         try {
             asset = openAssets[req.handle];
         } catch (ArrayBoundsException e) {
-            auto resp = createResponse(req.id, BitHordeMessage.Type.ReadResponse);
+            scope auto resp = createResponse(req.id, BitHordeMessage.Type.ReadResponse);
             resp.status = BHStatus.INVALID_HANDLE;
             return sendMessage(resp);
         }

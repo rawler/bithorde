@@ -16,6 +16,7 @@ private:
     ByteBuffer msgbuf, szbuf;
     BitHordeMessage[uint] inFlightRequests;
     LinkedList!(BitHordeMessage) availableRequests;
+    BitHordeMessage responseMessage;
 public:
     this(SocketConduit s)
     {
@@ -66,7 +67,7 @@ private:
         if (buf == data || buf.length < msglen) {
             return data; // Not enough data in buffer
         } else {
-            auto msg = new BitHordeMessage();
+            scope auto msg = new BitHordeMessage();
             msg.decode(buf[0..msglen]);
             if (msg.isResponse) {
                 auto req = inFlightRequests[msg.id];
@@ -89,6 +90,13 @@ protected:
         inFlightRequests[msg.id] = msg;
         msg.type = t;
         return msg;
+    }
+    BitHordeMessage createResponse(ushort id, BitHordeMessage.Type type)
+    {
+        auto resp = new BitHordeMessage;
+        resp.type = type;
+        resp.id = id;
+        return resp;
     }
     void sendMessage(BitHordeMessage m)
     {

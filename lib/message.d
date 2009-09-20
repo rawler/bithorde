@@ -1,8 +1,37 @@
 module lib.message;
 
+private import tango.core.Exception;
+private import tango.core.Memory;
+private import tango.io.Stdout;
+
 private import lib.protobuf;
 
 public class BitHordeMessage : ProtoBufMessage {
+private:
+    static BitHordeMessage _freeList;
+    static uint alloc, reuse;
+    BitHordeMessage _next;
+    new(size_t sz)
+    {
+        BitHordeMessage m;
+
+        if (_freeList) {
+            m = _freeList;
+            _freeList = m._next;
+            reuse++;
+        } else {
+            m = cast(BitHordeMessage)GC.malloc(sz);
+            alloc++;
+        }
+        return cast(void*)m;
+    }
+    delete(void * p)
+    {
+        auto m = cast(BitHordeMessage)p;
+        m._next = _freeList;
+        _freeList = m;
+    }
+public:
     enum Type
     {
         KeepAlive = 0,
