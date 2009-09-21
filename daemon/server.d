@@ -5,6 +5,7 @@ private import tango.io.Stdout;
 private import tango.net.ServerSocket;
 private import tango.net.Socket;
 private import tango.net.SocketConduit;
+private import tango.stdc.posix.signal;
 private import Text = tango.text.Util;
 private import tango.util.Convert;
 
@@ -142,6 +143,9 @@ public int main(char[][] args)
         Stdout.format("Usage: {} <server-port> [friend1:port] [friend2:port] ...", args[0]).newline;
         return -1;
     }
+
+    // Hack, since Tango doesn't set MSG_NOSIGNAL on send/recieve, we have to explicitly ignore SIGPIPE
+    signal(SIGPIPE, SIG_IGN);
 
     auto port = to!(uint)(args[1]);
 
