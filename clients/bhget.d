@@ -94,7 +94,7 @@ void main(char[][] args)
     } catch (IllegalArgumentException e) {
         if (e.msg)
             Stderr(e.msg).newline;
-        Stderr.format("Usage: {} [--host|-h <hostname>] [--port|-p <port>] <objectid>", args[0]);
+        Stderr.format("Usage: {} [--host|-h=<hostname>] [--port|-p=<port>] <objectid>", args[0]);
         return -1;
     }
     bhget(arguments);
