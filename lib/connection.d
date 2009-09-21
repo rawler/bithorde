@@ -34,6 +34,10 @@ public:
         }
         this.socket.socket.setNoDelay(true);
     }
+    ~this()
+    {
+        socket.close();
+    }
 
     bool read()
     {
@@ -55,9 +59,8 @@ public:
         }
     }
 
-    void hangup()
-    {
-        socket.close();
+    char[] toString() {
+        return socket.socket.remoteAddress.toString;
     }
 private:
     ubyte[] decodeMessage(ubyte[] data)

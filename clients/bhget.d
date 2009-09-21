@@ -52,6 +52,8 @@ void bhget(Arguments args)
         doRun = false;
     }
 
+    scope IAsset openAsset;
+
     void onRead(IAsset asset, ulong offset, ubyte[] data, BHStatus status) {
         Cout(cast(char[])data);
         offset += data.length;
@@ -68,6 +70,7 @@ void bhget(Arguments args)
         delegate void(IAsset asset, BHStatus status) {
             switch (status) {
             case BHStatus.SUCCESS:
+                openAsset = asset;
                 auto length = asset.size - offset;
                 if (length > 1024)
                     length = 1024;

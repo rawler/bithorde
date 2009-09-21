@@ -39,6 +39,7 @@ public:
         OpenRequest = 2,
         OpenResponse = 3,
         CloseRequest = 4,
+        CloseResponse = 5,
         ReadRequest = 6,
         ReadResponse = 7,
     }

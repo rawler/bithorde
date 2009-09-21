@@ -56,11 +56,13 @@ protected:
         this.distance = resp.distance;
         this._size = resp.size;
     }
-public:
-    ubyte[] read(ulong offset, uint size) {
-        return []; // FIXME: Funkar inte för asynkrona anrop. :S
-    }
 
+    ~this() {
+        auto req = client.allocRequest(BitHordeMessage.Type.CloseRequest);
+        req.handle = handle;
+        client._sendRequest(req, Variant(null));
+    }
+public:
     void aSyncRead(ulong offset, uint size, BHReadCallback readCallback) {
         auto req = client.allocRequest(BitHordeMessage.Type.ReadRequest);
         req.handle = handle;
@@ -101,6 +103,8 @@ protected:
             break;
         case BitHordeMessage.Type.ReadRequest:
             callbacks[req.id].get!(BHReadCallback)()(openAssets[req.handle], resp.offset, resp.content, cast(BHStatus)resp.status);
+            break;
+        case BitHordeMessage.Type.CloseRequest: // CloseRequests returns nothing
             break;
         default:
             Stdout("Unknown response");

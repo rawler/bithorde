@@ -14,17 +14,22 @@ private import daemon.client;
 private import lib.asset;
 private import lib.message;
 
-class ForwardedAsset : IAsset {
+class ForwardedAsset : IServerAsset {
 private:
     IAsset[] backingAssets;
-    BHOpenCallback openCallback;
+    BHServerOpenCallback openCallback;
 package:
     uint waitingResponses;
 public:
-    this (BHOpenCallback cb)
+    this (BHServerOpenCallback cb)
     {
         this.openCallback = cb;
         this.waitingResponses = 0;
+    }
+    ~this() {
+        assert(waitingResponses == 0); // We've got to fix timeouts some day.
+        foreach (asset; backingAssets)
+            delete asset;
     }
     void aSyncRead(ulong offset, uint length, BHReadCallback cb) {
         backingAssets[0].aSyncRead(offset, length, cb);
@@ -44,6 +49,7 @@ public:
         if (waitingResponses <= 0)
             doCallback();
     }
+    mixin IRefCounted.Impl;
 package:
     void doCallback() {
         openCallback(this, (backingAssets.length > 0) ? BHStatus.SUCCESS : BHStatus.NOTFOUND);
@@ -80,8 +86,9 @@ public:
             }
             foreach (event; removeThese) {
                 auto c = cast(Client)event.attachment;
+                Stderr.format("Client disconnected").newline;
                 selector.unregister(event.conduit);
-                c.hangup();
+                delete c;
             }
         }
     }
@@ -94,9 +101,10 @@ public:
         return true;
     }
 
-    void forwardOpenRequest(BitHordeMessage.HashType hType, ubyte[] id, ubyte priority, BHOpenCallback callback, Client origin) {
+    void forwardOpenRequest(BitHordeMessage.HashType hType, ubyte[] id, ubyte priority, BHServerOpenCallback callback, Client origin) {
         bool forwarded = false;
         auto asset = new ForwardedAsset(callback);
+        asset.takeRef();
         foreach (client; connectedFriends) {
             if (client != origin) {
                 asset.waitingResponses += 1;
@@ -112,7 +120,7 @@ private:
     {
         auto c = new Client(this, s);
         selector.register(s, Event.Read, c);
-        Stdout.format("Client connected: {}", s.socket.remoteAddress).newline;
+        Stderr.format("Client connected: {}", s.socket.remoteAddress).newline;
         return c;
     }
 
@@ -140,7 +148,7 @@ private:
 public int main(char[][] args)
 {
     if (args.length<2) {
-        Stdout.format("Usage: {} <server-port> [friend1:port] [friend2:port] ...", args[0]).newline;
+        Stderr.format("Usage: {} <server-port> [friend1:port] [friend2:port] ...", args[0]).newline;
         return -1;
     }
 
