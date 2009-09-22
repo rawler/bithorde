@@ -20,6 +20,7 @@ public:
         this.mgr = mgr;
         this.hType = hType;
         this.id = id.dup;
+        this.mgr.assets[this.id] = this;
         super(FilePath.join(mgr.assetDir, bytesToHex(id)), File.ReadWriteExisting);
     }
     ~this() {
@@ -57,7 +58,6 @@ public:
         } else {
             auto newAsset = new CachedAsset(this, hType, id);
             newAsset.takeRef();
-            assets[id] = newAsset;
             return newAsset;
         }
     }
