@@ -77,6 +77,7 @@ private:
     IAsset asset;
     Client client;
     ulong orderOffset;
+    int exitStatus;
 public:
     this(Arguments args) {
         auto socket = new SocketConduit();
@@ -96,12 +97,16 @@ public:
     void run()
     {
         while (doRun && ((asset is null) || (output.currentOffset < asset.size))) {
-            client.read();
+            if (!client.read()) {
+                Stderr("Server disconnected").newline;
+                exit(-1);
+            }
         }
     }
 private:
-    void exit() {
+    void exit(int exitStatus) {
         doRun = false;
+        this.exitStatus = exitStatus;
     }
 
     void onRead(IAsset asset, ulong offset, ubyte[] data, BHStatus status) {
@@ -130,15 +135,15 @@ private:
             break;
         case BHStatus.NOTFOUND:
             Stderr("Asset not found in BitHorde").newline;
-            return exit();
+            return exit(-1);
         default:
             Stderr.format("Got unknown status from BitHorde.open: {}", status).newline;
-            return exit();
+            return exit(-1);
         }
     }
 }
 
-void main(char[][] args)
+int main(char[][] args)
 {
     Arguments arguments;
     try {
@@ -151,5 +156,5 @@ void main(char[][] args)
     }
     scope auto b = new BHGet(arguments);
     b.run();
-    return 0;
+    return b.exitStatus;
 }
