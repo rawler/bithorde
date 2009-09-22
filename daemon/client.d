@@ -4,6 +4,7 @@ private import tango.core.Exception;
 private import tango.core.Memory;
 private import tango.io.Stdout;
 private import tango.net.SocketConduit;
+private import tango.util.container.more.Stack;
 
 import daemon.server;
 import daemon.cache;
@@ -59,7 +60,7 @@ class OpenRequest : Request {
             resp.status = status;
             switch (status) {
             case BHStatus.SUCCESS:
-                auto handle = 0; // FIXME: need to really allocate free handle
+                auto handle = client.allocateFreeHandle;
                 client.openAssets[handle] = asset;
                 resp.handle = handle;
                 resp.distance = 1;
@@ -120,6 +121,8 @@ private:
     CacheManager cacheMgr;
     IServerAsset[uint] openAssets;
     Request[ushort] inFlightRequests;
+    Stack!(ushort, 64) freeFileHandles;
+    ushort nextNewHandle;
 public:
     this (Server server, SocketConduit s)
     {
@@ -153,13 +156,23 @@ private:
         return resp;
     }
 
+    ushort allocateFreeHandle()
+    {
+        if (freeFileHandles.size > 0) {
+            Stderr("Was here").newline;
+            return freeFileHandles.pop();
+        } else {
+            Stderr("Here too").newline;
+            return nextNewHandle++;
+        }
+    }
+
     void processOpenRequest(BitHordeMessage req)
     {
         Stdout("Got open request, ");
         auto r = new OpenRequest(this, req.id);
         try {
             auto asset = cacheMgr.getAsset(cast(BitHordeMessage.HashType)req.hashtype, req.content);
-            openAssets[0] = asset;
             Stdout("serving from cache").newline;
             r.callback(asset, BHStatus.SUCCESS);
         } catch (IOException e) {
@@ -190,6 +203,7 @@ private:
         try {
             IServerAsset asset = openAssets[req.handle];
             openAssets.remove(req.handle);
+            freeFileHandles.push(req.handle);
             asset.unRef();
             resp.status = BHStatus.SUCCESS;
         } catch (ArrayBoundsException e) {
