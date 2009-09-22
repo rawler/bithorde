@@ -158,13 +158,10 @@ private:
 
     ushort allocateFreeHandle()
     {
-        if (freeFileHandles.size > 0) {
-            Stderr("Was here").newline;
+        if (freeFileHandles.size > 0)
             return freeFileHandles.pop();
-        } else {
-            Stderr("Here too").newline;
+        else
             return nextNewHandle++;
-        }
     }
 
     void processOpenRequest(BitHordeMessage req)
