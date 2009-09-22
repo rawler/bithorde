@@ -1,15 +1,18 @@
 module clients.bhget;
 
 import tango.core.Exception;
-import tango.io.Console;
 import tango.io.Stdout;
 import tango.net.InternetAddress;
 import tango.net.SocketConduit;
 import tango.util.ArgParser;
+import tango.util.container.SortedMap;
 import tango.util.Convert;
 
 import lib.client;
 import lib.message;
+
+const uint CHUNK_SIZE = 4096;
+const uint PARALLEL_REQUESTS = 5;
 
 class Arguments : private ArgParser {
 private:
@@ -39,53 +42,99 @@ public:
     }
 }
 
-void bhget(Arguments args)
+class SortedOutput {
+private:
+    OutputStream _output;
+    SortedMap!(ulong, ubyte[]) _queue;
+public:
+    ulong currentOffset;
+    this(OutputStream output) {
+        _output = output;
+        _queue = new SortedMap!(ulong, ubyte[]);
+    }
+    void queue(ulong offset, ubyte[] data) {
+        assert(offset >= currentOffset); // Maybe should handle a buffer beginning earlier as well?
+        if (offset == currentOffset) {
+            _output.write(data);
+            currentOffset += data.length;
+            while ((_queue.size>0) && _queue.firstKey == currentOffset) {
+                ubyte[] buf;
+                _queue.take(buf);
+                _output.write(buf);
+                currentOffset += buf.length;
+            }
+        } else {
+            _queue.add(offset, data);
+        }
+    }
+}
+
+class BHGet
 {
-    auto socket = new SocketConduit();
-    socket.connect(new InternetAddress(args.host, args.port));
+private:
+    bool doRun;
+    SortedOutput output;
+    IAsset asset;
+    Client client;
+    ulong orderOffset;
+public:
+    this(Arguments args) {
+        auto socket = new SocketConduit();
+        socket.connect(new InternetAddress(args.host, args.port));
+        
+        client = new Client(socket);
+        doRun = true;
+        output = new SortedOutput(Stdout);
 
-    auto c = new Client(socket);
-    bool doRun = true;
-    ulong offset;
+        client.open(BitHordeMessage.HashType.SHA1, args.objectid, &onOpen);
+    }
+    ~this(){
+        delete asset;
+        delete client;
+    }
 
+    void run()
+    {
+        while (doRun && ((asset is null) || (output.currentOffset < asset.size))) {
+            client.read();
+        }
+    }
+private:
     void exit() {
         doRun = false;
     }
 
-    scope IAsset openAsset;
-
     void onRead(IAsset asset, ulong offset, ubyte[] data, BHStatus status) {
-        Cout(cast(char[])data);
-        offset += data.length;
-        auto length = asset.size - offset;
-        if (length > 1024)
-            length = 1024;
-        if (length > 0)
-            asset.aSyncRead(offset, length, &onRead);
-        else
-            exit();
+        assert(asset == this.asset);
+        output.queue(offset, data);
+        auto newoffset = offset + data.length;
+        orderData();
     }
 
-    c.open(BitHordeMessage.HashType.SHA1, args.objectid,
-        delegate void(IAsset asset, BHStatus status) {
-            switch (status) {
-            case BHStatus.SUCCESS:
-                openAsset = asset;
-                auto length = asset.size - offset;
-                if (length > 1024)
-                    length = 1024;
-                asset.aSyncRead(offset, length, &onRead);
-                break;
-            case BHStatus.NOTFOUND:
-                Stderr("Asset not found in BitHorde").newline;
-                return exit();
-            default:
-                Stderr.format("Got unknown status from BitHorde.open: {}", status).newline;
-                return exit();
-            }
-    });
-    while (doRun) {
-        c.read();
+    void orderData() {
+        auto length = asset.size - orderOffset;
+        if (length > CHUNK_SIZE)
+            length = CHUNK_SIZE;
+        if (length > 0) {
+            this.asset.aSyncRead(orderOffset, length, &onRead);
+            orderOffset += length;
+        }
+    }
+
+    void onOpen(IAsset asset, BHStatus status) {
+        switch (status) {
+        case BHStatus.SUCCESS:
+            this.asset = asset;
+            for (uint i; i < PARALLEL_REQUESTS; i++)
+                orderData();
+            break;
+        case BHStatus.NOTFOUND:
+            Stderr("Asset not found in BitHorde").newline;
+            return exit();
+        default:
+            Stderr.format("Got unknown status from BitHorde.open: {}", status).newline;
+            return exit();
+        }
     }
 }
 
@@ -100,6 +149,7 @@ void main(char[][] args)
         Stderr.format("Usage: {} [--host|-h=<hostname>] [--port|-p=<port>] <objectid>", args[0]);
         return -1;
     }
-    bhget(arguments);
+    scope auto b = new BHGet(arguments);
+    b.run();
     return 0;
 }

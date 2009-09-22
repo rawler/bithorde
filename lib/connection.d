@@ -21,11 +21,11 @@ public:
     this(SocketConduit s)
     {
         this.socket = s;
-        this.frontbuf = new ubyte[4096];
-        this.backbuf = new ubyte[4096];
+        this.frontbuf = new ubyte[8192]; // TODO: Handle overflow
+        this.backbuf = new ubyte[8192];
         this.remainder = 0;
         this.szbuf = new ByteBuffer(16);
-        this.msgbuf = new ByteBuffer(4096);
+        this.msgbuf = new ByteBuffer(8192);
         this.availableRequests = new LinkedList!(BitHordeMessage);
         for (auto i = 0; i < 16; i++) {
             auto msg = new BitHordeMessage;
