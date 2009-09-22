@@ -61,6 +61,7 @@ protected:
         auto req = client.allocRequest(BitHordeMessage.Type.CloseRequest);
         req.handle = handle;
         client._sendRequest(req, Variant(null));
+        client.openAssets.remove(handle);
     }
 public:
     void aSyncRead(ulong offset, uint size, BHReadCallback readCallback) {
@@ -84,6 +85,11 @@ public:
     this (SocketConduit s)
     {
         super(s);
+    }
+    ~this ()
+    {
+        foreach (asset; openAssets)
+            delete asset;
     }
     void open(BitHordeMessage.HashType type, ubyte[] id, BHOpenCallback openCallback) {
         auto req = allocRequest(BitHordeMessage.Type.OpenRequest);
