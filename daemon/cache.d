@@ -1,5 +1,6 @@
 module daemon.cache;
 
+private import tango.core.Thread;
 private import tango.io.device.File;
 private import tango.io.FilePath;
 private import tango.io.Stdout;
@@ -8,7 +9,24 @@ private import daemon.client;
 private import lib.asset;
 private import lib.message;
 private import lib.client;
+private import tango.core.Thread;
 alias BitHordeMessage.HashType HashType;
+
+static ThreadLocal!(ubyte[]) tls_buf;
+static this() {
+    tls_buf = new ThreadLocal!(ubyte[]);
+}
+
+static ubyte[] tlsBuffer(uint size) {
+    auto buf = tls_buf.val;
+    if (buf == (ubyte[]).init) {
+        buf = new ubyte[size];
+        tls_buf.val = buf;
+    } else if (size > buf.length) {
+        buf.length = size;
+    }
+    return buf;
+}
 
 class CachedAsset : public File, IServerAsset {
 protected:
@@ -28,7 +46,7 @@ public:
     }
 
     void aSyncRead(ulong offset, uint length, BHReadCallback cb) {
-        ubyte[] buf = new ubyte[length];
+        ubyte[] buf = tlsBuffer(length);
         seek(offset);
         auto got = super.read(buf);
         assert(got == length);
