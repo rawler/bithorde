@@ -1,6 +1,6 @@
 module daemon.server;
 
-private import tango.io.selector.SelectSelector;
+private import tango.io.selector.Selector;
 private import tango.io.Stdout;
 private import tango.net.ServerSocket;
 private import tango.net.Socket;
@@ -67,7 +67,8 @@ public:
     this(ushort port, InternetAddress[] friends)
     {
         super(new InternetAddress(IPv4Address.ADDR_ANY, port), 32, true);
-        this.selector = new SelectSelector;
+        this.selector = new Selector;
+        this.selector.open(10,10);
         selector.register(this, Event.Read);
         this.cacheMgr = new CacheManager(".");
         this.friends = friends;
