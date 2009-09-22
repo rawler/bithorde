@@ -103,8 +103,11 @@ protected:
         scope (exit) callbacks.remove(req.id);
         switch (req.type) {
         case BitHordeMessage.Type.OpenRequest:
-            auto asset = new RemoteAsset(this, req, resp);
-            openAssets[asset.handle] = asset;
+            RemoteAsset asset;
+            if (cast(BHStatus)resp.status == BHStatus.SUCCESS) {
+                asset = new RemoteAsset(this, req, resp);
+                openAssets[asset.handle] = asset;
+            }
             callbacks[req.id].get!(BHOpenCallback)()(asset, cast(BHStatus)resp.status);
             break;
         case BitHordeMessage.Type.ReadRequest:
