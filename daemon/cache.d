@@ -50,7 +50,7 @@ public:
         seek(offset);
         auto got = super.read(buf);
         assert(got == length);
-        cb(this, offset, buf, BHStatus.SUCCESS);
+        cb(this, offset, buf[0..got], BHStatus.SUCCESS);
     }
 
     ulong size() {
