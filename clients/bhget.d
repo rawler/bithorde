@@ -83,7 +83,7 @@ public:
         auto socket = new SocketConduit();
         socket.connect(new InternetAddress(args.host, args.port));
         
-        client = new Client(socket);
+        client = new Client(socket, "bhget");
         doRun = true;
         output = new SortedOutput(Stdout);
 

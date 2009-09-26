@@ -56,7 +56,6 @@ protected:
         this.distance = resp.distance;
         this._size = resp.size;
     }
-
     ~this() {
         auto req = client.allocRequest(BitHordeMessage.Type.CloseRequest);
         req.handle = handle;
@@ -82,9 +81,9 @@ private:
     Variant[uint] callbacks;
     RemoteAsset[uint] openAssets;
 public:
-    this (SocketConduit s)
+    this (SocketConduit s, char[] name)
     {
-        super(s);
+        super(s, name);
     }
     ~this ()
     {

@@ -9,7 +9,7 @@ public import lib.message;
 
 class Connection
 {
-private:
+protected:
     SocketConduit socket;
     ubyte[] frontbuf, backbuf;
     uint remainder;
@@ -17,8 +17,9 @@ private:
     BitHordeMessage[uint] inFlightRequests;
     LinkedList!(BitHordeMessage) availableRequests;
     BitHordeMessage responseMessage;
+    char[] _myname, _peername;
 public:
-    this(SocketConduit s)
+    this(SocketConduit s, char[] myname)
     {
         this.socket = s;
         this.frontbuf = new ubyte[8192]; // TODO: Handle overflow
@@ -33,6 +34,9 @@ public:
             availableRequests.add(msg);
         }
         this.socket.socket.setNoDelay(true);
+        this._myname = myname;
+        sayHello();
+        expectHello();
     }
     ~this()
     {
@@ -48,21 +52,37 @@ public:
                 buf = left;
                 left = decodeMessage(buf);
             }
-            remainder = left.length;
-            backbuf[0..remainder] = left; // Copy remainder to backbuf
-            left = frontbuf;              // Remember current frontbuf
-            frontbuf = backbuf;           // Switch new frontbuf to current backbuf
-            backbuf = left;               // And new backbuf is our current frontbuf
+            swapBufs(left);
             return true;
         } else {
             return false;
         }
     }
-
+    final char[] peername() { return _peername; }
+    final char[] myname() { return _myname; }
     char[] toString() {
         return socket.socket.remoteAddress.toString;
     }
 private:
+    void sayHello() {
+        auto buf = new ByteBuffer;
+        enc_wt_ld!(char[])(_myname, buf);
+        socket.write(buf.data);
+    }
+    void expectHello() {
+        int read = socket.read(frontbuf);
+        auto left = frontbuf[0..read];
+        auto id = dec_wt_ld!(char[])(left);
+        _peername = id.dup;
+        swapBufs(left);
+    }
+    void swapBufs(ubyte[] left) {
+        remainder = left.length;
+        backbuf[0..remainder] = left; // Copy remainder to backbuf
+        left = frontbuf;              // Remember current frontbuf
+        frontbuf = backbuf;           // Switch new frontbuf to current backbuf
+        backbuf = left;               // And new backbuf is our current frontbuf
+    }
     ubyte[] decodeMessage(ubyte[] data)
     {
         auto buf = data;

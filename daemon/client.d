@@ -126,9 +126,9 @@ private:
 public:
     this (Server server, SocketConduit s)
     {
-        super(s);
         this.server = server;
         this.cacheMgr = server.cacheMgr;
+        super(s, server.name);
     }
     ~this()
     {
