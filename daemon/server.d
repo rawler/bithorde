@@ -66,7 +66,15 @@ public:
     }
 
     IServerAsset getAsset(BitHordeMessage.HashType hType, ubyte[] id, ulong reqid, ubyte priority, BHServerOpenCallback callback, Client origin) {
-        return router.getAsset(hType, id, reqid, priority, callback, origin);
+        IServerAsset asset = cacheMgr.getAsset(hType, id);
+        if (asset) {
+            Stdout("serving from cache").newline;
+            callback(asset, BHStatus.SUCCESS);
+        } else {
+            Stdout("forwarding...").newline;
+            asset = router.getAsset(hType, id, reqid, priority, callback, origin);
+        }
+        return asset;
     }
 private:
     void onClientConnect(SocketConduit s)

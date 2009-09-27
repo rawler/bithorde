@@ -1,5 +1,6 @@
 module daemon.cache;
 
+private import tango.core.Exception;
 private import tango.core.Thread;
 private import tango.io.device.File;
 private import tango.io.FilePath;
@@ -68,15 +69,19 @@ public:
     this(char[] assetDir) {
         this.assetDir = assetDir;
     }
-    IServerAsset getAsset(HashType hType, ubyte[] id) {
+    CachedAsset getAsset(BitHordeMessage.HashType hType, ubyte[] id) {
         if (auto asset = id in assets) {
             assert(asset.hType == hType);
             asset.takeRef();
             return *asset;
         } else {
-            auto newAsset = new CachedAsset(this, hType, id);
-            newAsset.takeRef();
-            return newAsset;
+            try {
+                auto newAsset = new CachedAsset(this, hType, id);
+                newAsset.takeRef();
+                return newAsset;
+            } catch (IOException e) {
+                return null;
+            }
         }
     }
 }

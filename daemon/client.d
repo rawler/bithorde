@@ -171,17 +171,10 @@ private:
     {
         Stdout("Got open request, ");
         auto r = new OpenRequest(this, req.id);
-        try {
-            auto asset = cacheMgr.getAsset(cast(BitHordeMessage.HashType)req.hashtype, req.content);
-            Stdout("serving from cache").newline;
-            r.callback(asset, BHStatus.SUCCESS);
-        } catch (IOException e) {
-            Stdout("forwarding...").newline;
-            ulong reqid = req.offset;
-            if (reqid == 0)
-                reqid = rand.uniformR2!(ulong)(1,ulong.max);
-            server.getAsset(cast(BitHordeMessage.HashType)req.hashtype, req.content, reqid, req.priority, &r.callback, this);
-        }
+        ulong reqid = req.offset;
+        if (reqid == 0)
+            reqid = rand.uniformR2!(ulong)(1,ulong.max);
+        server.getAsset(cast(BitHordeMessage.HashType)req.hashtype, req.content, reqid, req.priority, &r.callback, this);
     }
 
     void processReadRequest(BitHordeMessage req)
