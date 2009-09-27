@@ -2,6 +2,7 @@ module lib.client;
 
 private import tango.core.Exception;
 private import tango.io.Stdout;
+private import tango.math.random.Random;
 private import tango.net.SocketConduit;
 private import tango.core.Variant;
 
@@ -84,17 +85,24 @@ public:
     this (SocketConduit s, char[] name)
     {
         super(s, name);
+
     }
     ~this ()
     {
         foreach (asset; openAssets)
             delete asset;
     }
-    void open(BitHordeMessage.HashType type, ubyte[] id, BHOpenCallback openCallback) {
+    void open(BitHordeMessage.HashType type, ubyte[] id,
+              BHOpenCallback openCallback) {
+        open(type, id, openCallback, rand.uniformR2!(ulong)(1,ulong.max));
+    }
+package:
+    void open(BitHordeMessage.HashType type, ubyte[] id, BHOpenCallback openCallback, ulong reqid) {
         auto req = allocRequest(BitHordeMessage.Type.OpenRequest);
         req.priority = 128;
         req.hashtype = type;
         req.content = id;
+        req.offset = reqid;
         _sendRequest(req, Variant(openCallback));
     }
 protected:

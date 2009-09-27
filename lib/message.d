@@ -55,6 +55,7 @@ public:
         SUCCESS = 1,
         NOTFOUND = 2,
         INVALID_HANDLE = 3,
+        WOULD_LOOP = 4,
     }
 
     const ProtoBufField[] _fields = [
@@ -67,7 +68,7 @@ public:
         ProtoBufField(6,  "distance",  PBuInt8), // How fast will we be able to deliver on this?
         ProtoBufField(7,  "size",     PBuInt64), // Size of asset
         ProtoBufField(8,  "handle",   PBuInt16), // Handle to asset, 0 means failure
-        ProtoBufField(9,  "offset",   PBuInt64), // How fast will we be able to deliver on this?
+        ProtoBufField(9,  "offset",   PBuInt64), // Start reading from where?
         ];
     mixin(MessageMixin("BitHordeMessage", _fields));
 

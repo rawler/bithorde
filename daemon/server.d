@@ -20,13 +20,18 @@ private import lib.message;
 
 class ForwardedAsset : IServerAsset {
 private:
+    Server server;
+    ubyte[] id;
     IAsset[] backingAssets;
     BHServerOpenCallback openCallback;
 package:
+    ulong[] requests;
     uint waitingResponses;
 public:
-    this (BHServerOpenCallback cb)
+    this (Server server, ubyte[] id, BHServerOpenCallback cb)
     {
+        this.id = id;
+        this.server = server;
         this.openCallback = cb;
         this.waitingResponses = 0;
     }
@@ -34,6 +39,9 @@ public:
         assert(waitingResponses == 0); // We've got to fix timeouts some day.
         foreach (asset; backingAssets)
             delete asset;
+    }
+    void addRequest(ulong reqid) {
+        requests ~= reqid;
     }
     void aSyncRead(ulong offset, uint length, BHReadCallback cb) {
         backingAssets[0].aSyncRead(offset, length, cb);
@@ -48,6 +56,8 @@ public:
             break;
         case BHStatus.NOTFOUND:
             break;
+        case BHStatus.WOULD_LOOP:
+            break;
         }
         waitingResponses -= 1;
         if (waitingResponses <= 0)
@@ -56,6 +66,7 @@ public:
     mixin IRefCounted.Impl;
 package:
     void doCallback() {
+        server.openRequests.remove(id);
         openCallback(this, (backingAssets.length > 0) ? BHStatus.SUCCESS : BHStatus.NOTFOUND);
     }
 }
@@ -65,6 +76,7 @@ class Server : ServerSocket
 package:
     ISelector selector;
     CacheManager cacheMgr;
+    ForwardedAsset[ubyte[]] openRequests;
     Friend[char[]] offlineFriends;
     Friend[Client] connectedFriends;
     Thread reconnectThread;
@@ -101,22 +113,37 @@ public:
         }
     }
 
-    void forwardOpenRequest(BitHordeMessage.HashType hType, ubyte[] id, ubyte priority, BHServerOpenCallback callback, Client origin) {
+    void handleOpenRequest(BitHordeMessage.HashType hType, ubyte[] id, ulong reqid, ubyte priority, BHServerOpenCallback callback, Client origin) {
+        if (id in openRequests) {
+            auto asset = openRequests[id];
+            assert(reqid == asset.requests[0]); // TODO: Handle merging independent requests
+            callback(null, BHStatus.WOULD_LOOP);
+        } else {
+            forwardOpenRequest(hType, id, reqid, priority, callback, origin);
+        }
+    }
+private:
+    void forwardOpenRequest(BitHordeMessage.HashType hType, ubyte[] id, ulong reqid, ubyte priority, BHServerOpenCallback callback, Client origin) {
         bool forwarded = false;
-        auto asset = new ForwardedAsset(callback);
+        auto asset = new ForwardedAsset(this, id, callback);
+        asset.addRequest(reqid);
         asset.takeRef();
         foreach (friend; connectedFriends) {
             auto client = friend.c;
             if (client != origin) {
                 asset.waitingResponses += 1;
-                client.open(hType, id, &asset.addBackingAsset);
+                client.open(hType, id, &asset.addBackingAsset, reqid);
                 forwarded = true;
             }
         }
-        if (!forwarded)
+        if (!forwarded) {
             asset.doCallback();
+            delete asset;
+        } else {
+            openRequests[id] = asset;
+        }
     }
-private:
+
     void onClientConnect(SocketConduit s)
     {
         auto c = new Client(this, s);

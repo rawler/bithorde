@@ -3,6 +3,7 @@ module daemon.client;
 private import tango.core.Exception;
 private import tango.core.Memory;
 private import tango.io.Stdout;
+private import tango.math.random.Random;
 private import tango.net.SocketConduit;
 private import tango.util.container.more.Stack;
 
@@ -67,6 +68,8 @@ class OpenRequest : Request {
                 resp.size = asset.size;
                 break;
             case BHStatus.NOTFOUND:
+                break;
+            case BHStatus.WOULD_LOOP:
                 break;
             }
             client.sendMessage(resp);
@@ -174,7 +177,10 @@ private:
             r.callback(asset, BHStatus.SUCCESS);
         } catch (IOException e) {
             Stdout("forwarding...").newline;
-            server.forwardOpenRequest(cast(BitHordeMessage.HashType)req.hashtype, req.content, req.priority, &r.callback, this);
+            ulong reqid = req.offset;
+            if (reqid == 0)
+                reqid = rand.uniformR2!(ulong)(1,ulong.max);
+            server.handleOpenRequest(cast(BitHordeMessage.HashType)req.hashtype, req.content, reqid, req.priority, &r.callback, this);
         }
     }
 
