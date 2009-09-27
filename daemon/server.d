@@ -15,70 +15,21 @@ private import tango.util.Convert;
 private import daemon.cache;
 private import daemon.client;
 private import daemon.friend;
+private import daemon.router;
 private import lib.asset;
 private import lib.message;
 
-class ForwardedAsset : IServerAsset {
-private:
-    Server server;
-    ubyte[] id;
-    IAsset[] backingAssets;
-    BHServerOpenCallback openCallback;
-package:
-    ulong[] requests;
-    uint waitingResponses;
-public:
-    this (Server server, ubyte[] id, BHServerOpenCallback cb)
-    {
-        this.id = id;
-        this.server = server;
-        this.openCallback = cb;
-        this.waitingResponses = 0;
-    }
-    ~this() {
-        assert(waitingResponses == 0); // We've got to fix timeouts some day.
-        foreach (asset; backingAssets)
-            delete asset;
-    }
-    void addRequest(ulong reqid) {
-        requests ~= reqid;
-    }
-    void aSyncRead(ulong offset, uint length, BHReadCallback cb) {
-        backingAssets[0].aSyncRead(offset, length, cb);
-    }
-    ulong size() {
-        return backingAssets[0].size;
-    }
-    void addBackingAsset(IAsset asset, BHStatus status) {
-        switch (status) {
-        case BHStatus.SUCCESS:
-            backingAssets ~= asset;
-            break;
-        case BHStatus.NOTFOUND:
-            break;
-        case BHStatus.WOULD_LOOP:
-            break;
-        }
-        waitingResponses -= 1;
-        if (waitingResponses <= 0)
-            doCallback();
-    }
-    mixin IRefCounted.Impl;
-package:
-    void doCallback() {
-        server.openRequests.remove(id);
-        openCallback(this, (backingAssets.length > 0) ? BHStatus.SUCCESS : BHStatus.NOTFOUND);
-    }
+interface IAssetSource {
+    IServerAsset getAsset(BitHordeMessage.HashType hType, ubyte[] id, ulong reqid, ubyte priority, BHServerOpenCallback callback, Client origin);
 }
 
-class Server : ServerSocket
+class Server : ServerSocket, IAssetSource
 {
 package:
     ISelector selector;
     CacheManager cacheMgr;
-    ForwardedAsset[ubyte[]] openRequests;
+    Router router;
     Friend[char[]] offlineFriends;
-    Friend[Client] connectedFriends;
     Thread reconnectThread;
     char[] name;
 public:
@@ -90,6 +41,7 @@ public:
         this.selector.open(10,10);
         selector.register(this, Event.Read);
         this.cacheMgr = new CacheManager(".");
+        this.router = new Router(this);
         foreach (f;friends)
             this.offlineFriends[f.name] = f;
         this.reconnectThread = new Thread(&reconnectLoop);
@@ -113,37 +65,10 @@ public:
         }
     }
 
-    void handleOpenRequest(BitHordeMessage.HashType hType, ubyte[] id, ulong reqid, ubyte priority, BHServerOpenCallback callback, Client origin) {
-        if (id in openRequests) {
-            auto asset = openRequests[id];
-            assert(reqid == asset.requests[0]); // TODO: Handle merging independent requests
-            callback(null, BHStatus.WOULD_LOOP);
-        } else {
-            forwardOpenRequest(hType, id, reqid, priority, callback, origin);
-        }
+    IServerAsset getAsset(BitHordeMessage.HashType hType, ubyte[] id, ulong reqid, ubyte priority, BHServerOpenCallback callback, Client origin) {
+        return router.getAsset(hType, id, reqid, priority, callback, origin);
     }
 private:
-    void forwardOpenRequest(BitHordeMessage.HashType hType, ubyte[] id, ulong reqid, ubyte priority, BHServerOpenCallback callback, Client origin) {
-        bool forwarded = false;
-        auto asset = new ForwardedAsset(this, id, callback);
-        asset.addRequest(reqid);
-        asset.takeRef();
-        foreach (friend; connectedFriends) {
-            auto client = friend.c;
-            if (client != origin) {
-                asset.waitingResponses += 1;
-                client.open(hType, id, &asset.addBackingAsset, reqid);
-                forwarded = true;
-            }
-        }
-        if (!forwarded) {
-            asset.doCallback();
-            delete asset;
-        } else {
-            openRequests[id] = asset;
-        }
-    }
-
     void onClientConnect(SocketConduit s)
     {
         auto c = new Client(this, s);
@@ -153,7 +78,7 @@ private:
             f = offlineFriends[peername];
             offlineFriends.remove(peername);
             f.c = c;
-            connectedFriends[c] = f;
+            router.registerFriend(f);
         }
         selector.register(s, Event.Read, c);
         Stderr.format("{} {} connected: {}", f?"Friend":"Client", peername, s.socket.remoteAddress).newline;
@@ -161,10 +86,8 @@ private:
 
     void onClientDisconnect(Client c)
     {
-        Friend f;
-        if (c in connectedFriends) {
-            f = connectedFriends[c];
-            connectedFriends.remove(c);
+        auto f = router.unregisterFriend(c);
+        if (f) {
             f.c = null;
             offlineFriends[f.name] = f;
         }

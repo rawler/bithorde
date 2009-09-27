@@ -180,7 +180,7 @@ private:
             ulong reqid = req.offset;
             if (reqid == 0)
                 reqid = rand.uniformR2!(ulong)(1,ulong.max);
-            server.handleOpenRequest(cast(BitHordeMessage.HashType)req.hashtype, req.content, reqid, req.priority, &r.callback, this);
+            server.getAsset(cast(BitHordeMessage.HashType)req.hashtype, req.content, reqid, req.priority, &r.callback, this);
         }
     }
 
