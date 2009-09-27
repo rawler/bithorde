@@ -39,8 +39,8 @@ public:
         this.mgr = mgr;
         this.hType = hType;
         this.id = id.dup;
-        this.mgr.assets[this.id] = this;
         super(FilePath.join(mgr.assetDir, bytesToHex(id)), File.ReadWriteExisting);
+        this.mgr.assets[this.id] = this;
     }
     ~this() {
         mgr.assets.remove(id);
