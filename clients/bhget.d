@@ -4,6 +4,7 @@ import tango.core.Exception;
 import tango.io.Stdout;
 import tango.net.InternetAddress;
 import tango.net.SocketConduit;
+import tango.time.Clock;
 import tango.util.ArgParser;
 import tango.util.container.SortedMap;
 import tango.util.Convert;
@@ -19,6 +20,8 @@ private:
     char[] host;
     ushort port;
     ubyte[] objectid;
+    bool verbose;
+    bool progress;
 public:
     this(char[][] arguments) {
         super(delegate void(char[] value,uint ordinal) {
@@ -35,6 +38,12 @@ public:
         });
         bindPosix(["port", "p"], delegate void(char[] value) {
             port = to!(ushort)(value);
+        });
+        bindPosix(["verbose", "v"], delegate void(char[] value) {
+            verbose = true;
+        });
+        bindPosix(["progress", "P"], delegate void(char[] value) {
+            progress = true;
         });
         parse(arguments);
         if (!objectid)
@@ -78,8 +87,14 @@ private:
     Client client;
     ulong orderOffset;
     int exitStatus;
+    Arguments args;
+    Time lastTime;
+    Time lastBwTime;
+    ulong lastBwOffset;
+    ulong currentBw;
 public:
     this(Arguments args) {
+        this.args = args;
         auto socket = new SocketConduit();
         socket.connect(new InternetAddress(args.host, args.port));
         
@@ -102,6 +117,8 @@ public:
                 exit(-1);
             }
         }
+        if (args.progress)
+            Stderr.newline;
     }
 private:
     void exit(int exitStatus) {
@@ -110,10 +127,31 @@ private:
     }
 
     void onRead(IAsset asset, ulong offset, ubyte[] data, BHStatus status) {
+        static auto updateThreshold = TimeSpan.fromMillis(50);
+        static auto bwWindow = TimeSpan.fromMillis(500);
         assert(asset == this.asset);
         output.queue(offset, data);
         auto newoffset = offset + data.length;
         orderData();
+        if (args.progress) {
+            auto now = Clock.now;
+            if ((now - lastTime) > updateThreshold ) {
+                lastTime = now;
+                auto bwTime = now - lastBwTime;
+                if (bwTime > bwWindow) {
+                    currentBw = ((orderOffset - lastBwOffset) * 1000) / bwTime.millis;
+                    lastBwTime = now;
+                    lastBwOffset = orderOffset;
+                }
+                auto bar = "------------------------------------------------------------";
+                auto percent = (orderOffset * 100) / asset.size;
+                auto barlen  = (orderOffset * bar.length) / asset.size;
+                for (int i; i < barlen; i++)
+                    bar[i] = '*';
+
+                Stderr.format("\x0D[{}] {}% {}kB/s", bar, percent, currentBw).flush;
+            }
+        }
     }
 
     void orderData() {
@@ -129,6 +167,12 @@ private:
     void onOpen(IAsset asset, BHStatus status) {
         switch (status) {
         case BHStatus.SUCCESS:
+            if (args.verbose)
+                Stderr.format("Asset found, size is {}kB.", asset.size / 1024).newline;
+            if (args.progress) {
+                lastTime = Clock.now;
+                lastBwTime = Clock.now;
+            }
             this.asset = asset;
             for (uint i; i < PARALLEL_REQUESTS; i++)
                 orderData();
@@ -151,7 +195,7 @@ int main(char[][] args)
     } catch (IllegalArgumentException e) {
         if (e.msg)
             Stderr(e.msg).newline;
-        Stderr.format("Usage: {} [--host|-h=<hostname>] [--port|-p=<port>] <objectid>", args[0]);
+        Stderr.format("Usage: {} [--verbose|-v] [--progress|-P] [--host|-h=<hostname>] [--port|-p=<port>] <objectid>", args[0]);
         return -1;
     }
     scope auto b = new BHGet(arguments);
