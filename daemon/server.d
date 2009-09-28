@@ -23,7 +23,7 @@ interface IAssetSource {
     IServerAsset getAsset(BitHordeMessage.HashType hType, ubyte[] id, ulong reqid, ubyte priority, BHServerOpenCallback callback, Client origin);
 }
 
-class Server : ServerSocket, IAssetSource
+class Server : IAssetSource
 {
 package:
     ISelector selector;
@@ -32,16 +32,26 @@ package:
     Friend[char[]] offlineFriends;
     Thread reconnectThread;
     char[] name;
+    ServerSocket tcpServer;
 public:
     this(char[] name, ushort port, Friend[] friends)
     {
-        super(new InternetAddress(IPv4Address.ADDR_ANY, port), 32, true);
+        // Setup basics
         this.name = name;
+
+        // Setup selector
         this.selector = new Selector;
         this.selector.open(10,10);
-        selector.register(this, Event.Read);
+
+        // Setup servers
+        this.tcpServer = new ServerSocket(new InternetAddress(IPv4Address.ADDR_ANY, port), 32, true);
+        selector.register(tcpServer, Event.Read);
+
+        // Setup helper functions, routing and caching
         this.cacheMgr = new CacheManager(".");
         this.router = new Router(this);
+
+        // Setup friend connections
         foreach (f;friends)
             this.offlineFriends[f.name] = f;
         this.reconnectThread = new Thread(&reconnectLoop);
@@ -105,9 +115,9 @@ private:
 
     bool processSelectEvent(SelectionKey event)
     {
-        if (event.conduit is this) {
+        if (event.conduit is tcpServer) {
             assert(event.isReadable);
-            onClientConnect(accept());
+            onClientConnect(tcpServer.accept());
         } else {
             auto c = cast(Client)event.attachment;
             if (event.isError || event.isHangup || event.isInvalidHandle) {
