@@ -5,6 +5,7 @@ import tango.io.Stdout;
 import tango.net.InternetAddress;
 import tango.net.Socket;
 import tango.net.SocketConduit;
+import tango.text.convert.Layout;
 import tango.time.Clock;
 import tango.util.ArgParser;
 import tango.util.container.SortedMap;
@@ -17,6 +18,8 @@ import lib.message;
 
 const uint CHUNK_SIZE = 4096;
 const uint PARALLEL_REQUESTS = 5;
+const auto updateThreshold = TimeSpan.fromMillis(50);
+const auto bwWindow = TimeSpan.fromMillis(500);
 
 class Arguments : private ArgParser {
 private:
@@ -95,6 +98,8 @@ private:
     Time lastBwTime;
     ulong lastBwOffset;
     ulong currentBw;
+    ushort lastProgressSize;
+    Layout!(char) progressLayout;
 public:
     this(Arguments args) {
         this.args = args;
@@ -110,6 +115,8 @@ public:
 
         doRun = true;
         output = new SortedOutput(Stdout);
+        if (args.progress)
+            progressLayout = new Layout!(char);
 
         client.open(BitHordeMessage.HashType.SHA1, args.objectid, &onOpen);
     }
@@ -135,32 +142,37 @@ private:
         this.exitStatus = exitStatus;
     }
 
+    void updateProgress() {
+        auto now = Clock.now;
+        if ((now - lastTime) > updateThreshold ) {
+            lastTime = now;
+            auto bwTime = now - lastBwTime;
+            if (bwTime > bwWindow) {
+                currentBw = ((orderOffset - lastBwOffset) * 1000) / bwTime.millis;
+                lastBwTime = now;
+                lastBwOffset = orderOffset;
+            }
+            auto bar = "------------------------------------------------------------";
+            auto percent = (orderOffset * 100) / asset.size;
+            auto barlen  = (orderOffset * bar.length) / asset.size;
+            for (int i; i < barlen; i++)
+                bar[i] = '*';
+
+            auto progressSize = progressLayout.convert(Stderr, "\x0D[{}] {}% {}kB/s", bar, percent, currentBw);
+            for (int i = progressSize; i < lastProgressSize; i++)
+                Stderr(' ');
+            lastProgressSize = progressSize;
+            Stderr.flush;
+        }
+    }
+
     void onRead(IAsset asset, ulong offset, ubyte[] data, BHStatus status) {
-        static auto updateThreshold = TimeSpan.fromMillis(50);
-        static auto bwWindow = TimeSpan.fromMillis(500);
         assert(asset == this.asset);
         output.queue(offset, data);
         auto newoffset = offset + data.length;
         orderData();
-        if (args.progress) {
-            auto now = Clock.now;
-            if ((now - lastTime) > updateThreshold ) {
-                lastTime = now;
-                auto bwTime = now - lastBwTime;
-                if (bwTime > bwWindow) {
-                    currentBw = ((orderOffset - lastBwOffset) * 1000) / bwTime.millis;
-                    lastBwTime = now;
-                    lastBwOffset = orderOffset;
-                }
-                auto bar = "------------------------------------------------------------";
-                auto percent = (orderOffset * 100) / asset.size;
-                auto barlen  = (orderOffset * bar.length) / asset.size;
-                for (int i; i < barlen; i++)
-                    bar[i] = '*';
-
-                Stderr.format("\x0D[{}] {}% {}kB/s", bar, percent, currentBw).flush;
-            }
-        }
+        if (args.progress)
+            updateProgress();
     }
 
     void orderData() {
