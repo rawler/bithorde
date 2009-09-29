@@ -1,6 +1,7 @@
 module lib.connection;
 
 private import tango.io.Stdout;
+private import tango.net.Socket;
 private import tango.net.SocketConduit;
 private import tango.util.container.LinkedList;
 
@@ -33,7 +34,8 @@ public:
             msg.id = i;
             availableRequests.add(msg);
         }
-        this.socket.socket.setNoDelay(true);
+        if (s.socket.addressFamily is AddressFamily.INET)
+            this.socket.socket.setNoDelay(true);
         this._myname = myname;
         sayHello();
         expectHello();

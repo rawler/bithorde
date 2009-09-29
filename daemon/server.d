@@ -2,6 +2,7 @@ module daemon.server;
 
 private import tango.core.Exception;
 private import tango.core.Thread;
+private import tango.io.FilePath;
 private import tango.io.selector.Selector;
 private import tango.io.Stdout;
 private import tango.net.ServerSocket;
@@ -11,6 +12,8 @@ private import tango.stdc.posix.signal;
 private import Text = tango.text.Util;
 private import tango.util.container.more.Stack;
 private import tango.util.Convert;
+
+private import tango.net.LocalAddress;
 
 private import daemon.cache;
 private import daemon.client;
@@ -23,6 +26,8 @@ interface IAssetSource {
     IServerAsset getAsset(BitHordeMessage.HashType hType, ubyte[] id, ulong reqid, ubyte priority, BHServerOpenCallback callback, Client origin);
 }
 
+static auto sockFile = "/tmp/bithorde";
+
 class Server : IAssetSource
 {
 package:
@@ -33,6 +38,7 @@ package:
     Thread reconnectThread;
     char[] name;
     ServerSocket tcpServer;
+    ServerSocket unixServer;
 public:
     this(char[] name, ushort port, Friend[] friends)
     {
@@ -44,8 +50,13 @@ public:
         this.selector.open(10,10);
 
         // Setup servers
+        auto sockF = new FilePath(sockFile);
+        if (sockF.exists())
+            sockF.remove();
         this.tcpServer = new ServerSocket(new InternetAddress(IPv4Address.ADDR_ANY, port), 32, true);
         selector.register(tcpServer, Event.Read);
+        this.unixServer = new ServerSocket(new LocalAddress(sockFile), 32, true);
+        selector.register(unixServer, Event.Read);
 
         // Setup helper functions, routing and caching
         this.cacheMgr = new CacheManager(".");
@@ -56,6 +67,10 @@ public:
             this.offlineFriends[f.name] = f;
         this.reconnectThread = new Thread(&reconnectLoop);
         this.reconnectThread.start();
+    }
+    ~this() {
+        this.tcpServer.socket.detach();
+        this.unixServer.socket.detach();
     }
 
     void run()
@@ -118,6 +133,9 @@ private:
         if (event.conduit is tcpServer) {
             assert(event.isReadable);
             onClientConnect(tcpServer.accept());
+        } else if (event.conduit is unixServer) {
+            assert(event.isReadable);
+            onClientConnect(unixServer.accept());
         } else {
             auto c = cast(Client)event.attachment;
             if (event.isError || event.isHangup || event.isInvalidHandle) {
@@ -174,7 +192,7 @@ public int main(char[][] args)
         friends ~= new Friend(part[0], new InternetAddress(part[1], to!(ushort)(part[2])));
     }
 
-    Server s = new Server(name, port, friends);
+    scope Server s = new Server(name, port, friends);
     s.run();
 
     return 0;

@@ -3,11 +3,14 @@ module clients.bhget;
 import tango.core.Exception;
 import tango.io.Stdout;
 import tango.net.InternetAddress;
+import tango.net.Socket;
 import tango.net.SocketConduit;
 import tango.time.Clock;
 import tango.util.ArgParser;
 import tango.util.container.SortedMap;
 import tango.util.Convert;
+
+import tango.net.LocalAddress;
 
 import lib.client;
 import lib.message;
@@ -31,7 +34,7 @@ public:
                 objectid = hexToBytes(value);
             }
         });
-        host = "localhost";
+        host = "/tmp/bithorde";
         port = 1337;
         bindPosix(["host", "h"], delegate void(char[] value) {
             host = value;
@@ -95,10 +98,16 @@ private:
 public:
     this(Arguments args) {
         this.args = args;
-        auto socket = new SocketConduit();
-        socket.connect(new InternetAddress(args.host, args.port));
-        
+        Address addr;
+        if (args.host[0] == '/') {
+            addr = new LocalAddress(args.host);
+        } else {
+            addr = new InternetAddress(args.host, args.port);
+        }
+        auto socket = new SocketConduit(addr.addressFamily, SocketType.STREAM, ProtocolType.IP);
+        socket.connect(addr);
         client = new Client(socket, "bhget");
+
         doRun = true;
         output = new SortedOutput(Stdout);
 

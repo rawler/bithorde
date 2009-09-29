@@ -7,12 +7,13 @@
         version:        Initial release: Aug 2009      
         
         author:         Lukas Pinkowski
+                        Ulrik Mikaelsson (Tango 0.99.8 adaptations)
 
 *******************************************************************************/
 
 module tango.net.LocalAddress;
 
-private import tango.net.device.Berkeley;
+private import tango.net.Socket;
 
 /*******************************************************************************
 
