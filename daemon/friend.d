@@ -11,9 +11,8 @@ package:
     InternetAddress addr;
     Client c;
 public:
-    this(char[] name, InternetAddress addr)
+    this(char[] name)
     {
         this.name = name;
-        this.addr = addr;
     }
 }

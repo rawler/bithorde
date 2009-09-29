@@ -17,6 +17,7 @@ private import tango.net.LocalAddress;
 
 private import daemon.cache;
 private import daemon.client;
+private import daemon.config;
 private import daemon.friend;
 private import daemon.router;
 private import lib.asset;
@@ -40,7 +41,7 @@ package:
     ServerSocket tcpServer;
     ServerSocket unixServer;
 public:
-    this(char[] name, ushort port, Friend[] friends)
+    this(Config config)
     {
         // Setup basics
         this.name = name;
@@ -53,7 +54,7 @@ public:
         auto sockF = new FilePath(sockFile);
         if (sockF.exists())
             sockF.remove();
-        this.tcpServer = new ServerSocket(new InternetAddress(IPv4Address.ADDR_ANY, port), 32, true);
+        this.tcpServer = new ServerSocket(new InternetAddress(IPv4Address.ADDR_ANY, config.port), 32, true);
         selector.register(tcpServer, Event.Read);
         this.unixServer = new ServerSocket(new LocalAddress(sockFile), 32, true);
         selector.register(unixServer, Event.Read);
@@ -63,7 +64,7 @@ public:
         this.router = new Router(this);
 
         // Setup friend connections
-        foreach (f;friends)
+        foreach (f;config.friends)
             this.offlineFriends[f.name] = f;
         this.reconnectThread = new Thread(&reconnectLoop);
         this.reconnectThread.start();
@@ -175,24 +176,17 @@ private:
  */
 public int main(char[][] args)
 {
-    if (args.length<2) {
-        Stderr.format("Usage: {} <name> <server-port> [friend1:ip:port] [friend2:ip:port] ...", args[0]).newline;
+    if (args.length != 2) {
+        Stderr.format("Usage: {} <config>", args[0]).newline;
         return -1;
     }
 
     // Hack, since Tango doesn't set MSG_NOSIGNAL on send/recieve, we have to explicitly ignore SIGPIPE
     signal(SIGPIPE, SIG_IGN);
 
-    auto name = args[1];
-    auto port = to!(uint)(args[2]);
+    auto config = new Config(args[1]);
 
-    Friend[] friends;
-    foreach (arg; args[3..length]) {
-        char[][] part = Text.delimit(arg, ":");
-        friends ~= new Friend(part[0], new InternetAddress(part[1], to!(ushort)(part[2])));
-    }
-
-    scope Server s = new Server(name, port, friends);
+    scope Server s = new Server(config);
     s.run();
 
     return 0;
