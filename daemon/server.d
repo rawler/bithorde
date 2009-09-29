@@ -27,8 +27,6 @@ interface IAssetSource {
     IServerAsset getAsset(BitHordeMessage.HashType hType, ubyte[] id, ulong reqid, ubyte priority, BHServerOpenCallback callback, Client origin);
 }
 
-static auto sockFile = "/tmp/bithorde";
-
 class Server : IAssetSource
 {
 package:
@@ -51,13 +49,15 @@ public:
         this.selector.open(10,10);
 
         // Setup servers
-        auto sockF = new FilePath(sockFile);
-        if (sockF.exists())
-            sockF.remove();
         this.tcpServer = new ServerSocket(new InternetAddress(IPv4Address.ADDR_ANY, config.port), 32, true);
         selector.register(tcpServer, Event.Read);
-        this.unixServer = new ServerSocket(new LocalAddress(sockFile), 32, true);
-        selector.register(unixServer, Event.Read);
+        if (config.unixSocket) {
+            auto sockF = new FilePath(config.unixSocket);
+            if (sockF.exists())
+                sockF.remove();
+            this.unixServer = new ServerSocket(new LocalAddress(config.unixSocket), 32, true);
+            selector.register(unixServer, Event.Read);
+        }
 
         // Setup helper functions, routing and caching
         this.cacheMgr = new CacheManager(".");

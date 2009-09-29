@@ -15,9 +15,10 @@ class ConfigException : Exception
 
 class Config
 {
-    Friend[char[]] friends;
-    ushort port = 1337;
     char[] name;
+    ushort port = 1337;
+    char[] unixSocket = "/tmp/bithorde";
+    Friend[char[]] friends;
 
     this (char[] configFileName) {
         scope auto configFile = new File(configFileName, File.ReadExisting);
@@ -59,6 +60,12 @@ private:
             break;
         case "name":
             this.name = value.dup;
+            break;
+        case "unixsocket":
+            if (value.length)
+                this.unixSocket = value;
+            else
+                this.unixSocket = null;
             break;
         default:
             throw new ConfigException("Unknown server option");
