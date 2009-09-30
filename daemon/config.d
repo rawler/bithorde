@@ -18,6 +18,7 @@ class Config
     char[] name;
     ushort port = 1337;
     char[] unixSocket = "/tmp/bithorde";
+    char[] cachedir = ".";
     Friend[char[]] friends;
 
     this (char[] configFileName) {
@@ -63,9 +64,12 @@ private:
             break;
         case "unixsocket":
             if (value.length)
-                this.unixSocket = value;
+                this.unixSocket = value.dup;
             else
                 this.unixSocket = null;
+            break;
+        case "cachedir":
+            this.cachedir = value.dup;
             break;
         default:
             throw new ConfigException("Unknown server option");

@@ -60,7 +60,7 @@ public:
         }
 
         // Setup helper functions, routing and caching
-        this.cacheMgr = new CacheManager(".");
+        this.cacheMgr = new CacheManager(config.cachedir);
         this.router = new Router(this);
 
         // Setup friend connections
