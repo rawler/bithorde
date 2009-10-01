@@ -6,3 +6,4 @@ dsss.last
 server
 tests/protobuf
 bhget
+bhfuse
