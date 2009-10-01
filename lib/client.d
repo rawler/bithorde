@@ -20,8 +20,11 @@ char[] bytesToHex(ubyte[] bytes) {
     return retval;
 }
 
-ubyte[] hexToBytes(char[] hex) {
-    ubyte[] retval = new ubyte[hex.length / 2];
+ubyte[] hexToBytes(char[] hex, ubyte[] buf = null) {
+    if (!buf)
+        buf = new ubyte[hex.length / 2];
+    assert(buf.length*2 >= hex.length);
+    ubyte[] retval = buf[0..hex.length/2];
     ubyte parseChar(uint idx) {
         auto c = hex[idx];
         if (('0' <= c) && (c <= '9'))
@@ -79,13 +82,12 @@ public:
 
 class Client : Connection {
 private:
-    Variant[uint] callbacks;
+    Variant[100] callbacks;
     RemoteAsset[uint] openAssets;
 public:
     this (SocketConduit s, char[] name)
     {
         super(s, name);
-
     }
     ~this ()
     {
@@ -106,8 +108,8 @@ package:
         _sendRequest(req, Variant(openCallback));
     }
 protected:
-    void processResponse(BitHordeMessage req, BitHordeMessage resp) {
-        scope (exit) callbacks.remove(req.id);
+    synchronized void processResponse(BitHordeMessage req, BitHordeMessage resp) {
+        scope (exit) callbacks[req.id].clear;
         switch (req.type) {
         case BitHordeMessage.Type.OpenRequest:
             RemoteAsset asset;
@@ -130,7 +132,8 @@ protected:
         Stdout("Danger Danger! This client should not get requests!").newline;
     }
 private:
-    void _sendRequest(BitHordeMessage req, Variant callback) {
+    synchronized void _sendRequest(BitHordeMessage req, Variant callback) {
+        assert(callbacks[req.id].isEmpty);
         callbacks[req.id] = callback;
         sendMessage(req);
     }

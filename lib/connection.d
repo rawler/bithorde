@@ -3,7 +3,7 @@ module lib.connection;
 private import tango.io.Stdout;
 private import tango.net.Socket;
 private import tango.net.SocketConduit;
-private import tango.util.container.LinkedList;
+private import tango.util.container.more.Stack;
 
 private import lib.protobuf;
 public import lib.message;
@@ -15,8 +15,8 @@ protected:
     ubyte[] frontbuf, backbuf;
     uint remainder;
     ByteBuffer msgbuf, szbuf;
-    BitHordeMessage[uint] inFlightRequests;
-    LinkedList!(BitHordeMessage) availableRequests;
+    BitHordeMessage[100] requests;
+    Stack!(ushort,100) availableRequests;
     BitHordeMessage responseMessage;
     char[] _myname, _peername;
 public:
@@ -28,11 +28,11 @@ public:
         this.remainder = 0;
         this.szbuf = new ByteBuffer(16);
         this.msgbuf = new ByteBuffer(8192);
-        this.availableRequests = new LinkedList!(BitHordeMessage);
-        for (auto i = 0; i < 16; i++) {
+        for (auto i = 0; i < 100; i++) { // FIXME: Alloc smarter
             auto msg = new BitHordeMessage;
             msg.id = i;
-            availableRequests.add(msg);
+            requests[i] = msg;
+            availableRequests.push(i);
         }
         if (s.socket.addressFamily is AddressFamily.INET)
             this.socket.socket.setNoDelay(true);
@@ -45,7 +45,7 @@ public:
         socket.close();
     }
 
-    bool read()
+    synchronized bool read()
     {
         int read = socket.read(frontbuf[remainder..length]);
         if (read > 0) {
@@ -95,11 +95,8 @@ private:
             scope auto msg = new BitHordeMessage();
             msg.decode(buf[0..msglen]);
             if (msg.isResponse) {
-                auto req = inFlightRequests[msg.id];
-                scope (exit) {
-                    inFlightRequests.remove(req.id);
-                    availableRequests.add(req);
-                }
+                auto req = requests[msg.id];
+                scope (exit) availableRequests.push(req.id);
                 processResponse(req, msg);
             } else {
                 processRequest(msg);
@@ -109,14 +106,14 @@ private:
     }
 
 protected:
-    BitHordeMessage allocRequest(BitHordeMessage.Type t)
+    synchronized BitHordeMessage allocRequest(BitHordeMessage.Type t)
     {
-        auto msg = availableRequests.removeHead();
-        inFlightRequests[msg.id] = msg;
+        auto msgid = availableRequests.pop();
+        auto msg = requests[msgid];
         msg.type = t;
         return msg;
     }
-    void sendMessage(BitHordeMessage m)
+    synchronized void sendMessage(BitHordeMessage m)
     {
         szbuf.reset();
         msgbuf.reset();
