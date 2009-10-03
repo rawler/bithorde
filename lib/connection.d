@@ -17,7 +17,6 @@ protected:
     ByteBuffer msgbuf, szbuf;
     BitHordeMessage[100] requests;
     Stack!(ushort,100) availableRequests;
-    BitHordeMessage responseMessage;
     char[] _myname, _peername;
 public:
     this(SocketConduit s, char[] myname)
@@ -50,7 +49,7 @@ public:
         int read = socket.read(frontbuf[remainder..length]);
         if (read > 0) {
             ubyte[] buf, left = frontbuf[0..remainder + read];
-            while (buf != left) {
+            while (buf != left && left.length > 3) {
                 buf = left;
                 left = decodeMessage(buf);
             }
@@ -80,6 +79,11 @@ private:
     }
     void swapBufs(ubyte[] left) {
         remainder = left.length;
+        if ((remainder * 2) > backbuf.length) { // Alloc new backbuf
+            auto newsize = remainder * 2;       // TODO: Implement some upper-limit
+            delete backbuf;
+            backbuf = new ubyte[newsize];
+        }
         backbuf[0..remainder] = left; // Copy remainder to backbuf
         left = frontbuf;              // Remember current frontbuf
         frontbuf = backbuf;           // Switch new frontbuf to current backbuf
@@ -118,7 +122,7 @@ protected:
         szbuf.reset();
         msgbuf.reset();
         auto msgbuf = m.encode(msgbuf);
-        enc_varint!(ushort)(msgbuf.length, szbuf);
+        enc_varint!(uint)(msgbuf.length, szbuf);
         socket.write(szbuf.data);
         socket.write(msgbuf);
     }

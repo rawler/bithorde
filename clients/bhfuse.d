@@ -191,8 +191,6 @@ static int bh_read(char *path, void *buf, size_t size, off_t offset,
     if (offset < asset.size) {
         if (offset + size > asset.size)
             size = asset.size - offset;
-        if (size > 4096) // FIXME bithorde.Client should really handle with more grace
-            size = 4096;
         asset.aSyncRead(offset, size, delegate void(IAsset asset, ulong respOffset, ubyte[] data, BHStatus status) {
             switch (status) {
             case BHStatus.SUCCESS:
@@ -207,10 +205,14 @@ static int bh_read(char *path, void *buf, size_t size, off_t offset,
             gotResponse = true;
         });
     } else {
-        size = 0;
+        return 0;
     }
-    while (!gotResponse)
+
+    while (true) synchronized(client) {
+        if (gotResponse)
+            break;
         client.read();
+    }
     return size;
 }
 
@@ -234,5 +236,5 @@ int main(char[][] args)
         arg[length-1] = 0;
         argv[idx] = arg.ptr;
     }
-    return fuse_main_real(args.length, argv, &bh_oper, fuse_operations.sizeof, null);
+    return fuse_main_real(args.length, argv, &bh_oper, bh_oper.sizeof, null);
 }
