@@ -50,7 +50,6 @@ public:
         ubyte[] buf = tlsBuffer(length);
         seek(offset);
         auto got = super.read(buf);
-        assert(got == length);
         cb(this, offset, buf[0..got], BHStatus.SUCCESS);
     }
 
