@@ -34,8 +34,6 @@ private:
 public:
     enum Type
     {
-        KeepAlive = 0,
-        Error = 1,
         OpenRequest = 2,
         OpenResponse = 3,
         CloseRequest = 4,
