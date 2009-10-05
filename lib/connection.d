@@ -62,7 +62,7 @@ public:
     final char[] peername() { return _peername; }
     final char[] myname() { return _myname; }
     char[] toString() {
-        return socket.socket.remoteAddress.toString;
+        return peername;
     }
 private:
     void sayHello() {

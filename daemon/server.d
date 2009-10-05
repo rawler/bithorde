@@ -125,7 +125,7 @@ private:
             f.c = null;
             offlineFriends[f.name] = f;
         }
-        Stderr.format("{} disconnected", f?f.name:"Client").newline;
+        Stderr.format("{} {} disconnected", f?"Friend":"Client", c.peername).newline;
         return c;
     }
 
