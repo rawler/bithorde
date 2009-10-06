@@ -33,9 +33,9 @@ bool test_varintenc() {
             auto data = middle.data;
             uint roundtrip = dec_varint!(uint)(data);
             if (i == roundtrip) {
-                version (Debug) Stdout.format("{} == {} (middle: {})", i, roundtrip, middle).newline;
+                debug (protobuf) Stdout.format("{} == {} (middle: {})", i, roundtrip, middle).newline;
             } else {
-                version (Debug) Stdout.format("{} != {} (middle: {})", i, roundtrip, middle).newline;
+                debug (protobuf) Stdout.format("{} != {} (middle: {})", i, roundtrip, middle).newline;
                 throw new AssertException("Varint_test failed", __LINE__);
             }
         }
@@ -56,9 +56,9 @@ bool test_wt_ld_enc() {
         auto data = middle.data;
         ubyte[] roundtrip = dec_wt_ld!(ubyte[])(data);
         if (testdata == roundtrip) {
-            version (Debug) Stdout.format("{} == {} (middle: {})", testdata, roundtrip, middle).newline;
+            debug (protobuf) Stdout.format("{} == {} (middle: {})", testdata, roundtrip, middle).newline;
         } else {
-            version (Debug) Stdout.format("{} != {} (middle: {})", testdata, roundtrip, middle).newline;
+            debug (protobuf) Stdout.format("{} != {} (middle: {})", testdata, roundtrip, middle).newline;
             throw new AssertException("wt_ld_codec failed", __LINE__);
         }
         Stdout("[PASS]").newline;
@@ -72,18 +72,18 @@ bool test_wt_ld_enc() {
 bool test_object_enc()
 {
     Stdout ("Testing Object-Encoding...");
-    version (Debug) Stdout(MessageMixin("Person", Person._fields)).newline;
+    debug (protobuf) Stdout(MessageMixin("Person", Person._fields)).newline;
     Person x = new Person;
     x.name = "apa";
     x.id = 14;
-    version (Debug) Stdout(x).newline();
+    debug (protobuf) Stdout(x).newline();
     auto bb = new ByteBuffer;
     ubyte[] buf;
     buf = x.encode(bb);
-    version (Debug) Stdout(buf).newline();
+    debug (protobuf) Stdout(buf).newline();
     Person y = new Person;
     y.decode(buf);
-    version (Debug) Stdout(y).newline();
+    debug (protobuf) Stdout(y).newline();
     if (x == y) {
         Stdout("[PASS]").newline;
         return true;

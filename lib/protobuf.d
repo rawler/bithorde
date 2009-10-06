@@ -1,5 +1,8 @@
 module lib.protobuf;
 
+/**
+ * Buffer implementation designed to be filled BACKWARDS, to increase performance of prefix-length encoding.
+ */
 final class PBuffer(T) {
 private:
     uint pos;
@@ -7,32 +10,43 @@ private:
 public:
     this(uint size = 16) {
         buf = new T[size];
+        pos = size;
     }
     T[] data() {
-        return buf[0 .. pos];
+        return buf[pos .. length];
     }
     T[] alloc(uint size) {
-        auto newpos = pos + size;
-        if (newpos > buf.length)
-            buf.length = buf.length*2 + size;
-        return buf[pos..newpos];
+        int newpos = pos - size;
+        if (newpos < 0) {
+            auto newbuf = new T[buf.length + size];
+            auto resize = newbuf.length - buf.length;
+            newbuf[length-(buf.length-pos)..length] = buf[pos..length];
+            delete buf;
+            newpos += resize;
+            pos += resize;
+            buf = newbuf;
+        }
+        return buf[newpos..pos];
     }
     void charge(uint size) {
-        pos += size;
+        pos -= size;
     }
-    void append(T[] data) {
+    void prepend(T[] data) {
         alloc(data.length)[] = data;
         charge(data.length);
     }
     void reset() {
-        pos = 0;
+        pos = buf.length;
+    }
+    size_t length() {
+        return buf.length-pos;
     }
 }
 alias PBuffer!(ubyte) ByteBuffer;
 
 void enc_wt_ld(T)(T value, ByteBuffer buf) {
+    buf.prepend(cast(ubyte[])value);
     enc_varint(value.length, buf);
-    buf.append(cast(ubyte[])value);
 }
 
 T dec_wt_ld(T)(ref ubyte[] buf) {
@@ -48,24 +62,23 @@ interface ProtoBufMessage {
 }
 
 void enc_varint(T)(T i, ByteBuffer buffer) {
-    ubyte idx;
-    auto buf = buffer.alloc((T.sizeof*8)/7 + 1);
-    do
-    {
-        ubyte current = i & 0b01111111;
+    auto maxbits = 0;
+    auto x = i;
+    while (x) {
+        maxbits += 7;
+        x >>= 7;
+    }
+    auto encbytes = (maxbits/8)+1;
+    auto slice = buffer.alloc(encbytes);
+    foreach (ref b; slice) {
+        b = i | 0b10000000;
         i >>= 7;
-        if (i) {
-            buf[idx++] = current | 0b10000000;
-        } else {
-            buf[idx++] = current;
-            break;
-        }
-    } while (i)
-    buffer.charge(idx);
+    }
+    slice[length-1] &= 0b01111111;
+    buffer.charge(encbytes);
 }
 
 T dec_varint(T)(ref ubyte[] buf) {
-    uint base = 1;
     T retval = 0;
     uint idx = 0;
     foreach (b; buf) {
@@ -131,8 +144,8 @@ char[] MessageMixin(char[] name, ProtoBufField fields[]) {
     // Create encode-function
     retval ~= "final ubyte[] encode(ByteBuffer buf = new ByteBuffer) { \n";
     foreach (f; fields) {
-        retval ~= " enc_varint!(uint)(" ~ lib.protobuf.ItoA((f.id<<3)|cast(uint)f.type.wtype) ~ ", buf);\n";
         retval ~= " " ~ f.type.enc_func ~ "!(" ~ f.type.dtype ~ ")(this." ~ f.name ~ ", buf);\n";
+        retval ~= " enc_varint!(uint)(" ~ lib.protobuf.ItoA((f.id<<3)|cast(uint)f.type.wtype) ~ ", buf);\n";
     }
     retval ~= " return buf.data;\n}\n";
 

@@ -14,7 +14,7 @@ protected:
     SocketConduit socket;
     ubyte[] frontbuf, backbuf;
     uint remainder;
-    ByteBuffer msgbuf, szbuf;
+    ByteBuffer msgbuf;
     BitHordeMessage[100] requests;
     Stack!(ushort,100) availableRequests;
     char[] _myname, _peername;
@@ -25,7 +25,6 @@ public:
         this.frontbuf = new ubyte[8192]; // TODO: Handle overflow
         this.backbuf = new ubyte[8192];
         this.remainder = 0;
-        this.szbuf = new ByteBuffer(16);
         this.msgbuf = new ByteBuffer(8192);
         for (auto i = 0; i < 100; i++) { // FIXME: Alloc smarter
             auto msg = new BitHordeMessage;
@@ -119,12 +118,10 @@ protected:
     }
     synchronized void sendMessage(BitHordeMessage m)
     {
-        szbuf.reset();
         msgbuf.reset();
-        auto msgbuf = m.encode(msgbuf);
-        enc_varint!(uint)(msgbuf.length, szbuf);
-        socket.write(szbuf.data);
-        socket.write(msgbuf);
+        m.encode(msgbuf);
+        enc_varint!(uint)(msgbuf.length, msgbuf);
+        socket.write(msgbuf.data);
     }
     abstract void processResponse(BitHordeMessage req, BitHordeMessage response);
     abstract void processRequest(BitHordeMessage req);
