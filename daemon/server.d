@@ -21,10 +21,10 @@ private import daemon.config;
 private import daemon.friend;
 private import daemon.router;
 private import lib.asset;
-private import lib.message;
+private import message = lib.message;
 
 interface IAssetSource {
-    IServerAsset getAsset(BitHordeMessage.HashType hType, ubyte[] id, ulong reqid, ubyte priority, BHServerOpenCallback callback, Client origin);
+    IServerAsset getAsset(message.HashType hType, ubyte[] id, ulong reqid, BHServerOpenCallback callback, Client origin);
 }
 
 class Server : IAssetSource
@@ -91,14 +91,14 @@ public:
         }
     }
 
-    IServerAsset getAsset(BitHordeMessage.HashType hType, ubyte[] id, ulong reqid, ubyte priority, BHServerOpenCallback callback, Client origin) {
+    IServerAsset getAsset(message.HashType hType, ubyte[] id, ulong reqid, BHServerOpenCallback callback, Client origin) {
         IServerAsset asset = cacheMgr.getAsset(hType, id);
         if (asset) {
             Stdout("serving from cache").newline;
-            callback(asset, BHStatus.SUCCESS);
+            callback(asset, message.Status.SUCCESS);
         } else {
             Stdout("forwarding...").newline;
-            asset = router.getAsset(hType, id, reqid, priority, callback, origin);
+            asset = router.getAsset(hType, id, reqid, callback, origin);
         }
         return asset;
     }

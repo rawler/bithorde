@@ -1,37 +1,64 @@
 package bithorde;
 
-message Message {
-  enum Type {
-    OpenRequest = 2;
-    OpenResponse = 3;
-    CloseRequest = 4;
-    CloseResponse = 5;
-    ReadRequest = 6;
-    ReadResponse = 7;
-  }
+enum HashType
+{
+  MD5 = 1;
+  SHA1 = 2;
+  SHA256 = 3;
+}
 
-  enum HashType
-  {
-    MD5 = 1;
-    SHA1 = 2;
-    SHA256 = 3;
-  }
+enum Status {
+  SUCCESS = 1;
+  NOTFOUND = 2;
+  INVALID_HANDLE = 3;
+  WOULD_LOOP = 4;
+}
 
-  enum Status {
-    SUCCESS = 1;
-    NOTFOUND = 2;
-    INVALID_HANDLE = 3;
-    WOULD_LOOP = 4;
-  }
+message HandShake { // Must be first message in stream
+  required string name = 1;
+  required uint32 protoversion = 2 [default = 1];
+}
 
-  required Type   type = 1;       // Type of message
-  required uint32 id = 2;         // Local-link-id of message
-  optional Status status = 3;     // Did some error occurr?
-  optional uint32 priority = 4;   // Priority of this request
-  optional bytes  content = 5;    // Content of message
-  optional HashType hashtype = 6; // Hash-domain to look in
-  optional uint32 distance = 7;   // How fast will we be able to deliver on this?
-  optional uint64 size = 8;       // Size of asset
-  optional uint32 handle = 9;     // Handle to asset, 0 means failure
-  optional uint64 offset = 10;    // Start reading from where?
+message Open {
+  message Request {
+    required uint32 reqId = 1;
+    required HashType hashType = 2;
+    required bytes assetId = 3;
+  }
+  message Response {
+    required uint32 reqId = 1;
+    required Status status = 2;
+    optional uint32 handle = 3;
+    optional uint32 size = 4;
+  }
+}
+
+message Read {
+  message Request {
+    required uint32 reqId = 1;
+    required uint32 handle = 2;
+    required uint64 offset = 3;
+    required uint32 size = 4;
+  }
+  message Response {
+    required uint32 reqId = 1;
+    required Status status = 2;
+    required uint64 offset = 3;
+    required bytes content = 4;
+  }
+}
+
+message Close {
+  required uint32 handle = 1;     // Handle to asset, 0 means failure
+}
+
+message Stream
+{
+  required HandShake handshake   = 1;
+  repeated Open.Request openReq  = 2;
+  repeated Open.Response openRes = 3;
+  repeated Close close           = 4;
+  repeated Read.Request readReq  = 5;
+  repeated Read.Response readRes = 6;
+
 }

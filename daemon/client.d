@@ -11,10 +11,10 @@ import daemon.server;
 import daemon.cache;
 import lib.asset;
 import lib.client;
-import lib.message;
+import message = lib.message;
 import lib.protobuf;
 
-alias void delegate(IServerAsset, BHStatus status) BHServerOpenCallback;
+alias void delegate(IServerAsset, message.Status status) BHServerOpenCallback;
 
 interface IRefCounted {
     template Impl() {
@@ -55,21 +55,21 @@ class OpenRequest : Request {
     this(Client c, ushort id){
         super(c,id);
     }
-    final void callback(IServerAsset asset, BHStatus status) {
+    final void callback(IServerAsset asset, message.Status status) {
         if (client) {
-            scope auto resp = client.createResponse(id, BitHordeMessage.Type.OpenResponse);
+            scope auto resp = new message.OpenResponse;
+            resp.rpcId = id;
             resp.status = status;
             switch (status) {
-            case BHStatus.SUCCESS:
+            case message.Status.SUCCESS:
                 auto handle = client.allocateFreeHandle;
                 client.openAssets[handle] = asset;
                 resp.handle = handle;
-                resp.distance = 1;
                 resp.size = asset.size;
                 break;
-            case BHStatus.NOTFOUND:
+            case message.Status.NOTFOUND:
                 break;
-            case BHStatus.WOULD_LOOP:
+            case message.Status.WOULD_LOOP:
                 break;
             }
             client.sendMessage(resp);
@@ -106,9 +106,10 @@ public:
     this(Client c, ushort id){
         super(c,id);
     }
-    final void callback(IAsset asset, ulong offset, ubyte[] content, BHStatus status) {
+    final void callback(IAsset asset, ulong offset, ubyte[] content, message.Status status) {
         if (client) {
-            scope auto resp = client.createResponse(id, BitHordeMessage.Type.ReadResponse);
+            scope auto resp = new message.ReadResponse;
+            resp.rpcId = id;
             resp.content = content;
             resp.status = status;
             resp.offset = offset;
@@ -141,73 +142,51 @@ public:
             req.client = null; // Make sure stale requests know we're gone
     }
 protected:
-    void processRequest(BitHordeMessage req) {
-        switch (req.type) {
-            case BitHordeMessage.Type.OpenRequest:  processOpenRequest(req); break;
-            case BitHordeMessage.Type.ReadRequest:  processReadRequest(req); break;
-            case BitHordeMessage.Type.CloseRequest: processCloseRequest(req); break;
-            default:
-                Stdout.format("Unknown request type: {}", req.type);
-        }
-    }
-private:
-    BitHordeMessage createResponse(ushort id, BitHordeMessage.Type type)
-    {
-        auto resp = new BitHordeMessage;
-        resp.type = type;
-        resp.id = id;
-        return resp;
-    }
-
-    ushort allocateFreeHandle()
-    {
-        if (freeFileHandles.size > 0)
-            return freeFileHandles.pop();
-        else
-            return nextNewHandle++;
-    }
-
-    void processOpenRequest(BitHordeMessage req)
+    void process(message.OpenRequest req)
     {
         Stdout("Got open request, ");
-        auto r = new OpenRequest(this, req.id);
-        ulong reqid = req.offset;
+        auto r = new OpenRequest(this, req.rpcId);
+        ulong reqid = req.session;
         if (reqid == 0)
             reqid = rand.uniformR2!(ulong)(1,ulong.max);
-        server.getAsset(cast(BitHordeMessage.HashType)req.hashtype, req.content, reqid, req.priority, &r.callback, this);
+        server.getAsset(req.hashType, req.assetId, reqid, &r.callback, this);
     }
 
-    void processReadRequest(BitHordeMessage req)
+    void process(message.ReadRequest req)
     {
         IAsset asset;
         try {
             asset = openAssets[req.handle];
         } catch (ArrayBoundsException e) {
-            scope auto resp = createResponse(req.id, BitHordeMessage.Type.ReadResponse);
-            resp.status = BHStatus.INVALID_HANDLE;
+            scope auto resp = new message.ReadResponse;
+            resp.rpcId = req.rpcId;
+            resp.status = message.Status.INVALID_HANDLE;
             return sendMessage(resp);
         }
-        auto r = new ReadRequest(this, req.id);
+        auto r = new ReadRequest(this, req.rpcId);
         asset.aSyncRead(req.offset, req.size, &r.callback);
     }
 
-    void processCloseRequest(BitHordeMessage req)
+    void process(message.Close req)
     {
-        scope auto resp = createResponse(req.id, BitHordeMessage.Type.CloseResponse);
-        resp.handle = req.handle;
         Stderr.format("Client {} closing handle {}: ", this, req.handle);
         try {
             IServerAsset asset = openAssets[req.handle];
             openAssets.remove(req.handle);
             freeFileHandles.push(req.handle);
             asset.unRef();
-            resp.status = BHStatus.SUCCESS;
         } catch (ArrayBoundsException e) {
-            resp.status = BHStatus.INVALID_HANDLE;
             Stderr("[INVALID_HANDLE]").newline;
             return;
         }
         Stderr("[OK]").newline;
-        return sendMessage(resp);
+    }
+private:
+    ushort allocateFreeHandle()
+    {
+        if (freeFileHandles.size > 0)
+            return freeFileHandles.pop();
+        else
+            return nextNewHandle++;
     }
 }

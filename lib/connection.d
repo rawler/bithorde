@@ -6,7 +6,7 @@ private import tango.net.SocketConduit;
 private import tango.util.container.more.Stack;
 
 private import lib.protobuf;
-public import lib.message;
+public import message = lib.message;
 
 class Connection
 {
@@ -15,9 +15,32 @@ protected:
     ubyte[] frontbuf, backbuf;
     uint remainder;
     ByteBuffer msgbuf;
-    BitHordeMessage[100] requests;
-    Stack!(ushort,100) availableRequests;
     char[] _myname, _peername;
+
+private:
+    message.RPCRequest[] inFlightRequests;
+    Stack!(ushort,100) _freeIds;
+    ushort nextid;
+    void allocRequest(message.RPCRequest target) {
+        if (_freeIds.size)
+            target.rpcId = _freeIds.pop();
+        else {
+            target.rpcId = nextid++;
+            if (inFlightRequests.length <= target.rpcId) {
+                auto newInFlightRequests = new message.RPCRequest[inFlightRequests.length*2];
+                newInFlightRequests[0..inFlightRequests.length] = inFlightRequests;
+                delete inFlightRequests;
+                inFlightRequests = newInFlightRequests;
+            }
+        }
+        inFlightRequests[target.rpcId] = target;
+    }
+    void releaseRequest(message.RPCResponse msg) {
+        msg.request = inFlightRequests[msg.rpcId];
+        inFlightRequests[msg.rpcId] = null;
+        if (_freeIds.unused)
+            return _freeIds.push(msg.rpcId);
+    }
 public:
     this(SocketConduit s, char[] myname)
     {
@@ -26,14 +49,9 @@ public:
         this.backbuf = new ubyte[8192];
         this.remainder = 0;
         this.msgbuf = new ByteBuffer(8192);
-        for (auto i = 0; i < 100; i++) { // FIXME: Alloc smarter
-            auto msg = new BitHordeMessage;
-            msg.id = i;
-            requests[i] = msg;
-            availableRequests.push(i);
-        }
         if (s.socket.addressFamily is AddressFamily.INET)
             this.socket.socket.setNoDelay(true);
+        this.inFlightRequests = new message.RPCRequest[16];
         this._myname = myname;
         sayHello();
         expectHello();
@@ -91,38 +109,66 @@ private:
     ubyte[] decodeMessage(ubyte[] data)
     {
         auto buf = data;
+        auto type = dec_varint!(message.Type)(buf);
+        if (buf == data) {
+            return data;
+        } else {
+            assert((type & 0b0000_0111) == 0b0010);
+            type >>= 3;
+        }
         uint msglen = dec_varint!(uint)(buf);
         if (buf == data || buf.length < msglen) {
             return data; // Not enough data in buffer
         } else {
-            scope auto msg = new BitHordeMessage();
-            msg.decode(buf[0..msglen]);
-            if (msg.isResponse) {
-                auto req = requests[msg.id];
-                scope (exit) availableRequests.push(req.id);
-                processResponse(req, msg);
-            } else {
-                processRequest(msg);
-            }
+            with (message) { switch (type) {
+            case Type.OpenRequest:
+                scope auto msg = new OpenRequest;
+                msg.decode(buf[0..msglen]);
+                process(msg);
+                break;
+            case Type.OpenResponse:
+                scope auto msg = new OpenResponse;
+                msg.decode(buf[0..msglen]);
+                releaseRequest(msg);
+                process(msg);
+                break;
+            case Type.Close:
+                scope auto msg = new Close;
+                msg.decode(buf[0..msglen]);
+                process(msg);
+                break;
+            case Type.ReadRequest:
+                scope auto msg = new ReadRequest;
+                msg.decode(buf[0..msglen]);
+                process(msg);
+                break;
+            case Type.ReadResponse:
+                scope auto msg = new ReadResponse;
+                msg.decode(buf[0..msglen]);
+                releaseRequest(msg);
+                process(msg);
+                break;
+            default:
+                Stderr.format("Unknown message type; {}", type).newline;
+            } }
             return buf[msglen..length];
         }
     }
-
 protected:
-    synchronized BitHordeMessage allocRequest(BitHordeMessage.Type t)
-    {
-        auto msgid = availableRequests.pop();
-        auto msg = requests[msgid];
-        msg.type = t;
-        return msg;
-    }
-    synchronized void sendMessage(BitHordeMessage m)
-    {
+    synchronized void sendMessage(message.Message m) {
         msgbuf.reset();
         m.encode(msgbuf);
         enc_varint!(uint)(msgbuf.length, msgbuf);
+        enc_varint!(ushort)((m.typeId << 3) | 0b0000_0010, msgbuf);
         socket.write(msgbuf.data);
     }
-    abstract void processResponse(BitHordeMessage req, BitHordeMessage response);
-    abstract void processRequest(BitHordeMessage req);
+    synchronized void sendRequest(message.RPCRequest req) {
+        allocRequest(req);
+        sendMessage(req);
+    }
+    abstract void process(message.OpenRequest);
+    abstract void process(message.OpenResponse);
+    abstract void process(message.Close);
+    abstract void process(message.ReadRequest);
+    abstract void process(message.ReadResponse);
 }

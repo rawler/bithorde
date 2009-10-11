@@ -3,83 +3,148 @@ module lib.message;
 private import tango.core.Exception;
 private import tango.core.Memory;
 private import tango.io.Stdout;
+private import tango.util.container.more.Stack;
 
 private import lib.protobuf;
 
-public class BitHordeMessage : ProtoBufMessage {
+enum Type
+{
+    OpenRequest = 2,
+    OpenResponse = 3,
+    Close = 4,
+    ReadRequest = 5,
+    ReadResponse = 6,
+}
+
+public abstract class Message : ProtoBufMessage {
 private:
-    static BitHordeMessage _freeList;
-    static uint alloc, reuse;
-    BitHordeMessage _next;
+    static Stack!(void*, 100) _freeList;
     new(size_t sz)
     {
-        BitHordeMessage m;
-
-        if (_freeList) {
-            m = _freeList;
-            _freeList = m._next;
-            reuse++;
-        } else {
-            m = cast(BitHordeMessage)GC.malloc(sz);
-            alloc++;
-        }
-        return cast(void*)m;
+        if (_freeList.size)
+            return _freeList.pop();
+        else
+            return GC.malloc(128);
     }
     delete(void * p)
     {
-        auto m = cast(BitHordeMessage)p;
-        m._next = _freeList;
-        _freeList = m;
+        if (_freeList.unused)
+            _freeList.push(p);
+        else
+            GC.free(p);
     }
+protected:
 public:
-    enum Type
-    {
-        OpenRequest = 2,
-        OpenResponse = 3,
-        CloseRequest = 4,
-        CloseResponse = 5,
-        ReadRequest = 6,
-        ReadResponse = 7,
-    }
+    abstract ubyte[] encode(ByteBuffer buf = new ByteBuffer);
+    abstract void decode(ubyte[] buf);
+    abstract Type typeId();
+    abstract bool isResponse();
+}
 
-    enum HashType
-    {
-        MD5 = 1,
-        SHA1 = 2,
-        SHA256 = 3,
-    }
-
-    enum Status {
-        SUCCESS = 1,
-        NOTFOUND = 2,
-        INVALID_HANDLE = 3,
-        WOULD_LOOP = 4,
-    }
-
-    const ProtoBufField[] _fields = [
-        ProtoBufField(0,  "type",      PBuInt8), // Type of message
-        ProtoBufField(1,  "id",        PBuInt8), // Local-link-id of message
-        ProtoBufField(2,  "status",    PBuInt8), // Did some error occurr?
-        ProtoBufField(3,  "priority",  PBuInt8), // Priority of this request
-        ProtoBufField(4,  "content",   PBBytes), // Content of message
-        ProtoBufField(5,  "hashtype",  PBuInt8), // Hash-domain to look in
-        ProtoBufField(6,  "distance",  PBuInt8), // How fast will we be able to deliver on this?
-        ProtoBufField(7,  "size",     PBuInt64), // Size of asset
-        ProtoBufField(8,  "handle",   PBuInt16), // Handle to asset, 0 means failure
-        ProtoBufField(9,  "offset",   PBuInt64), // Start reading from where?
-        ];
-    mixin(MessageMixin("BitHordeMessage", _fields));
-
-    char[] toString() {
-        auto retval = "<BitHordeMessage type: " ~ ItoA(type) ~ " id: " ~ ItoA(id);
-        if (this.content)
-            retval ~= " content.length: " ~ ItoA(content.length);
-        return retval ~ ">";
-    }
-
-    bool isResponse() {
-        return cast(bool)(this.type & 1);
+abstract class RPCMessage : Message {
+    abstract ushort rpcId();
+    abstract void rpcId(ushort val);
+    template Mixin() {
+        final ushort rpcId() { return reqId; }
+        final void rpcId(ushort val) { reqId = val; }
     }
 }
-alias BitHordeMessage.Status BHStatus;
 
+abstract class RPCRequest : RPCMessage {
+    final bool isResponse() { return false; }
+}
+
+abstract class RPCResponse : RPCMessage {
+    final bool isResponse() { return true; }
+    RPCRequest request;
+    ~this() {
+        if (request)
+            delete request;
+    }
+}
+
+enum HashType
+{
+    MD5 = 1,
+    SHA1 = 2,
+    SHA256 = 3,
+}
+const PBType PBHashType = PBType("HashType",  "enc_varint", "dec_varint", WireType.varint );
+
+enum Status {
+    SUCCESS = 1,
+    NOTFOUND = 2,
+    INVALID_HANDLE = 3,
+    WOULD_LOOP = 4,
+}
+const PBType PBStatus = PBType("Status",  "enc_varint", "dec_varint", WireType.varint );
+
+private import lib.asset;
+
+/****** Start defining the messages *******/
+
+class OpenRequest : RPCRequest {
+    const ProtoBufField[] _fields = [
+        ProtoBufField(1,  "reqId",    PBuInt16), // Local-link-request id
+        ProtoBufField(2,  "hashType", PBHashType), // Hash-domain to look in
+        ProtoBufField(3,  "assetId",   PBBytes), // AssetId
+        ProtoBufField(4,  "session",  PBuInt64), // SessionId to avoid loops
+        ];
+    mixin(MessageMixin(_fields));
+
+    Type typeId() { return Type.OpenRequest; }
+    mixin RPCMessage.Mixin;
+
+    BHOpenCallback callback;
+}
+
+class OpenResponse : RPCResponse {
+    const ProtoBufField[] _fields = [
+        ProtoBufField(1,  "reqId",    PBuInt16), // Local-link-request id
+        ProtoBufField(2,  "status",   PBStatus), // Status of request
+        ProtoBufField(3,  "handle",   PBuInt16), // Assigned handle
+        ProtoBufField(4,  "size",     PBuInt64), // Size of opened asset
+        ];
+    mixin(MessageMixin(_fields));
+
+    Type typeId() { return Type.OpenResponse; }
+    mixin RPCMessage.Mixin;
+}
+
+class ReadRequest : RPCRequest {
+    const ProtoBufField[] _fields = [
+        ProtoBufField(1,  "reqId",    PBuInt16), // Local-link-request id
+        ProtoBufField(2,  "handle",   PBuInt16), // Asset handle to read from
+        ProtoBufField(3,  "offset",   PBuInt64), // Requested segment start
+        ProtoBufField(4,  "size",     PBuInt32), // Requested segment length
+        ];
+    mixin(MessageMixin(_fields));
+
+    Type typeId() { return Type.ReadRequest; }
+    mixin RPCMessage.Mixin;
+
+    BHReadCallback callback;
+}
+
+class ReadResponse : RPCResponse {
+    const ProtoBufField[] _fields = [
+        ProtoBufField(1,  "reqId",    PBuInt16), // Local-link-request id
+        ProtoBufField(2,  "status",   PBStatus), // Status of request
+        ProtoBufField(3,  "offset",   PBuInt64), // Returned segment start
+        ProtoBufField(4,  "content",   PBBytes), // Returned data
+        ];
+    mixin(MessageMixin(_fields));
+
+    Type typeId() { return Type.ReadResponse; }
+    mixin RPCMessage.Mixin;
+}
+
+class Close : Message {
+    const ProtoBufField[] _fields = [
+        ProtoBufField(1,  "handle",   PBuInt16), // AssetHandle to release
+        ];
+    mixin(MessageMixin(_fields));
+
+    Type typeId() { return Type.Close; }
+    bool isResponse() { return false; }
+}

@@ -94,12 +94,12 @@ static Client client;
 extern (D) IAsset openAsset(ubyte[] objectid) {
     bool gotResponse = false;
     IAsset retval;
-    client.open(BitHordeMessage.HashType.SHA1, objectid, delegate void(IAsset asset, BHStatus status) {
+    client.open(HashType.SHA1, objectid, delegate void(IAsset asset, Status status) {
         switch (status) {
-        case BHStatus.SUCCESS:
+        case Status.SUCCESS:
             retval = fileMap[objectid.dup] = asset;
             break;
-        case BHStatus.NOTFOUND:
+        case Status.NOTFOUND:
             break;
         default:
             Stderr.format("Got unknown status from BitHorde.open: {}", status).newline;
@@ -191,9 +191,9 @@ static int bh_read(char *path, void *buf, size_t size, off_t offset,
     if (offset < asset.size) {
         if (offset + size > asset.size)
             size = asset.size - offset;
-        asset.aSyncRead(offset, size, delegate void(IAsset asset, ulong respOffset, ubyte[] data, BHStatus status) {
+        asset.aSyncRead(offset, size, delegate void(IAsset asset, ulong respOffset, ubyte[] data, Status status) {
             switch (status) {
-            case BHStatus.SUCCESS:
+            case Status.SUCCESS:
                 auto adjust = offset - respOffset;
                 if (adjust + size > data.length)
                     size = data.length - adjust;

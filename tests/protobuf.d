@@ -11,7 +11,7 @@ class Person
         ProtoBufField(5, "id", PBInt32),
         ProtoBufField(6, "name", PBString),
         ];
-    mixin(MessageMixin("Person", _fields));
+    mixin(MessageMixin(_fields));
 
     char[] toString() {
         return this.classinfo.name ~ "{\n id: "~lib.protobuf.ItoA(this.id)~"\n name: "~this.name~"\n}";

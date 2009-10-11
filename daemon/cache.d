@@ -8,10 +8,10 @@ private import tango.io.Stdout;
 
 private import daemon.client;
 private import lib.asset;
-private import lib.message;
+private import message = lib.message;
 private import lib.client;
 private import tango.core.Thread;
-alias BitHordeMessage.HashType HashType;
+alias message.HashType HashType;
 
 static ThreadLocal!(ubyte[]) tls_buf;
 static this() {
@@ -50,7 +50,7 @@ public:
         ubyte[] buf = tlsBuffer(length);
         seek(offset);
         auto got = super.read(buf);
-        cb(this, offset, buf[0..got], BHStatus.SUCCESS);
+        cb(this, offset, buf[0..got], message.Status.SUCCESS);
     }
 
     ulong size() {
@@ -68,7 +68,7 @@ public:
     this(char[] assetDir) {
         this.assetDir = assetDir;
     }
-    CachedAsset getAsset(BitHordeMessage.HashType hType, ubyte[] id) {
+    CachedAsset getAsset(HashType hType, ubyte[] id) {
         if (auto asset = id in assets) {
             assert(asset.hType == hType);
             asset.takeRef();

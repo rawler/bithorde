@@ -37,14 +37,14 @@ public:
     ulong size() {
         return backingAssets[0].size;
     }
-    void addBackingAsset(IAsset asset, BHStatus status) {
+    void addBackingAsset(IAsset asset, Status status) {
         switch (status) {
-        case BHStatus.SUCCESS:
+        case Status.SUCCESS:
             backingAssets ~= asset;
             break;
-        case BHStatus.NOTFOUND:
+        case Status.NOTFOUND:
             break;
-        case BHStatus.WOULD_LOOP:
+        case Status.WOULD_LOOP:
             break;
         }
         waitingResponses -= 1;
@@ -55,7 +55,7 @@ public:
 package:
     void doCallback() {
         router.openRequests.remove(id);
-        openCallback(this, (backingAssets.length > 0) ? BHStatus.SUCCESS : BHStatus.NOTFOUND);
+        openCallback(this, (backingAssets.length > 0) ? Status.SUCCESS : Status.NOTFOUND);
     }
 }
 
@@ -69,14 +69,14 @@ public:
         this.server = server;
     }
 
-    ForwardedAsset getAsset(BitHordeMessage.HashType hType, ubyte[] id, ulong reqid, ubyte priority, BHServerOpenCallback callback, Client origin) {
+    ForwardedAsset getAsset(HashType hType, ubyte[] id, ulong reqid, BHServerOpenCallback callback, Client origin) {
         ForwardedAsset asset;
         if (id in openRequests) {
             asset = openRequests[id];
             assert(reqid == asset.requests[0]); // TODO: Handle merging independent requests
-            callback(null, BHStatus.WOULD_LOOP);
+            callback(null, Status.WOULD_LOOP);
         } else {
-            asset = forwardOpenRequest(hType, id, reqid, priority, callback, origin);
+            asset = forwardOpenRequest(hType, id, reqid, callback, origin);
         }
         return asset;
     }
@@ -95,7 +95,7 @@ public:
         }
     }
 private:
-    ForwardedAsset forwardOpenRequest(BitHordeMessage.HashType hType, ubyte[] id, ulong reqid, ubyte priority, BHServerOpenCallback callback, Client origin) {
+    ForwardedAsset forwardOpenRequest(HashType hType, ubyte[] id, ulong reqid, BHServerOpenCallback callback, Client origin) {
         bool forwarded = false;
         auto asset = new ForwardedAsset(this, id, callback);
         asset.addRequest(reqid);

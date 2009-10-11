@@ -134,7 +134,7 @@ char[] ItoA(uint i) {
     return retval;
 }
 
-char[] MessageMixin(char[] name, ProtoBufField fields[]) {
+char[] MessageMixin(ProtoBufField fields[]) {
     char[] retval = "";
     // Declare members
     foreach (f; fields) {

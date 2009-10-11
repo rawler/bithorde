@@ -118,7 +118,7 @@ public:
         if (args.progress)
             progressLayout = new Layout!(char);
 
-        client.open(BitHordeMessage.HashType.SHA1, args.objectid, &onOpen);
+        client.open(HashType.SHA1, args.objectid, &onOpen);
     }
     ~this(){
         delete asset;
@@ -166,7 +166,7 @@ private:
         }
     }
 
-    void onRead(IAsset asset, ulong offset, ubyte[] data, BHStatus status) {
+    void onRead(IAsset asset, ulong offset, ubyte[] data, Status status) {
         assert(asset == this.asset);
         output.queue(offset, data);
         auto newoffset = offset + data.length;
@@ -185,9 +185,9 @@ private:
         }
     }
 
-    void onOpen(IAsset asset, BHStatus status) {
+    void onOpen(IAsset asset, Status status) {
         switch (status) {
-        case BHStatus.SUCCESS:
+        case Status.SUCCESS:
             if (args.verbose)
                 Stderr.format("Asset found, size is {}kB.", asset.size / 1024).newline;
             if (args.progress) {
@@ -198,7 +198,7 @@ private:
             for (uint i; i < PARALLEL_REQUESTS; i++)
                 orderData();
             break;
-        case BHStatus.NOTFOUND:
+        case Status.NOTFOUND:
             Stderr("Asset not found in BitHorde").newline;
             return exit(-1);
         default:

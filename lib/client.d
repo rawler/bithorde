@@ -42,37 +42,36 @@ ubyte[] hexToBytes(char[] hex, ubyte[] buf = null) {
     return retval;
 }
 
-alias void delegate(BitHordeMessage) BHMessageCallback;
 class RemoteAsset : IAsset {
 private:
     Client client;
-    BitHordeMessage.HashType hType;
+    message.HashType hType;
     ubyte[] id;
     uint handle;
     ubyte distance;
     ulong _size;
 protected:
-    this(Client c, BitHordeMessage req, BitHordeMessage resp) {
+    this(Client c, message.OpenRequest req, message.OpenResponse resp) {
         this.client = c;
-        this.hType = cast(BitHordeMessage.HashType)req.hashtype;
-        this.id = req.content.dup;
+        this.hType = cast(message.HashType)req.hashType;
+        this.id = req.assetId.dup;
         this.handle = resp.handle;
-        this.distance = resp.distance;
         this._size = resp.size;
     }
     ~this() {
-        auto req = client.allocRequest(BitHordeMessage.Type.CloseRequest);
+        auto req = new message.Close;
         req.handle = handle;
-        client._sendRequest(req, Variant(null));
+        client.sendMessage(req);
         client.openAssets.remove(handle);
     }
 public:
     void aSyncRead(ulong offset, uint size, BHReadCallback readCallback) {
-        auto req = client.allocRequest(BitHordeMessage.Type.ReadRequest);
+        auto req = new message.ReadRequest;
         req.handle = handle;
         req.offset = offset;
         req.size = size;
-        client._sendRequest(req, Variant(readCallback));
+        req.callback = readCallback;
+        client.sendRequest(req);
     }
 
     ulong size() {
@@ -94,47 +93,41 @@ public:
         foreach (asset; openAssets)
             delete asset;
     }
-    void open(BitHordeMessage.HashType type, ubyte[] id,
+    void open(message.HashType type, ubyte[] id,
               BHOpenCallback openCallback) {
         open(type, id, openCallback, rand.uniformR2!(ulong)(1,ulong.max));
     }
 package:
-    void open(BitHordeMessage.HashType type, ubyte[] id, BHOpenCallback openCallback, ulong reqid) {
-        auto req = allocRequest(BitHordeMessage.Type.OpenRequest);
-        req.priority = 128;
-        req.hashtype = type;
-        req.content = id;
-        req.offset = reqid;
-        _sendRequest(req, Variant(openCallback));
+    void open(message.HashType type, ubyte[] id, BHOpenCallback openCallback, ulong sessionid) {
+        auto req = new message.OpenRequest;
+        req.hashType = type;
+        req.assetId = id;
+        req.session = sessionid;
+        req.callback = openCallback;
+        sendRequest(req);
     }
 protected:
-    synchronized void processResponse(BitHordeMessage req, BitHordeMessage resp) {
-        scope (exit) callbacks[req.id].clear;
-        switch (req.type) {
-        case BitHordeMessage.Type.OpenRequest:
-            RemoteAsset asset;
-            if (cast(BHStatus)resp.status == BHStatus.SUCCESS) {
-                asset = new RemoteAsset(this, req, resp);
-                openAssets[asset.handle] = asset;
-            }
-            callbacks[req.id].get!(BHOpenCallback)()(asset, cast(BHStatus)resp.status);
-            break;
-        case BitHordeMessage.Type.ReadRequest:
-            callbacks[req.id].get!(BHReadCallback)()(openAssets[req.handle], resp.offset, resp.content, cast(BHStatus)resp.status);
-            break;
-        case BitHordeMessage.Type.CloseRequest: // CloseRequests returns nothing
-            break;
-        default:
-            Stdout("Unknown response");
+    synchronized void process(message.OpenResponse resp) {
+        auto req = cast(message.OpenRequest)resp.request;
+        RemoteAsset asset;
+        if (resp.status == message.Status.SUCCESS) {
+            asset = new RemoteAsset(this, req, resp);
+            openAssets[asset.handle] = asset;
         }
+        req.callback(asset, resp.status);
     }
-    void processRequest(BitHordeMessage req) {
+    synchronized void process(message.ReadResponse resp) {
+        auto req = cast(message.ReadRequest)resp.request;
+        scope (exit) callbacks[req.rpcId].clear;
+        req.callback(openAssets[req.handle], resp.offset, resp.content, resp.status);
+    }
+    void process(message.OpenRequest req) {
         Stdout("Danger Danger! This client should not get requests!").newline;
     }
-private:
-    synchronized void _sendRequest(BitHordeMessage req, Variant callback) {
-        assert(callbacks[req.id].isEmpty);
-        callbacks[req.id] = callback;
-        sendMessage(req);
+    void process(message.Close req) {
+        Stdout("Danger Danger! This client should not get requests!").newline;
+    }
+    void process(message.ReadRequest req) {
+        Stdout("Danger Danger! This client should not get requests!").newline;
     }
 }
