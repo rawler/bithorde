@@ -79,17 +79,17 @@ void enc_varint(T)(T i, ByteBuffer buffer) {
 }
 
 T dec_varint(T)(ref ubyte[] buf) {
-    T retval = 0;
+    T retval = cast(T)0;
     uint idx = 0;
     foreach (b; buf) {
-        retval ^= cast(uint)(b & 0b01111111) << (idx++*7);
+        retval ^= cast(T)(b & 0b01111111) << (idx++*7);
         if (!(b & 0b10000000))
         {
             buf = buf[idx .. length];
             return retval;
         }
     }
-    return 0;
+    return T.init;
 }
 
 enum WireType {
