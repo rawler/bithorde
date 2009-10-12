@@ -142,8 +142,10 @@ public:
             req.client = null; // Make sure stale requests know we're gone
     }
 protected:
-    void process(message.OpenRequest req)
+    void processOpenRequest(ubyte[] buf)
     {
+        scope auto req = new message.OpenRequest;
+        req.decode(buf);
         Stdout("Got open request, ");
         auto r = new OpenRequest(this, req.rpcId);
         ulong uuid = req.uuid;
@@ -152,8 +154,10 @@ protected:
         server.getAsset(req.hashType, req.assetId, uuid, &r.callback, this);
     }
 
-    void process(message.ReadRequest req)
+    void processReadRequest(ubyte[] buf)
     {
+        scope auto req = new message.ReadRequest;
+        req.decode(buf);
         IAsset asset;
         try {
             asset = openAssets[req.handle];
@@ -167,8 +171,10 @@ protected:
         asset.aSyncRead(req.offset, req.size, &r.callback);
     }
 
-    void process(message.Close req)
+    void processClose(ubyte[] buf)
     {
+        scope auto req = new message.Close;
+        req.decode(buf);
         Stderr.format("Client {} closing handle {}: ", this, req.handle);
         try {
             IServerAsset asset = openAssets[req.handle];

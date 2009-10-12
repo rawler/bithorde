@@ -17,7 +17,7 @@ protected:
     ByteBuffer msgbuf;
     char[] _myname, _peername;
 
-private:
+protected: // TODO: This logic should really be moved into a higher layer soon.
     message.RPCRequest[] inFlightRequests;
     Stack!(ushort,100) _freeIds;
     ushort nextid;
@@ -35,11 +35,13 @@ private:
         }
         inFlightRequests[target.rpcId] = target;
     }
-    void releaseRequest(message.RPCResponse msg) {
-        msg.request = inFlightRequests[msg.rpcId];
+    message.RPCRequest releaseRequest(message.RPCResponse msg) {
+        auto req = inFlightRequests[msg.rpcId];
+        msg.request = req;
         inFlightRequests[msg.rpcId] = null;
         if (_freeIds.unused)
-            return _freeIds.push(msg.rpcId);
+            _freeIds.push(msg.rpcId);
+        return req;
     }
 public:
     this(SocketConduit s, char[] myname)
@@ -122,31 +124,19 @@ private:
         } else {
             with (message) { switch (type) {
             case Type.OpenRequest:
-                scope auto msg = new OpenRequest;
-                msg.decode(buf[0..msglen]);
-                process(msg);
+                processOpenRequest(buf[0..msglen]);
                 break;
             case Type.OpenResponse:
-                scope auto msg = new OpenResponse;
-                msg.decode(buf[0..msglen]);
-                releaseRequest(msg);
-                process(msg);
+                processOpenResponse(buf[0..msglen]);
                 break;
             case Type.Close:
-                scope auto msg = new Close;
-                msg.decode(buf[0..msglen]);
-                process(msg);
+                processClose(buf[0..msglen]);
                 break;
             case Type.ReadRequest:
-                scope auto msg = new ReadRequest;
-                msg.decode(buf[0..msglen]);
-                process(msg);
+                processReadRequest(buf[0..msglen]);
                 break;
             case Type.ReadResponse:
-                scope auto msg = new ReadResponse;
-                msg.decode(buf[0..msglen]);
-                releaseRequest(msg);
-                process(msg);
+                processReadResponse(buf[0..msglen]);
                 break;
             default:
                 Stderr.format("Unknown message type; {}", type).newline;
@@ -154,7 +144,7 @@ private:
             return buf[msglen..length];
         }
     }
-protected:
+package:
     synchronized void sendMessage(message.Message m) {
         msgbuf.reset();
         m.encode(msgbuf);
@@ -166,9 +156,10 @@ protected:
         allocRequest(req);
         sendMessage(req);
     }
-    abstract void process(message.OpenRequest);
-    abstract void process(message.OpenResponse);
-    abstract void process(message.Close);
-    abstract void process(message.ReadRequest);
-    abstract void process(message.ReadResponse);
+protected:
+    abstract void processOpenRequest(ubyte[]);
+    abstract void processOpenResponse(ubyte[]);
+    abstract void processClose(ubyte[]);
+    abstract void processReadRequest(ubyte[]);
+    abstract void processReadResponse(ubyte[]);
 }

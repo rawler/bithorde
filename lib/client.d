@@ -107,8 +107,10 @@ package:
         sendRequest(req);
     }
 protected:
-    synchronized void process(message.OpenResponse resp) {
-        auto req = cast(message.OpenRequest)resp.request;
+    synchronized void processOpenResponse(ubyte[] buf) {
+        scope auto resp = new message.OpenResponse;
+        resp.decode(buf);
+        auto req = cast(message.OpenRequest)releaseRequest(resp);
         RemoteAsset asset;
         if (resp.status == message.Status.SUCCESS) {
             asset = new RemoteAsset(this, req, resp);
@@ -116,18 +118,20 @@ protected:
         }
         req.callback(asset, resp.status);
     }
-    synchronized void process(message.ReadResponse resp) {
-        auto req = cast(message.ReadRequest)resp.request;
+    synchronized void processReadResponse(ubyte[] buf) {
+        scope auto resp = new message.ReadResponse;
+        resp.decode(buf);
+        auto req = cast(message.ReadRequest)releaseRequest(resp);
         scope (exit) callbacks[req.rpcId].clear;
         req.callback(openAssets[req.handle], resp.offset, resp.content, resp.status);
     }
-    void process(message.OpenRequest req) {
+    void processOpenRequest(ubyte[] buf) {
         Stdout("Danger Danger! This client should not get requests!").newline;
     }
-    void process(message.Close req) {
+    void processClose(ubyte[] buf) {
         Stdout("Danger Danger! This client should not get requests!").newline;
     }
-    void process(message.ReadRequest req) {
+    void processReadRequest(ubyte[] buf) {
         Stdout("Danger Danger! This client should not get requests!").newline;
     }
 }
