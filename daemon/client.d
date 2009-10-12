@@ -146,10 +146,10 @@ protected:
     {
         Stdout("Got open request, ");
         auto r = new OpenRequest(this, req.rpcId);
-        ulong reqid = req.session;
-        if (reqid == 0)
-            reqid = rand.uniformR2!(ulong)(1,ulong.max);
-        server.getAsset(req.hashType, req.assetId, reqid, &r.callback, this);
+        ulong uuid = req.uuid;
+        if (uuid == 0)
+            uuid = rand.uniformR2!(ulong)(1,ulong.max);
+        server.getAsset(req.hashType, req.assetId, uuid, &r.callback, this);
     }
 
     void process(message.ReadRequest req)

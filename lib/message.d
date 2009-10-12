@@ -88,7 +88,7 @@ class OpenRequest : RPCRequest {
         ProtoBufField(1,  "reqId",    PBuInt16), // Local-link-request id
         ProtoBufField(2,  "hashType", PBHashType), // Hash-domain to look in
         ProtoBufField(3,  "assetId",   PBBytes), // AssetId
-        ProtoBufField(4,  "session",  PBuInt64), // SessionId to avoid loops
+        ProtoBufField(4,  "uuid",     PBuInt64), // UUID to avoid loops
         ];
     mixin(MessageMixin(_fields));
 

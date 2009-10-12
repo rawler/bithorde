@@ -98,11 +98,11 @@ public:
         open(type, id, openCallback, rand.uniformR2!(ulong)(1,ulong.max));
     }
 package:
-    void open(message.HashType type, ubyte[] id, BHOpenCallback openCallback, ulong sessionid) {
+    void open(message.HashType type, ubyte[] id, BHOpenCallback openCallback, ulong uuid) {
         auto req = new message.OpenRequest;
         req.hashType = type;
         req.assetId = id;
-        req.session = sessionid;
+        req.uuid = uuid;
         req.callback = openCallback;
         sendRequest(req);
     }
