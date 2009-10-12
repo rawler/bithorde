@@ -51,14 +51,15 @@ public:
     }
 }
 
-class OpenRequest : Request {
-    this(Client c, ushort id){
-        super(c,id);
+class OpenRequest : message.OpenRequest {
+    Client client;
+    this(Client c) {
+        client = c;
     }
     final void callback(IServerAsset asset, message.Status status) {
         if (client) {
             scope auto resp = new message.OpenResponse;
-            resp.rpcId = id;
+            resp.rpcId = rpcId;
             resp.status = status;
             switch (status) {
             case message.Status.SUCCESS:
@@ -144,14 +145,13 @@ public:
 protected:
     void processOpenRequest(ubyte[] buf)
     {
-        scope auto req = new message.OpenRequest;
+        auto req = new OpenRequest(this);
         req.decode(buf);
         Stdout("Got open request, ");
-        auto r = new OpenRequest(this, req.rpcId);
         ulong uuid = req.uuid;
         if (uuid == 0)
             uuid = rand.uniformR2!(ulong)(1,ulong.max);
-        server.getAsset(req.hashType, req.assetId, uuid, &r.callback, this);
+        server.getAsset(req.hashType, req.assetId, uuid, &req.callback, this);
     }
 
     void processReadRequest(ubyte[] buf)
