@@ -42,21 +42,20 @@ ubyte[] hexToBytes(char[] hex, ubyte[] buf = null) {
     return retval;
 }
 
-class RemoteAsset : IAsset {
+class RemoteAsset : private message.OpenResponse, IAsset {
 private:
     Client client;
-    message.HashType hType;
-    ubyte[] id;
-    uint handle;
-    ubyte distance;
-    ulong _size;
+
+    message.OpenRequest _req;
+    final message.OpenRequest openRequest() {
+        if (!_req)
+            return _req = cast(message.OpenRequest)request;
+        else
+            return _req;
+    }
 protected:
-    this(Client c, message.OpenRequest req, message.OpenResponse resp) {
+    this(Client c) {
         this.client = c;
-        this.hType = cast(message.HashType)req.hashType;
-        this.id = req.assetId.dup;
-        this.handle = resp.handle;
-        this._size = resp.size;
     }
     ~this() {
         auto req = new message.Close;
@@ -74,8 +73,15 @@ public:
         client.sendRequest(req);
     }
 
-    ulong size() {
-        return _size;
+    final ulong size() {
+        return super.size;
+    }
+    final message.HashType hashType() { return openRequest.hashType; }
+    final AssetId id() { return openRequest.assetId; }
+
+protected:
+    void doCallback() {
+        (cast(message.OpenRequest)request).callback(this, status);
     }
 }
 
@@ -108,15 +114,12 @@ package:
     }
 protected:
     synchronized void processOpenResponse(ubyte[] buf) {
-        scope auto resp = new message.OpenResponse;
+        auto resp = new RemoteAsset(this);
         resp.decode(buf);
-        auto req = cast(message.OpenRequest)releaseRequest(resp);
-        RemoteAsset asset;
-        if (resp.status == message.Status.SUCCESS) {
-            asset = new RemoteAsset(this, req, resp);
-            openAssets[asset.handle] = asset;
-        }
-        req.callback(asset, resp.status);
+        releaseRequest(resp);
+        if (resp.status == message.Status.SUCCESS)
+            openAssets[resp.handle] = resp;
+        resp.doCallback();
     }
     synchronized void processReadResponse(ubyte[] buf) {
         scope auto resp = new message.ReadResponse;

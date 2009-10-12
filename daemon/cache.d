@@ -32,13 +32,13 @@ static ubyte[] tlsBuffer(uint size) {
 class CachedAsset : public File, IServerAsset {
 protected:
     CacheManager mgr;
-    HashType hType;
-    ubyte[] id;
+    HashType _hType;
+    ubyte[] _id;
 public:
     this(CacheManager mgr, HashType hType, ubyte[] id) {
         this.mgr = mgr;
-        this.hType = hType;
-        this.id = id.dup;
+        this._hType = hType;
+        this._id = id.dup;
         super(FilePath.join(mgr.assetDir, bytesToHex(id)), File.ReadWriteExisting);
         this.mgr.assets[this.id] = this;
     }
@@ -53,9 +53,12 @@ public:
         cb(this, offset, buf[0..got], message.Status.SUCCESS);
     }
 
-    ulong size() {
+    final ulong size() {
         return super.length;
     }
+
+    final HashType hashType() { return _hType; }
+    final AssetId id() { return _id; }
 
     mixin IRefCounted.Impl;
 }
@@ -70,7 +73,7 @@ public:
     }
     CachedAsset getAsset(HashType hType, ubyte[] id) {
         if (auto asset = id in assets) {
-            assert(asset.hType == hType);
+            assert(asset.hashType == hType);
             asset.takeRef();
             return *asset;
         } else {

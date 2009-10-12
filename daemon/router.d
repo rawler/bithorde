@@ -9,17 +9,19 @@ private import lib.message;
 private class ForwardedAsset : IServerAsset {
 private:
     Router router;
-    ubyte[] id;
+    ubyte[] _id;
+    HashType _hType;
     IAsset[] backingAssets;
     BHServerOpenCallback openCallback;
 package:
     ulong[] requests;
     uint waitingResponses;
 public:
-    this (Router router, ubyte[] id, BHServerOpenCallback cb)
+    this (Router router, HashType hType, ubyte[] id, BHServerOpenCallback cb)
     {
-        this.id = id;
         this.router = router;
+        this._hType = hType;
+        this._id = id;
         this.openCallback = cb;
         this.waitingResponses = 0;
     }
@@ -28,6 +30,10 @@ public:
         foreach (asset; backingAssets)
             delete asset;
     }
+
+    final HashType hashType() { return _hType; }
+    final AssetId id() { return _id; }
+
     void addRequest(ulong reqid) {
         requests ~= reqid;
     }
@@ -97,7 +103,7 @@ public:
 private:
     ForwardedAsset forwardOpenRequest(HashType hType, ubyte[] id, ulong reqid, BHServerOpenCallback callback, Client origin) {
         bool forwarded = false;
-        auto asset = new ForwardedAsset(this, id, callback);
+        auto asset = new ForwardedAsset(this, hType, id, callback);
         asset.addRequest(reqid);
         asset.takeRef();
         foreach (friend; connectedFriends) {
