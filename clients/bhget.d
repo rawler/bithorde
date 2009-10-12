@@ -94,6 +94,7 @@ private:
     ulong orderOffset;
     int exitStatus;
     Arguments args;
+    Time startTime;
     Time lastTime;
     Time lastBwTime;
     ulong lastBwOffset;
@@ -133,8 +134,15 @@ public:
                 exit(-1);
             }
         }
-        if (args.progress)
+        if (args.progress) {
+            if (exitStatus == 0) { // Successful finish
+                lastBwOffset = 0;
+                lastBwTime = startTime;
+                lastTime = startTime;
+                updateProgress(); // Display final avg BW.
+            }
             Stderr.newline;
+        }
     }
 private:
     void exit(int exitStatus) {
@@ -191,6 +199,7 @@ private:
             if (args.verbose)
                 Stderr.format("Asset found, size is {}kB.", asset.size / 1024).newline;
             if (args.progress) {
+                startTime = Clock.now;
                 lastTime = Clock.now;
                 lastBwTime = Clock.now;
             }
