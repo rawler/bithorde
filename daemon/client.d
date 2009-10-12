@@ -35,22 +35,6 @@ interface IRefCounted {
 
 interface IServerAsset : IAsset, IRefCounted {}
 
-class Request {
-private:
-    Client client;
-    ushort id;
-public:
-    this(Client c, ushort id) {
-        this.client = c;
-        this.id = id;
-        c.inFlightRequests[id] = this;
-    }
-    ~this() {
-        if (client)
-            client.inFlightRequests.remove(id);
-    }
-}
-
 class OpenRequest : message.OpenRequest {
     Client client;
     this(Client c) {
@@ -79,38 +63,16 @@ class OpenRequest : message.OpenRequest {
     }
 }
 
-class ReadRequest : Request {
-    static ReadRequest _freeList;
-    static uint alloc, reuse;
-    ReadRequest _next;
-    new(size_t sz)
-    {
-        ReadRequest m;
-
-        if (_freeList) {
-            m = _freeList;
-            _freeList = m._next;
-            reuse++;
-        } else {
-            m = cast(ReadRequest)GC.malloc(sz);
-            alloc++;
-        }
-        return cast(void*)m;
-    }
-    delete(void * p)
-    {
-        auto m = cast(ReadRequest)p;
-        m._next = _freeList;
-        _freeList = m;
-    }
+class ReadRequest : message.ReadRequest {
+    Client client;
 public:
-    this(Client c, ushort id){
-        super(c,id);
+    this(Client c) {
+        client = c;
     }
     final void callback(IAsset asset, ulong offset, ubyte[] content, message.Status status) {
         if (client) {
             scope auto resp = new message.ReadResponse;
-            resp.rpcId = id;
+            resp.rpcId = rpcId;
             resp.content = content;
             resp.status = status;
             resp.offset = offset;
@@ -125,7 +87,6 @@ private:
     Server server;
     CacheManager cacheMgr;
     IServerAsset[uint] openAssets;
-    Request[ushort] inFlightRequests;
     Stack!(ushort, 64) freeFileHandles;
     ushort nextNewHandle;
 public:
@@ -139,8 +100,6 @@ public:
     {
         foreach (asset; openAssets)
             asset.unRef();
-        foreach (req; inFlightRequests)
-            req.client = null; // Make sure stale requests know we're gone
     }
 protected:
     void processOpenRequest(ubyte[] buf)
@@ -156,19 +115,19 @@ protected:
 
     void processReadRequest(ubyte[] buf)
     {
-        scope auto req = new message.ReadRequest;
+        auto req = new ReadRequest(this);
         req.decode(buf);
         IAsset asset;
         try {
             asset = openAssets[req.handle];
         } catch (ArrayBoundsException e) {
+            delete req;
             scope auto resp = new message.ReadResponse;
             resp.rpcId = req.rpcId;
             resp.status = message.Status.INVALID_HANDLE;
             return sendMessage(resp);
         }
-        auto r = new ReadRequest(this, req.rpcId);
-        asset.aSyncRead(req.offset, req.size, &r.callback);
+        asset.aSyncRead(req.offset, req.size, &req.callback);
     }
 
     void processClose(ubyte[] buf)
