@@ -87,7 +87,6 @@ protected:
 
 class Client : Connection {
 private:
-    Variant[100] callbacks;
     RemoteAsset[uint] openAssets;
 public:
     this (SocketConduit s, char[] name)
@@ -125,7 +124,6 @@ protected:
         scope auto resp = new message.ReadResponse;
         resp.decode(buf);
         auto req = cast(message.ReadRequest)releaseRequest(resp);
-        scope (exit) callbacks[req.rpcId].clear;
         req.callback(openAssets[req.handle], resp.offset, resp.content, resp.status);
     }
     void processOpenRequest(ubyte[] buf) {
