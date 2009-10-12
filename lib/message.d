@@ -19,15 +19,13 @@ enum Type
 public abstract class Message : ProtoBufMessage {
 private:
     static Stack!(void*, 100) _freeList;
-    new(size_t sz)
-    {
+    new(size_t sz) {
         if (_freeList.size)
             return _freeList.pop();
         else
             return GC.malloc(128);
     }
-    delete(void * p)
-    {
+    delete(void * p) {
         if (_freeList.unused)
             _freeList.push(p);
         else
@@ -35,8 +33,6 @@ private:
     }
 protected:
 public:
-    abstract ubyte[] encode(ByteBuffer buf = new ByteBuffer);
-    abstract void decode(ubyte[] buf);
     abstract Type typeId();
     abstract bool isResponse();
 }
