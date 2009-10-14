@@ -42,7 +42,7 @@ public:
     this(Config config)
     {
         // Setup basics
-        this.name = name;
+        this.name = config.name;
 
         // Setup selector
         this.selector = new Selector;
