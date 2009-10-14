@@ -85,16 +85,24 @@ public:
     }
 private:
     void sayHello() {
-        auto buf = new ByteBuffer;
-        enc_wt_ld!(char[])(_myname, buf);
-        socket.write(buf.data);
+        scope auto handshake = new message.HandShake;
+        handshake.name = _myname;
+        handshake.protoversion = 1;
+        sendMessage(handshake);
     }
     void expectHello() {
         int read = socket.read(frontbuf);
         auto left = frontbuf[0..read];
-        auto id = dec_wt_ld!(char[])(left);
-        _peername = id.dup;
-        swapBufs(left);
+        auto id = dec_varint!(ubyte)(left);
+        assert(id == (message.Type.HandShake<<3 | 0b0010));
+        auto length = dec_varint!(ushort)(left);
+        assert(length > 0);
+        assert(left.length >= length);
+        scope auto handshake = new message.HandShake;
+        handshake.decode(left[0..length]);
+        _peername = handshake.name.dup;
+        assert(handshake.protoversion == 1);
+        swapBufs(left[length..left.length]);
     }
     void swapBufs(ubyte[] left) {
         remainder = left.length;
@@ -123,6 +131,9 @@ private:
             return data; // Not enough data in buffer
         } else {
             with (message) { switch (type) {
+            case Type.HandShake:
+                Stderr("Error: HandShake recieved after initialization").newline;
+                break;
             case Type.OpenRequest:
                 processOpenRequest(buf[0..msglen]);
                 break;

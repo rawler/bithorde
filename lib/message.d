@@ -9,6 +9,7 @@ private import lib.protobuf;
 
 enum Type
 {
+    HandShake = 1,
     OpenRequest = 2,
     OpenResponse = 3,
     Close = 4,
@@ -75,6 +76,15 @@ const PBType PBStatus = PBType("Status",  "enc_varint", "dec_varint", WireType.v
 private import lib.asset;
 
 /****** Start defining the messages *******/
+
+class HandShake : Message {
+    const ProtoBufField[] _fields = [
+        ProtoBufField(1,  "name",     PBString), // Name of the other side
+        ProtoBufField(2,  "protoversion",  PBuInt8),  // Version of the protocol this client supports
+        ];
+    mixin(MessageMixin(_fields));
+    Type typeId() { return Type.HandShake; }
+}
 
 class OpenRequest : RPCRequest {
     const ProtoBufField[] _fields = [
