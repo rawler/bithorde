@@ -34,7 +34,6 @@ private:
 protected:
 public:
     abstract Type typeId();
-    abstract bool isResponse();
 }
 
 abstract class RPCMessage : Message {
@@ -47,11 +46,9 @@ abstract class RPCMessage : Message {
 }
 
 abstract class RPCRequest : RPCMessage {
-    final bool isResponse() { return false; }
 }
 
 abstract class RPCResponse : RPCMessage {
-    final bool isResponse() { return true; }
     RPCRequest request;
     ~this() {
         if (request)
@@ -142,5 +139,4 @@ class Close : Message {
     mixin(MessageMixin(_fields));
 
     Type typeId() { return Type.Close; }
-    bool isResponse() { return false; }
 }
