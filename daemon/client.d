@@ -63,6 +63,30 @@ class OpenRequest : message.OpenRequest {
     }
 }
 
+class UploadRequest : message.UploadRequest {
+    Client client;
+    this(Client c) {
+        client = c;
+    }
+    final void callback(IServerAsset asset, message.Status status) {
+        if (client) {
+            scope auto resp = new message.OpenResponse;
+            resp.rpcId = rpcId;
+            resp.status = status;
+            switch (status) {
+            case message.Status.SUCCESS:
+                auto handle = client.allocateFreeHandle;
+                client.openAssets[handle] = asset;
+                resp.handle = handle;
+                break;
+            // TODO: And else?
+            }
+            client.sendMessage(resp);
+        }
+        delete this;
+    }
+}
+
 class ReadRequest : message.ReadRequest {
     Client client;
 public:
@@ -113,6 +137,18 @@ protected:
         server.getAsset(req.hashType, req.assetId, uuid, &req.callback, this);
     }
 
+    void processUploadRequest(ubyte[] buf)
+    {
+        if (!isTrusted) {
+            Stdout("Got UploadRequest from unauthorized client", this).newline;
+            return;
+        }
+        auto req = new UploadRequest(this);
+        req.decode(buf);
+        Stdout("Got UploadRequest from trusted client").newline;
+        server.uploadAsset(req);
+    }
+
     void processReadRequest(ubyte[] buf)
     {
         auto req = new ReadRequest(this);
@@ -128,6 +164,20 @@ protected:
             return sendMessage(resp);
         }
         asset.aSyncRead(req.offset, req.size, &req.callback);
+    }
+
+    void processDataSegment(ubyte[] buf) {
+        scope auto req = new message.DataSegment();
+        req.decode(buf);
+        try {
+            auto asset = cast(CachedAsset)openAssets[req.handle];
+            if (asset)
+                asset.add(req.offset, req.content);
+            else
+                Stderr("Asset is not in cache").newline;
+        } catch (ArrayBoundsException e) {
+            Stderr("[INVALID_HANDLE]").newline;
+        }
     }
 
     void processClose(ubyte[] buf)

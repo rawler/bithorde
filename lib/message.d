@@ -15,6 +15,8 @@ enum Type
     Close = 4,
     ReadRequest = 5,
     ReadResponse = 6,
+    UploadRequest = 7,
+    DataSegment = 8,
 }
 
 public abstract class Message : ProtoBufMessage {
@@ -76,6 +78,14 @@ const PBType PBStatus = PBType("Status",  "enc_varint", "dec_varint", WireType.v
 private import lib.asset;
 
 /****** Start defining the messages *******/
+class Identifier : ProtoBufMessage {
+    const ProtoBufField[] _fields = [
+        ProtoBufField(1,  "type",          PBHashType), // Name of the other side
+        ProtoBufField(2,  "id",            PBBytes),  // Version of the protocol this client supports
+        ];
+    mixin(MessageMixin(_fields));
+}
+const PBType PBIdentifiers = PBType("Identifier[]", "enc_pb_message_repeated", "dec_pb_message_repeated", WireType.length_delim);
 
 class HandShake : Message {
     const ProtoBufField[] _fields = [
@@ -86,7 +96,11 @@ class HandShake : Message {
     Type typeId() { return Type.HandShake; }
 }
 
-class OpenRequest : RPCRequest {
+package class OpenOrUploadRequest : RPCRequest {
+    BHOpenCallback callback;
+}
+
+class OpenRequest : OpenOrUploadRequest {
     const ProtoBufField[] _fields = [
         ProtoBufField(1,  "reqId",    PBuInt16), // Local-link-request id
         ProtoBufField(2,  "hashType", PBHashType), // Hash-domain to look in
@@ -97,8 +111,17 @@ class OpenRequest : RPCRequest {
 
     Type typeId() { return Type.OpenRequest; }
     mixin RPCMessage.Mixin;
+}
 
-    BHOpenCallback callback;
+class UploadRequest : OpenOrUploadRequest {
+    const ProtoBufField[] _fields = [
+        ProtoBufField(1,  "reqId",    PBuInt16), // Local-link-request id
+        ProtoBufField(2,  "size",     PBuInt64), // Size of opened asset
+        ];
+    mixin(MessageMixin(_fields));
+
+    Type typeId() { return Type.UploadRequest; }
+    mixin RPCMessage.Mixin;
 }
 
 class OpenResponse : RPCResponse {
@@ -140,6 +163,17 @@ class ReadResponse : RPCResponse {
 
     Type typeId() { return Type.ReadResponse; }
     mixin RPCMessage.Mixin;
+}
+
+class DataSegment : Message {
+    const ProtoBufField[] _fields = [
+        ProtoBufField(1,  "handle",   PBuInt16), // Asset handle for the data
+        ProtoBufField(2,  "offset",   PBuInt64), // Content start offset
+        ProtoBufField(3,  "content",   PBBytes), // Content to write
+        ];
+    mixin(MessageMixin(_fields));
+
+    Type typeId() { return Type.DataSegment; }
 }
 
 class Close : Message {

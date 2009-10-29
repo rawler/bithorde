@@ -73,6 +73,14 @@ public:
         client.sendRequest(req);
     }
 
+    void sendDataSegment(ulong offset, ubyte[] data) {
+        auto msg = new message.DataSegment;
+        msg.handle = handle;
+        msg.offset = offset;
+        msg.content = data;
+        client.sendMessage(msg);
+    }
+
     final ulong size() {
         return super.size;
     }
@@ -81,7 +89,7 @@ public:
 
 protected:
     void doCallback() {
-        (cast(message.OpenRequest)request).callback(this, status);
+        (cast(message.OpenOrUploadRequest)request).callback(this, status);
     }
 }
 
@@ -101,6 +109,12 @@ public:
     void open(message.HashType type, ubyte[] id,
               BHOpenCallback openCallback) {
         open(type, id, openCallback, rand.uniformR2!(ulong)(1,ulong.max));
+    }
+    void beginUpload(ulong size, BHOpenCallback cb) {
+        auto req = new message.UploadRequest;
+        req.size = size;
+        req.callback = cb;
+        sendRequest(req);
     }
 package:
     void open(message.HashType type, ubyte[] id, BHOpenCallback openCallback, ulong uuid) {
@@ -134,5 +148,11 @@ protected:
     }
     void processReadRequest(ubyte[] buf) {
         Stdout("Danger Danger! This client should not get requests!").newline;
+    }
+    void processUploadRequest(ubyte[] buf) {
+        Stdout("Danger Danger! This client should not get requests!").newline;
+    }
+    void processDataSegment(ubyte[] buf) {
+        Stdout("Danger Danger! This client should not get segment data!").newline;
     }
 }

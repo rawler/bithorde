@@ -6,8 +6,10 @@ private import tango.io.device.File;
 private import tango.io.device.FileMap;
 private import tango.io.FilePath;
 private import tango.io.Stdout;
+private import tango.math.random.Random;
 
 private import daemon.client;
+private import daemon.hashes;
 private import lib.asset;
 private import message = lib.message;
 private import lib.client;
@@ -55,12 +57,14 @@ private:
     Segment[] segments;
     uint segcount;
     MappedFile file;
+    FilePath path;
     void ensureIdxAvail(uint length) {
         if (length > segments.length)
             segments = cast(Segment[])file.resize(Segment.sizeof * length);
     }
 public:
     this(FilePath path) {
+        this.path = path;
         file = new MappedFile(path.toString, File.ReadWriteCreate);
         if (file.length)
             segments = cast(Segment[])file.map();
@@ -68,6 +72,15 @@ public:
             segments = cast(Segment[])file.resize(Segment.sizeof * 16);
         for (; !segments[segcount].isEmpty; segcount++) {}
     }
+
+    ~this() {
+        if (file)
+            file.close();
+    }
+
+    /**
+     * Check if a segment is covered by the cache.
+     */
     bool has(ulong start, uint length) {
         auto end = start+length;
         uint i;
@@ -77,6 +90,10 @@ public:
         else
             return (start>=segments[i].start) && (end<=segments[i].end);
     }
+
+    /**
+     * Add a segment to the cachemap
+     */
     void add(ulong start, uint length) {
         // Original new segment
         auto onew = Segment(start, start + length);
@@ -123,7 +140,20 @@ public:
             for (;shift; shift--)
                 segments[i++] = Segment.init;
         }
+    }
+
+    void flush() {
         file.flush();
+    }
+
+    /**
+     * Returns the size of any block starting at offset 0, or 0, if no such block exists
+     */
+    ulong zeroBlockSize() {
+        if (segments[0].start == 0)
+            return segments[0].end;
+        else
+            return 0;
     }
 
     unittest {
@@ -135,7 +165,7 @@ public:
         cleanup();
         scope(exit) cleanup();
 
-        auto map = new CacheMap(path);
+        auto map = new CacheMap(path.toString);
         map.add(0,15);
         assert(map.segments[0].start == 0);
         assert(map.segments[0].end == 15);
@@ -185,22 +215,22 @@ public:
 class CachedAsset : public File, IServerAsset {
 protected:
     CacheManager mgr;
-    HashType _hType;
     ubyte[] _id;
     CacheMap cacheMap;
 public:
-    this(CacheManager mgr, HashType hType, ubyte[] id) {
+    this(CacheManager mgr, ubyte[] id) {
         this.mgr = mgr;
-        this._hType = hType;
         this._id = id.dup;
-        super(FilePath.join(mgr.assetDir, bytesToHex(id)), File.ReadWriteExisting);
+        super(mgr.uploadPath.dup.append(bytesToHex(id)).toString, File.ReadWriteCreate);
         this.mgr.assets[this.id] = this;
     }
     ~this() {
+        if (cacheMap)
+            delete cacheMap;
         mgr.assets.remove(id);
     }
 
-    void aSyncRead(ulong offset, uint length, BHReadCallback cb) {
+    synchronized void aSyncRead(ulong offset, uint length, BHReadCallback cb) {
         if (cacheMap && !cacheMap.has(offset, length))
             throw new MissingSegmentException("Missing given segment");
         ubyte[] buf = tlsBuffer(length);
@@ -209,23 +239,86 @@ public:
         cb(this, offset, buf[0..got], message.Status.SUCCESS);
     }
 
+    synchronized void add(ulong offset, ubyte[] data) {
+        if (!cacheMap)
+            throw new IOException("Trying to write to a completed file");
+        seek(offset);
+        write(data);
+        cacheMap.add(offset, data.length);
+    }
+
     final ulong size() {
         return super.length;
     }
 
-    final HashType hashType() { return _hType; }
+    final HashType hashType() { return HashType.init; } // TODO: Change API to support multi-hash
     final AssetId id() { return _id; }
 
     mixin IRefCounted.Impl;
+}
+
+class UploadAsset : public CachedAsset {
+private:
+    Hash[char[]] hashes;
+    uint hashingptr;
+public:
+    this(CacheManager mgr, ulong size)
+    in { assert(size > 0); }
+    body{
+        scope auto tempId = new ubyte[32];
+        rand.randomizeUniform!(ubyte[],false)(tempId);
+        super(mgr, tempId);
+        cacheMap = new CacheMap(mgr.uploadPath.dup.append(bytesToHex(tempId)).suffix("idx"));
+        truncate(size);
+        foreach (k,factory; HashMap)
+            hashes[k] = factory();
+    }
+    synchronized void add(ulong offset, ubyte[] data) {
+        super.add(offset, data);
+        auto zeroBlockSize = cacheMap.zeroBlockSize;
+        if (zeroBlockSize > hashingptr) {
+            scope auto newdata = new ubyte[zeroBlockSize - hashingptr];
+            seek(hashingptr);
+            auto read = read(newdata);
+            assert(read == newdata.length);
+            foreach (hash; hashes) {
+                hash.update(newdata);
+            }
+            if (zeroBlockSize == length)
+                finish();
+            else
+                hashingptr = zeroBlockSize;
+        }
+    }
+private:
+    void finish() {
+        assert(cacheMap.segcount == 1);
+        assert(cacheMap.segments[0].start == 0);
+        assert(cacheMap.segments[0].end == length);
+        foreach (hash; hashes) {
+            Stderr.format("Hash {}: {}", hash.name, hash.hexDigest).newline;
+        }
+        cacheMap.path.remove();
+        delete cacheMap;
+    }
 }
 
 class CacheManager {
 protected:
     char[] assetDir;
     CachedAsset[ubyte[]] assets;
+    FilePath uploadPath;
 public:
     this(char[] assetDir) {
         this.assetDir = assetDir;
+        uploadPath = new FilePath(FilePath.join(assetDir, "upload"));
+        if (!uploadPath.exists)
+            uploadPath.createFolder();
+        foreach (k,v; HashMap) {
+            scope auto fp = new FilePath(FilePath.join(assetDir, k));
+            if (!fp.exists)
+                fp.createFolder();
+        }
     }
     CachedAsset getAsset(HashType hType, ubyte[] id) {
         if (auto asset = id in assets) {
@@ -234,12 +327,23 @@ public:
             return *asset;
         } else {
             try {
-                auto newAsset = new CachedAsset(this, hType, id);
+                auto newAsset = new CachedAsset(this, id);
                 newAsset.takeRef();
                 return newAsset;
             } catch (IOException e) {
+                Stderr("While opening asset", e).newline;
                 return null;
             }
+        }
+    }
+    UploadAsset uploadAsset(UploadRequest req) {
+        try {
+            auto newAsset = new UploadAsset(this, req.size);
+            newAsset.takeRef();
+            return newAsset;
+        } catch (IOException e) {
+            Stderr("While opening asset", e).newline;
+            return null;
         }
     }
 }

@@ -25,6 +25,10 @@ message Open {
     required HashType hashType = 2;
     required bytes assetId = 3;
   }
+  message Upload {
+    required uint32 reqId = 1;
+    required uint64 size = 2;
+  }
   message Response {
     required uint32 reqId = 1;
     required Status status = 2;
@@ -48,10 +52,18 @@ message Read {
   }
 }
 
+message DataSegment {
+    const ProtoBufField[] _fields = [
+    required uint32 handle = 1;   // Asset handle for the data
+    required uint64 offset = 2;   // Content start offset
+    required bytes content = 3;   // Content to write
+}
+
 message Close {
   required uint32 handle = 1;     // Handle to asset, 0 means failure
 }
 
+// Dummy message to document the stream itself. Makes no sense as a message or object.
 message Stream
 {
   required HandShake handshake   = 1;
@@ -60,5 +72,6 @@ message Stream
   repeated Close close           = 4;
   repeated Read.Request readReq  = 5;
   repeated Read.Response readRes = 6;
-
+  repeated Open.Upload uploadReq = 7;
+  repeated DataSegment dataSeg   = 8;
 }

@@ -102,6 +102,12 @@ public:
         }
         return asset;
     }
+
+    IServerAsset uploadAsset(UploadRequest req) {
+        auto asset = cacheMgr.uploadAsset(req);
+        req.callback(asset, message.Status.SUCCESS);
+        return asset;
+    }
 private:
     void onClientConnect(SocketConduit s)
     {

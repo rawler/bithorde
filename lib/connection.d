@@ -83,6 +83,9 @@ public:
     char[] toString() {
         return peername;
     }
+    bool isTrusted() {
+        return socket.socket.remoteAddress.addressFamily == AddressFamily.UNIX;
+    }
 private:
     void sayHello() {
         scope auto handshake = new message.HandShake;
@@ -137,6 +140,9 @@ private:
             case Type.OpenRequest:
                 processOpenRequest(buf[0..msglen]);
                 break;
+            case Type.UploadRequest:
+                processUploadRequest(buf[0..msglen]);
+                break;
             case Type.OpenResponse:
                 processOpenResponse(buf[0..msglen]);
                 break;
@@ -148,6 +154,9 @@ private:
                 break;
             case Type.ReadResponse:
                 processReadResponse(buf[0..msglen]);
+                break;
+            case Type.DataSegment:
+                processDataSegment(buf[0..msglen]);
                 break;
             default:
                 Stderr.format("Unknown message type; {}", type).newline;
@@ -169,8 +178,10 @@ package:
     }
 protected:
     abstract void processOpenRequest(ubyte[]);
+    abstract void processUploadRequest(ubyte[]);
     abstract void processOpenResponse(ubyte[]);
     abstract void processClose(ubyte[]);
     abstract void processReadRequest(ubyte[]);
     abstract void processReadResponse(ubyte[]);
+    abstract void processDataSegment(ubyte[]);
 }
