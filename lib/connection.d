@@ -17,7 +17,7 @@ protected:
     ByteBuffer msgbuf;
     char[] _myname, _peername;
 
-protected: // TODO: This logic should really be moved into a higher layer soon.
+protected: // TODO: This logic should really be moved into lib/Client layer soon.
     message.RPCRequest[] inFlightRequests;
     Stack!(ushort,100) _freeIds;
     ushort nextid;
@@ -96,9 +96,9 @@ private:
     void expectHello() {
         int read = socket.read(frontbuf);
         auto left = frontbuf[0..read];
-        auto id = dec_varint!(ubyte)(left);
+        auto id = decode_val!(ubyte)(left);
         assert(id == (message.Type.HandShake<<3 | 0b0010));
-        auto length = dec_varint!(ushort)(left);
+        auto length = decode_val!(ushort)(left);
         assert(length > 0);
         assert(left.length >= length);
         scope auto handshake = new message.HandShake;
@@ -122,14 +122,14 @@ private:
     ubyte[] decodeMessage(ubyte[] data)
     {
         auto buf = data;
-        auto type = dec_varint!(message.Type)(buf);
+        auto type = decode_val!(message.Type)(buf);
         if (buf == data) {
             return data;
         } else {
             assert((type & 0b0000_0111) == 0b0010);
             type >>= 3;
         }
-        uint msglen = dec_varint!(uint)(buf);
+        uint msglen = decode_val!(uint)(buf);
         if (buf == data || buf.length < msglen) {
             return data; // Not enough data in buffer
         } else {
@@ -168,8 +168,8 @@ package:
     synchronized void sendMessage(message.Message m) {
         msgbuf.reset();
         m.encode(msgbuf);
-        enc_varint!(uint)(msgbuf.length, msgbuf);
-        enc_varint!(ushort)((m.typeId << 3) | 0b0000_0010, msgbuf);
+        encode_val!(uint)(msgbuf.length, msgbuf);
+        encode_val!(ushort)((m.typeId << 3) | 0b0000_0010, msgbuf);
         socket.write(msgbuf.data);
     }
     synchronized void sendRequest(message.RPCRequest req) {

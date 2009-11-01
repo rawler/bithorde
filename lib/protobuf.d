@@ -44,14 +44,15 @@ public:
 }
 alias PBuffer!(ubyte) ByteBuffer;
 
-void enc_wt_ld(T)(T value, ByteBuffer buf) {
+void encode_val(T : ubyte[])(T value, ByteBuffer buf) {
     buf.prepend(cast(ubyte[])value);
-    enc_varint(value.length, buf);
+    encode_val(value.length, buf);
 }
 
-T dec_wt_ld(T)(ref ubyte[] buf) {
-    auto vlen = dec_varint!(uint)(buf);
-    T retval = cast(T)buf[0 .. vlen];
+T decode_val(T : ubyte[])(ref ubyte[] buf) {
+    uint vlen = decode_val!(uint)(buf);
+    assert(buf.length >= vlen);
+    auto retval = cast(T)buf[0 .. vlen];
     buf = buf[vlen .. length];
     return retval;
 }
@@ -61,7 +62,7 @@ interface ProtoBufMessage {
     void decode(ubyte[] buf);
 }
 
-void enc_varint(T)(T i, ByteBuffer buffer) {
+void encode_val(T : long)(T i, ByteBuffer buffer) {
     auto maxbits = 0;
     auto x = i;
     while (x) {
@@ -78,7 +79,7 @@ void enc_varint(T)(T i, ByteBuffer buffer) {
     buffer.charge(encbytes);
 }
 
-T dec_varint(T)(ref ubyte[] buf) {
+T decode_val(T : long)(ref ubyte[] buf) {
     T retval = cast(T)0;
     uint idx = 0;
     foreach (b; buf) {
@@ -92,6 +93,7 @@ T dec_varint(T)(ref ubyte[] buf) {
     return T.init;
 }
 
+///// Basic Types /////
 enum WireType {
     varint = 0,
     fixed64 = 1,
@@ -99,29 +101,13 @@ enum WireType {
     fixed32 = 5,
 }
 
-struct PBType {
-    char[] dtype;
-    char[] enc_func;
-    char[] dec_func;
-    WireType wtype;
-};
-
-const PBType PBInt8   = PBType("byte",    "enc_varint", "dec_varint", WireType.varint );
-const PBType PBuInt8  = PBType("ubyte",   "enc_varint", "dec_varint", WireType.varint );
-const PBType PBInt16  = PBType("short",   "enc_varint", "dec_varint", WireType.varint );
-const PBType PBuInt16 = PBType("ushort",  "enc_varint", "dec_varint", WireType.varint );
-const PBType PBInt32  = PBType("int",     "enc_varint", "dec_varint", WireType.varint );
-const PBType PBuInt32 = PBType("uint",    "enc_varint", "dec_varint", WireType.varint );
-const PBType PBInt64  = PBType("long",    "enc_varint", "dec_varint", WireType.varint );
-const PBType PBuInt64 = PBType("ulong",   "enc_varint", "dec_varint", WireType.varint );
-const PBType PBBool   = PBType("bool",    "enc_varint", "dec_varint", WireType.varint );
-const PBType PBString = PBType("char[]",  "enc_wt_ld" , "dec_wt_ld" , WireType.length_delim );
-const PBType PBBytes  = PBType("ubyte[]", "enc_wt_ld" , "dec_wt_ld" , WireType.length_delim );
-
-struct ProtoBufField {
-    uint id;
-    char[] name;
-    PBType type;
+struct PBField(char[] _name, uint _id) {
+    char[] name = _name;
+    uint id = _id;
+    static if ( is( typeof(mixin(_name)) : int) )
+        WireType wType = WireType.varint;
+    else
+        WireType wType = WireType.length_delim;
 };
 
 char[] ItoA(uint i) {
@@ -134,29 +120,65 @@ char[] ItoA(uint i) {
     return retval;
 }
 
-char[] MessageMixin(ProtoBufField fields[]) {
-    char[] retval = "";
-    // Declare members
-    foreach (f; fields) {
-        retval ~= f.type.dtype ~ " " ~ f.name ~ ";\n";
+public {
+    void write(T:int)(uint descriptor, T value, ByteBuffer buf) {
+        encode_val(value, buf);
+        encode_val(descriptor, buf);
+    }
+    void write(T:ubyte[])(uint descriptor, T value, ByteBuffer buf) {
+        encode_val(value, buf);
+        encode_val(descriptor, buf);
+    }
+    void write(T:ProtoBufMessage)(uint descriptor, T value, ByteBuffer buf) {
+        auto start = buf.length;
+        value.encode(buf);  // Encode the message to the buffer
+        encode_val(buf.length - start, buf); // Write the length of the message to the buffer
+        encode_val(descriptor, buf);
+    }
+    void write(T:ProtoBufMessage)(uint descriptor, T[] values, ByteBuffer buf) {
+        foreach_reverse(value; values)
+            write(descriptor, value, buf);
     }
 
-    // Create encode-function
-    retval ~= "final ubyte[] encode(ByteBuffer buf = new ByteBuffer) { \n";
-    foreach (f; fields) {
-        retval ~= " " ~ f.type.enc_func ~ "!(" ~ f.type.dtype ~ ")(this." ~ f.name ~ ", buf);\n";
-        retval ~= " enc_varint!(uint)(" ~ lib.protobuf.ItoA((f.id<<3)|cast(uint)f.type.wtype) ~ ", buf);\n";
+    void read(T:int)(ref T member, ref ubyte[] buf) {
+        member = decode_val!(T)(buf);
     }
-    retval ~= " return buf.data;\n}\n";
-
-    // Create decode-function
-    retval ~= "final void decode(ubyte[] buf) {\n";
-    retval ~= " while (buf.length > 0) {\n  switch (dec_varint!(uint)(buf)) {\n";
-    foreach (f; fields) {
-        retval ~= "   case " ~ lib.protobuf.ItoA((f.id<<3)|cast(uint)f.type.wtype) ~ ": ";
-        retval ~= "    this." ~ f.name ~ "=" ~ f.type.dec_func ~"!(" ~ f.type.dtype ~ ")(buf); break;\n";
+    void read(T:ubyte[])(ref T member, ref ubyte[] buf) {
+        member = decode_val!(T)(buf);
     }
-    retval ~= "  }\n }\n \n}";
+    void read(T:ProtoBufMessage)(ref T member, ref ubyte[] buf) {
+        member = new T;
+        auto msglen = decode_val!(uint)(buf);
+        member.decode(buf[0..msglen]);
+        buf = buf[msglen..length];
+    }
+    void read(T:ProtoBufMessage)(ref T[] members, ref ubyte[] buf) {
+        auto t = new T;
+        auto msglen = decode_val!(uint)(buf);
+        t.decode(buf[0..msglen]);
+        members ~= t;
+        buf = buf[msglen..length];
+    }
+}
 
-    return retval;
+template MessageMixin(fields...) {
+    final ubyte[] encode(ByteBuffer buf = new ByteBuffer) {
+        foreach_reverse (int i, f; fields)
+            write((fields[i].id<<3) | fields[i].wType,
+                  mixin("this."~fields[i].name), buf);
+        return buf.data;
+    }
+
+    final void decode(ubyte[] buf) {
+        while (buf.length > 0) {
+            auto descriptor = decode_val!(uint)(buf);
+            switch (descriptor) {
+                foreach (int i, f; fields) {
+                    case (fields[i].id<<3)|fields[i].wType:
+                        read(mixin("this."~fields[i].name), buf);
+                        break;
+                }
+            }
+        }
+    }
 }
