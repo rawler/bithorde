@@ -80,7 +80,7 @@ public:
         Address addr = new LocalAddress(args.sockPath);
         auto socket = new SocketConduit(addr.addressFamily, SocketType.STREAM, ProtocolType.IP);
         socket.connect(addr);
-        client = new Client(socket, "bhget");
+        client = new Client(socket, "bhupload");
 
         doRun = true;
         file = new File(args.file.toString);
@@ -190,7 +190,7 @@ int main(char[][] args)
     } catch (IllegalArgumentException e) {
         if (e.msg)
             Stderr(e.msg).newline;
-        Stderr.format("Usage: {} [--verbose|-v] [--progress|-P] [--unixsocket|-u=<socket path>] <file>", args[0]);
+        Stderr.format("Usage: {} [--verbose|-v] [--progress|-P] [--unixsocket|-u=<socket path>] <file>", args[0]).newline;
         return -1;
     }
     scope auto b = new BHUpload(arguments);
