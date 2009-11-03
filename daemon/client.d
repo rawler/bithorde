@@ -134,7 +134,7 @@ protected:
         ulong uuid = req.uuid;
         if (uuid == 0)
             uuid = rand.uniformR2!(ulong)(1,ulong.max);
-        server.getAsset(req.hashType, req.assetId, uuid, &req.callback, this);
+        server.findAsset(req, this);
     }
 
     void processUploadRequest(ubyte[] buf)

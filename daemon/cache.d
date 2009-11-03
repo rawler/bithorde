@@ -381,16 +381,21 @@ public:
         if (idMapPath.exists)
             loadIdMap();
     }
-    CachedAsset getAsset(HashType hType, ubyte[] hashId) {
-        if (!(hashId in hashIdMap[hType])) {
-            Stderr("Unknown asset", hType, bytesToHex(hashId));
+    CachedAsset findAsset(daemon.client.OpenRequest req) {
+        ubyte[] localId;
+        foreach (id; req.ids) {
+            if (id.id in hashIdMap[id.type]) {
+                auto assetMeta = hashIdMap[id.type][id.id];
+                localId = assetMeta.localId;
+                break;
+            }
+        }
+        if (!localId) {
+            Stderr("Cache: Unknown asset");
             return null;
         }
-        auto assetMeta = hashIdMap[hType][hashId];
-        auto localId = assetMeta.localId;
 
         if (auto asset = localId in openAssets) {
-            assert(asset.hashType == hType);
             asset.takeRef();
             return *asset;
         } else {

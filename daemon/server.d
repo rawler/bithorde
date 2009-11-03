@@ -24,7 +24,7 @@ private import lib.asset;
 private import message = lib.message;
 
 interface IAssetSource {
-    IServerAsset getAsset(message.HashType hType, ubyte[] id, ulong reqid, BHServerOpenCallback callback, Client origin);
+    IServerAsset findAsset(OpenRequest req, Client origin);
 }
 
 class Server : IAssetSource
@@ -91,14 +91,14 @@ public:
         }
     }
 
-    IServerAsset getAsset(message.HashType hType, ubyte[] id, ulong reqid, BHServerOpenCallback callback, Client origin) {
-        IServerAsset asset = cacheMgr.getAsset(hType, id);
+    IServerAsset findAsset(OpenRequest req, Client origin) {
+        IServerAsset asset = cacheMgr.findAsset(req);
         if (asset) {
             Stdout("serving from cache").newline;
-            callback(asset, message.Status.SUCCESS);
+            req.callback(asset, message.Status.SUCCESS);
         } else {
             Stdout("forwarding...").newline;
-            asset = router.getAsset(hType, id, reqid, callback, origin);
+            asset = router.findAsset(req, origin);
         }
         return asset;
     }

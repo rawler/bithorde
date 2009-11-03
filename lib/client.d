@@ -91,8 +91,6 @@ public:
     final ulong size() {
         return super.size;
     }
-    final message.HashType hashType() { return openRequest.hashType; }
-    final AssetId id() { return openRequest.assetId; }
 }
 
 class Client : Connection {
@@ -108,9 +106,9 @@ public:
         foreach (asset; openAssets)
             delete asset;
     }
-    void open(message.HashType type, ubyte[] id,
+    void open(message.Identifier[] ids,
               BHOpenCallback openCallback) {
-        open(type, id, openCallback, rand.uniformR2!(ulong)(1,ulong.max));
+        open(ids, openCallback, rand.uniformR2!(ulong)(1,ulong.max));
     }
     void beginUpload(ulong size, BHOpenCallback cb) {
         auto req = new message.UploadRequest;
@@ -119,10 +117,9 @@ public:
         sendRequest(req);
     }
 package:
-    void open(message.HashType type, ubyte[] id, BHOpenCallback openCallback, ulong uuid) {
+    void open(message.Identifier[] ids, BHOpenCallback openCallback, ulong uuid) {
         auto req = new message.OpenRequest;
-        req.hashType = type;
-        req.assetId = id;
+        req.ids = ids;
         req.uuid = uuid;
         req.callback = openCallback;
         sendRequest(req);

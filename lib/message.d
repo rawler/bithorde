@@ -94,14 +94,12 @@ package class OpenOrUploadRequest : RPCRequest {
 }
 
 class OpenRequest : OpenOrUploadRequest {
-    HashType hashType; // Hash-domain to look in
-    ubyte[] assetId;   // AssetId
+    Identifier ids[];  // Asset-Id:s to look for
     ulong uuid;        // UUID to avoid loops
 
     mixin MessageMixin!(PBField!("rpcId",    1)(),
-                        PBField!("hashType", 2)(),
-                        PBField!("assetId",  3)(),
-                        PBField!("uuid",     4)());
+                        PBField!("ids",      2)(),
+                        PBField!("uuid",     3)());
 
     Type typeId() { return Type.OpenRequest; }
 }

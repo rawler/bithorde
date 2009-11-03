@@ -13,6 +13,7 @@ import tango.util.Convert;
 
 import tango.net.LocalAddress;
 
+import lib.hashes;
 import lib.client;
 import lib.message;
 
@@ -25,16 +26,18 @@ class Arguments : private ArgParser {
 private:
     char[] host;
     ushort port;
-    ubyte[] objectid;
+    Identifier[] ids;
     bool verbose;
     bool progress;
 public:
     this(char[][] arguments) {
         super(delegate void(char[] value,uint ordinal) {
             if (ordinal > 0) {
-                throw new IllegalArgumentException("Only 1 objectid supported");
+                throw new IllegalArgumentException("Only 1 uri supported");
             } else {
-                objectid = hexToBytes(value);
+                ids = parseUri(value);
+                if (!ids)
+                    throw new IllegalArgumentException("Failed to parse Uri. Supported styles are magnet-links, and ed2k-links");
             }
         });
         host = "/tmp/bithorde";
@@ -52,7 +55,7 @@ public:
             progress = true;
         });
         parse(arguments);
-        if (!objectid)
+        if (!ids)
             throw new IllegalArgumentException("Missing objectid");
     }
 }
@@ -119,7 +122,7 @@ public:
         if (args.progress)
             progressLayout = new Layout!(char);
 
-        client.open(HashType.SHA1, args.objectid, &onOpen);
+        client.open(args.ids, &onOpen);
     }
     ~this(){
         delete asset;
