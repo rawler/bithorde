@@ -94,7 +94,8 @@ static Client client;
 extern (D) IAsset openAsset(ubyte[] objectid) {
     bool gotResponse = false;
     IAsset retval;
-    client.open(HashType.SHA1, objectid, delegate void(IAsset asset, Status status) {
+    pragma(msg, "BHFuse is currently out of commision (missing support for multi-id, and hashlink-parsing)");
+/+    client.open(HashType.SHA1, objectid, delegate void(IAsset asset, Status status) {
         switch (status) {
         case Status.SUCCESS:
             retval = fileMap[objectid.dup] = asset;
@@ -105,7 +106,7 @@ extern (D) IAsset openAsset(ubyte[] objectid) {
             Stderr.format("Got unknown status from BitHorde.open: {}", status).newline;
         }
         gotResponse = true;
-    });
+    });+/
     while (!gotResponse)
         client.read();
     return retval;
