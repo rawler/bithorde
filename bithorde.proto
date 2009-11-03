@@ -2,9 +2,10 @@ package bithorde;
 
 enum HashType
 {
-  MD5 = 1;
-  SHA1 = 2;
-  SHA256 = 3;
+  SHA1 = 1;
+  SHA256 = 2;
+  TREE_TIGER = 3;
+  ED2K = 4;
 }
 
 enum Status {
@@ -12,6 +13,11 @@ enum Status {
   NOTFOUND = 2;
   INVALID_HANDLE = 3;
   WOULD_LOOP = 4;
+}
+
+message Identifier {
+    required HashType type = 1;   // Name of the other side
+    required bytes    id   = 2;   // Version of the protocol this client supports
 }
 
 message HandShake { // Must be first message in stream
@@ -53,7 +59,6 @@ message Read {
 }
 
 message DataSegment {
-    const ProtoBufField[] _fields = [
     required uint32 handle = 1;   // Asset handle for the data
     required uint64 offset = 2;   // Content start offset
     required bytes content = 3;   // Content to write
@@ -63,15 +68,28 @@ message Close {
   required uint32 handle = 1;     // Handle to asset, 0 means failure
 }
 
+message MetaDataRequest {
+    required uint32 reqId = 1;
+    required uint32 handle = 2;      // Asset handle for the data
+}
+
+message MetaDataResponse {
+    required uint32 reqId = 1;
+    required Status status = 2;
+    repeated Identifier ids = 3;
+}
+
 // Dummy message to document the stream itself. Makes no sense as a message or object.
 message Stream
 {
-  required HandShake handshake   = 1;
-  repeated Open.Request openReq  = 2;
-  repeated Open.Response openRes = 3;
-  repeated Close close           = 4;
-  repeated Read.Request readReq  = 5;
-  repeated Read.Response readRes = 6;
-  repeated Open.Upload uploadReq = 7;
-  repeated DataSegment dataSeg   = 8;
+  required HandShake handshake          = 1;
+  repeated Open.Request openReq         = 2;
+  repeated Open.Response openRes        = 3;
+  repeated Close close                  = 4;
+  repeated Read.Request readReq         = 5;
+  repeated Read.Response readRes        = 6;
+  repeated Open.Upload uploadReq        = 7;
+  repeated DataSegment dataSeg          = 8;
+  repeated MetaDataRequest  metaDataReq = 9;
+  repeated MetaDataResponse metaDataRes = 10;
 }

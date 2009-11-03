@@ -17,6 +17,8 @@ enum Type
     ReadResponse = 6,
     UploadRequest = 7,
     DataSegment = 8,
+    MetaDataRequest = 9,
+    MetaDataResponse = 10,
 }
 
 public abstract class Message : ProtoBufMessage {
@@ -56,9 +58,10 @@ abstract class RPCResponse : RPCMessage {
 
 enum HashType
 {
-    MD5 = 1,
-    SHA1 = 2,
-    SHA256 = 3,
+    SHA1 = 1,
+    SHA256 = 2,
+    TREE_TIGER = 3,
+    ED2K = 4,
 }
 
 enum Status {
@@ -158,6 +161,26 @@ class DataSegment : Message {
                         PBField!("content",   3)());
 
     Type typeId() { return Type.DataSegment; }
+}
+
+class MetaDataRequest : RPCRequest {
+    ushort handle;     // Asset handle for the data
+    mixin MessageMixin!(PBField!("rpcId",     1)(),
+                        PBField!("handle",    2)());
+
+    Type typeId() { return Type.MetaDataRequest; }
+
+    BHMetaDataCallback callback;
+}
+
+class MetaDataResponse : RPCResponse {
+    Status status;
+    Identifier[] ids;
+    mixin MessageMixin!(PBField!("rpcId",     1)(),
+                        PBField!("status",    2)(),
+                        PBField!("ids",       3)());
+
+    Type typeId() { return Type.MetaDataResponse; }
 }
 
 class Close : Message {

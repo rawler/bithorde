@@ -9,11 +9,11 @@ private import tango.io.Stdout;
 private import tango.math.random.Random;
 
 private import daemon.client;
-private import daemon.hashes;
 private import lib.asset;
-private import message = lib.message;
 private import lib.client;
-private import tango.core.Thread;
+private import lib.hashes;
+private import message = lib.message;
+private import lib.protobuf;
 alias message.HashType HashType;
 
 private static ThreadLocal!(ubyte[]) tls_buf;
@@ -65,7 +65,7 @@ private:
 public:
     this(FilePath path) {
         this.path = path;
-        file = new MappedFile(path.toString, File.ReadWriteCreate);
+        file = new MappedFile(path.toString, File.ReadWriteOpen);
         if (file.length)
             segments = cast(Segment[])file.map();
         else
@@ -215,19 +215,40 @@ public:
 class CachedAsset : public File, IServerAsset {
 protected:
     CacheManager mgr;
+    FilePath path;
     ubyte[] _id;
     CacheMap cacheMap;
 public:
-    this(CacheManager mgr, ubyte[] id) {
+    this(CacheManager mgr, ubyte[] id, bool create = false) {
         this.mgr = mgr;
         this._id = id.dup;
-        super(mgr.uploadPath.dup.append(bytesToHex(id)).toString, File.ReadWriteCreate);
-        this.mgr.assets[this.id] = this;
+        this.path = mgr.assetDir.dup.append(bytesToHex(id));
+
+        if (path.exists && create)
+            throw new IllegalArgumentException("Trying to create already existing file");
+
+        File.Style style;
+        style.open = create ? File.Open.Sedate : File.Open.Exists;
+        style.share = File.Share.None;
+        style.cache = File.Cache.Random;
+
+        auto idxPath = path.dup.suffix(".idx");
+        if (idxPath.exists || create) {
+            cacheMap = new CacheMap(idxPath);
+            style.access = File.Access.ReadWrite;
+        } else {
+            style.access = File.Access.Read;
+        }
+
+        super(path.toString, style);
+
+        this.mgr.openAssets[this.id] = this;
     }
     ~this() {
         if (cacheMap)
             delete cacheMap;
-        mgr.assets.remove(id);
+        close();
+        mgr.openAssets.remove(id);
     }
 
     synchronized void aSyncRead(ulong offset, uint length, BHReadCallback cb) {
@@ -251,28 +272,33 @@ public:
         return super.length;
     }
 
+    AssetMetaData metadata() {
+        return mgr.localIdMap[id];
+    }
+
     final HashType hashType() { return HashType.init; } // TODO: Change API to support multi-hash
     final AssetId id() { return _id; }
 
     mixin IRefCounted.Impl;
 }
 
-class UploadAsset : public CachedAsset {
+class UploadAsset : CachedAsset {
 private:
-    Hash[char[]] hashes;
+    Hash[HashType] hashes;
     uint hashingptr;
+    File file;
 public:
     this(CacheManager mgr, ulong size)
     in { assert(size > 0); }
     body{
-        scope auto tempId = new ubyte[32];
+        auto tempId = new ubyte[32];
         rand.randomizeUniform!(ubyte[],false)(tempId);
-        super(mgr, tempId);
-        cacheMap = new CacheMap(mgr.uploadPath.dup.append(bytesToHex(tempId)).suffix("idx"));
+        super(mgr, tempId, true);
         truncate(size);
-        foreach (k,factory; HashMap)
-            hashes[k] = factory();
+        foreach (k,hash; HashMap)
+            hashes[hash.pbType] = hash.factory();
     }
+
     synchronized void add(ulong offset, ubyte[] data) {
         super.add(offset, data);
         auto zeroBlockSize = cacheMap.zeroBlockSize;
@@ -290,44 +316,86 @@ public:
                 hashingptr = zeroBlockSize;
         }
     }
+
 private:
     void finish() {
         assert(cacheMap.segcount == 1);
         assert(cacheMap.segments[0].start == 0);
         assert(cacheMap.segments[0].end == length);
-        foreach (hash; hashes) {
-            Stderr.format("Hash {}: {}", hash.name, hash.hexDigest).newline;
+        auto asset = new AssetMetaData;
+        asset.localId = _id.dup;
+        
+        foreach (type, hash; hashes) {
+            auto digest = hash.digest;
+            auto hashId = new message.Identifier;
+            hashId.type = type;
+            hashId.id = digest.dup;
+            asset.hashIds ~= hashId;
+            Stderr.format("Hash {}: {}", hash.name, bytesToHex(digest)).newline;
         }
+
+        mgr.addToIdMap(asset);
+        
         cacheMap.path.remove();
         delete cacheMap;
     }
 }
 
+class AssetMetaData : ProtoBufMessage {
+    ubyte[] localId;        // Local assetId
+    message.Identifier[] hashIds;   // HashIds
+    mixin MessageMixin!(PBField!("localId",   1)(),
+                        PBField!("hashIds",   2)());
+
+    char[] toString() {
+        char[] retval = "AssetMetaData {\n";
+        retval ~= "     localId: " ~ bytesToHex(localId) ~ "\n";
+        foreach (hash; hashIds) {
+            retval ~= "     " ~ HashMap[hash.type].name ~ ": " ~ bytesToHex(hash.id) ~ "\n";
+        }
+        return retval ~ "}";
+    }
+}
+
+private class IdMap {
+    AssetMetaData[] assets;
+    mixin MessageMixin!(PBField!("assets",    1)());
+}
+
 class CacheManager {
 protected:
-    char[] assetDir;
-    CachedAsset[ubyte[]] assets;
-    FilePath uploadPath;
+    CachedAsset[ubyte[]] openAssets;
+    AssetMetaData hashIdMap[HashType][ubyte[]];
+    AssetMetaData localIdMap[ubyte[]];
+    FilePath assetDir;
+    FilePath uploadDir;
+    FilePath idMapPath;
 public:
     this(char[] assetDir) {
-        this.assetDir = assetDir;
-        uploadPath = new FilePath(FilePath.join(assetDir, "upload"));
-        if (!uploadPath.exists)
-            uploadPath.createFolder();
-        foreach (k,v; HashMap) {
-            scope auto fp = new FilePath(FilePath.join(assetDir, k));
-            if (!fp.exists)
-                fp.createFolder();
-        }
+        this.assetDir = new FilePath(assetDir);
+        uploadDir = this.assetDir.dup.append("upload");
+        if (!uploadDir.exists)
+            uploadDir.createFolder();
+
+        idMapPath = this.assetDir.dup.append("index.protobuf");
+        if (idMapPath.exists)
+            loadIdMap();
     }
-    CachedAsset getAsset(HashType hType, ubyte[] id) {
-        if (auto asset = id in assets) {
+    CachedAsset getAsset(HashType hType, ubyte[] hashId) {
+        if (!(hashId in hashIdMap[hType])) {
+            Stderr("Unknown asset", hType, bytesToHex(hashId));
+            return null;
+        }
+        auto assetMeta = hashIdMap[hType][hashId];
+        auto localId = assetMeta.localId;
+
+        if (auto asset = localId in openAssets) {
             assert(asset.hashType == hType);
             asset.takeRef();
             return *asset;
         } else {
             try {
-                auto newAsset = new CachedAsset(this, id);
+                auto newAsset = new CachedAsset(this, localId);
                 newAsset.takeRef();
                 return newAsset;
             } catch (IOException e) {
@@ -345,5 +413,27 @@ public:
             Stderr("While opening asset", e).newline;
             return null;
         }
+    }
+private:
+    void loadIdMap() {
+        scope auto mapsrc = new IdMap();
+        scope auto fileContent = cast(ubyte[])File.get(idMapPath.toString);
+        mapsrc.decode(fileContent);
+        foreach (asset; mapsrc.assets)
+            addToIdMap(asset);
+    }
+
+    void saveIdMap() {
+        scope auto map = new IdMap;
+        map.assets = localIdMap.values;
+        File.set(idMapPath.toString, map.encode());
+    }
+
+    void addToIdMap(AssetMetaData asset) {
+        localIdMap[asset.localId] = asset;
+        foreach (id; asset.hashIds) {
+            hashIdMap[id.type][id.id] = asset;
+        }
+        saveIdMap();
     }
 }

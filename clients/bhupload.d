@@ -13,8 +13,10 @@ import tango.util.ArgParser;
 import tango.util.container.SortedMap;
 import tango.util.Convert;
 import tango.net.LocalAddress;
+import tango.text.convert.Format;
 
 import lib.client;
+import lib.hashes;
 import lib.message;
 
 const uint CHUNK_SIZE = 4096;
@@ -126,6 +128,7 @@ public:
             }
             Stderr.newline;
         }
+        asset.requestMetaData(&onComplete);
         while (doRun) { // Wait for completion
             if (!client.read()) {
                 Stderr("Server disconnected").newline;
@@ -179,6 +182,16 @@ private:
             Stderr.format("Got unknown status from BitHorde.open: {}", status).newline;
             return exit(-1);
         }
+    }
+
+    void onComplete(IAsset asset, MetaDataResponse resp) {
+        doRun = false;
+        if (resp.status == Status.SUCCESS) {
+            Stdout(formatMagnet(resp.ids, pos)).newline;
+            Stdout(formatED2K(resp.ids, pos)).newline;
+        }
+        else
+            Stderr("Non-successful upload").newline;
     }
 }
 

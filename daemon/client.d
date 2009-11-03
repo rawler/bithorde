@@ -180,6 +180,22 @@ protected:
         }
     }
 
+    void processMetaDataRequest(ubyte[] buf) {
+        scope auto req = new message.MetaDataRequest();
+        req.decode(buf);
+        scope auto resp = new message.MetaDataResponse;
+        resp.rpcId = req.rpcId;
+        try {
+            auto asset = cast(CachedAsset)openAssets[req.handle];
+            resp.status = message.Status.SUCCESS;
+            resp.ids = asset.metadata.hashIds;
+        } catch (ArrayBoundsException e) {
+            Stderr("[INVALID_HANDLE]").newline;
+            resp.status = message.Status.INVALID_HANDLE;
+        }
+        sendMessage(resp);
+    }
+
     void processClose(ubyte[] buf)
     {
         scope auto req = new message.Close;

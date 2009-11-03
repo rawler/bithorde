@@ -73,6 +73,13 @@ public:
         client.sendRequest(req);
     }
 
+    void requestMetaData(BHMetaDataCallback cb) {
+        auto req = new message.MetaDataRequest;
+        req.handle = handle;
+        req.callback = cb;
+        client.sendRequest(req);
+    }
+
     void sendDataSegment(ulong offset, ubyte[] data) {
         auto msg = new message.DataSegment;
         msg.handle = handle;
@@ -86,11 +93,6 @@ public:
     }
     final message.HashType hashType() { return openRequest.hashType; }
     final AssetId id() { return openRequest.assetId; }
-
-protected:
-    void doCallback() {
-        (cast(message.OpenOrUploadRequest)request).callback(this, status);
-    }
 }
 
 class Client : Connection {
@@ -129,16 +131,25 @@ protected:
     synchronized void processOpenResponse(ubyte[] buf) {
         auto resp = new RemoteAsset(this);
         resp.decode(buf);
-        releaseRequest(resp);
+        auto req = cast(message.OpenOrUploadRequest)releaseRequest(resp);
+        assert(req, "OpenResponse, but not OpenOrUploadRequest");
         if (resp.status == message.Status.SUCCESS)
             openAssets[resp.handle] = resp;
-        resp.doCallback();
+        req.callback(resp, resp.status);
     }
     synchronized void processReadResponse(ubyte[] buf) {
         scope auto resp = new message.ReadResponse;
         resp.decode(buf);
         auto req = cast(message.ReadRequest)releaseRequest(resp);
+        assert(req, "ReadResponse, but not ReadRequest");
         req.callback(openAssets[req.handle], resp.offset, resp.content, resp.status);
+    }
+    synchronized void processMetaDataResponse(ubyte[] buf) {
+        scope auto resp = new message.MetaDataResponse;
+        resp.decode(buf);
+        auto req = cast(message.MetaDataRequest)releaseRequest(resp);
+        assert(req, "MetaDataResponse, but not MetaDataRequest");
+        req.callback(openAssets[req.handle], resp);
     }
     void processOpenRequest(ubyte[] buf) {
         Stdout("Danger Danger! This client should not get requests!").newline;
@@ -154,5 +165,8 @@ protected:
     }
     void processDataSegment(ubyte[] buf) {
         Stdout("Danger Danger! This client should not get segment data!").newline;
+    }
+    void processMetaDataRequest(ubyte[] buf) {
+        Stdout("Danger Danger! This client should not get requests!").newline;
     }
 }

@@ -133,34 +133,23 @@ private:
         if (buf == data || buf.length < msglen) {
             return data; // Not enough data in buffer
         } else {
-            with (message) { switch (type) {
+            auto msg = buf[0..msglen];
+            with (message) switch (type) {
             case Type.HandShake:
                 Stderr("Error: HandShake recieved after initialization").newline;
                 break;
-            case Type.OpenRequest:
-                processOpenRequest(buf[0..msglen]);
-                break;
-            case Type.UploadRequest:
-                processUploadRequest(buf[0..msglen]);
-                break;
-            case Type.OpenResponse:
-                processOpenResponse(buf[0..msglen]);
-                break;
-            case Type.Close:
-                processClose(buf[0..msglen]);
-                break;
-            case Type.ReadRequest:
-                processReadRequest(buf[0..msglen]);
-                break;
-            case Type.ReadResponse:
-                processReadResponse(buf[0..msglen]);
-                break;
-            case Type.DataSegment:
-                processDataSegment(buf[0..msglen]);
-                break;
+            case Type.OpenRequest: processOpenRequest(msg); break;
+            case Type.UploadRequest: processUploadRequest(msg); break;
+            case Type.OpenResponse: processOpenResponse(msg); break;
+            case Type.Close: processClose(msg); break;
+            case Type.ReadRequest: processReadRequest(msg); break;
+            case Type.ReadResponse: processReadResponse(msg); break;
+            case Type.DataSegment: processDataSegment(msg); break;
+            case Type.MetaDataRequest: processMetaDataRequest(msg); break;
+            case Type.MetaDataResponse: processMetaDataResponse(msg); break;
             default:
                 Stderr.format("Unknown message type; {}", type).newline;
-            } }
+            }
             return buf[msglen..length];
         }
     }
@@ -184,4 +173,6 @@ protected:
     abstract void processReadRequest(ubyte[]);
     abstract void processReadResponse(ubyte[]);
     abstract void processDataSegment(ubyte[]);
+    abstract void processMetaDataRequest(ubyte[]);
+    abstract void processMetaDataResponse(ubyte[]);
 }

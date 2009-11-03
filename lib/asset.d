@@ -14,4 +14,5 @@ interface IAsset {
 
 alias void delegate(IAsset, Status status) BHOpenCallback;
 alias void delegate(IAsset, ulong offset, ubyte[], Status status) BHReadCallback;
+alias void delegate(IAsset, MetaDataResponse response) BHMetaDataCallback;
 
