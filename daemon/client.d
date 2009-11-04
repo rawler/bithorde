@@ -2,10 +2,10 @@ module daemon.client;
 
 private import tango.core.Exception;
 private import tango.core.Memory;
-private import tango.io.Stdout;
 private import tango.math.random.Random;
 private import tango.net.SocketConduit;
 private import tango.util.container.more.Stack;
+private import tango.util.log.Log;
 
 import daemon.server;
 import daemon.cache;
@@ -113,12 +113,15 @@ private:
     IServerAsset[uint] openAssets;
     Stack!(ushort, 64) freeFileHandles;
     ushort nextNewHandle;
+    Logger log;
 public:
     this (Server server, SocketConduit s)
     {
         this.server = server;
         this.cacheMgr = server.cacheMgr;
+        this.log = Log.lookup("daemon.client");
         super(s, server.name);
+        this.log = Log.lookup("daemon.client."~_peername);
     }
     ~this()
     {
@@ -130,7 +133,7 @@ protected:
     {
         auto req = new OpenRequest(this);
         req.decode(buf);
-        Stdout("Got open request, ");
+        log.trace("Got open request");
         ulong uuid = req.uuid;
         if (uuid == 0)
             uuid = rand.uniformR2!(ulong)(1,ulong.max);
@@ -140,12 +143,12 @@ protected:
     void processUploadRequest(ubyte[] buf)
     {
         if (!isTrusted) {
-            Stdout("Got UploadRequest from unauthorized client", this).newline;
+            log.warn("Got UploadRequest from unauthorized client {}", this);
             return;
         }
         auto req = new UploadRequest(this);
         req.decode(buf);
-        Stdout("Got UploadRequest from trusted client").newline;
+        log.trace("Got UploadRequest from trusted client");
         server.uploadAsset(req);
     }
 
@@ -171,12 +174,9 @@ protected:
         req.decode(buf);
         try {
             auto asset = cast(CachedAsset)openAssets[req.handle];
-            if (asset)
-                asset.add(req.offset, req.content);
-            else
-                Stderr("Asset is not in cache").newline;
+            asset.add(req.offset, req.content);
         } catch (ArrayBoundsException e) {
-            Stderr("[INVALID_HANDLE]").newline;
+            log.error("DataSegment to invalid handle");
         }
     }
 
@@ -190,7 +190,7 @@ protected:
             resp.status = message.Status.SUCCESS;
             resp.ids = asset.metadata.hashIds;
         } catch (ArrayBoundsException e) {
-            Stderr("[INVALID_HANDLE]").newline;
+            log.error("MetaDataRequest on invalid handle");
             resp.status = message.Status.INVALID_HANDLE;
         }
         sendMessage(resp);
@@ -200,17 +200,16 @@ protected:
     {
         scope auto req = new message.Close;
         req.decode(buf);
-        Stderr.format("Client {} closing handle {}: ", this, req.handle);
+        log.trace("closing handle {}", req.handle);
         try {
             IServerAsset asset = openAssets[req.handle];
             openAssets.remove(req.handle);
             freeFileHandles.push(req.handle);
             asset.unRef();
         } catch (ArrayBoundsException e) {
-            Stderr("[INVALID_HANDLE]").newline;
+            log.error("tried to Close invalid handle");
             return;
         }
-        Stderr("[OK]").newline;
     }
 private:
     ushort allocateFreeHandle()

@@ -12,6 +12,9 @@ private import tango.stdc.posix.signal;
 private import Text = tango.text.Util;
 private import tango.util.container.more.Stack;
 private import tango.util.Convert;
+private import tango.util.log.AppendConsole;
+private import tango.util.log.LayoutDate;
+private import tango.util.log.Log;
 
 private import tango.net.LocalAddress;
 
@@ -38,6 +41,11 @@ package:
     char[] name;
     ServerSocket tcpServer;
     ServerSocket unixServer;
+
+    static Logger log;
+    static this() {
+        log = Log.lookup("daemon.server");
+    }
 public:
     this(Config config)
     {
@@ -68,6 +76,8 @@ public:
             this.offlineFriends[f.name] = f;
         this.reconnectThread = new Thread(&reconnectLoop);
         this.reconnectThread.start();
+
+        log.info("Started");
     }
     ~this() {
         this.tcpServer.socket.detach();
@@ -92,15 +102,15 @@ public:
     }
 
     IServerAsset findAsset(OpenRequest req, Client origin) {
-        IServerAsset asset = cacheMgr.findAsset(req);
+        auto asset = cacheMgr.findAsset(req);
         if (asset) {
-            Stdout("serving from cache").newline;
+            log.trace("serving {} from cache", asset.id);
             req.callback(asset, message.Status.SUCCESS);
+            return asset;
         } else {
-            Stdout("forwarding...").newline;
-            asset = router.findAsset(req, origin);
+            log.trace("forwarding {}", req);
+            return router.findAsset(req, origin);
         }
-        return asset;
     }
 
     IServerAsset uploadAsset(UploadRequest req) {
@@ -121,7 +131,7 @@ private:
             router.registerFriend(f);
         }
         selector.register(s, Event.Read, c);
-        Stderr.format("{} {} connected: {}", f?"Friend":"Client", peername, s.socket.remoteAddress).newline;
+        log.info("{} {} connected: {}", f?"Friend":"Client", peername, s.socket.remoteAddress);
     }
 
     void onClientDisconnect(Client c)
@@ -131,7 +141,7 @@ private:
             f.c = null;
             offlineFriends[f.name] = f;
         }
-        Stderr.format("{} {} disconnected", f?"Friend":"Client", c.peername).newline;
+        log.info("{} {} disconnected", f?"Friend":"Client", c.peername);
         return c;
     }
 
@@ -172,7 +182,7 @@ private:
             } catch (SocketException e) {}
             Thread.sleep(2);
         } catch (Exception e) {
-            Stderr.format("Caught unexpected exceptin in reconnectLoop: {}", e).newline;
+            log.error("Caught unexpected exception in reconnectLoop: {}", e);
         }
     }
 }
@@ -191,6 +201,9 @@ public int main(char[][] args)
     signal(SIGPIPE, SIG_IGN);
 
     auto config = new Config(args[1]);
+
+    auto consoleOut = new AppendConsole(new LayoutDate);
+    Log.root.add(consoleOut);
 
     scope Server s = new Server(config);
     s.run();

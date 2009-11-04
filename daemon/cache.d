@@ -5,8 +5,8 @@ private import tango.core.Thread;
 private import tango.io.device.File;
 private import tango.io.device.FileMap;
 private import tango.io.FilePath;
-private import tango.io.Stdout;
 private import tango.math.random.Random;
+private import tango.util.log.Log;
 
 private import daemon.client;
 private import lib.asset;
@@ -331,7 +331,6 @@ private:
             hashId.type = type;
             hashId.id = digest.dup;
             asset.hashIds ~= hashId;
-            Stderr.format("Hash {}: {}", hash.name, bytesToHex(digest)).newline;
         }
 
         mgr.addToIdMap(asset);
@@ -370,6 +369,11 @@ protected:
     FilePath assetDir;
     FilePath uploadDir;
     FilePath idMapPath;
+    static Logger log;
+
+static this() {
+    log = Log.lookup("daemon.cache");
+}
 public:
     this(char[] assetDir) {
         this.assetDir = new FilePath(assetDir);
@@ -391,7 +395,7 @@ public:
             }
         }
         if (!localId) {
-            Stderr("Cache: Unknown asset");
+            log.trace("Unknown asset");
             return null;
         }
 
@@ -404,7 +408,7 @@ public:
                 newAsset.takeRef();
                 return newAsset;
             } catch (IOException e) {
-                Stderr("While opening asset", e).newline;
+                log.error("While opening asset: {}", e);
                 return null;
             }
         }
@@ -415,7 +419,7 @@ public:
             newAsset.takeRef();
             return newAsset;
         } catch (IOException e) {
-            Stderr("While opening asset", e).newline;
+            log.error("While opening upload asset: {}", e);
             return null;
         }
     }
