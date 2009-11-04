@@ -28,8 +28,8 @@ message HandShake { // Must be first message in stream
 message Open {
   message Request {
     required uint32 reqId = 1;
-    required HashType hashType = 2;
-    required bytes assetId = 3;
+    repeated Identifier ids = 2;
+    required uint64 uuid = 3;
   }
   message Upload {
     required uint32 reqId = 1;
