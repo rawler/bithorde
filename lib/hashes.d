@@ -85,8 +85,6 @@ Identifier[] parseUri(char[] uri) {
     return retVal;
 }
 
-private import tango.io.Stdout;
-
 Identifier[] parseMagnet(char[] magnetUri) {
     Identifier[] retVal;
     foreach (hash; HashMap) {
@@ -94,9 +92,7 @@ Identifier[] parseMagnet(char[] magnetUri) {
         foreach (m; re.search(magnetUri)) {
             auto newid = new Identifier;
             newid.type = hash.pbType;
-            Stderr("Found hash", m[1]).newline;
             newid.id = hash.magnetDeformatter(m[1]);
-            Stderr("Rev is", ByteConverter.base32Encode(newid.id), ByteConverter.hexEncode(newid.id)).newline;
             retVal ~= newid;
         }
     }
