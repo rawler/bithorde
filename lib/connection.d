@@ -1,6 +1,6 @@
 module lib.connection;
 
-private import tango.io.Stdout;
+private import tango.core.Exception;
 private import tango.net.Socket;
 private import tango.net.SocketConduit;
 private import tango.util.container.more.Stack;
@@ -63,14 +63,15 @@ public:
         socket.close();
     }
 
-    synchronized bool read()
+    synchronized bool read(int maxmsg = -1)
     {
         int read = socket.read(frontbuf[remainder..length]);
         if (read > 0) {
             ubyte[] buf, left = frontbuf[0..remainder + read];
-            while (buf != left && left.length > 3) {
+            while (maxmsg != 0 && buf != left && left.length > 3) {
                 buf = left;
                 left = decodeMessage(buf);
+                maxmsg--;
             }
             swapBufs(left);
             return true;
@@ -94,18 +95,9 @@ private:
         sendMessage(handshake);
     }
     void expectHello() {
-        int read = socket.read(frontbuf);
-        auto left = frontbuf[0..read];
-        auto id = decode_val!(ubyte)(left);
-        assert(id == (message.Type.HandShake<<3 | 0b0010));
-        auto length = decode_val!(ushort)(left);
-        assert(length > 0);
-        assert(left.length >= length);
-        scope auto handshake = new message.HandShake;
-        handshake.decode(left[0..length]);
-        _peername = handshake.name.dup;
-        assert(handshake.protoversion == 1);
-        swapBufs(left[length..left.length]);
+        read(1);
+        if (!_peername)
+            throw new AssertException("Other side did not greet with handshake", __FILE__, __LINE__);
     }
     void swapBufs(ubyte[] left) {
         remainder = left.length;
@@ -135,9 +127,7 @@ private:
         } else {
             auto msg = buf[0..msglen];
             with (message) switch (type) {
-            case Type.HandShake:
-                Stderr("Error: HandShake recieved after initialization").newline;
-                break;
+            case Type.HandShake: processHandShake(msg); break;
             case Type.OpenRequest: processOpenRequest(msg); break;
             case Type.UploadRequest: processUploadRequest(msg); break;
             case Type.OpenResponse: processOpenResponse(msg); break;
@@ -147,8 +137,6 @@ private:
             case Type.DataSegment: processDataSegment(msg); break;
             case Type.MetaDataRequest: processMetaDataRequest(msg); break;
             case Type.MetaDataResponse: processMetaDataResponse(msg); break;
-            default:
-                Stderr.format("Unknown message type; {}", type).newline;
             }
             return buf[msglen..length];
         }
@@ -166,6 +154,14 @@ package:
         sendMessage(req);
     }
 protected:
+    void processHandShake(ubyte[] msg) {
+        if (_peername)
+            throw new AssertException("HandShake recieved after initialization", __FILE__, __LINE__);
+        scope auto handshake = new message.HandShake;
+        handshake.decode(msg);
+        _peername = handshake.name.dup;
+        assert(handshake.protoversion == 1);
+    }
     abstract void processOpenRequest(ubyte[]);
     abstract void processUploadRequest(ubyte[]);
     abstract void processOpenResponse(ubyte[]);

@@ -1,7 +1,6 @@
 module lib.client;
 
 private import tango.core.Exception;
-private import tango.io.Stdout;
 private import tango.math.random.Random;
 private import tango.net.SocketConduit;
 private import tango.core.Variant;
@@ -149,21 +148,21 @@ protected:
         req.callback(openAssets[req.handle], resp);
     }
     void processOpenRequest(ubyte[] buf) {
-        Stdout("Danger Danger! This client should not get requests!").newline;
+        throw new AssertException("Danger Danger! This client should not get requests!", __FILE__, __LINE__);
     }
     void processClose(ubyte[] buf) {
-        Stdout("Danger Danger! This client should not get requests!").newline;
+        throw new AssertException("Danger Danger! This client should not get requests!", __FILE__, __LINE__);
     }
     void processReadRequest(ubyte[] buf) {
-        Stdout("Danger Danger! This client should not get requests!").newline;
+        throw new AssertException("Danger Danger! This client should not get requests!", __FILE__, __LINE__);
     }
     void processUploadRequest(ubyte[] buf) {
-        Stdout("Danger Danger! This client should not get requests!").newline;
+        throw new AssertException("Danger Danger! This client should not get requests!", __FILE__, __LINE__);
     }
     void processDataSegment(ubyte[] buf) {
-        Stdout("Danger Danger! This client should not get segment data!").newline;
+        throw new AssertException("Danger Danger! This client should not get segment data!", __FILE__, __LINE__);
     }
     void processMetaDataRequest(ubyte[] buf) {
-        Stdout("Danger Danger! This client should not get requests!").newline;
+        throw new AssertException("Danger Danger! This client should not get requests!", __FILE__, __LINE__);
     }
 }

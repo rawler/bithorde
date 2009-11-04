@@ -2,7 +2,6 @@ module lib.message;
 
 private import tango.core.Exception;
 private import tango.core.Memory;
-private import tango.io.Stdout;
 private import tango.util.container.more.Stack;
 
 private import lib.protobuf;
