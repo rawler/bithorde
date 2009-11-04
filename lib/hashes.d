@@ -101,7 +101,7 @@ Identifier[] parseMagnet(char[] magnetUri) {
 
 Identifier[] parseED2K(char[] ed2kUri) {
     Identifier[] retVal;
-    auto re = Regex(r"ed2k://|file|[^\|]*|\d*|(\w+)|/");
+    auto re = Regex(r"ed2k://\|file\|[^\|]*\|\d*\|(\w+)\|/");
     foreach (m; re.search(ed2kUri)) {
         auto newid = new Identifier;
         newid.type = HashType.ED2K;
