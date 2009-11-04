@@ -1,5 +1,6 @@
 *~
 *.o
+*.pyc
 dsss.last
 
 # Built executables
@@ -7,3 +8,7 @@ server
 tests/protobuf
 bhget
 bhfuse
+bhupload
+
+# Releases-dir
+releases
