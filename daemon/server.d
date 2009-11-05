@@ -24,6 +24,7 @@ private import daemon.config;
 private import daemon.friend;
 private import daemon.router;
 private import lib.asset;
+private import lib.client : bytesToHex;
 private import message = lib.message;
 
 interface IAssetSource {
@@ -104,7 +105,7 @@ public:
     IServerAsset findAsset(OpenRequest req, Client origin) {
         auto asset = cacheMgr.findAsset(req);
         if (asset) {
-            log.trace("serving {} from cache", asset.id);
+            log.trace("serving {} from cache", bytesToHex(asset.id));
             req.callback(asset, message.Status.SUCCESS);
             return asset;
         } else {
