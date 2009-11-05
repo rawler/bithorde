@@ -1,7 +1,7 @@
 module lib.hashes;
 
 private import tango.io.device.Array;
-private import tango.io.stream.Format;
+private import tango.text.convert.Format;
 private import tango.text.Regex;
 
 public import dcrypt.crypto.Hash;
@@ -44,28 +44,29 @@ static this() {
         HashMap[h.pbType] = h;
 }
 
-char[] formatMagnet(Identifier[] ids, ulong length)
+char[] formatMagnet(Identifier[] ids, ulong length, char[] name = null)
 in {
     assert(ids.length > 0);
 } body {
     scope auto array = new Array(64,64);
-    scope auto format = new FormatOutput!(char)(array);
-    format.format("magnet:?");
+    array.write("magnet:?");
     uint idx;
+    void append(char[] fmt, ...) {
+        if (idx++)
+            array.write("&");
+        Format.convert(cast(uint delegate(char[]))&array.write, _arguments, _argptr, fmt);
+    }
+    if (name)
+        append("dn={}", name);
+    append("xl={}", length);
     foreach (id; ids) {
         auto hash = HashMap[id.type];
-        if (idx++)
-            format.print('&');
-        format.format("xt=urn:{}:{}", hash.name, hash.magnetFormatter(id.id));
+        append("xt=urn:{}:{}", hash.name, hash.magnetFormatter(id.id));
     }
-    format.format("&xl={}", length);
-    format.flush();
     return cast(char[])array.slice;
 }
 
-char[] formatED2K(Identifier[] ids, ulong length) {
-    scope auto array = new Array(64,64);
-    scope auto format = new FormatOutput!(char)(array);
+char[] formatED2K(Identifier[] ids, ulong length, char[] name = null) {
     ubyte[] hash;
     foreach (id; ids) {
         if (id.type == HashType.ED2K) {
@@ -73,9 +74,10 @@ char[] formatED2K(Identifier[] ids, ulong length) {
             break;
         }
     }
-    format.format("ed2k://|file||{}|{}|/", length, ByteConverter.hexEncode(hash));
-    format.flush();
-    return cast(char[])array.slice;
+    if (hash)
+        return Format.convert("ed2k://|file|{}|{}|{}|/", name?name:"", length, ByteConverter.hexEncode(hash));
+    else 
+        return null;
 }
 
 Identifier[] parseUri(char[] uri) {
@@ -101,7 +103,7 @@ Identifier[] parseMagnet(char[] magnetUri) {
 
 Identifier[] parseED2K(char[] ed2kUri) {
     Identifier[] retVal;
-    auto re = Regex(r"ed2k://\|file\|[^\|]*\|\d*\|(\w+)\|/");
+    auto re = Regex(r"ed2k://\|file\|[^\|]*\|\d*\|(\w+)\|");
     foreach (m; re.search(ed2kUri)) {
         auto newid = new Identifier;
         newid.type = HashType.ED2K;

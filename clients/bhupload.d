@@ -187,8 +187,8 @@ private:
     void onComplete(IAsset asset, MetaDataResponse resp) {
         doRun = false;
         if (resp.status == Status.SUCCESS) {
-            Stdout(formatMagnet(resp.ids, pos)).newline;
-            Stdout(formatED2K(resp.ids, pos)).newline;
+            Stdout(formatMagnet(resp.ids, pos, args.file.file)).newline;
+            Stdout(formatED2K(resp.ids, pos, args.file.file)).newline;
         }
         else
             Stderr("Non-successful upload").newline;
