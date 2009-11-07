@@ -297,6 +297,12 @@ public:
         truncate(size);
         foreach (k,hash; HashMap)
             hashes[hash.pbType] = hash.factory();
+        mgr.log.trace("Upload started");
+    }
+    ~this() {
+        foreach (hash;hashes)
+            delete hash;
+        mgr.log.trace("Upload finished");
     }
 
     synchronized void add(ulong offset, ubyte[] data) {
