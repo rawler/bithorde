@@ -132,7 +132,7 @@ public:
     void run()
     {
         while (doRun && ((asset is null) || (output.currentOffset < asset.size))) {
-            if (!client.read()) {
+            if (!client.readAndProcessMessage()) {
                 Stderr("Server disconnected").newline;
                 exit(-1);
             }

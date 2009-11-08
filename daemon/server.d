@@ -132,6 +132,11 @@ private:
             router.registerFriend(f);
         }
         selector.register(s, Event.Read, c);
+
+        // ATM, there may be stale data in the buffers from the HandShake that needs processing
+        // FIXME: internal API should be re-written so that the HandShake is handled in normal run-loop
+        while (c.processMessage()) {}
+
         log.info("{} {} connected: {}", f?"Friend":"Client", peername, s.socket.remoteAddress);
     }
 
@@ -160,7 +165,10 @@ private:
                 return false;
             } else {
                 assert (event.isReadable);
-                return c.read();
+                if (c.readNewData())
+                    while (c.processMessage()) {}
+                else
+                    return false;
             }
         }
         return true;

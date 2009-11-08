@@ -108,7 +108,7 @@ extern (D) IAsset openAsset(ubyte[] objectid) {
         gotResponse = true;
     });+/
     while (!gotResponse)
-        client.read();
+        client.readAndProcessMessage();
     return retval;
 }
 
@@ -212,7 +212,7 @@ static int bh_read(char *path, void *buf, size_t size, off_t offset,
     while (true) synchronized(client) {
         if (gotResponse)
             break;
-        client.read();
+        client.readAndProcessMessage();
     }
     return size;
 }

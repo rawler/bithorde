@@ -12,8 +12,7 @@ class Connection
 {
 protected:
     SocketConduit socket;
-    ubyte[] frontbuf, backbuf;
-    uint remainder;
+    ubyte[] frontbuf, backbuf, left;
     ByteBuffer msgbuf;
     char[] _myname, _peername;
 
@@ -49,7 +48,7 @@ public:
         this.socket = s;
         this.frontbuf = new ubyte[8192]; // TODO: Handle overflow
         this.backbuf = new ubyte[8192];
-        this.remainder = 0;
+        this.left = [];
         this.msgbuf = new ByteBuffer(8192);
         if (s.socket.addressFamily is AddressFamily.INET)
             this.socket.socket.setNoDelay(true);
@@ -63,22 +62,31 @@ public:
         socket.close();
     }
 
-    synchronized bool read(int maxmsg = -1)
-    {
-        int read = socket.read(frontbuf[remainder..length]);
+    synchronized bool readNewData() {
+        swapBufs();
+        int read = socket.read(frontbuf[left.length..length]);
         if (read > 0) {
-            ubyte[] buf, left = frontbuf[0..remainder + read];
-            while (maxmsg != 0 && buf != left && left.length > 3) {
-                buf = left;
-                left = decodeMessage(buf);
-                maxmsg--;
-            }
-            swapBufs(left);
+            left = frontbuf[0..left.length+read];
             return true;
-        } else {
+        } else
             return false;
-        }
     }
+
+    synchronized bool processMessage()
+    {
+        auto buf = left;
+        left = decodeMessage(buf);
+        return buf != left;
+    }
+
+    synchronized bool readAndProcessMessage() {
+        while (!processMessage()) {
+            if (!readNewData())
+                return false;
+        }
+        return true;
+    }
+
     final char[] peername() { return _peername; }
     final char[] myname() { return _myname; }
     char[] toString() {
@@ -95,12 +103,12 @@ private:
         sendMessage(handshake);
     }
     void expectHello() {
-        read(1);
+        readAndProcessMessage();
         if (!_peername)
             throw new AssertException("Other side did not greet with handshake", __FILE__, __LINE__);
     }
-    void swapBufs(ubyte[] left) {
-        remainder = left.length;
+    void swapBufs() {
+        auto remainder = left.length;
         if ((remainder * 2) > backbuf.length) { // Alloc new backbuf
             auto newsize = remainder * 2;       // TODO: Implement some upper-limit
             delete backbuf;
@@ -110,6 +118,7 @@ private:
         left = frontbuf;              // Remember current frontbuf
         frontbuf = backbuf;           // Switch new frontbuf to current backbuf
         backbuf = left;               // And new backbuf is our current frontbuf
+        left = frontbuf[0..remainder];
     }
     ubyte[] decodeMessage(ubyte[] data)
     {

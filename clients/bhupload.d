@@ -99,7 +99,7 @@ public:
     void run()
     {
         while (doRun && (asset is null)) {
-            if (!client.read()) {
+            if (!client.readAndProcessMessage()) {
                 Stderr("Server disconnected").newline;
                 exit(-1);
             }
@@ -130,7 +130,7 @@ public:
         }
         asset.requestMetaData(&onComplete);
         while (doRun) { // Wait for completion
-            if (!client.read()) {
+            if (!client.readAndProcessMessage()) {
                 Stderr("Server disconnected").newline;
                 exit(-1);
             }
