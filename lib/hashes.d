@@ -80,18 +80,21 @@ char[] formatED2K(Identifier[] ids, ulong length, char[] name = null) {
         return null;
 }
 
-Identifier[] parseUri(char[] uri) {
-    auto retVal = parseMagnet(uri);
+Identifier[] parseUri(char[] uri, out char[] name) {
+    auto retVal = parseMagnet(uri, name);
     if (!retVal)
-        retVal = parseED2K(uri);
+        retVal = parseED2K(uri, name);
     return retVal;
 }
 
-Identifier[] parseMagnet(char[] magnetUri) {
+Identifier[] parseMagnet(char[] magnetUri, out char[] name) {
     Identifier[] retVal;
+    auto name_re = Regex(r"dn=([^&]+)");
+    foreach (m; name_re.search(magnetUri))
+        name = m[1];
     foreach (hash; HashMap) {
-        auto re = Regex(r"xt=urn:"~hash.name~r":(\w+)");
-        foreach (m; re.search(magnetUri)) {
+        auto hash_re = Regex(r"xt=urn:"~hash.name~r":(\w+)");
+        foreach (m; hash_re.search(magnetUri)) {
             auto newid = new Identifier;
             newid.type = hash.pbType;
             newid.id = hash.magnetDeformatter(m[1]);
@@ -101,13 +104,15 @@ Identifier[] parseMagnet(char[] magnetUri) {
     return retVal;
 }
 
-Identifier[] parseED2K(char[] ed2kUri) {
+Identifier[] parseED2K(char[] ed2kUri, out char[] name) {
     Identifier[] retVal;
-    auto re = Regex(r"ed2k://\|file\|[^\|]*\|\d*\|(\w+)\|");
+    auto re = Regex(r"ed2k://\|file\|([^\|]*)\|\d*\|(\w+)\|");
     foreach (m; re.search(ed2kUri)) {
+        name = m[1];
+
         auto newid = new Identifier;
         newid.type = HashType.ED2K;
-        newid.id = ByteConverter.hexDecode(m[1]);
+        newid.id = ByteConverter.hexDecode(m[2]);
         retVal ~= newid;
     }
     return retVal;

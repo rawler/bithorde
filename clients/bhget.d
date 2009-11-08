@@ -1,6 +1,7 @@
 module clients.bhget;
 
 import tango.core.Exception;
+import tango.io.device.File;
 import tango.io.Stdout;
 import tango.net.InternetAddress;
 import tango.net.Socket;
@@ -10,6 +11,7 @@ import tango.time.Clock;
 import tango.util.ArgParser;
 import tango.util.container.SortedMap;
 import tango.util.Convert;
+import tango.stdc.posix.unistd;
 
 import tango.net.LocalAddress;
 
@@ -23,40 +25,71 @@ const auto updateThreshold = TimeSpan.fromMillis(50);
 const auto bwWindow = TimeSpan.fromMillis(500);
 
 class Arguments : private ArgParser {
+    enum OutMode {
+        AUTO,
+        STDOUT,
+        FILE,
+    }
+    enum ProgressBar {
+        AUTO,
+        ON,
+        OFF,
+    }
 private:
-    char[] host;
-    ushort port;
+    char[] sockPath;
     Identifier[] ids;
+    char[] name;
     bool verbose;
-    bool progress;
+    ProgressBar progress = ProgressBar.AUTO;
+    OutMode outMode = OutMode.AUTO;
 public:
     this(char[][] arguments) {
         super(delegate void(char[] value,uint ordinal) {
             if (ordinal > 0) {
                 throw new IllegalArgumentException("Only 1 uri supported");
             } else {
-                ids = parseUri(value);
+                ids = parseUri(value, name);
                 if (!ids)
                     throw new IllegalArgumentException("Failed to parse Uri. Supported styles are magnet-links, and ed2k-links");
             }
         });
-        host = "/tmp/bithorde";
-        port = 1337;
-        bindPosix(["host", "h"], delegate void(char[] value) {
-            host = value;
-        });
-        bindPosix(["port", "p"], delegate void(char[] value) {
-            port = to!(ushort)(value);
-        });
+        sockPath = "/tmp/bithorde";
         bindPosix(["verbose", "v"], delegate void(char[] value) {
             verbose = true;
         });
-        bindPosix(["progress", "P"], delegate void(char[] value) {
-            progress = true;
+        bindPosix(["progress", "p"], delegate void(char[] value) {
+            progress = ProgressBar.ON;
+        });
+        bindPosix(["no-progress", "P"], delegate void(char[] value) {
+            progress = ProgressBar.OFF;
+        });
+        bindPosix(["stdout", "s"], delegate void(char[] value) {
+            outMode = OutMode.STDOUT;
+        });
+        bindPosix(["no-stdout", "S"], delegate void(char[] value) {
+            outMode = OutMode.FILE;
         });
         parse(arguments);
         if (!ids)
             throw new IllegalArgumentException("Missing objectid");
+
+        switch (outMode) {
+            case OutMode.FILE:
+                if (!name)
+                    throw new IllegalArgumentException("Output forced to file, but no filename found in URI");
+                break;
+            case OutMode.AUTO:
+                outMode = name ? OutMode.FILE : OutMode.STDOUT;
+                break;
+            default:
+        }
+
+        if (progress == ProgressBar.AUTO) {
+            if (isatty(2) && (!isatty(1) || outMode == OutMode.FILE))
+                progress = ProgressBar.ON;
+            else
+                progress = ProgressBar.OFF;
+        }
     }
 }
 
@@ -105,21 +138,27 @@ private:
     ushort lastProgressSize;
     Layout!(char) progressLayout;
 public:
-    this(Arguments args) {
+    this(Arguments args) in {
+        assert(args.outMode != Arguments.OutMode.AUTO, "args.outMode must be decided");
+        assert(args.progress != Arguments.ProgressBar.AUTO, "args.progress must be decided");
+    } body {
         this.args = args;
-        Address addr;
-        if (args.host[0] == '/') {
-            addr = new LocalAddress(args.host);
-        } else {
-            addr = new InternetAddress(args.host, args.port);
-        }
+        Address addr = new LocalAddress(args.sockPath);
         auto socket = new SocketConduit(addr.addressFamily, SocketType.STREAM, ProtocolType.IP);
         socket.connect(addr);
         client = new Client(socket, "bhget");
 
         doRun = true;
-        output = new SortedOutput(Stdout);
-        if (args.progress)
+        switch (args.outMode) {
+            case Arguments.OutMode.STDOUT:
+                output = new SortedOutput(Stdout);
+                break;
+            case Arguments.OutMode.FILE:
+                output = new SortedOutput(new File(args.name, File.WriteCreate));
+                break;
+        }
+
+        if (args.progress == Arguments.ProgressBar.ON)
             progressLayout = new Layout!(char);
 
         client.open(args.ids, &onOpen);
@@ -137,12 +176,12 @@ public:
                 exit(-1);
             }
         }
-        if (args.progress) {
+        if (args.progress == Arguments.ProgressBar.ON) {
             if (exitStatus == 0) { // Successful finish
                 lastBwOffset = 0;
                 lastBwTime = startTime;
                 lastTime = startTime;
-                updateProgress(); // Display final avg BW.
+                updateProgress(true); // Display final avg BW.
             }
             Stderr.newline;
         }
@@ -153,13 +192,13 @@ private:
         this.exitStatus = exitStatus;
     }
 
-    void updateProgress() {
+    void updateProgress(bool forced = false) {
         auto now = Clock.now;
-        if ((now - lastTime) > updateThreshold ) {
+        if (((now - lastTime) > updateThreshold) || forced) {
             lastTime = now;
             auto bwTime = now - lastBwTime;
-            if (bwTime > bwWindow) {
-                currentBw = ((orderOffset - lastBwOffset) * 1000) / bwTime.millis;
+            if ((bwTime > bwWindow) || forced) {
+                currentBw = ((orderOffset - lastBwOffset) * 1000000) / bwTime.micros;
                 lastBwTime = now;
                 lastBwOffset = orderOffset;
             }
@@ -182,7 +221,7 @@ private:
         output.queue(offset, data);
         auto newoffset = offset + data.length;
         orderData();
-        if (args.progress)
+        if (args.progress == Arguments.ProgressBar.ON)
             updateProgress();
     }
 
@@ -201,7 +240,7 @@ private:
         case Status.SUCCESS:
             if (args.verbose)
                 Stderr.format("Asset found, size is {}kB.", asset.size / 1024).newline;
-            if (args.progress) {
+            if (args.progress == Arguments.ProgressBar.ON) {
                 startTime = Clock.now;
                 lastTime = Clock.now;
                 lastBwTime = Clock.now;
@@ -228,7 +267,7 @@ int main(char[][] args)
     } catch (IllegalArgumentException e) {
         if (e.msg)
             Stderr(e.msg).newline;
-        Stderr.format("Usage: {} [--verbose|-v] [--progress|-P] [--host|-h=<hostname>] [--port|-p=<port>] <objectid>", args[0]).newline;
+        Stderr.format("Usage: {} [--verbose|-v] [--progress|-P] [--host|-h=<hostname>] [--port|-p=<port>] <uri>", args[0]).newline;
         return -1;
     }
     scope auto b = new BHGet(arguments);
