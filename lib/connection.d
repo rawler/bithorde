@@ -1,8 +1,8 @@
 module lib.connection;
 
 private import tango.core.Exception;
-private import tango.net.Socket;
-private import tango.net.SocketConduit;
+private import tango.net.device.Berkeley;
+private import tango.net.device.Socket;
 private import tango.util.container.more.Stack;
 
 private import lib.protobuf;
@@ -11,7 +11,7 @@ public import message = lib.message;
 class Connection
 {
 protected:
-    SocketConduit socket;
+    Socket socket;
     ubyte[] frontbuf, backbuf, left;
     ByteBuffer msgbuf;
     char[] _myname, _peername;
@@ -43,7 +43,7 @@ protected: // TODO: This logic should really be moved into lib/Client layer soon
         return req;
     }
 public:
-    this(SocketConduit s, char[] myname)
+    this(Socket s, char[] myname)
     {
         this.socket = s;
         this.frontbuf = new ubyte[8192]; // TODO: Handle overflow

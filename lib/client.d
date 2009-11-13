@@ -2,7 +2,7 @@ module lib.client;
 
 private import tango.core.Exception;
 private import tango.math.random.Random;
-private import tango.net.SocketConduit;
+private import tango.net.device.Socket;
 private import tango.core.Variant;
 
 public import lib.asset;
@@ -96,7 +96,7 @@ class Client : Connection {
 private:
     RemoteAsset[uint] openAssets;
 public:
-    this (SocketConduit s, char[] name)
+    this (Socket s, char[] name)
     {
         super(s, name);
     }

@@ -3,7 +3,7 @@ module daemon.client;
 private import tango.core.Exception;
 private import tango.core.Memory;
 private import tango.math.random.Random;
-private import tango.net.SocketConduit;
+private import tango.net.device.Socket;
 private import tango.util.container.more.Stack;
 private import tango.util.log.Log;
 
@@ -115,7 +115,7 @@ private:
     ushort nextNewHandle;
     Logger log;
 public:
-    this (Server server, SocketConduit s)
+    this (Server server, Socket s)
     {
         this.server = server;
         this.cacheMgr = server.cacheMgr;

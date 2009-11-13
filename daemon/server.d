@@ -5,9 +5,9 @@ private import tango.core.Thread;
 private import tango.io.FilePath;
 private import tango.io.selector.Selector;
 private import tango.io.Stdout;
-private import tango.net.ServerSocket;
-private import tango.net.Socket;
-private import tango.net.SocketConduit;
+private import tango.net.device.Berkeley;
+private import tango.net.device.Socket;
+private import tango.net.InternetAddress;
 private import tango.stdc.posix.signal;
 private import Text = tango.text.Util;
 private import tango.util.container.more.Stack;
@@ -120,7 +120,7 @@ public:
         return asset;
     }
 private:
-    void onClientConnect(SocketConduit s)
+    void onClientConnect(Socket s)
     {
         auto c = new Client(this, s);
         Friend f;
@@ -175,19 +175,19 @@ private:
     }
 
     bool attemptConnect(InternetAddress friend) {
-        auto socket = new SocketConduit();
+        auto socket = new Socket();
         socket.connect(friend);
         onClientConnect(socket);
         return true;
     }
 
     void reconnectLoop() {
-        auto socket = new SocketConduit();
+        auto socket = new Socket();
         while (true) try {
             foreach (friend; offlineFriends.values) try {
                 socket.connect(friend.addr);
                 onClientConnect(socket);
-                socket = new SocketConduit();
+                socket = new Socket();
             } catch (SocketException e) {}
             Thread.sleep(2);
         } catch (Exception e) {

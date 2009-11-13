@@ -2,7 +2,6 @@ module clients.fuse;
 
 private import tango.core.Exception,
                tango.io.Stdout,
-               tango.net.SocketConduit,
                tango.stdc.errno,
                tango.stdc.posix.fcntl,
                tango.stdc.posix.signal,
@@ -11,7 +10,7 @@ private import tango.core.Exception,
                tango.stdc.posix.utime,
                tango.stdc.string;
 
-private import tango.net.Socket : SocketType, ProtocolType;
+private import tango.net.device.Socket : Socket, SocketType, ProtocolType;
 
 private import tango.net.LocalAddress;
 
@@ -227,7 +226,7 @@ extern (D):
 int main(char[][] args)
 {
     auto addr = new LocalAddress("/tmp/bithorde");
-    auto socket = new SocketConduit(addr.addressFamily, SocketType.STREAM, ProtocolType.IP);
+    auto socket = new Socket(addr.addressFamily, SocketType.STREAM, ProtocolType.IP);
     socket.connect(addr);
     client = new Client(socket, "bhfuse");
 

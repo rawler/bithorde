@@ -2,10 +2,11 @@ module clients.bhget;
 
 import tango.core.Exception;
 import tango.io.device.File;
+import tango.io.model.IConduit;
 import tango.io.Stdout;
 import tango.net.InternetAddress;
-import tango.net.Socket;
-import tango.net.SocketConduit;
+import tango.net.device.Berkeley;
+import tango.net.device.Socket;
 import tango.text.convert.Layout;
 import tango.time.Clock;
 import tango.util.ArgParser;
@@ -144,7 +145,7 @@ public:
     } body {
         this.args = args;
         Address addr = new LocalAddress(args.sockPath);
-        auto socket = new SocketConduit(addr.addressFamily, SocketType.STREAM, ProtocolType.IP);
+        auto socket = new Socket(addr.addressFamily, SocketType.STREAM, ProtocolType.IP);
         socket.connect(addr);
         client = new Client(socket, "bhget");
 

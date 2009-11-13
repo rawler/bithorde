@@ -13,7 +13,8 @@
 
 module tango.net.LocalAddress;
 
-private import tango.net.Socket;
+private import tango.net.device.Berkeley,
+               tango.stdc.posix.sys.socket: sockaddr;
 
 /*******************************************************************************
 
@@ -22,98 +23,97 @@ private import tango.net.Socket;
 
 public class LocalAddress : Address
 {
-		struct sockaddr_un
-		{
-			align(1):
-				ushort sun_family = AddressFamily.UNIX;
-				char[108] sun_path;
-		}
-		
-				
-		protected
-		{
-				sockaddr_un sun;
-				char[] _path;
-				int _pathLength;
-		}
-
-		/***********************************************************************
-
-			-path- path to a unix domain socket (which is a filename)
-
-		***********************************************************************/
-		this(char[] path)
-		{
-				assert(path.length < 108);
-				
-				sun.sun_path[0 .. path.length] = path[];
-				sun.sun_path[path.length .. $] = 0;
-				
-				_pathLength = path.length;
-				_path = sun.sun_path[0 .. path.length];
-		}
-
-		/***********************************************************************
+    align(1) struct sockaddr_un
+    {
+        ushort sun_family = AddressFamily.UNIX;
+        char[108] sun_path;
+    }
 
 
+    protected
+    {
+        sockaddr_un sun;
+        char[] _path;
+        int _pathLength;
+    }
 
-		***********************************************************************/
-		sockaddr* name() 
-		{ 
-				return cast(sockaddr*)&sun; 
-		}
-		
-		/***********************************************************************
+    /***********************************************************************
+
+        -path- path to a unix domain socket (which is a filename)
+
+    ***********************************************************************/
+    this(char[] path)
+    {
+        assert(path.length < 108);
+
+        sun.sun_path[0 .. path.length] = path[];
+        sun.sun_path[path.length .. $] = 0;
+
+        _pathLength = path.length;
+        _path = sun.sun_path[0 .. path.length];
+    }
+
+    /***********************************************************************
 
 
 
-		***********************************************************************/
-		int nameLen() 
-		{ 
-				return _pathLength + ushort.sizeof; 
-		}
-		
-		/***********************************************************************
+    ***********************************************************************/
+    sockaddr* name()
+    {
+        return cast(sockaddr*)&sun;
+    }
+
+    /***********************************************************************
 
 
 
-		***********************************************************************/
-		AddressFamily addressFamily() 
-		{ 
-				return AddressFamily.UNIX; 
-		}
-		
-		/***********************************************************************
+    ***********************************************************************/
+    int nameLen()
+    {
+        return _pathLength + ushort.sizeof;
+    }
+
+    /***********************************************************************
 
 
 
-		***********************************************************************/
-		char[] toString()
-		{
-				if(isAbstract)
-					return "unix:abstract=" ~ _path[1..$];
-				else
-					return "unix:path=" ~ _path;
-		}
-		
-		/***********************************************************************
+    ***********************************************************************/
+    AddressFamily addressFamily()
+    {
+        return AddressFamily.UNIX;
+    }
+
+    /***********************************************************************
 
 
 
-		***********************************************************************/
-		char[] path()
-		{
-			return _path;
-		}
-		
-		/***********************************************************************
+    ***********************************************************************/
+    char[] toString()
+    {
+        if(isAbstract)
+            return "unix:abstract=" ~ _path[1..$];
+        else
+            return "unix:path=" ~ _path;
+    }
+
+    /***********************************************************************
 
 
 
-		***********************************************************************/
-		bool isAbstract()
-		{
-			return _path[0] == 0;
-		}
+    ***********************************************************************/
+    char[] path()
+    {
+        return _path;
+    }
+
+    /***********************************************************************
+
+
+
+    ***********************************************************************/
+    bool isAbstract()
+    {
+        return _path[0] == 0;
+    }
 }
 
