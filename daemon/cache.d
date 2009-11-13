@@ -373,7 +373,6 @@ protected:
     AssetMetaData hashIdMap[HashType][ubyte[]];
     AssetMetaData localIdMap[ubyte[]];
     FilePath assetDir;
-    FilePath uploadDir;
     FilePath idMapPath;
     static Logger log;
 
@@ -383,9 +382,6 @@ static this() {
 public:
     this(char[] assetDir) {
         this.assetDir = new FilePath(assetDir);
-        uploadDir = this.assetDir.dup.append("upload");
-        if (!uploadDir.exists)
-            uploadDir.createFolder();
 
         idMapPath = this.assetDir.dup.append("index.protobuf");
         if (idMapPath.exists)
