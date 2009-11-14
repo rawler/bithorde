@@ -27,7 +27,7 @@ private:
     char[] sockPath;
     FilePath file;
     bool verbose;
-    bool progress;
+    bool progress = true;
 public:
     this(char[][] arguments) {
         super(delegate void(char[] value,uint ordinal) {
@@ -44,8 +44,11 @@ public:
         bindPosix(["verbose", "v"], delegate void(char[] value) {
             verbose = true;
         });
-        bindPosix(["progress", "P"], delegate void(char[] value) {
+        bindPosix(["progress", "p"], delegate void(char[] value) {
             progress = true;
+        });
+        bindPosix(["progress", "P"], delegate void(char[] value) {
+            progress = false;
         });
         parse(arguments);
         if (!file)
