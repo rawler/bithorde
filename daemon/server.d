@@ -6,6 +6,7 @@ private import tango.io.FilePath;
 private import tango.io.selector.Selector;
 private import tango.io.Stdout;
 private import tango.net.device.Berkeley;
+private import tango.net.device.LocalSocket;
 private import tango.net.device.Socket;
 private import tango.net.InternetAddress;
 private import tango.stdc.posix.signal;
@@ -15,8 +16,6 @@ private import tango.util.Convert;
 private import tango.util.log.AppendConsole;
 private import tango.util.log.LayoutDate;
 private import tango.util.log.Log;
-
-private import tango.net.LocalAddress;
 
 private import daemon.cache;
 private import daemon.client;
@@ -148,7 +147,6 @@ private:
             offlineFriends[f.name] = f;
         }
         log.info("{} {} disconnected", f?"Friend":"Client", c.peername);
-        return c;
     }
 
     bool processSelectEvent(SelectionKey event)

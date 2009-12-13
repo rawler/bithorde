@@ -6,6 +6,7 @@ import tango.io.model.IConduit;
 import tango.io.Stdout;
 import tango.net.InternetAddress;
 import tango.net.device.Berkeley;
+import tango.net.device.LocalSocket;
 import tango.net.device.Socket;
 import tango.text.convert.Layout;
 import tango.time.Clock;
@@ -13,8 +14,6 @@ import tango.util.ArgParser;
 import tango.util.container.SortedMap;
 import tango.util.Convert;
 import tango.stdc.posix.unistd;
-
-import tango.net.LocalAddress;
 
 import lib.hashes;
 import lib.client;

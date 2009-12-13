@@ -5,13 +5,13 @@ import tango.io.device.File;
 import tango.io.FilePath;
 import tango.io.Stdout;
 import tango.net.device.Berkeley;
+import tango.net.device.LocalSocket;
 import tango.net.device.Socket;
 import tango.text.convert.Layout;
 import tango.time.Clock;
 import tango.util.ArgParser;
 import tango.util.container.SortedMap;
 import tango.util.Convert;
-import tango.net.LocalAddress;
 import tango.text.convert.Format;
 
 import lib.client;
