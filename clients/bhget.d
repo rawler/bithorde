@@ -19,10 +19,10 @@ import lib.client;
 import lib.message;
 import lib.arguments;
 
+import clients.lib.progressbar;
+
 const uint CHUNK_SIZE = 4096;
 const uint PARALLEL_REQUESTS = 5;
-const auto updateThreshold = TimeSpan.fromMillis(50);
-const auto bwWindow = TimeSpan.fromMillis(500);
 
 class GetArguments : protected Arguments {
 private:
@@ -100,13 +100,7 @@ private:
     ulong orderOffset;
     int exitStatus;
     GetArguments args;
-    Time startTime;
-    Time lastTime;
-    Time lastBwTime;
-    ulong lastBwOffset;
-    ulong currentBw;
-    ushort lastProgressSize;
-    Layout!(char) progressLayout;
+    ProgressBar pBar;
 public:
     this(GetArguments args) {
         this.args = args;
@@ -120,9 +114,6 @@ public:
             output = new SortedOutput(Stdout);
         else
             output = new SortedOutput(new File(args.name, File.WriteCreate));
-
-        if (args.progressBar)
-            progressLayout = new Layout!(char);
 
         client.open(args.ids, &onOpen);
     }
@@ -139,14 +130,11 @@ public:
                 exit(-1);
             }
         }
-        if (args.stdout) {
-            if (exitStatus == 0) { // Successful finish
-                lastBwOffset = 0;
-                lastBwTime = startTime;
-                lastTime = startTime;
-                updateProgress(true); // Display final avg BW.
-            }
-            Stderr.newline;
+        if (pBar) {
+            if (exitStatus == 0) // Successful finish
+                pBar.finish(orderOffset);
+            else
+                Stderr.newline;
         }
     }
 private:
@@ -155,37 +143,13 @@ private:
         this.exitStatus = exitStatus;
     }
 
-    void updateProgress(bool forced = false) {
-        auto now = Clock.now;
-        if (((now - lastTime) > updateThreshold) || forced) {
-            lastTime = now;
-            auto bwTime = now - lastBwTime;
-            if ((bwTime > bwWindow) || forced) {
-                currentBw = ((orderOffset - lastBwOffset) * 1000000) / bwTime.micros;
-                lastBwTime = now;
-                lastBwOffset = orderOffset;
-            }
-            auto bar = "------------------------------------------------------------";
-            auto percent = (orderOffset * 100) / asset.size;
-            auto barlen  = (orderOffset * bar.length) / asset.size;
-            for (int i; i < barlen; i++)
-                bar[i] = '*';
-
-            auto progressSize = progressLayout.convert(Stderr, "\x0D[{}] {}% {}kB/s", bar, percent, currentBw);
-            for (int i = progressSize; i < lastProgressSize; i++)
-                Stderr(' ');
-            lastProgressSize = progressSize;
-            Stderr.flush;
-        }
-    }
-
     void onRead(IAsset asset, ulong offset, ubyte[] data, Status status) {
         assert(asset == this.asset);
         output.queue(offset, data);
         auto newoffset = offset + data.length;
         orderData();
-        if (args.progressBar)
-            updateProgress();
+        if (pBar)
+            pBar.update(orderOffset);
     }
 
     void orderData() {
@@ -203,11 +167,10 @@ private:
         case Status.SUCCESS:
             if (args.verbose)
                 Stderr.format("Asset found, size is {}kB.", asset.size / 1024).newline;
-            if (args.progressBar) {
-                startTime = Clock.now;
-                lastTime = Clock.now;
-                lastBwTime = Clock.now;
-            }
+
+            if (args.progressBar)
+                pBar = new ProgressBar(asset.size, (args.name ? args.name : "<unnamed>") ~ " : ", "kB", 1024);
+
             this.asset = asset;
             for (uint i; i < PARALLEL_REQUESTS; i++)
                 orderData();

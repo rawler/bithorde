@@ -18,10 +18,9 @@ import lib.client;
 import lib.hashes;
 import lib.message;
 import lib.arguments;
+import clients.lib.progressbar;
 
 const uint CHUNK_SIZE = 4096;
-const auto updateThreshold = TimeSpan.fromMillis(50);
-const auto bwWindow = TimeSpan.fromMillis(500);
 
 class UploadArguments : private Arguments {
 private:
@@ -68,13 +67,7 @@ private:
     File file;
     ulong pos;
 
-    Time startTime;
-    Time lastTime;
-    Time lastBwTime;
-    ulong lastBwPos;
-    ulong currentBw;
-    ushort lastProgressSize;
-    Layout!(char) progressLayout;
+    ProgressBar pBar;
 public:
     this(UploadArguments args) {
         this.args = args;
@@ -85,8 +78,6 @@ public:
 
         doRun = true;
         file = new File(args.file.toString);
-        if (args.progressBar)
-            progressLayout = new Layout!(char);
 
         client.beginUpload(file.length, &onOpen);
     }
@@ -111,21 +102,18 @@ public:
                 asset.sendDataSegment(pos, buf[0..read]);
                 pos += read;
 
-                if (args.progressBar)
-                    updateProgress();
+                if (pBar)
+                    pBar.update(pos);
             } else {
                 Stderr("Failed to read chunk from pos").newline;
                 exit(-1);
             }
         }
         if (args.progressBar) {
-            if (exitStatus == 0) { // Successful finish
-                lastBwPos = 0;
-                lastBwTime = startTime;
-                lastTime = startTime;
-                updateProgress(); // Display final avg BW.
-            }
-            Stderr.newline;
+            if (exitStatus == 0) // Successful finish
+                pBar.finish(pos);
+            else
+                Stderr.newline;
         }
         asset.requestMetaData(&onComplete);
         while (doRun) { // Wait for completion
@@ -141,40 +129,13 @@ private:
         this.exitStatus = exitStatus;
     }
 
-    void updateProgress() {
-        auto now = Clock.now;
-        if ((now - lastTime) > updateThreshold ) {
-            lastTime = now;
-            auto bwTime = now - lastBwTime;
-            if (bwTime > bwWindow) {
-                currentBw = ((pos - lastBwPos) * 1000) / bwTime.millis;
-                lastBwTime = now;
-                lastBwPos = pos;
-            }
-            auto bar = "------------------------------------------------------------";
-            auto percent = (pos * 100) / file.length;
-            auto barlen  = (pos * bar.length) / file.length;
-            for (int i; i < barlen; i++)
-                bar[i] = '*';
-
-            auto progressSize = progressLayout.convert(Stderr, "\x0D[{}] {}% {}kB/s", bar, percent, currentBw);
-            for (int i = progressSize; i < lastProgressSize; i++)
-                Stderr(' ');
-            lastProgressSize = progressSize;
-            Stderr.flush;
-        }
-    }
-
     void onOpen(IAsset asset, Status status) {
         switch (status) {
         case Status.SUCCESS:
             if (args.verbose)
                 Stderr.format("File upload begun.").newline;
-            if (args.progressBar) {
-                startTime = Clock.now;
-                lastTime = Clock.now;
-                lastBwTime = Clock.now;
-            }
+            if (args.progressBar)
+                pBar = new ProgressBar(file.length, args.file.name ~ " : ", "kB", 1024);
             this.asset = cast(RemoteAsset)asset;
             break;
         default:
