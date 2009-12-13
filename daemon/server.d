@@ -57,12 +57,14 @@ public:
         this.selector.open(10,10);
 
         // Setup servers
+        log.info("Listening to tcp-port {}", config.port);
         this.tcpServer = new ServerSocket(new InternetAddress(IPv4Address.ADDR_ANY, config.port), 32, true);
         selector.register(tcpServer, Event.Read);
         if (config.unixSocket) {
             auto sockF = new FilePath(config.unixSocket);
             if (sockF.exists())
                 sockF.remove();
+            log.info("Listening to unix-socket {}", config.unixSocket);
             this.unixServer = new ServerSocket(new LocalAddress(config.unixSocket), 32, true);
             selector.register(unixServer, Event.Read);
         }
