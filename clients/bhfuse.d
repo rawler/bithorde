@@ -11,8 +11,7 @@ private import tango.core.Exception,
                tango.stdc.string;
 
 private import tango.net.device.Socket : Socket, SocketType, ProtocolType;
-
-private import tango.net.LocalAddress;
+private import tango.net.device.LocalSocket;
 
 private import lib.client,
                lib.message;

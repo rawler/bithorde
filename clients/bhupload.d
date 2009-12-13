@@ -9,54 +9,51 @@ import tango.net.device.LocalSocket;
 import tango.net.device.Socket;
 import tango.text.convert.Layout;
 import tango.time.Clock;
-import tango.util.ArgParser;
 import tango.util.container.SortedMap;
 import tango.util.Convert;
 import tango.text.convert.Format;
+import tango.stdc.posix.unistd;
 
 import lib.client;
 import lib.hashes;
 import lib.message;
+import lib.arguments;
 
 const uint CHUNK_SIZE = 4096;
 const auto updateThreshold = TimeSpan.fromMillis(50);
 const auto bwWindow = TimeSpan.fromMillis(500);
 
-class Arguments : private ArgParser {
+class UploadArguments : private Arguments {
 private:
     char[] sockPath;
     FilePath file;
     bool verbose;
-    bool progress = true;
+    bool progressBar;
 public:
-    this(char[][] arguments) {
-        super(delegate void(char[] value,uint ordinal) {
-            if (ordinal > 0) {
-                throw new IllegalArgumentException("Only 1 file supported");
-            } else {
-                file = new FilePath(value);
-            }
-        });
+    this() {
         sockPath = "/tmp/bithorde";
-        bindPosix(["unixsocket", "u"], delegate void(char[] value) {
-            sockPath = value;
-        });
-        bindPosix(["verbose", "v"], delegate void(char[] value) {
-            verbose = true;
-        });
-        bindPosix(["progress", "p"], delegate void(char[] value) {
-            progress = true;
-        });
-        bindPosix(["progress", "P"], delegate void(char[] value) {
-            progress = false;
-        });
-        parse(arguments);
-        if (!file)
-            throw new IllegalArgumentException("Missing filename");
+        this["verbose"].aliased('v').smush;
+        this["progressBar"].aliased('p').params(1).restrict(autoBool).smush.defaults("auto");
+        this[null].title("file").required.params(1);
+    }
+
+    bool parse(char[][] arguments) {
+        if (!super.parse(arguments))
+            throw new IllegalArgumentException("Failed to parse arguments\n:" ~ errors(&stderr.layout.sprint));
+
+        file = new FilePath(this[null].assigned[0]);
         if (!file.exists)
             throw new IllegalArgumentException("File does not exist");
         if (!file.isFile)
             throw new IllegalArgumentException("File is not a regular file");
+
+        progressBar = getAutoBool("progressBar", delegate bool() {
+            return isatty(2) == 1;
+        });
+
+        verbose = this["verbose"].set;
+
+        return true;
     }
 }
 
@@ -67,7 +64,7 @@ private:
     RemoteAsset asset;
     Client client;
     int exitStatus;
-    Arguments args;
+    UploadArguments args;
     File file;
     ulong pos;
 
@@ -79,7 +76,7 @@ private:
     ushort lastProgressSize;
     Layout!(char) progressLayout;
 public:
-    this(Arguments args) {
+    this(UploadArguments args) {
         this.args = args;
         Address addr = new LocalAddress(args.sockPath);
         auto socket = new Socket(addr.addressFamily, SocketType.STREAM, ProtocolType.IP);
@@ -88,7 +85,7 @@ public:
 
         doRun = true;
         file = new File(args.file.toString);
-        if (args.progress)
+        if (args.progressBar)
             progressLayout = new Layout!(char);
 
         client.beginUpload(file.length, &onOpen);
@@ -114,14 +111,14 @@ public:
                 asset.sendDataSegment(pos, buf[0..read]);
                 pos += read;
 
-                if (args.progress)
+                if (args.progressBar)
                     updateProgress();
             } else {
                 Stderr("Failed to read chunk from pos").newline;
                 exit(-1);
             }
         }
-        if (args.progress) {
+        if (args.progressBar) {
             if (exitStatus == 0) { // Successful finish
                 lastBwPos = 0;
                 lastBwTime = startTime;
@@ -173,7 +170,7 @@ private:
         case Status.SUCCESS:
             if (args.verbose)
                 Stderr.format("File upload begun.").newline;
-            if (args.progress) {
+            if (args.progressBar) {
                 startTime = Clock.now;
                 lastTime = Clock.now;
                 lastBwTime = Clock.now;
@@ -199,13 +196,13 @@ private:
 
 int main(char[][] args)
 {
-    Arguments arguments;
+    auto arguments = new UploadArguments;
     try {
-        arguments = new Arguments(args[1..length]);
+        arguments.parse(args[1..length]);
     } catch (IllegalArgumentException e) {
         if (e.msg)
             Stderr(e.msg).newline;
-        Stderr.format("Usage: {} [--verbose|-v] [--progress|-P] [--unixsocket|-u=<socket path>] <file>", args[0]).newline;
+        Stderr.format("Usage: {} [--verbose|-v] [{{--progressBar|-p}}=yes/no] <uri>", args[0]).newline;
         return -1;
     }
     scope auto b = new BHUpload(arguments);
