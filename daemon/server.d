@@ -26,10 +26,6 @@ private import lib.asset;
 private import lib.client : bytesToHex;
 private import message = lib.message;
 
-interface IAssetSource {
-    IServerAsset findAsset(OpenRequest req, Client origin);
-}
-
 class Server : IAssetSource
 {
 package:
@@ -70,8 +66,8 @@ public:
         }
 
         // Setup helper functions, routing and caching
-        this.cacheMgr = new CacheManager(config.cachedir);
         this.router = new Router(this);
+        this.cacheMgr = new CacheManager(config.cachedir, router);
 
         // Setup friend connections
         foreach (f;config.friends)
@@ -103,16 +99,8 @@ public:
         }
     }
 
-    IServerAsset findAsset(OpenRequest req, Client origin) {
-        auto asset = cacheMgr.findAsset(req);
-        if (asset) {
-            log.trace("serving {} from cache", bytesToHex(asset.id));
-            req.callback(asset, message.Status.SUCCESS);
-            return asset;
-        } else {
-            log.trace("forwarding {}", req);
-            return router.findAsset(req, origin);
-        }
+    IServerAsset findAsset(OpenRequest req) {
+        return cacheMgr.findAsset(req);
     }
 
     IServerAsset uploadAsset(UploadRequest req) {

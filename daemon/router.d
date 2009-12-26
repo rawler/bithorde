@@ -65,11 +65,11 @@ public:
         this.server = server;
     }
 
-    ForwardedAsset findAsset(daemon.client.OpenRequest req, Client origin) {
+    ForwardedAsset findAsset(daemon.client.OpenRequest req) {
         if (req.uuid in openRequests)
             req.callback(null, Status.WOULD_LOOP);
         else
-            return forwardOpenRequest(req, origin);
+            return forwardOpenRequest(req, req.client);
     }
 
     void registerFriend(Friend f) {

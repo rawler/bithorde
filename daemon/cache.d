@@ -9,6 +9,7 @@ private import tango.math.random.Random;
 private import tango.util.log.Log;
 
 private import daemon.client;
+private import daemon.router;
 private import lib.asset;
 private import lib.client;
 private import lib.hashes;
@@ -220,6 +221,7 @@ protected:
     CacheMap cacheMap;
 public:
     this(CacheManager mgr, ubyte[] id, bool create = false) {
+        // TODO: Merge id and create
         this.mgr = mgr;
         this._id = id.dup;
         this.path = mgr.assetDir.dup.append(bytesToHex(id));
@@ -367,27 +369,45 @@ private class IdMap {
     mixin MessageMixin!(PBField!("assets",    1)());
 }
 
-class CacheManager {
+class CacheManager : IAssetSource {
 protected:
     CachedAsset[ubyte[]] openAssets;
     AssetMetaData hashIdMap[HashType][ubyte[]];
     AssetMetaData localIdMap[ubyte[]];
     FilePath assetDir;
     FilePath idMapPath;
+    Router router;
     static Logger log;
 
 static this() {
     log = Log.lookup("daemon.cache");
 }
 public:
-    this(char[] assetDir) {
+    this(char[] assetDir, Router router) {
         this.assetDir = new FilePath(assetDir);
+        this.router = router;
 
         idMapPath = this.assetDir.dup.append("index.protobuf");
         if (idMapPath.exists)
             loadIdMap();
+        else {
+            hashIdMap[message.HashType.SHA1] = null;
+            hashIdMap[message.HashType.SHA256] = null;
+            hashIdMap[message.HashType.TREE_TIGER] = null;
+            hashIdMap[message.HashType.ED2K] = null;
+        }
     }
-    CachedAsset findAsset(daemon.client.OpenRequest req) {
+    IServerAsset findAsset(OpenRequest req) {
+        IServerAsset fromCache(CachedAsset asset) {
+            asset.takeRef();
+            log.trace("serving {} from cache", bytesToHex(asset.id));
+            req.callback(asset, message.Status.SUCCESS);
+            return asset;
+        }
+        IServerAsset forwardRequest() {
+            return router.findAsset(req);
+        }
+
         ubyte[] localId;
         foreach (id; req.ids) {
             if (id.id in hashIdMap[id.type]) {
@@ -397,18 +417,16 @@ public:
             }
         }
         if (!localId) {
-            log.trace("Unknown asset");
-            return null;
+            log.trace("Unknown asset, forwarding {}", req);
+            return forwardRequest();
         }
 
         if (auto asset = localId in openAssets) {
-            asset.takeRef();
-            return *asset;
+            return fromCache(*asset);
         } else {
             try {
                 auto newAsset = new CachedAsset(this, localId);
-                newAsset.takeRef();
-                return newAsset;
+                return fromCache(newAsset);
             } catch (IOException e) {
                 log.error("While opening asset: {}", e);
                 return null;
@@ -430,8 +448,11 @@ private:
         scope auto mapsrc = new IdMap();
         scope auto fileContent = cast(ubyte[])File.get(idMapPath.toString);
         mapsrc.decode(fileContent);
-        foreach (asset; mapsrc.assets)
-            addToIdMap(asset);
+        foreach (asset; mapsrc.assets) {
+            localIdMap[asset.localId] = asset;
+            foreach (id; asset.hashIds)
+                hashIdMap[id.type][id.id] = asset;
+        }
     }
 
     void saveIdMap() {
