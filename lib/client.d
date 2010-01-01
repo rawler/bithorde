@@ -3,7 +3,6 @@ module lib.client;
 private import tango.core.Exception;
 private import tango.math.random.Random;
 private import tango.net.device.Socket;
-private import tango.core.Variant;
 
 public import lib.asset;
 import lib.connection;
