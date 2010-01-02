@@ -84,7 +84,7 @@ public:
                 currentOffset += buf.length;
             }
         } else {
-            _queue.add(offset, data);
+            _queue.add(offset, data.dup);
         }
     }
 }
