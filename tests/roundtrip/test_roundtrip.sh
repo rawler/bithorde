@@ -16,9 +16,11 @@ function setup() {
     dd if=/dev/urandom of="$TESTFILE" bs=1024 count=1024
 }
 
-function verify() {
-    if [ -e "$1" ]; then
-        cmp "$1" $TESTFILE
+function verify_equal() {
+    if [ -z "$1" ]; then
+        cmp - "$TESTFILE"
+    elif [ -e "$1" ]; then
+        cmp "$1" "$TESTFILE"
     else
         return 1;
     fi
@@ -49,20 +51,27 @@ function daemons_start() {
     sleep 0.1
 }
 
+function quiet_stop() {
+    disown $1 && kill $1
+}
+
 function daemons_stop() {
     for job in `jobs -p`; do
-        disown $job && kill $job
+        quiet_stop $job
     done
 }
 
 daemons_start
 MAGNET=$("$BHUPLOAD" -u/tmp/bithorde-rta "$TESTFILE"|grep '^magnet:')
-verify cachea/?????????????????????* || exit_error "Uploaded file did not match upload source"
+verify_equal cachea/?????????????????????* || exit_error "Uploaded file did not match upload source"
 verify_done cacheb/?????????????????????* || exit_error "Uploaded file still has an index, indicating not done"
 
-"$BHGET" -u/tmp/bithorde-rtb -sy "$MAGNET" > "$TESTFILE.new"
+"$BHGET" -u/tmp/bithorde-rtb -sy "$MAGNET" | verify_equal || exit_error "Downloaded file did not match upload source"
 verify_done cacheb/?????????????????????* || exit_error "Cached asset still has an index, indicating not done"
-verify cacheb/?????????????????????* || exit_error "File wasn't cached properly"
-verify "$TESTFILE.new" || exit_error "Downloaded file did not match upload source"
+verify_equal cacheb/?????????????????????* || exit_error "File wasn't cached properly"
+
+quiet_stop $DAEMON1
+
+#"$BHGET" -u/tmp/bithorde-rtb -sy "$MAGNET" | verify_equal || exit_error "Re-Download from cache failed"
 
 exit_success

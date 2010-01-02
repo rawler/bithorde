@@ -356,7 +356,6 @@ protected:
 }
 
 class CachingAsset : WriteableAsset {
-    // TODO: Validate on finish
     BHServerOpenCallback cb;
     IServerAsset remoteAsset;
 public:
@@ -381,6 +380,13 @@ public:
         r.length = length;
         r.cb = cb;
         r.tryRead();
+    }
+protected:
+    void finish() {
+        // TODO: Validate hashId:s
+        super.finish();
+        remoteAsset.unRef();
+        remoteAsset = null;
     }
 private:
     void realRead(ulong offset, uint length, BHReadCallback cb) {
