@@ -34,10 +34,10 @@ private:
     bool stdout;
 public:
     this() {
-        sockPath = "/tmp/bithorde";
         this["verbose"].aliased('v').smush;
         this["progressBar"].aliased('p').params(1).restrict(autoBool).smush.defaults("auto");
         this["stdout"].aliased('s').params(1).restrict(autoBool).smush.defaults("auto");
+        this["unixsocket"].aliased('u').params(1).smush.defaults("/tmp/bithorde");
         this[null].title("uri").required.params(1);
     }
 
@@ -52,12 +52,11 @@ public:
         stdout = getAutoBool("stdout", delegate bool() {
             return !name;
         });
-
         progressBar = getAutoBool("progressBar", delegate bool() {
             return isatty(2) && (!isatty(1) || !stdout);
         });
-
         verbose = this["verbose"].set;
+        sockPath = this["unixsocket"].assigned[0];
 
         return true;
     }
@@ -193,7 +192,7 @@ int main(char[][] args)
     } catch (IllegalArgumentException e) {
         if (e.msg)
             Stderr(e.msg).newline;
-        Stderr.format("Usage: {} [--verbose|-v] [{{--stdout|-s}}=yes/no] [{{--progressBar|-p}}=yes/no] <uri>", args[0]).newline;
+        Stderr.format("Usage: {} [--verbose|-v] [{{--stdout|-s}}=yes/no] [{{--progressBar|-p}}=yes/no] [--unixsocket|u=/tmp/bithorde] <uri>", args[0]).newline;
         return -1;
     }
 

@@ -30,9 +30,9 @@ private:
     bool progressBar;
 public:
     this() {
-        sockPath = "/tmp/bithorde";
         this["verbose"].aliased('v').smush;
         this["progressBar"].aliased('p').params(1).restrict(autoBool).smush.defaults("auto");
+        this["unixsocket"].aliased('u').params(1).smush.defaults("/tmp/bithorde");
         this[null].title("file").required.params(1);
     }
 
@@ -49,8 +49,8 @@ public:
         progressBar = getAutoBool("progressBar", delegate bool() {
             return isatty(2) == 1;
         });
-
         verbose = this["verbose"].set;
+        sockPath = this["unixsocket"].assigned[0];
 
         return true;
     }
@@ -163,7 +163,7 @@ int main(char[][] args)
     } catch (IllegalArgumentException e) {
         if (e.msg)
             Stderr(e.msg).newline;
-        Stderr.format("Usage: {} [--verbose|-v] [{{--progressBar|-p}}=yes/no] <uri>", args[0]).newline;
+        Stderr.format("Usage: {} [--verbose|-v] [{{--progressBar|-p}}=yes/no] [--unixsocket|u=/tmp/bithorde] <uri>", args[0]).newline;
         return -1;
     }
     scope auto b = new BHUpload(arguments);
