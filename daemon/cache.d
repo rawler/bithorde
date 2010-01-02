@@ -221,11 +221,13 @@ protected:
     ubyte[] _id;
     File file;
 public:
+    class IncompleteAssetException {}
     this(CacheManager mgr, ubyte[] id) {
         this.mgr = mgr;
         this._id = id.dup;
         this.path = mgr.assetDir.dup.append(bytesToHex(id));
         this.idxPath = path.dup.suffix(".idx");
+        this.mgr.openAssets[this.id] = this;
     }
     ~this() {
         if (file)
@@ -235,9 +237,8 @@ public:
 
     void open() {
         if (idxPath.exists)
-            throw new IOException("Asset is not completely cached.");
+            throw new IncompleteAssetException;
         file = new File(path.toString, File.ReadExisting);
-        this.mgr.openAssets[this.id] = this;
     }
 
     synchronized void aSyncRead(ulong offset, uint length, BHReadCallback cb) {
@@ -358,9 +359,11 @@ protected:
 class CachingAsset : WriteableAsset {
     BHServerOpenCallback cb;
     IServerAsset remoteAsset;
+    message.Identifier[] reqHashIds;
 public:
-    this (CacheManager mgr, BHServerOpenCallback cb) {
+    this (CacheManager mgr, BHServerOpenCallback cb, message.Identifier[] reqHashIds) {
         this.cb = cb;
+        this.reqHashIds = reqHashIds;
         super(mgr, null);
     }
 
@@ -369,6 +372,11 @@ public:
             this.remoteAsset = remoteAsset;
             create(remoteAsset.size);
             mgr.log.trace("Caching remoteAsset of size {}", size);
+
+            auto meta = new AssetMetaData;
+            meta.localId = id;
+            meta.hashIds = reqHashIds;
+            mgr.addToIdMap(meta);
         }
         cb(this, status);
     }
@@ -406,7 +414,8 @@ private:
         }
         void callback(IAsset asset, ulong offset, ubyte[] data, message.Status status) {
             if (status == message.Status.SUCCESS) {
-                add(offset, data);
+                if (cacheMap) // If Still open for writing, may have stale requests
+                    add(offset, data);
                 tryRead();
             }
         }
@@ -480,7 +489,8 @@ public:
             }
         }
         IServerAsset forwardRequest() {
-            auto asset = new CachingAsset(this, cb);
+            auto asset = new CachingAsset(this, cb, req.ids);
+            asset.takeRef();
             return router.findAsset(req, &asset.remoteCallback);
         }
 

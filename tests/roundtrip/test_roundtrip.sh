@@ -6,7 +6,7 @@ SERVER="$BINDIR/server"
 BHUPLOAD="$BINDIR/bhupload"
 BHGET="$BINDIR/bhget"
 TESTFILE=testfile
-TESTSIZE=4096
+TESTSIZE=16
 
 function clean() {
     rm -rf cache? *.log "$TESTFILE"{,.new}
@@ -14,7 +14,10 @@ function clean() {
 
 function setup() {
     mkdir cachea cacheb
-    dd if=/dev/urandom of="$TESTFILE" bs=1024 count=$TESTSIZE
+}
+
+function create_testfile() {
+    dd if=/dev/urandom of="$TESTFILE" bs=1048576 count=$TESTSIZE 2>/dev/null
 }
 
 function verify_equal() {
@@ -65,20 +68,27 @@ function daemons_stop() {
 echo "Starting up Nodes..."
 daemons_start
 
+echo "Preparing testfile..."
+create_testfile
+
 echo "Uploading to A..."
-MAGNET=$("$BHUPLOAD" -u/tmp/bithorde-rta "$TESTFILE"|grep '^magnet:')
+MAGNETURL=$("$BHUPLOAD" -u/tmp/bithorde-rta "$TESTFILE"|grep '^magnet:')
 verify_equal cachea/?????????????????????* || exit_error "Uploaded file did not match upload source"
 verify_done cacheb/?????????????????????* || exit_error "Uploaded file still has an index, indicating not done"
 
-echo "Getting from B..."
-"$BHGET" -u/tmp/bithorde-rtb -sy "$MAGNET" | verify_equal || exit_error "Downloaded file did not match upload source"
+echo "Getting (2 in parallel) from B..."
+"$BHGET" -u/tmp/bithorde-rtb -sy "$MAGNETURL" | verify_equal || exit_error "Downloaded file did not match upload source" &
+sleep 0.01
+"$BHGET" -u/tmp/bithorde-rtb -sy "$MAGNETURL" | verify_equal || exit_error "Downloaded file did not match upload source"
+wait $!
 verify_done cacheb/?????????????????????* || exit_error "Cached asset still has an index, indicating not done"
 verify_equal cacheb/?????????????????????* || exit_error "File wasn't cached properly"
+[ $(grep -c 'serving [0-9a-f]* from cache' a.log) -eq 1 ] || exit_error "File was doubly-transfered from node A"
 
 echo "Shutting down A..."
 quiet_stop $DAEMON1
 
 echo "Re-Getting from B..."
-"$BHGET" -u/tmp/bithorde-rtb -sy "$MAGNET" | verify_equal || exit_error "Re-Download from cache failed"
+"$BHGET" -u/tmp/bithorde-rtb -sy "$MAGNETURL" | verify_equal || exit_error "Re-Download from cache failed"
 
 exit_success

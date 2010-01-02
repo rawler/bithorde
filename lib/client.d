@@ -136,8 +136,11 @@ protected:
         scope auto resp = new message.ReadResponse;
         resp.decode(buf);
         auto req = cast(message.ReadRequest)releaseRequest(resp);
-        assert(req, "ReadResponse, but not ReadRequest");
-        req.callback(openAssets[req.handle], resp.offset, resp.content, resp.status);
+        auto asset = req.handle in openAssets;
+        if (asset)
+            req.callback(*asset, resp.offset, resp.content, resp.status);
+        else
+            req.callback(null, resp.offset, resp.content, resp.status);
     }
     synchronized void processMetaDataResponse(ubyte[] buf) {
         scope auto resp = new message.MetaDataResponse;
