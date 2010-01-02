@@ -265,31 +265,31 @@ public:
     mixin IRefCounted.Impl;
 }
 
-abstract class WriteableAsset : CachedAsset {
+class WriteableAsset : CachedAsset {
 protected:
     CacheMap cacheMap;
+    Hash[HashType] hashes;
+    uint hashingptr;
 public:
     this(CacheManager mgr, ubyte[] id) {
         if (!id) {
             id = new ubyte[32];
             rand.randomizeUniform!(ubyte[],false)(id);
         }
+        foreach (k,hash; HashMap)
+            hashes[hash.pbType] = hash.factory();
         super(mgr, id);
     }
     ~this() {
         if (cacheMap)
             delete cacheMap;
+        foreach (hash;hashes)
+            delete hash;
     }
 
-    synchronized void add(ulong offset, ubyte[] data) {
-        if (!cacheMap)
-            throw new IOException("Trying to write to a completed file");
-        file.seek(offset);
-        file.write(data);
-        cacheMap.add(offset, data.length);
-    }
-
-    void create(ulong size) {
+    void create(ulong size)
+    in { assert(size > 0); }
+    body {
         cacheMap = new CacheMap(idxPath);
         file = new File(path.toString, File.Style(File.Access.ReadWrite, File.Open.New));
         file.truncate(size);
@@ -301,10 +301,57 @@ public:
     }
 
     synchronized void aSyncRead(ulong offset, uint length, BHReadCallback cb) {
-        if (cacheMap.has(offset, length))
+        if (!cacheMap || cacheMap.has(offset, length))
             super.aSyncRead(offset, length, cb);
         else
             throw new MissingSegmentException("Missing given segment");
+    }
+    synchronized void add(ulong offset, ubyte[] data) {
+        if (!cacheMap)
+            throw new IOException("Trying to write to a completed file");
+        file.seek(offset);
+        file.write(data);
+        cacheMap.add(offset, data.length);
+        updateHashes();
+    }
+protected:
+    void updateHashes() {
+        auto zeroBlockSize = cacheMap.zeroBlockSize;
+        if (zeroBlockSize > hashingptr) {
+            scope auto newdata = new ubyte[zeroBlockSize - hashingptr];
+            file.seek(hashingptr);
+            auto read = file.read(newdata);
+            assert(read == newdata.length);
+            foreach (hash; hashes) {
+                hash.update(newdata);
+            }
+            if (zeroBlockSize == file.length)
+                finish();
+            else
+                hashingptr = zeroBlockSize;
+        }
+    }
+
+    void finish() {
+        assert(cacheMap.segcount == 1);
+        assert(cacheMap.segments[0].start == 0);
+        assert(cacheMap.segments[0].end == file.length);
+        mgr.log.trace("Asset complete");
+        auto asset = new AssetMetaData;
+        asset.localId = _id.dup;
+
+        foreach (type, hash; hashes) {
+            auto digest = hash.digest;
+            auto hashId = new message.Identifier;
+            hashId.type = type;
+            hashId.id = digest.dup;
+            asset.hashIds ~= hashId;
+        }
+
+        mgr.addToIdMap(asset);
+
+        cacheMap.path.remove();
+        delete cacheMap;
     }
 }
 
@@ -357,67 +404,6 @@ private:
                 tryRead();
             }
         }
-    }
-}
-
-class UploadAsset : WriteableAsset {
-private:
-    Hash[HashType] hashes;
-    uint hashingptr;
-public:
-    this(CacheManager mgr, ulong size)
-    in { assert(size > 0); }
-    body{
-        super(mgr, null);
-        create(size);
-        foreach (k,hash; HashMap)
-            hashes[hash.pbType] = hash.factory();
-        mgr.log.trace("Upload started");
-    }
-    ~this() {
-        foreach (hash;hashes)
-            delete hash;
-        mgr.log.trace("Upload finished");
-    }
-
-    synchronized void add(ulong offset, ubyte[] data) {
-        super.add(offset, data);
-        auto zeroBlockSize = cacheMap.zeroBlockSize;
-        if (zeroBlockSize > hashingptr) {
-            scope auto newdata = new ubyte[zeroBlockSize - hashingptr];
-            file.seek(hashingptr);
-            auto read = file.read(newdata);
-            assert(read == newdata.length);
-            foreach (hash; hashes) {
-                hash.update(newdata);
-            }
-            if (zeroBlockSize == file.length)
-                finish();
-            else
-                hashingptr = zeroBlockSize;
-        }
-    }
-
-protected:
-    void finish() {
-        assert(cacheMap.segcount == 1);
-        assert(cacheMap.segments[0].start == 0);
-        assert(cacheMap.segments[0].end == file.length);
-        auto asset = new AssetMetaData;
-        asset.localId = _id.dup;
-        
-        foreach (type, hash; hashes) {
-            auto digest = hash.digest;
-            auto hashId = new message.Identifier;
-            hashId.type = type;
-            hashId.id = digest.dup;
-            asset.hashIds ~= hashId;
-        }
-
-        mgr.addToIdMap(asset);
-        
-        cacheMap.path.remove();
-        delete cacheMap;
     }
 }
 
@@ -509,9 +495,10 @@ public:
             return openAsset(localId);
         }
     }
-    UploadAsset uploadAsset(UploadRequest req) {
+    WriteableAsset uploadAsset(UploadRequest req) {
         try {
-            auto newAsset = new UploadAsset(this, req.size);
+            auto newAsset = new WriteableAsset(this, null);
+            newAsset.create(req.size);
             newAsset.takeRef();
             return newAsset;
         } catch (IOException e) {
