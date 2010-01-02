@@ -6,6 +6,7 @@ SERVER="$BINDIR/server"
 BHUPLOAD="$BINDIR/bhupload"
 BHGET="$BINDIR/bhget"
 TESTFILE=testfile
+TESTSIZE=4096
 
 function clean() {
     rm -rf cache? *.log "$TESTFILE"{,.new}
@@ -13,7 +14,7 @@ function clean() {
 
 function setup() {
     mkdir cachea cacheb
-    dd if=/dev/urandom of="$TESTFILE" bs=1024 count=1024
+    dd if=/dev/urandom of="$TESTFILE" bs=1024 count=$TESTSIZE
 }
 
 function verify_equal() {
@@ -61,17 +62,23 @@ function daemons_stop() {
     done
 }
 
+echo "Starting up Nodes..."
 daemons_start
+
+echo "Uploading to A..."
 MAGNET=$("$BHUPLOAD" -u/tmp/bithorde-rta "$TESTFILE"|grep '^magnet:')
 verify_equal cachea/?????????????????????* || exit_error "Uploaded file did not match upload source"
 verify_done cacheb/?????????????????????* || exit_error "Uploaded file still has an index, indicating not done"
 
+echo "Getting from B..."
 "$BHGET" -u/tmp/bithorde-rtb -sy "$MAGNET" | verify_equal || exit_error "Downloaded file did not match upload source"
 verify_done cacheb/?????????????????????* || exit_error "Cached asset still has an index, indicating not done"
 verify_equal cacheb/?????????????????????* || exit_error "File wasn't cached properly"
 
+echo "Shutting down A..."
 quiet_stop $DAEMON1
 
-#"$BHGET" -u/tmp/bithorde-rtb -sy "$MAGNET" | verify_equal || exit_error "Re-Download from cache failed"
+echo "Re-Getting from B..."
+"$BHGET" -u/tmp/bithorde-rtb -sy "$MAGNET" | verify_equal || exit_error "Re-Download from cache failed"
 
 exit_success
