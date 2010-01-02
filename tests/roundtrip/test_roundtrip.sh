@@ -16,12 +16,12 @@ function setup() {
     dd if=/dev/urandom of="$TESTFILE" bs=1024 count=1024
 }
 
-function verify_upload() {
-    cmp cachea/?????????????????????* $TESTFILE
-}
-
-function verify_download() {
-    cmp "$TESTFILE"{,.new}
+function verify() {
+    if [ -e "$1" ]; then
+        cmp "$1" $TESTFILE
+    else
+        return 1;
+    fi
 }
 
 function exit_error() {
@@ -54,10 +54,10 @@ function daemons_stop() {
 
 daemons_start
 MAGNET=$("$BHUPLOAD" -u/tmp/bithorde-rta "$TESTFILE"|grep '^magnet:')
-verify_upload || exit_error "Uploaded file did not match upload source"
+verify cachea/?????????????????????* || exit_error "Uploaded file did not match upload source"
 
 "$BHGET" -u/tmp/bithorde-rtb -sy "$MAGNET" > "$TESTFILE.new"
-
-verify_download || exit_error "Downloaded file did not match upload source"
+verify cacheb/?????????????????????* || exit_error "File wasn't cached properly"
+verify "$TESTFILE.new" || exit_error "Downloaded file did not match upload source"
 
 exit_success

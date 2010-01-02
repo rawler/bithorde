@@ -234,8 +234,10 @@ public:
     }
 
     void open() {
-        this.mgr.openAssets[this.id] = this;
+        if (idxPath.exists)
+            throw new IOException("Asset is not completely cached.");
         file = new File(path.toString, File.ReadExisting);
+        this.mgr.openAssets[this.id] = this;
     }
 
     synchronized void aSyncRead(ulong offset, uint length, BHReadCallback cb) {
@@ -287,9 +289,10 @@ public:
         cacheMap.add(offset, data.length);
     }
 
-    void create() {
+    void create(ulong size) {
         cacheMap = new CacheMap(idxPath);
         file = new File(path.toString, File.Style(File.Access.ReadWrite, File.Open.New));
+        file.truncate(size);
     }
 
     void open() {
@@ -299,9 +302,9 @@ public:
 
     synchronized void aSyncRead(ulong offset, uint length, BHReadCallback cb) {
         if (cacheMap.has(offset, length))
-            throw new MissingSegmentException("Missing given segment");
-        else
             super.aSyncRead(offset, length, cb);
+        else
+            throw new MissingSegmentException("Missing given segment");
     }
 }
 
@@ -318,9 +321,10 @@ public:
     void remoteCallback(IServerAsset remoteAsset, message.Status status) {
         if (remoteAsset && (status == message.Status.SUCCESS)) {
             this.remoteAsset = remoteAsset;
-            create();
+            create(remoteAsset.size);
+            mgr.log.trace("Caching remoteAsset of size {}", size);
         }
-        cb(remoteAsset, status);
+        cb(this, status);
     }
 
     // TODO: Intercept and forward missing segments
@@ -344,7 +348,7 @@ private:
             try {
                 realRead(offset, length, cb);
             } catch (MissingSegmentException e) {
-                remoteAsset.aSyncRead(offset,length,cb);
+                remoteAsset.aSyncRead(offset, length, &callback);
             }
         }
         void callback(IAsset asset, ulong offset, ubyte[] data, message.Status status) {
@@ -365,8 +369,7 @@ public:
     in { assert(size > 0); }
     body{
         super(mgr, null);
-        create();
-        file.truncate(size);
+        create(size);
         foreach (k,hash; HashMap)
             hashes[hash.pbType] = hash.factory();
         mgr.log.trace("Upload started");
@@ -485,7 +488,8 @@ public:
             }
         }
         IServerAsset forwardRequest() {
-            return router.findAsset(req, cb);
+            auto asset = new CachingAsset(this, cb);
+            return router.findAsset(req, &asset.remoteCallback);
         }
 
         ubyte[] localId;
