@@ -213,65 +213,44 @@ public:
     }
 }
 
-class CachedAsset : public File, IServerAsset {
+class CachedAsset : IServerAsset {
 protected:
     CacheManager mgr;
     FilePath path;
+    FilePath idxPath;
     ubyte[] _id;
-    CacheMap cacheMap;
+    File file;
 public:
-    this(CacheManager mgr, ubyte[] id, bool create = false) {
-        // TODO: Merge id and create
+    this(CacheManager mgr, ubyte[] id) {
         this.mgr = mgr;
         this._id = id.dup;
         this.path = mgr.assetDir.dup.append(bytesToHex(id));
-
-        if (path.exists && create)
-            throw new IllegalArgumentException("Trying to create already existing file");
-
-        File.Style style;
-        style.open = create ? File.Open.Sedate : File.Open.Exists;
-        style.share = File.Share.None;
-        style.cache = File.Cache.Random;
-
-        auto idxPath = path.dup.suffix(".idx");
-        if (idxPath.exists || create) {
-            cacheMap = new CacheMap(idxPath);
-            style.access = File.Access.ReadWrite;
-        } else {
-            style.access = File.Access.Read;
-        }
-
-        super(path.toString, style);
-
-        this.mgr.openAssets[this.id] = this;
+        this.idxPath = path.dup.suffix(".idx");
     }
     ~this() {
-        if (cacheMap)
-            delete cacheMap;
-        close();
+        if (file)
+            file.close();
         mgr.openAssets.remove(id);
     }
 
+    void open() {
+        this.mgr.openAssets[this.id] = this;
+        file = new File(path.toString, File.ReadExisting);
+    }
+
     synchronized void aSyncRead(ulong offset, uint length, BHReadCallback cb) {
-        if (cacheMap && !cacheMap.has(offset, length))
-            throw new MissingSegmentException("Missing given segment");
         ubyte[] buf = tlsBuffer(length);
-        seek(offset);
-        auto got = super.read(buf);
+        file.seek(offset);
+        auto got = file.read(buf);
         cb(this, offset, buf[0..got], message.Status.SUCCESS);
     }
 
-    synchronized void add(ulong offset, ubyte[] data) {
-        if (!cacheMap)
-            throw new IOException("Trying to write to a completed file");
-        seek(offset);
-        write(data);
-        cacheMap.add(offset, data.length);
+    void add(ulong offset, ubyte[] data) {
+        throw new IOException("Trying to write to a completed file");
     }
 
     final ulong size() {
-        return super.length;
+        return file.length;
     }
 
     AssetMetaData metadata() {
@@ -284,19 +263,110 @@ public:
     mixin IRefCounted.Impl;
 }
 
-class UploadAsset : CachedAsset {
+abstract class WriteableAsset : CachedAsset {
+protected:
+    CacheMap cacheMap;
+public:
+    this(CacheManager mgr, ubyte[] id) {
+        if (!id) {
+            id = new ubyte[32];
+            rand.randomizeUniform!(ubyte[],false)(id);
+        }
+        super(mgr, id);
+    }
+    ~this() {
+        if (cacheMap)
+            delete cacheMap;
+    }
+
+    synchronized void add(ulong offset, ubyte[] data) {
+        if (!cacheMap)
+            throw new IOException("Trying to write to a completed file");
+        file.seek(offset);
+        file.write(data);
+        cacheMap.add(offset, data.length);
+    }
+
+    void create() {
+        cacheMap = new CacheMap(idxPath);
+        file = new File(path.toString, File.Style(File.Access.ReadWrite, File.Open.New));
+    }
+
+    void open() {
+        cacheMap = new CacheMap(idxPath);
+        super.open();
+    }
+
+    synchronized void aSyncRead(ulong offset, uint length, BHReadCallback cb) {
+        if (cacheMap.has(offset, length))
+            throw new MissingSegmentException("Missing given segment");
+        else
+            super.aSyncRead(offset, length, cb);
+    }
+}
+
+class CachingAsset : WriteableAsset {
+    // TODO: Validate on finish
+    BHServerOpenCallback cb;
+    IServerAsset remoteAsset;
+public:
+    this (CacheManager mgr, BHServerOpenCallback cb) {
+        this.cb = cb;
+        super(mgr, null);
+    }
+
+    void remoteCallback(IServerAsset remoteAsset, message.Status status) {
+        if (remoteAsset && (status == message.Status.SUCCESS)) {
+            this.remoteAsset = remoteAsset;
+            create();
+        }
+        cb(remoteAsset, status);
+    }
+
+    // TODO: Intercept and forward missing segments
+    synchronized void aSyncRead(ulong offset, uint length, BHReadCallback cb) {
+        auto r = new ForwardedRead;
+        r.offset = offset;
+        r.length = length;
+        r.cb = cb;
+        r.tryRead();
+    }
+private:
+    void realRead(ulong offset, uint length, BHReadCallback cb) {
+        super.aSyncRead(offset, length, cb);
+    }
+
+    class ForwardedRead {
+        ulong offset;
+        uint length;
+        BHReadCallback cb;
+        void tryRead() {
+            try {
+                realRead(offset, length, cb);
+            } catch (MissingSegmentException e) {
+                remoteAsset.aSyncRead(offset,length,cb);
+            }
+        }
+        void callback(IAsset asset, ulong offset, ubyte[] data, message.Status status) {
+            if (status == message.Status.SUCCESS) {
+                add(offset, data);
+                tryRead();
+            }
+        }
+    }
+}
+
+class UploadAsset : WriteableAsset {
 private:
     Hash[HashType] hashes;
     uint hashingptr;
-    File file;
 public:
     this(CacheManager mgr, ulong size)
     in { assert(size > 0); }
     body{
-        auto tempId = new ubyte[32];
-        rand.randomizeUniform!(ubyte[],false)(tempId);
-        super(mgr, tempId, true);
-        truncate(size);
+        super(mgr, null);
+        create();
+        file.truncate(size);
         foreach (k,hash; HashMap)
             hashes[hash.pbType] = hash.factory();
         mgr.log.trace("Upload started");
@@ -312,24 +382,24 @@ public:
         auto zeroBlockSize = cacheMap.zeroBlockSize;
         if (zeroBlockSize > hashingptr) {
             scope auto newdata = new ubyte[zeroBlockSize - hashingptr];
-            seek(hashingptr);
-            auto read = read(newdata);
+            file.seek(hashingptr);
+            auto read = file.read(newdata);
             assert(read == newdata.length);
             foreach (hash; hashes) {
                 hash.update(newdata);
             }
-            if (zeroBlockSize == length)
+            if (zeroBlockSize == file.length)
                 finish();
             else
                 hashingptr = zeroBlockSize;
         }
     }
 
-private:
+protected:
     void finish() {
         assert(cacheMap.segcount == 1);
         assert(cacheMap.segments[0].start == 0);
-        assert(cacheMap.segments[0].end == length);
+        assert(cacheMap.segments[0].end == file.length);
         auto asset = new AssetMetaData;
         asset.localId = _id.dup;
         
@@ -397,15 +467,25 @@ public:
             hashIdMap[message.HashType.ED2K] = null;
         }
     }
-    IServerAsset findAsset(OpenRequest req) {
+    IServerAsset findAsset(OpenRequest req, BHServerOpenCallback cb) {
         IServerAsset fromCache(CachedAsset asset) {
             asset.takeRef();
             log.trace("serving {} from cache", bytesToHex(asset.id));
             req.callback(asset, message.Status.SUCCESS);
             return asset;
         }
+        IServerAsset openAsset(ubyte[] localId) {
+            try {
+                auto newAsset = new CachedAsset(this, localId);
+                newAsset.open();
+                return fromCache(newAsset);
+            } catch (IOException e) {
+                log.error("While opening asset: {}", e);
+                return null;
+            }
+        }
         IServerAsset forwardRequest() {
-            return router.findAsset(req);
+            return router.findAsset(req, cb);
         }
 
         ubyte[] localId;
@@ -419,18 +499,10 @@ public:
         if (!localId) {
             log.trace("Unknown asset, forwarding {}", req);
             return forwardRequest();
-        }
-
-        if (auto asset = localId in openAssets) {
+        } else if (auto asset = localId in openAssets) {
             return fromCache(*asset);
         } else {
-            try {
-                auto newAsset = new CachedAsset(this, localId);
-                return fromCache(newAsset);
-            } catch (IOException e) {
-                log.error("While opening asset: {}", e);
-                return null;
-            }
+            return openAsset(localId);
         }
     }
     UploadAsset uploadAsset(UploadRequest req) {

@@ -99,8 +99,8 @@ public:
         }
     }
 
-    IServerAsset findAsset(OpenRequest req) {
-        return cacheMgr.findAsset(req);
+    IServerAsset findAsset(OpenRequest req, BHServerOpenCallback cb) {
+        return cacheMgr.findAsset(req, cb);
     }
 
     IServerAsset uploadAsset(UploadRequest req) {

@@ -35,7 +35,7 @@ interface IRefCounted {
 
 interface IServerAsset : IAsset, IRefCounted {}
 interface IAssetSource {
-    IServerAsset findAsset(daemon.client.OpenRequest req);
+    IServerAsset findAsset(daemon.client.OpenRequest req, BHServerOpenCallback cb);
 }
 
 class OpenRequest : message.OpenRequest {
@@ -140,7 +140,7 @@ protected:
         ulong uuid = req.uuid;
         if (uuid == 0)
             uuid = rand.uniformR2!(ulong)(1,ulong.max);
-        server.findAsset(req);
+        server.findAsset(req, &req.callback);
     }
 
     void processUploadRequest(ubyte[] buf)

@@ -15,11 +15,11 @@ private:
 package:
     uint waitingResponses;
 public:
-    this (Router router, daemon.client.OpenRequest req)
+    this (Router router, daemon.client.OpenRequest req, BHServerOpenCallback cb)
     {
         this.router = router;
         this.req = req;
-        this.waitingResponses = 0;
+        this.openCallback = cb;
     }
     ~this() {
         assert(waitingResponses == 0); // We've got to fix timeouts some day.
@@ -51,7 +51,7 @@ public:
 package:
     void doCallback() {
         router.openRequests.remove(req.uuid);
-        req.callback(this, (backingAssets.length > 0) ? Status.SUCCESS : Status.NOTFOUND);
+        openCallback(this, (backingAssets.length > 0) ? Status.SUCCESS : Status.NOTFOUND);
     }
 }
 
@@ -65,11 +65,11 @@ public:
         this.server = server;
     }
 
-    ForwardedAsset findAsset(daemon.client.OpenRequest req) {
+    ForwardedAsset findAsset(daemon.client.OpenRequest req, BHServerOpenCallback cb) {
         if (req.uuid in openRequests)
             req.callback(null, Status.WOULD_LOOP);
         else
-            return forwardOpenRequest(req, req.client);
+            return forwardOpenRequest(req, cb);
     }
 
     void registerFriend(Friend f) {
@@ -86,13 +86,13 @@ public:
         }
     }
 private:
-    ForwardedAsset forwardOpenRequest(daemon.client.OpenRequest req, Client origin) {
+    ForwardedAsset forwardOpenRequest(daemon.client.OpenRequest req, BHServerOpenCallback cb) {
         bool forwarded = false;
-        auto asset = new ForwardedAsset(this, req);
+        auto asset = new ForwardedAsset(this, req, cb);
         asset.takeRef();
         foreach (friend; connectedFriends) {
             auto client = friend.c;
-            if (client != origin) {
+            if (client != req.client) {
                 asset.waitingResponses += 1;
                 client.open(req.ids, &asset.addBackingAsset, req.uuid);
                 forwarded = true;
