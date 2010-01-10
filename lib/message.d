@@ -68,6 +68,8 @@ enum Status {
     NOTFOUND = 2,
     INVALID_HANDLE = 3,
     WOULD_LOOP = 4,
+    DISCONNECTED = 5,
+    TIMEOUT = 6,
 }
 
 private import lib.asset;
