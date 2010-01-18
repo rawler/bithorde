@@ -78,7 +78,7 @@ verify_done cacheb/?????????????????????* || exit_error "Uploaded file still has
 
 echo "Getting (2 in parallel) from B..."
 "$BHGET" -u/tmp/bithorde-rtb -sy "$MAGNETURL" | verify_equal || exit_error "Downloaded file did not match upload source" &
-sleep 0.01
+sleep 0.1
 "$BHGET" -u/tmp/bithorde-rtb -sy "$MAGNETURL" | verify_equal || exit_error "Downloaded file did not match upload source"
 wait $!
 verify_done cacheb/?????????????????????* || exit_error "Cached asset still has an index, indicating not done"
