@@ -41,8 +41,35 @@ ubyte[] hexToBytes(char[] hex, ubyte[] buf = null) {
 }
 
 class RemoteAsset : private message.OpenResponse, IAsset {
+    class ReadRequest : message.ReadRequest {
+        BHReadCallback _callback;
+        this(BHReadCallback cb) {
+            this.handle = this.outer.handle;
+            _callback = cb;
+        }
+        void callback(message.ReadResponse resp) {
+            _callback(this.outer, resp.status, this, resp);
+        }
+        void abort(message.Status s) {
+            _callback(this.outer, s, this, null);
+        }
+    }
+    class MetaDataRequest : message.MetaDataRequest {
+        BHMetaDataCallback _callback;
+        this(BHMetaDataCallback cb) {
+            this.handle = this.outer.handle;
+            _callback = cb;
+        }
+        void callback(message.MetaDataResponse resp) {
+            _callback(this.outer, resp.status, this, resp);
+        }
+        void abort(message.Status s) {
+            _callback(this.outer, s, this, null);
+        }
+    }
 private:
     Client client;
+    bool closed;
 
     message.OpenRequest _req;
     final message.OpenRequest openRequest() {
@@ -56,25 +83,19 @@ protected:
         this.client = c;
     }
     ~this() {
-        auto req = new message.Close;
-        req.handle = handle;
-        client.sendMessage(req);
-        client.openAssets.remove(handle);
+        if (!closed)
+            close();
     }
 public:
     void aSyncRead(ulong offset, uint size, BHReadCallback readCallback) {
-        auto req = new message.ReadRequest;
-        req.handle = handle;
+        auto req = new ReadRequest(readCallback);
         req.offset = offset;
         req.size = size;
-        req.callback = readCallback;
         client.sendRequest(req);
     }
 
     void requestMetaData(BHMetaDataCallback cb) {
-        auto req = new message.MetaDataRequest;
-        req.handle = handle;
-        req.callback = cb;
+        auto req = new MetaDataRequest(cb);
         client.sendRequest(req);
     }
 
@@ -89,10 +110,36 @@ public:
     final ulong size() {
         return super.size;
     }
+
+    void close() {
+        closed = true;
+        auto req = new message.Close;
+        req.handle = handle;
+        client.sendMessage(req);
+        client.openAssets.remove(handle);
+    }
 }
 
 class Client : Connection {
 private:
+    class UploadRequest : message.UploadRequest {
+        BHOpenCallback callback;
+        this(BHOpenCallback cb) {
+            this.callback = cb;
+        }
+        void abort(message.Status s) {
+            callback(null, s, this, null);
+        }
+    }
+    class OpenRequest : message.OpenRequest {
+        BHOpenCallback callback;
+        this(BHOpenCallback cb) {
+            this.callback = cb;
+        }
+        void abort(message.Status s) {
+            callback(null, s, this, null);
+        }
+    }
     RemoteAsset[uint] openAssets;
 public:
     this (Socket s, char[] name)
@@ -108,46 +155,49 @@ public:
               BHOpenCallback openCallback) {
         open(ids, openCallback, rand.uniformR2!(ulong)(1,ulong.max));
     }
+
     void beginUpload(ulong size, BHOpenCallback cb) {
-        auto req = new message.UploadRequest;
+        auto req = new UploadRequest(cb);
         req.size = size;
-        req.callback = cb;
         sendRequest(req);
     }
 package:
     void open(message.Identifier[] ids, BHOpenCallback openCallback, ulong uuid) {
-        auto req = new message.OpenRequest;
+        auto req = new OpenRequest(openCallback);
         req.ids = ids;
         req.uuid = uuid;
-        req.callback = openCallback;
         sendRequest(req);
     }
 protected:
     synchronized void processOpenResponse(ubyte[] buf) {
         auto resp = new RemoteAsset(this);
         resp.decode(buf);
-        auto req = cast(message.OpenOrUploadRequest)releaseRequest(resp);
-        assert(req, "OpenResponse, but not OpenOrUploadRequest");
         if (resp.status == message.Status.SUCCESS)
             openAssets[resp.handle] = resp;
-        req.callback(resp, resp.status);
+        auto basereq = releaseRequest(resp);
+        if (basereq.typeId == message.Type.UploadRequest) {
+            auto req = cast(UploadRequest)basereq;
+            assert(req, "OpenResponse, but not OpenOrUploadRequest");
+            req.callback(resp, resp.status, req, resp);
+        } else if (basereq.typeId == message.Type.OpenRequest) {
+            auto req = cast(OpenRequest)basereq;
+            assert(req, "OpenResponse, but not OpenOrUploadRequest");
+            req.callback(resp, resp.status, req, resp);
+        }
     }
     synchronized void processReadResponse(ubyte[] buf) {
         scope auto resp = new message.ReadResponse;
         resp.decode(buf);
-        auto req = cast(message.ReadRequest)releaseRequest(resp);
-        auto asset = req.handle in openAssets;
-        if (asset)
-            req.callback(*asset, resp.offset, resp.content, resp.status);
-        else
-            req.callback(null, resp.offset, resp.content, resp.status);
+        auto req = cast(RemoteAsset.ReadRequest)releaseRequest(resp);
+        assert(req, "ReadResponse, but not MetaDataRequest");
+        req.callback(resp);
     }
     synchronized void processMetaDataResponse(ubyte[] buf) {
         scope auto resp = new message.MetaDataResponse;
         resp.decode(buf);
-        auto req = cast(message.MetaDataRequest)releaseRequest(resp);
+        auto req = cast(RemoteAsset.MetaDataRequest)releaseRequest(resp);
         assert(req, "MetaDataResponse, but not MetaDataRequest");
-        req.callback(openAssets[req.handle], resp);
+        req.callback(resp);
     }
     void processOpenRequest(ubyte[] buf) {
         throw new AssertException("Danger Danger! This client should not get requests!", __FILE__, __LINE__);

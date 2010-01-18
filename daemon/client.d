@@ -55,14 +55,15 @@ class OpenRequest : message.OpenRequest {
                 resp.handle = handle;
                 resp.size = asset.size;
                 break;
-            case message.Status.NOTFOUND:
-                break;
-            case message.Status.WOULD_LOOP:
+            default:
                 break;
             }
             client.sendMessage(resp);
         }
         delete this;
+    }
+    void abort(message.Status s) {
+        callback(null, s);
     }
 }
 
@@ -88,6 +89,9 @@ class UploadRequest : message.UploadRequest {
         }
         delete this;
     }
+    void abort(message.Status s) {
+        callback(null, s);
+    }
 }
 
 class ReadRequest : message.ReadRequest {
@@ -96,16 +100,19 @@ public:
     this(Client c) {
         client = c;
     }
-    final void callback(IAsset asset, ulong offset, ubyte[] content, message.Status status) {
+    final void callback(IAsset asset, message.Status status, message.ReadRequest remoteReq, message.ReadResponse remoteResp) {
         if (client) {
             scope auto resp = new message.ReadResponse;
             resp.rpcId = rpcId;
-            resp.content = content;
+            resp.offset = remoteResp.offset;
+            resp.content = remoteResp.content;
             resp.status = status;
-            resp.offset = offset;
             client.sendMessage(resp);
         }
         delete this;
+    }
+    void abort(message.Status s) {
+        callback(null, s, null, null);
     }
 }
 
@@ -134,7 +141,7 @@ public:
 protected:
     void processOpenRequest(ubyte[] buf)
     {
-        auto req = new OpenRequest(this);
+        auto req = new daemon.client.OpenRequest(this);
         req.decode(buf);
         log.trace("Got open request");
         ulong uuid = req.uuid;
@@ -149,7 +156,7 @@ protected:
             log.warn("Got UploadRequest from unauthorized client {}", this);
             return;
         }
-        auto req = new UploadRequest(this);
+        auto req = new daemon.client.UploadRequest(this);
         req.decode(buf);
         log.trace("Got UploadRequest from trusted client");
         server.uploadAsset(req);
@@ -184,7 +191,11 @@ protected:
     }
 
     void processMetaDataRequest(ubyte[] buf) {
-        scope auto req = new message.MetaDataRequest();
+        // Create anon class to satisfy abstract abort().
+        // MetaData is always local and never async, so don't need full storage
+        scope auto req = new class message.MetaDataRequest {
+            void abort(message.Status s) {}
+        };
         req.decode(buf);
         scope auto resp = new message.MetaDataResponse;
         resp.rpcId = req.rpcId;

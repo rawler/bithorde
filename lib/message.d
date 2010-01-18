@@ -41,21 +41,6 @@ public:
     abstract Type typeId();
 }
 
-abstract class RPCMessage : Message {
-    ushort rpcId;    // Local-link request id
-}
-
-abstract class RPCRequest : RPCMessage {
-}
-
-abstract class RPCResponse : RPCMessage {
-    RPCRequest request;
-    ~this() {
-        if (request)
-            delete request;
-    }
-}
-
 enum HashType
 {
     SHA1 = 1,
@@ -71,6 +56,22 @@ enum Status {
     WOULD_LOOP = 4,
     DISCONNECTED = 5,
     TIMEOUT = 6,
+}
+
+abstract class RPCMessage : Message {
+    ushort rpcId;    // Local-link request id
+}
+
+abstract class RPCRequest : RPCMessage {
+    abstract void abort(Status s);
+}
+
+abstract class RPCResponse : RPCMessage {
+    RPCRequest request;
+    ~this() {
+        if (request)
+            delete request;
+    }
 }
 
 private import lib.asset;
@@ -92,7 +93,6 @@ class HandShake : Message {
 }
 
 package class OpenOrUploadRequest : RPCRequest {
-    BHOpenCallback callback;
 }
 
 class OpenRequest : OpenOrUploadRequest {
@@ -136,8 +136,6 @@ class ReadRequest : RPCRequest {
                         PBField!("size",      4)());
 
     Type typeId() { return Type.ReadRequest; }
-
-    BHReadCallback callback;
 }
 
 class ReadResponse : RPCResponse {
@@ -169,8 +167,6 @@ class MetaDataRequest : RPCRequest {
                         PBField!("handle",    2)());
 
     Type typeId() { return Type.MetaDataRequest; }
-
-    BHMetaDataCallback callback;
 }
 
 class MetaDataResponse : RPCResponse {

@@ -117,7 +117,7 @@ public:
         client.open(args.ids, &onOpen);
     }
     ~this(){
-        delete asset;
+        asset.close();
         delete client;
     }
 
@@ -142,10 +142,10 @@ private:
         this.exitStatus = exitStatus;
     }
 
-    void onRead(IAsset asset, ulong offset, ubyte[] data, Status status) {
+    void onRead(IAsset asset, Status status, ReadRequest req, ReadResponse resp) {
         assert(asset == this.asset);
-        output.queue(offset, data);
-        auto newoffset = offset + data.length;
+        output.queue(resp.offset, resp.content);
+        auto newoffset = resp.offset + resp.content.length;
         orderData();
         if (pBar)
             pBar.update(orderOffset);
@@ -161,7 +161,7 @@ private:
         }
     }
 
-    void onOpen(IAsset asset, Status status) {
+    void onOpen(IAsset asset, Status status, OpenOrUploadRequest req, OpenResponse resp) {
         switch (status) {
         case Status.SUCCESS:
             if (args.verbose)

@@ -8,9 +8,10 @@ alias ushort  AssetHandle;
 interface IAsset {
     void aSyncRead(ulong offset, uint length, BHReadCallback);
     ulong size();
+    void close();
 }
 
-alias void delegate(IAsset, Status status) BHOpenCallback;
-alias void delegate(IAsset, ulong offset, ubyte[], Status status) BHReadCallback;
-alias void delegate(IAsset, MetaDataResponse response) BHMetaDataCallback;
+alias void delegate(IAsset, Status status, OpenOrUploadRequest, OpenResponse) BHOpenCallback;
+alias void delegate(IAsset, Status status, ReadRequest, ReadResponse) BHReadCallback;
+alias void delegate(IAsset, Status status, MetaDataRequest, MetaDataResponse) BHMetaDataCallback;
 

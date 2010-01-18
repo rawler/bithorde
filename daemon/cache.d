@@ -231,8 +231,7 @@ public:
     }
     ~this() {
         if (file)
-            file.close();
-        mgr.openAssets.remove(id);
+            close();
     }
 
     void open() {
@@ -240,12 +239,24 @@ public:
             throw new IncompleteAssetException;
         file = new File(path.toString, File.ReadExisting);
     }
+    void close() {
+        if (file) {
+            file.close();
+            file = null;
+        }
+        mgr.openAssets.remove(id);
+    }
 
     synchronized void aSyncRead(ulong offset, uint length, BHReadCallback cb) {
+        assert(file);
         ubyte[] buf = tlsBuffer(length);
         file.seek(offset);
         auto got = file.read(buf);
-        cb(this, offset, buf[0..got], message.Status.SUCCESS);
+        auto resp = new lib.message.ReadResponse;
+        resp.status = message.Status.SUCCESS;
+        resp.offset = offset;
+        resp.content = buf[0..got];
+        cb(this, message.Status.SUCCESS, null, resp); // TODO: should really hold reference to req
     }
 
     void add(ulong offset, ubyte[] data) {
@@ -253,6 +264,7 @@ public:
     }
 
     final ulong size() {
+        assert(file);
         return file.length;
     }
 
@@ -405,6 +417,9 @@ private:
         ulong offset;
         uint length;
         BHReadCallback cb;
+        message.Status lastStatus;
+        // TODO: Limit re-tries
+
         void tryRead() {
             try {
                 realRead(offset, length, cb);
@@ -412,11 +427,16 @@ private:
                 remoteAsset.aSyncRead(offset, length, &callback);
             }
         }
-        void callback(IAsset asset, ulong offset, ubyte[] data, message.Status status) {
+        void callback(IAsset asset, message.Status status, message.ReadRequest req, message.ReadResponse resp) {
             if (status == message.Status.SUCCESS) {
                 if (cacheMap) // If Still open for writing, may have stale requests
-                    add(offset, data);
+                    add(resp.offset, resp.content);
                 tryRead();
+            } else if ((status == message.Status.DISCONNECTED) && (status != lastStatus)) { // Hackish. We may have double-requested the same part of the file, so attempt to read it anyways
+                lastStatus = status;
+                tryRead();
+            } else {
+                // TODO: Report back error
             }
         }
     }

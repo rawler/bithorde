@@ -82,7 +82,7 @@ public:
         client.beginUpload(file.length, &onOpen);
     }
     ~this(){
-        delete asset;
+        asset.close();
         delete client;
     }
 
@@ -129,7 +129,7 @@ private:
         this.exitStatus = exitStatus;
     }
 
-    void onOpen(IAsset asset, Status status) {
+    void onOpen(IAsset asset, Status status, OpenOrUploadRequest req, OpenResponse resp) {
         switch (status) {
         case Status.SUCCESS:
             if (args.verbose)
@@ -144,9 +144,9 @@ private:
         }
     }
 
-    void onComplete(IAsset asset, MetaDataResponse resp) {
+    void onComplete(IAsset asset, Status status, MetaDataRequest req, MetaDataResponse resp) {
         doRun = false;
-        if (resp.status == Status.SUCCESS) {
+        if (status == Status.SUCCESS) {
             Stdout(formatMagnet(resp.ids, pos, args.file.file)).newline;
             Stdout(formatED2K(resp.ids, pos, args.file.file)).newline;
         }

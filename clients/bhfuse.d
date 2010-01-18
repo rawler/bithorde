@@ -190,13 +190,13 @@ static int bh_read(char *path, void *buf, size_t size, off_t offset,
     if (offset < asset.size) {
         if (offset + size > asset.size)
             size = asset.size - offset;
-        asset.aSyncRead(offset, size, delegate void(IAsset asset, ulong respOffset, ubyte[] data, Status status) {
+        asset.aSyncRead(offset, size, delegate void(IAsset asset, Status status, ReadRequest req, ReadResponse resp) {
             switch (status) {
             case Status.SUCCESS:
-                auto adjust = offset - respOffset;
-                if (adjust + size > data.length)
-                    size = data.length - adjust;
-                buf[0..size] = data[adjust .. adjust+size];
+                auto adjust = offset - resp.offset;
+                if (adjust + size > resp.content.length)
+                    size = resp.content.length - adjust;
+                buf[0..size] = resp.content[adjust .. adjust+size];
                 break;
             default:
                 size = 0;

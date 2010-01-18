@@ -22,9 +22,13 @@ public:
         this.openCallback = cb;
     }
     ~this() {
+        close();
+    }
+
+    void close() {
         assert(waitingResponses == 0); // We've got to fix timeouts some day.
         foreach (asset; backingAssets)
-            delete asset;
+            asset.close();
     }
 
     void aSyncRead(ulong offset, uint length, BHReadCallback cb) {
@@ -33,9 +37,10 @@ public:
     ulong size() {
         return backingAssets[0].size;
     }
-    void addBackingAsset(IAsset asset, Status status) {
+    void addBackingAsset(IAsset asset, Status status, lib.message.OpenOrUploadRequest req, OpenResponse resp) {
         switch (status) {
         case Status.SUCCESS:
+            assert(asset, "SUCCESS response, but no asset");
             backingAssets ~= asset;
             break;
         case Status.NOTFOUND:

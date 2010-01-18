@@ -60,6 +60,10 @@ public:
     ~this()
     {
         socket.close();
+        foreach (req; inFlightRequests) {
+            if (req)
+                req.abort(message.Status.DISCONNECTED);
+        }
     }
 
     synchronized bool readNewData() {
