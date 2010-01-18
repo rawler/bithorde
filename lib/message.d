@@ -24,6 +24,7 @@ public abstract class Message : ProtoBufMessage {
 private:
     static Stack!(void*, 100) _freeList;
     new(size_t sz) {
+        assert(sz <= 100, "Error, allocating too much");
         if (_freeList.size)
             return _freeList.pop();
         else
