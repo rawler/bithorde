@@ -4,17 +4,13 @@ private import tango.core.Exception;
 private import tango.core.Thread;
 private import tango.io.FilePath;
 private import tango.io.selector.Selector;
-private import tango.io.Stdout;
 private import tango.net.device.Berkeley;
 private import tango.net.device.LocalSocket;
 private import tango.net.device.Socket;
 private import tango.net.InternetAddress;
-private import tango.stdc.posix.signal;
 private import Text = tango.text.Util;
 private import tango.util.container.more.Stack;
 private import tango.util.Convert;
-private import tango.util.log.AppendConsole;
-private import tango.util.log.LayoutDate;
 private import tango.util.log.Log;
 
 private import daemon.cache;
@@ -182,28 +178,4 @@ private:
             log.error("Caught unexpected exception in reconnectLoop: {}", e);
         }
     }
-}
-
-/**
- * Main entry for server daemon
- */
-public int main(char[][] args)
-{
-    if (args.length != 2) {
-        Stderr.format("Usage: {} <config>", args[0]).newline;
-        return -1;
-    }
-
-    // Hack, since Tango doesn't set MSG_NOSIGNAL on send/recieve, we have to explicitly ignore SIGPIPE
-    signal(SIGPIPE, SIG_IGN);
-
-    auto config = new Config(args[1]);
-
-    auto consoleOut = new AppendConsole(new LayoutDate);
-    Log.root.add(consoleOut);
-
-    scope Server s = new Server(config);
-    s.run();
-
-    return 0;
 }
