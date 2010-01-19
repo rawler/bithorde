@@ -146,6 +146,12 @@ public:
     {
         super(s, name);
     }
+    this (Address addr, char[] name)
+    {
+        auto socket = new Socket(addr.addressFamily, SocketType.STREAM, ProtocolType.IP);
+        socket.connect(addr);
+        this(socket, name);
+    }
     ~this ()
     {
         foreach (asset; openAssets)

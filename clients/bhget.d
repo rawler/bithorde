@@ -104,9 +104,7 @@ public:
     this(GetArguments args) {
         this.args = args;
         Address addr = new LocalAddress(args.sockPath);
-        auto socket = new Socket(addr.addressFamily, SocketType.STREAM, ProtocolType.IP);
-        socket.connect(addr);
-        client = new Client(socket, "bhget");
+        client = new Client(addr, "bhget");
 
         doRun = true;
         if (args.stdout)

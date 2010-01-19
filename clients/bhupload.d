@@ -72,9 +72,7 @@ public:
     this(UploadArguments args) {
         this.args = args;
         Address addr = new LocalAddress(args.sockPath);
-        auto socket = new Socket(addr.addressFamily, SocketType.STREAM, ProtocolType.IP);
-        socket.connect(addr);
-        client = new Client(socket, "bhupload");
+        client = new Client(addr, "bhupload");
 
         doRun = true;
         file = new File(args.file.toString);

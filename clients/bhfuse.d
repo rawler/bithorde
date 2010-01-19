@@ -225,9 +225,7 @@ extern (D):
 int main(char[][] args)
 {
     auto addr = new LocalAddress("/tmp/bithorde");
-    auto socket = new Socket(addr.addressFamily, SocketType.STREAM, ProtocolType.IP);
-    socket.connect(addr);
-    client = new Client(socket, "bhfuse");
+    client = new Client(addr, "bhfuse");
 
     scope char** argv = cast(char**)new char*[args.length];
     foreach (idx,arg; args) {
