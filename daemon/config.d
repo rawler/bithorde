@@ -45,6 +45,9 @@ class Config
         validate();
     }
 
+    this() {
+    }
+
     void validate() {
         if (!name)
             throw new ConfigException("Missing server.name");

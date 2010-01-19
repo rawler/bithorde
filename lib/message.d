@@ -50,6 +50,7 @@ enum HashType
 }
 
 enum Status {
+    NONE = 0,
     SUCCESS = 1,
     NOTFOUND = 2,
     INVALID_HANDLE = 3,

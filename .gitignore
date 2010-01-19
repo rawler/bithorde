@@ -6,6 +6,7 @@ dsss.last
 # Built executables
 server
 tests/protobuf
+tests/bithordelib
 bhget
 bhfuse
 bhupload

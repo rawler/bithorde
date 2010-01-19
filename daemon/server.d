@@ -39,9 +39,11 @@ package:
         log = Log.lookup("daemon.server");
     }
 public:
+    Config config;
     this(Config config)
     {
         // Setup basics
+        this.config = config;
         this.name = config.name;
 
         // Setup selector
@@ -69,6 +71,7 @@ public:
         foreach (f;config.friends)
             this.offlineFriends[f.name] = f;
         this.reconnectThread = new Thread(&reconnectLoop);
+        this.reconnectThread.isDaemon = true;
         this.reconnectThread.start();
 
         log.info("Started");
@@ -78,9 +81,14 @@ public:
         this.unixServer.socket.detach();
     }
 
-    void run()
+    void run() {
+        while (true)
+            pump();
+    }
+
+    protected void pump()
     {
-        while (selector.select() > 0) {
+        if (selector.select() > 0) {
             SelectionKey[] removeThese;
             foreach (SelectionKey event; selector.selectedSet()) {
                 if (!processSelectEvent(event))
