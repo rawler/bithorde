@@ -94,12 +94,8 @@ Identifier[] parseMagnet(char[] magnetUri, out char[] name) {
         name = m[1];
     foreach (hash; HashMap) {
         auto hash_re = Regex(r"xt=urn:"~hash.name~r":(\w+)");
-        foreach (m; hash_re.search(magnetUri)) {
-            auto newid = new Identifier;
-            newid.type = hash.pbType;
-            newid.id = hash.magnetDeformatter(m[1]);
-            retVal ~= newid;
-        }
+        foreach (m; hash_re.search(magnetUri))
+            retVal ~= new Identifier(hash.pbType, hash.magnetDeformatter(m[1]));
     }
     return retVal;
 }
@@ -109,11 +105,7 @@ Identifier[] parseED2K(char[] ed2kUri, out char[] name) {
     auto re = Regex(r"ed2k://\|file\|([^\|]*)\|\d*\|(\w+)\|");
     foreach (m; re.search(ed2kUri)) {
         name = m[1];
-
-        auto newid = new Identifier;
-        newid.type = HashType.ED2K;
-        newid.id = ByteConverter.hexDecode(m[2]);
-        retVal ~= newid;
+        retVal ~= new Identifier(HashType.ED2K, ByteConverter.hexDecode(m[2]));
     }
     return retVal;
 }

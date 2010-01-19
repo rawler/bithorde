@@ -78,6 +78,11 @@ private import lib.asset;
 
 /****** Start defining the messages *******/
 class Identifier : ProtoBufMessage {
+    this(HashType t, ubyte[] id) {
+        this.type = t;
+        this.id = id;
+    }
+    this() {}
     HashType type;
     ubyte[] id;
     mixin MessageMixin!(PBField!("type", 1)(),
