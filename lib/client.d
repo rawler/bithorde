@@ -115,7 +115,8 @@ public:
         closed = true;
         auto req = new message.Close;
         req.handle = handle;
-        client.sendMessage(req);
+        if (!client.closed)
+            client.sendMessage(req);
         client.openAssets.remove(handle);
     }
 }

@@ -1,8 +1,11 @@
 module lib.connection;
 
 private import tango.core.Exception;
+private import tango.io.selector.Selector;
 private import tango.net.device.Berkeley;
 private import tango.net.device.Socket;
+private import tango.time.Clock;
+private import tango.util.container.SortedMap;
 private import tango.util.container.more.Stack;
 
 private import lib.protobuf;
@@ -15,6 +18,7 @@ protected:
     ubyte[] frontbuf, backbuf, left;
     ByteBuffer msgbuf;
     char[] _myname, _peername;
+    SortedMap!(Time, message.RPCRequest) timeouts;
 
 protected: // TODO: This logic should really be moved into lib/Client layer soon.
     message.RPCRequest[] inFlightRequests;
@@ -50,6 +54,7 @@ public:
         this.backbuf = new ubyte[8192];
         this.left = [];
         this.msgbuf = new ByteBuffer(8192);
+        this.timeouts = new SortedMap!(Time, message.RPCRequest);
         if (s.socket.addressFamily is AddressFamily.INET)
             this.socket.socket.setNoDelay(true);
         this.inFlightRequests = new message.RPCRequest[16];
@@ -57,9 +62,16 @@ public:
         sayHello();
         expectHello();
     }
-    ~this()
-    {
-        socket.close();
+
+    ~this() {
+        close();
+    }
+
+    bool closed;
+    void close(bool reallyClose = true) {
+        closed = true;
+        if (reallyClose)
+            socket.close();
         foreach (req; inFlightRequests) {
             if (req)
                 req.abort(message.Status.DISCONNECTED);
@@ -83,12 +95,35 @@ public:
         return buf != left;
     }
 
-    synchronized bool readAndProcessMessage() {
-        while (!processMessage()) {
-            if (!readNewData())
-                return false;
+    synchronized void processTimeouts() {
+        while (!timeouts.isEmpty && (Clock.now > timeouts.firstKey)) {
+            message.RPCRequest req;
+            timeouts.take(req);
+            req.abort(message.Status.TIMEOUT);
         }
-        return true;
+    }
+
+    void run() {
+        auto selector = new Selector;
+        selector.open(1,1);
+        selector.register(socket, Event.Read|Event.Error);
+
+        while (!closed) {
+            auto timeout = timeouts.isEmpty? TimeSpan.max : (timeouts.firstKey-Clock.now);
+            if (selector.select(timeout)) {
+                foreach (key; selector.selectedSet()) {
+                    assert(key.conduit is socket);
+                    if (key.isReadable) {
+                        auto read = readNewData;
+                        assert(read, "Selector indicated data, but failed reading");
+                        while (processMessage()) {}
+                    } else if (key.isError) {
+                        close(false);
+                    }
+                }
+            }
+            processTimeouts();
+        }
     }
 
     final char[] peername() { return _peername; }
@@ -107,7 +142,9 @@ private:
         sendMessage(handshake);
     }
     void expectHello() {
-        readAndProcessMessage();
+        while (!processMessage()) {
+            readNewData();
+        }
         if (!_peername)
             throw new AssertException("Other side did not greet with handshake", __FILE__, __LINE__);
     }

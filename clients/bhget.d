@@ -72,7 +72,7 @@ public:
         _output = output;
         _queue = new SortedMap!(ulong, ubyte[]);
     }
-    void queue(ulong offset, ubyte[] data) {
+    ulong queue(ulong offset, ubyte[] data) {
         assert(offset >= currentOffset); // Maybe should handle a buffer beginning earlier as well?
         if (offset == currentOffset) {
             _output.write(data);
@@ -86,13 +86,13 @@ public:
         } else {
             _queue.add(offset, data.dup);
         }
+        return currentOffset;
     }
 }
 
 class BHGet
 {
 private:
-    bool doRun;
     SortedOutput output;
     IAsset asset;
     Client client;
@@ -106,7 +106,6 @@ public:
         Address addr = new LocalAddress(args.sockPath);
         client = new Client(addr, "bhget");
 
-        doRun = true;
         if (args.stdout)
             output = new SortedOutput(Stdout);
         else
@@ -115,18 +114,14 @@ public:
         client.open(args.ids, &onOpen);
     }
     ~this(){
-        asset.close();
-        delete client;
+        if (asset)
+            asset.close();
+        client.close();
     }
 
     void run()
     {
-        while (doRun && ((asset is null) || (output.currentOffset < asset.size))) {
-            if (!client.readAndProcessMessage()) {
-                Stderr("Server disconnected").newline;
-                exit(-1);
-            }
-        }
+        client.run();
         if (pBar) {
             if (exitStatus == 0) // Successful finish
                 pBar.finish(orderOffset);
@@ -136,15 +131,16 @@ public:
     }
 private:
     void exit(int exitStatus) {
-        doRun = false;
+        client.close();
         this.exitStatus = exitStatus;
     }
 
     void onRead(IAsset asset, Status status, ReadRequest req, ReadResponse resp) {
         assert(asset == this.asset);
-        output.queue(resp.offset, resp.content);
-        auto newoffset = resp.offset + resp.content.length;
-        orderData();
+        if (output.queue(resp.offset, resp.content) >= asset.size)
+            exit(0);
+        else
+            orderData();
         if (pBar)
             pBar.update(orderOffset);
     }

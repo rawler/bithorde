@@ -80,18 +80,22 @@ public:
         client.beginUpload(file.length, &onOpen);
     }
     ~this(){
-        asset.close();
-        delete client;
+        if (asset)
+            asset.close();
+        client.close();
     }
 
     void run()
     {
-        while (doRun && (asset is null)) {
-            if (!client.readAndProcessMessage()) {
-                Stderr("Server disconnected").newline;
-                exit(-1);
-            }
-        }
+        client.run();
+    }
+private:
+    void exit(int exitStatus) {
+        client.close();
+        this.exitStatus = exitStatus;
+    }
+
+    void sendFile() {
         pos = file.position;
         while (doRun && pos < file.length) {
             ubyte[CHUNK_SIZE] buf;
@@ -107,24 +111,13 @@ public:
                 exit(-1);
             }
         }
+        asset.requestMetaData(&onComplete);
         if (args.progressBar) {
             if (exitStatus == 0) // Successful finish
                 pBar.finish(pos);
             else
                 Stderr.newline;
         }
-        asset.requestMetaData(&onComplete);
-        while (doRun) { // Wait for completion
-            if (!client.readAndProcessMessage()) {
-                Stderr("Server disconnected").newline;
-                exit(-1);
-            }
-        }
-    }
-private:
-    void exit(int exitStatus) {
-        doRun = false;
-        this.exitStatus = exitStatus;
     }
 
     void onOpen(IAsset asset, Status status, OpenOrUploadRequest req, OpenResponse resp) {
@@ -135,6 +128,7 @@ private:
             if (args.progressBar)
                 pBar = new ProgressBar(file.length, args.file.name ~ " : ", "kB", 1024);
             this.asset = cast(RemoteAsset)asset;
+            sendFile();
             break;
         default:
             Stderr.format("Got unknown status from BitHorde.open: {}", status).newline;
@@ -150,6 +144,7 @@ private:
         }
         else
             Stderr("Non-successful upload").newline;
+        exit(0);
     }
 }
 

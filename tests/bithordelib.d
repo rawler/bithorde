@@ -61,7 +61,7 @@ void testTimeout(SteppingServer s) {
         assert(!resp, "Got unexpected response");
     });
     Stdout("Request sent, expecting Timeout").newline;
-    client.readAndProcessMessage();
+    client.run();
     if (gotTimeout)
         Stdout("SUCCESS: Timeout gotten").newline;
     else
