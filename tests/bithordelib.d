@@ -53,10 +53,12 @@ void testTimeout(SteppingServer s) {
     bool gotTimeout = false;
     client.open(ids, delegate(IAsset asset, Status status, OpenOrUploadRequest req, OpenResponse resp) {
         assert(!asset, "Asset is not null");
-        if (status == Status.TIMEOUT)
+        if (status == Status.TIMEOUT) {
             gotTimeout = true;
-        else
+            client.close();
+        } else {
             assert(false, "Expected Timeout but got other status");
+        }
         assert(req, "Invalid request");
         assert(!resp, "Got unexpected response");
     });

@@ -18,15 +18,18 @@ protected:
     ubyte[] frontbuf, backbuf, left;
     ByteBuffer msgbuf;
     char[] _myname, _peername;
-    SortedMap!(Time, message.RPCRequest) timeouts;
 
 protected: // TODO: This logic should really be moved into lib/Client layer soon.
     message.RPCRequest[] inFlightRequests;
+    SortedMap!(Time, message.RPCRequest) timeouts;
     Stack!(ushort,100) _freeIds;
+    SortedMap!(Time, ushort) lingerIds;
     ushort nextid;
     void allocRequest(message.RPCRequest target) {
         if (_freeIds.size)
             target.rpcId = _freeIds.pop();
+        else if (lingerIds.size && (lingerIds.firstKey < Clock.now))
+            lingerIds.take(target.rpcId);
         else {
             target.rpcId = nextid++;
             if (inFlightRequests.length <= target.rpcId) {
@@ -46,6 +49,10 @@ protected: // TODO: This logic should really be moved into lib/Client layer soon
             _freeIds.push(msg.rpcId);
         return req;
     }
+    void lingerRequest(message.RPCRequest req) {
+        lingerIds[Clock.now+TimeSpan.fromMillis(65536)] = req.rpcId;
+        inFlightRequests[req.rpcId] = null;
+    }
 public:
     this(Socket s, char[] myname)
     {
@@ -55,6 +62,7 @@ public:
         this.left = [];
         this.msgbuf = new ByteBuffer(8192);
         this.timeouts = new SortedMap!(Time, message.RPCRequest);
+        this.lingerIds = new SortedMap!(Time, ushort);
         if (s.socket.addressFamily is AddressFamily.INET)
             this.socket.socket.setNoDelay(true);
         this.inFlightRequests = new message.RPCRequest[16];
@@ -70,7 +78,7 @@ public:
     bool closed;
     void close(bool reallyClose = true) {
         closed = true;
-        if (reallyClose)
+        if (reallyClose && socket)
             socket.close();
         foreach (req; inFlightRequests) {
             if (req)
@@ -200,8 +208,14 @@ package:
         socket.write(msgbuf.data);
     }
     synchronized void sendRequest(message.RPCRequest req) {
+        // TODO: Randomize?
+        sendRequest(req, 500);
+    }
+    synchronized void sendRequest(message.RPCRequest req, ushort timeout) {
         allocRequest(req);
+        req.timeout = timeout;
         sendMessage(req);
+        timeouts[Clock.now + TimeSpan.fromMillis(timeout)] = req;
     }
 protected:
     void processHandShake(ubyte[] msg) {

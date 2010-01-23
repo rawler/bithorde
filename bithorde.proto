@@ -33,10 +33,12 @@ message Open {
     required uint32 reqId = 1;
     repeated Identifier ids = 2;
     required uint64 uuid = 3;
+    required uint32 timeout = 4;
   }
   message Upload {
     required uint32 reqId = 1;
     required uint64 size = 2;
+    required uint32 timeout = 3;
   }
   message Response {
     required uint32 reqId = 1;
@@ -52,6 +54,7 @@ message Read {
     required uint32 handle = 2;
     required uint64 offset = 3;
     required uint32 size = 4;
+    required uint32 timeout = 5;
   }
   message Response {
     required uint32 reqId = 1;
@@ -74,6 +77,7 @@ message Close {
 message MetaDataRequest {
     required uint32 reqId = 1;
     required uint32 handle = 2;      // Asset handle for the data
+    required uint32 timeout = 3;
 }
 
 message MetaDataResponse {

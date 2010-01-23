@@ -64,6 +64,7 @@ abstract class RPCMessage : Message {
 }
 
 abstract class RPCRequest : RPCMessage {
+    ushort timeout;
     abstract void abort(Status s);
 }
 
@@ -107,7 +108,8 @@ class OpenRequest : OpenOrUploadRequest {
 
     mixin MessageMixin!(PBField!("rpcId",    1)(),
                         PBField!("ids",      2)(),
-                        PBField!("uuid",     3)());
+                        PBField!("uuid",     3)(),
+                        PBField!("timeout",  4)());
 
     Type typeId() { return Type.OpenRequest; }
 }
@@ -115,7 +117,8 @@ class OpenRequest : OpenOrUploadRequest {
 class UploadRequest : OpenOrUploadRequest {
     ulong size;        // Size of opened asset
     mixin MessageMixin!(PBField!("rpcId",     1)(),
-                        PBField!("size",      2)());
+                        PBField!("size",      2)(),
+                        PBField!("timeout",   3)());
 
     Type typeId() { return Type.UploadRequest; }
 }
@@ -139,7 +142,8 @@ class ReadRequest : RPCRequest {
     mixin MessageMixin!(PBField!("rpcId",     1)(),
                         PBField!("handle",    2)(),
                         PBField!("offset",    3)(),
-                        PBField!("size",      4)());
+                        PBField!("size",      4)(),
+                        PBField!("timeout",   5)());
 
     Type typeId() { return Type.ReadRequest; }
 }
@@ -170,7 +174,8 @@ class DataSegment : Message {
 class MetaDataRequest : RPCRequest {
     ushort handle;     // Asset handle for the data
     mixin MessageMixin!(PBField!("rpcId",     1)(),
-                        PBField!("handle",    2)());
+                        PBField!("handle",    2)(),
+                        PBField!("timeout",   3)());
 
     Type typeId() { return Type.MetaDataRequest; }
 }
