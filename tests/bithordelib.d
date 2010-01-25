@@ -2,6 +2,7 @@ module tests.libbithorde;
 
 private import tango.core.Thread;
 private import tango.core.sync.Semaphore;
+private import tango.io.FilePath;
 private import tango.io.Stdout;
 private import tango.net.device.LocalSocket;
 private import tango.net.device.Socket;
@@ -21,7 +22,9 @@ class SteppingServer : Server {
         c.name = "TestServer-"~name;
         c.port = 1337;
         c.unixSocket = "/tmp/bithorde-test-"~name;
-        c.cachedir = "cache-test-"~name;
+        c.cachedir = new FilePath("cache-test-"~name);
+        if (!c.cachedir.exists)
+            c.cachedir.createFolder();
         // c.friends is unset;
         sem = new Semaphore;
 

@@ -1,10 +1,11 @@
 module daemon.config;
 
-private import tango.io.device.File,
-               tango.io.stream.Map,
-               tango.net.InternetAddress,
-               Text = tango.text.Util,
-               tango.util.Convert;
+private import tango.io.device.File;
+private import tango.io.FilePath;
+private import tango.io.stream.Map;
+private import tango.net.InternetAddress;
+private import Text = tango.text.Util;
+private import tango.util.Convert;
 
 private import daemon.friend;
 
@@ -18,7 +19,7 @@ class Config
     char[] name;
     ushort port = 1337;
     char[] unixSocket = "/tmp/bithorde";
-    char[] cachedir = ".";
+    FilePath cachedir;
     Friend[char[]] friends;
 
     this (char[] configFileName) {
@@ -72,7 +73,7 @@ private:
                 this.unixSocket = null;
             break;
         case "cachedir":
-            this.cachedir = value.dup;
+            this.cachedir = new FilePath(value);
             break;
         default:
             throw new ConfigException("Unknown server option");

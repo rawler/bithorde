@@ -9,6 +9,7 @@ private import tango.math.random.Random;
 private import tango.util.log.Log;
 
 private import daemon.client;
+private import daemon.config;
 private import daemon.router;
 private import lib.asset;
 private import lib.client;
@@ -471,14 +472,16 @@ protected:
     FilePath assetDir;
     FilePath idMapPath;
     Router router;
-    static Logger log;
 
-static this() {
-    log = Log.lookup("daemon.cache");
-}
+    static Logger log;
+    static this() {
+        log = Log.lookup("daemon.cache");
+    }
 public:
-    this(char[] assetDir, Router router) {
-        this.assetDir = new FilePath(assetDir);
+    this(FilePath assetDir, Router router) {
+        if (!(assetDir.exists && assetDir.isFolder && assetDir.isWritable))
+            throw new ConfigException(assetDir.toString ~ " must be an existing writable directory");
+        this.assetDir = assetDir;
         this.router = router;
 
         idMapPath = this.assetDir.dup.append("index.protobuf");
