@@ -5,11 +5,28 @@ private import tango.io.selector.Selector;
 private import tango.net.device.Berkeley;
 private import tango.net.device.Socket;
 private import tango.time.Clock;
-private import tango.util.container.SortedMap;
+private import tango.util.container.more.Heap;
 private import tango.util.container.more.Stack;
 
 private import lib.protobuf;
 public import message = lib.message;
+
+struct InFlightRequest {
+    Time time;
+    message.RPCRequest req;
+    int opCmp(InFlightRequest other) {
+        return this.time.opCmp(other.time);
+    }
+}
+struct LingerId {
+    Time time;
+    int rpcId;
+    int opCmp(LingerId other) {
+        return this.time.opCmp(other.time);
+    }
+}
+alias Heap!(InFlightRequest*, true) TimedRequestQueue;
+alias Heap!(LingerId, true) LingerIdQueue;
 
 class Connection
 {
@@ -19,39 +36,57 @@ protected:
     ByteBuffer msgbuf;
     char[] _myname, _peername;
 
-protected: // TODO: This logic should really be moved into lib/Client layer soon.
-    message.RPCRequest[] inFlightRequests;
-    SortedMap!(Time, message.RPCRequest) timeouts;
+protected:
+    // inFlightRequests contains actual requests, and is the allocation-heap for IFR:s
+    InFlightRequest[] inFlightRequests;
+    // timeouts contains references to inFlightRequests, sorted on timeout-time. Needs care and attention
+    TimedRequestQueue timeouts;
+    // Free reusable ids
     Stack!(ushort,100) _freeIds;
-    SortedMap!(Time, ushort) lingerIds;
+    // Ids that can't be re-used for a while, to avoid conflicting responses
+    LingerIdQueue lingerIds;
+    // Last resort, new-id allocation
     ushort nextid;
-    void allocRequest(message.RPCRequest target) {
-        if (_freeIds.size)
+
+    ushort allocRequest(message.RPCRequest target) {
+        if (_freeIds.size) {
             target.rpcId = _freeIds.pop();
-        else if (lingerIds.size && (lingerIds.firstKey < Clock.now))
-            lingerIds.take(target.rpcId);
-        else {
+        } else if (lingerIds.size && (lingerIds.peek.time < Clock.now)) {
+            target.rpcId = lingerIds.pop.rpcId;
+        } else {
             target.rpcId = nextid++;
             if (inFlightRequests.length <= target.rpcId) {
-                auto newInFlightRequests = new message.RPCRequest[inFlightRequests.length*2];
+                auto newInFlightRequests = new InFlightRequest[inFlightRequests.length*2];
                 newInFlightRequests[0..inFlightRequests.length] = inFlightRequests;
                 delete inFlightRequests;
                 inFlightRequests = newInFlightRequests;
+
+                // Timeouts is now full of broken references, rebuild
+                timeouts.clear();
+                foreach (ref ifr; inFlightRequests[0..target.rpcId]) {
+                    if (ifr.req)
+                        timeouts.push(&ifr);
+                }
             }
         }
-        inFlightRequests[target.rpcId] = target;
+        return target.rpcId;
     }
     message.RPCRequest releaseRequest(message.RPCResponse msg) {
-        auto req = inFlightRequests[msg.rpcId];
+        auto ifr = &inFlightRequests[msg.rpcId];
+        auto req = ifr.req;
         msg.request = req;
-        inFlightRequests[msg.rpcId] = null;
+        timeouts.remove(ifr);
+        inFlightRequests[msg.rpcId] = InFlightRequest.init;
         if (_freeIds.unused)
             _freeIds.push(msg.rpcId);
         return req;
     }
     void lingerRequest(message.RPCRequest req) {
-        lingerIds[Clock.now+TimeSpan.fromMillis(65536)] = req.rpcId;
-        inFlightRequests[req.rpcId] = null;
+        LingerId li;
+        li.rpcId = req.rpcId;
+        li.time = Clock.now+TimeSpan.fromMillis(65536);
+        lingerIds.push(li);
+        inFlightRequests[req.rpcId] = InFlightRequest.init;
     }
 public:
     this(Socket s, char[] myname)
@@ -61,11 +96,9 @@ public:
         this.backbuf = new ubyte[8192];
         this.left = [];
         this.msgbuf = new ByteBuffer(8192);
-        this.timeouts = new SortedMap!(Time, message.RPCRequest);
-        this.lingerIds = new SortedMap!(Time, ushort);
         if (s.socket.addressFamily is AddressFamily.INET)
             this.socket.socket.setNoDelay(true);
-        this.inFlightRequests = new message.RPCRequest[16];
+        this.inFlightRequests = new InFlightRequest[16];
         this._myname = myname;
         sayHello();
         expectHello();
@@ -80,9 +113,9 @@ public:
         closed = true;
         if (reallyClose && socket)
             socket.close();
-        foreach (req; inFlightRequests) {
-            if (req)
-                req.abort(message.Status.DISCONNECTED);
+        foreach (id, ifr; inFlightRequests) {
+            if (ifr.req)
+                ifr.req.abort(message.Status.DISCONNECTED);
         }
     }
 
@@ -104,9 +137,9 @@ public:
     }
 
     synchronized void processTimeouts() {
-        while (!timeouts.isEmpty && (Clock.now > timeouts.firstKey)) {
-            message.RPCRequest req;
-            timeouts.take(req);
+        while (timeouts.size && (Clock.now > timeouts.peek.time)) {
+            auto req = timeouts.pop.req;
+            lingerRequest(req);
             req.abort(message.Status.TIMEOUT);
         }
     }
@@ -117,7 +150,7 @@ public:
         selector.register(socket, Event.Read|Event.Error);
 
         while (!closed) {
-            auto timeout = timeouts.isEmpty? TimeSpan.max : (timeouts.firstKey-Clock.now);
+            auto timeout = timeouts.size ? (timeouts.peek.time-Clock.now) : TimeSpan.max;
             if (selector.select(timeout)) {
                 foreach (key; selector.selectedSet()) {
                     assert(key.conduit is socket);
@@ -212,10 +245,13 @@ package:
         sendRequest(req, 500);
     }
     synchronized void sendRequest(message.RPCRequest req, ushort timeout) {
-        allocRequest(req);
+        auto rpcId = allocRequest(req);
+        auto ifr = &inFlightRequests[rpcId];
+        ifr.req = req;
+        ifr.time = Clock.now + TimeSpan.fromMillis(timeout);
         req.timeout = timeout;
         sendMessage(req);
-        timeouts[Clock.now + TimeSpan.fromMillis(timeout)] = req;
+        timeouts.push(ifr);
     }
 protected:
     void processHandShake(ubyte[] msg) {

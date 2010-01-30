@@ -51,7 +51,6 @@ class RemoteAsset : private message.OpenResponse, IAsset {
             _callback(this.outer, resp.status, this, resp);
         }
         void abort(message.Status s) {
-            client.lingerRequest(this);
             _callback(this.outer, s, this, null);
         }
     }
@@ -65,7 +64,6 @@ class RemoteAsset : private message.OpenResponse, IAsset {
             _callback(this.outer, resp.status, this, resp);
         }
         void abort(message.Status s) {
-            client.lingerRequest(this);
             _callback(this.outer, s, this, null);
         }
     }
@@ -131,7 +129,6 @@ private:
             this.callback = cb;
         }
         void abort(message.Status s) {
-            lingerRequest(this);
             callback(null, s, this, null);
         }
     }
@@ -141,7 +138,6 @@ private:
             this.callback = cb;
         }
         void abort(message.Status s) {
-            lingerRequest(this);
             callback(null, s, this, null);
         }
     }
