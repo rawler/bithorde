@@ -5,6 +5,7 @@ private import tango.io.FilePath;
 private import tango.io.stream.Map;
 private import tango.net.InternetAddress;
 private import Text = tango.text.Util;
+private import tango.text.Unicode;
 private import tango.util.Convert;
 
 private import daemon.friend;
@@ -14,13 +15,26 @@ class ConfigException : Exception
     this (char[] msg) { super(msg); }
 }
 
+bool parseBool(char[] value) {
+    switch (toLower(value)) {
+        case "yes", "true", "1":
+            return true;
+        case "no", "false", "0":
+            return false;
+        default:
+            throw new ConfigException("Expected boolean but got '"~value~"'");
+    }
+}
+
 class Config
 {
     char[] name;
     ushort port = 1337;
     char[] unixSocket = "/tmp/bithorde";
     FilePath cachedir;
+    FilePath logfile;
     Friend[char[]] friends;
+    bool doDebug = false;
 
     this (char[] configFileName) {
         scope auto configFile = new File(configFileName, File.ReadExisting);
@@ -75,8 +89,14 @@ private:
         case "cachedir":
             this.cachedir = new FilePath(value);
             break;
+        case "logfile":
+            this.logfile = new FilePath(value);
+            break;
+        case "debug":
+            this.doDebug = parseBool(value);
+            break;
         default:
-            throw new ConfigException("Unknown server option");
+            throw new ConfigException("Unknown server option "~value~"ASA");
         }
     }
 

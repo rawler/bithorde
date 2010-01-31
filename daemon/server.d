@@ -72,9 +72,6 @@ public:
         // Setup friend connections
         foreach (f;config.friends)
             this.offlineFriends[f.name] = f;
-        this.reconnectThread = new Thread(&reconnectLoop);
-        this.reconnectThread.isDaemon = true;
-        this.reconnectThread.start();
 
         log.info("Started");
     }
@@ -86,6 +83,10 @@ public:
     }
 
     void run() {
+        this.reconnectThread = new Thread(&reconnectLoop);
+        this.reconnectThread.isDaemon = true;
+        this.reconnectThread.start();
+
         while (true)
             pump();
     }

@@ -2,7 +2,7 @@
 
 cd $(dirname $0)
 BINDIR="../.."
-SERVER="$BINDIR/server"
+SERVER="$BINDIR/bithorded"
 BHUPLOAD="$BINDIR/bhupload"
 BHGET="$BINDIR/bhget"
 TESTFILE=testfile
