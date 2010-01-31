@@ -15,4 +15,9 @@ public:
     {
         this.name = name;
     }
+    this(char[] name, InternetAddress addr)
+    {
+        this.name = name;
+        this.addr = addr;
+    }
 }

@@ -3,6 +3,7 @@ module lib.client;
 private import tango.core.Exception;
 private import tango.math.random.Random;
 private import tango.net.device.Socket;
+private import tango.time.Time;
 
 public import lib.asset;
 import lib.connection;
@@ -159,8 +160,8 @@ public:
             delete asset;
     }
     void open(message.Identifier[] ids,
-              BHOpenCallback openCallback) {
-        open(ids, openCallback, rand.uniformR2!(ulong)(1,ulong.max));
+              BHOpenCallback openCallback, TimeSpan timeout = TimeSpan.fromMillis(500)) {
+        open(ids, openCallback, rand.uniformR2!(ulong)(1,ulong.max), timeout);
     }
 
     void beginUpload(ulong size, BHOpenCallback cb) {
@@ -169,27 +170,30 @@ public:
         sendRequest(req);
     }
 package:
-    void open(message.Identifier[] ids, BHOpenCallback openCallback, ulong uuid) {
+    void open(message.Identifier[] ids, BHOpenCallback openCallback, ulong uuid, TimeSpan timeout) {
         auto req = new OpenRequest(openCallback);
         req.ids = ids;
         req.uuid = uuid;
-        sendRequest(req);
+        sendRequest(req, timeout);
     }
 protected:
     synchronized void processOpenResponse(ubyte[] buf) {
         auto resp = new RemoteAsset(this);
+        IAsset asset;
         resp.decode(buf);
-        if (resp.status == message.Status.SUCCESS)
+        if (resp.status == message.Status.SUCCESS) {
             openAssets[resp.handle] = resp;
+            asset = resp;
+        }
         auto basereq = releaseRequest(resp);
         if (basereq.typeId == message.Type.UploadRequest) {
             auto req = cast(UploadRequest)basereq;
             assert(req, "OpenResponse, but not OpenOrUploadRequest");
-            req.callback(resp, resp.status, req, resp);
+            req.callback(asset, resp.status, req, resp);
         } else if (basereq.typeId == message.Type.OpenRequest) {
             auto req = cast(OpenRequest)basereq;
             assert(req, "OpenResponse, but not OpenOrUploadRequest");
-            req.callback(resp, resp.status, req, resp);
+            req.callback(asset, resp.status, req, resp);
         }
     }
     synchronized void processReadResponse(ubyte[] buf) {

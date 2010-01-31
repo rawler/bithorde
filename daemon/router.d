@@ -1,5 +1,7 @@
 module daemon.router;
 
+private import tango.time.Time;
+
 private import daemon.client;
 private import daemon.friend;
 private import daemon.server;
@@ -44,8 +46,8 @@ public:
             backingAssets ~= asset;
             break;
         case Status.NOTFOUND:
-            break;
         case Status.WOULD_LOOP:
+        case Status.TIMEOUT:
             break;
         }
         waitingResponses -= 1;
@@ -99,7 +101,8 @@ private:
             auto client = friend.c;
             if (client != req.client) {
                 asset.waitingResponses += 1;
-                client.open(req.ids, &asset.addBackingAsset, req.uuid);
+                // TODO: Randomize timeouts
+                client.open(req.ids, &asset.addBackingAsset, req.uuid, TimeSpan.fromMillis(req.timeout-50));
                 forwarded = true;
             }
         }

@@ -40,7 +40,7 @@ protected:
     // inFlightRequests contains actual requests, and is the allocation-heap for IFR:s
     InFlightRequest[] inFlightRequests;
     // timeouts contains references to inFlightRequests, sorted on timeout-time. Needs care and attention
-    TimedRequestQueue timeouts;
+    public TimedRequestQueue timeouts;
     // Free reusable ids
     Stack!(ushort,100) _freeIds;
     // Ids that can't be re-used for a while, to avoid conflicting responses
@@ -72,8 +72,12 @@ protected:
         return target.rpcId;
     }
     message.RPCRequest releaseRequest(message.RPCResponse msg) {
+        if (msg.rpcId >= inFlightRequests.length)
+            return null;
         auto ifr = &inFlightRequests[msg.rpcId];
         auto req = ifr.req;
+        if (!req)
+            return null;
         msg.request = req;
         timeouts.remove(ifr);
         inFlightRequests[msg.rpcId] = InFlightRequest.init;
@@ -242,15 +246,15 @@ package:
     }
     synchronized void sendRequest(message.RPCRequest req) {
         // TODO: Randomize?
-        sendRequest(req, 500);
+        sendRequest(req, TimeSpan.fromMillis(500));
     }
-    synchronized void sendRequest(message.RPCRequest req, ushort timeout) {
+    synchronized void sendRequest(message.RPCRequest req, TimeSpan timeout) {
         auto rpcId = allocRequest(req);
+        req.timeout = timeout.millis;
+        sendMessage(req);
         auto ifr = &inFlightRequests[rpcId];
         ifr.req = req;
-        ifr.time = Clock.now + TimeSpan.fromMillis(timeout);
-        req.timeout = timeout;
-        sendMessage(req);
+        ifr.time = Clock.now + timeout;
         timeouts.push(ifr);
     }
 protected:

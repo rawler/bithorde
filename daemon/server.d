@@ -9,6 +9,7 @@ private import tango.net.device.LocalSocket;
 private import tango.net.device.Socket;
 private import tango.net.InternetAddress;
 private import Text = tango.text.Util;
+private import tango.time.Clock;
 private import tango.util.container.more.Stack;
 private import tango.util.Convert;
 private import tango.util.log.Log;
@@ -20,6 +21,7 @@ private import daemon.friend;
 private import daemon.router;
 private import lib.asset;
 private import lib.client : bytesToHex;
+private import lib.connection;
 private import message = lib.message;
 
 class Server : IAssetSource
@@ -30,7 +32,6 @@ package:
     Router router;
     Friend[char[]] offlineFriends;
     Thread reconnectThread;
-    char[] name;
     ServerSocket tcpServer;
     ServerSocket unixServer;
 
@@ -39,6 +40,7 @@ package:
         log = Log.lookup("daemon.server");
     }
 public:
+    char[] name;
     Config config;
     this(Config config)
     {
@@ -77,8 +79,10 @@ public:
         log.info("Started");
     }
     ~this() {
-        this.tcpServer.socket.detach();
-        this.unixServer.socket.detach();
+        if (tcpServer)
+            tcpServer.socket.detach();
+        if (unixServer)
+            unixServer.socket.detach();
     }
 
     void run() {
@@ -88,18 +92,29 @@ public:
 
     protected void pump()
     {
-        if (selector.select() > 0) {
-            SelectionKey[] removeThese;
+        scope SelectionKey[] removeThese;
+        auto nextDeadline = Time.max;
+        foreach (key; selector) {
+            auto c = cast(Connection)key.attachment;
+            if (c && c.timeouts.size && (c.timeouts.peek.time < nextDeadline))
+                nextDeadline = c.timeouts.peek.time;
+        }
+        if (selector.select(nextDeadline - Clock.now) > 0) {
             foreach (SelectionKey event; selector.selectedSet()) {
                 if (!processSelectEvent(event))
                     removeThese ~= event;
             }
-            foreach (event; removeThese) {
-                auto c = cast(Client)event.attachment;
-                onClientDisconnect(c);
-                selector.unregister(event.conduit);
-                delete c;
-            }
+        }
+        foreach (key; selector) {
+            auto c = cast(Connection)key.attachment;
+            if (c)
+                c.processTimeouts();
+        }
+        foreach (event; removeThese) {
+            auto c = cast(Client)event.attachment;
+            onClientDisconnect(c);
+            selector.unregister(event.conduit);
+            delete c;
         }
     }
 
@@ -112,7 +127,7 @@ public:
         req.callback(asset, message.Status.SUCCESS);
         return asset;
     }
-private:
+protected:
     void onClientConnect(Socket s)
     {
         auto c = new Client(this, s);
