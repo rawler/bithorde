@@ -114,10 +114,12 @@ public:
 
     bool closed;
     void close(bool reallyClose = true) {
+        if (closed)
+            return;
         closed = true;
         if (reallyClose && socket)
             socket.close();
-        foreach (id, ifr; inFlightRequests) {
+        foreach (ifr; inFlightRequests) {
             if (ifr.req)
                 ifr.req.abort(message.Status.DISCONNECTED);
         }
@@ -155,7 +157,7 @@ public:
 
         while (!closed) {
             auto timeout = timeouts.size ? (timeouts.peek.time-Clock.now) : TimeSpan.max;
-            if (selector.select(timeout)) {
+            if (selector.select(timeout) > 0) {
                 foreach (key; selector.selectedSet()) {
                     assert(key.conduit is socket);
                     if (key.isReadable) {
