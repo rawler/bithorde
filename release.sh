@@ -19,7 +19,7 @@ if [ -d "$PKGDIR" ]; then
 fi
 
 mkdir -p "$PKGDIR"
-cp sample.config server bhget bhupload "$PKGDIR"
+cp sample.config bithorded bhget bhupload "$PKGDIR"
 
 tar -zcvf "$PKGDIR.tar.gz" "$PKGDIR"
 
