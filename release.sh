@@ -9,7 +9,9 @@ fi
 cd `dirname $0`
 
 VERSION=$1
-PKGDIR=releases/bithorde-$VERSION
+BASEDIR=releases
+VERSIONDIR="bithorde-$VERSION"
+PKGDIR="$BASEDIR/$VERSIONDIR"
 
 # Currently we're still in alpha state, so build with debug-stuff
 dsss build -g
@@ -21,7 +23,8 @@ if [ $? == 0 ]; then
   mkdir -p "$PKGDIR"
 
   cp sample.config bithorded bhget bhupload "$PKGDIR"
-  tar -zcvf "$PKGDIR.tar.gz" "$PKGDIR"
+  cd "$BASEDIR"
+  tar -zcvf "$VERSIONDIR.tar.gz" "$VERSIONDIR"
 
   git tag $VERSION
 else
