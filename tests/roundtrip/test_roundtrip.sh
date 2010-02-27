@@ -42,7 +42,7 @@ function exit_error() {
 function exit_success() {
     clean
     echo "===== SUCCESS! ====="
-    exit 1
+    exit 0
 }
 
 function daemons_start() {

@@ -14,13 +14,17 @@ PKGDIR=releases/bithorde-$VERSION
 # Currently we're still in alpha state, so build with debug-stuff
 dsss build -g
 
-if [ -d "$PKGDIR" ]; then
-  rm -rf "$PKGDIR"
+# Run release-tests
+./tests/roundtrip/test_roundtrip.sh
+if [ $? == 0 ]; then
+  if [ -d "$PKGDIR" ]; then rm -rf "$PKGDIR"; fi
+  mkdir -p "$PKGDIR"
+
+  cp sample.config bithorded bhget bhupload "$PKGDIR"
+  tar -zcvf "$PKGDIR.tar.gz" "$PKGDIR"
+
+  git tag $VERSION
+else
+  echo "Failed roundtrip-test"
+  exit -1
 fi
-
-mkdir -p "$PKGDIR"
-cp sample.config bithorded bhget bhupload "$PKGDIR"
-
-tar -zcvf "$PKGDIR.tar.gz" "$PKGDIR"
-
-git tag $VERSION
