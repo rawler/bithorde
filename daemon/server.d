@@ -33,7 +33,7 @@ package:
     Friend[char[]] offlineFriends;
     Thread reconnectThread;
     ServerSocket tcpServer;
-    ServerSocket unixServer;
+    LocalServerSocket unixServer;
 
     static Logger log;
     static this() {
@@ -61,7 +61,7 @@ public:
             if (sockF.exists())
                 sockF.remove();
             log.info("Listening to unix-socket {}", config.unixSocket);
-            this.unixServer = new ServerSocket(new LocalAddress(config.unixSocket), 32, true);
+            this.unixServer = new LocalServerSocket(config.unixSocket);
             selector.register(unixServer, Event.Read);
         }
 
