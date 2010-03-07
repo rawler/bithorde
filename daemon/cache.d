@@ -75,9 +75,11 @@ public:
         for (; !segments[segcount].isEmpty; segcount++) {}
     }
 
-    ~this() {
-        if (file)
+    void close() {
+        if (file) {
             file.close();
+            file = null;
+        }
     }
 
     /**
@@ -230,16 +232,13 @@ public:
         this.idxPath = path.dup.suffix(".idx");
         this.mgr.openAssets[this.id] = this;
     }
-    ~this() {
-        if (file)
-            close();
-    }
 
     void open() {
         if (idxPath.exists)
             throw new IncompleteAssetException;
         file = new File(path.toString, File.ReadExisting);
     }
+
     void close() {
         if (file) {
             file.close();
@@ -293,12 +292,6 @@ public:
         foreach (k,hash; HashMap)
             hashes[hash.pbType] = hash.factory();
         super(mgr, id);
-    }
-    ~this() {
-        if (cacheMap)
-            delete cacheMap;
-        foreach (hash;hashes)
-            delete hash;
     }
 
     void create(ulong size)

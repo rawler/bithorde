@@ -137,6 +137,7 @@ public:
     {
         foreach (asset; openAssets)
             asset.unRef();
+        openAssets = null;
     }
 protected:
     void processOpenRequest(ubyte[] buf)
