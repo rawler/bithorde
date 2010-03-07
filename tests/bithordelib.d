@@ -10,6 +10,9 @@ private import tango.net.device.Socket;
 private import tango.net.InternetAddress;
 private import tango.text.convert.Integer;
 private import tango.time.Clock;
+private import tango.util.log.AppendConsole;
+private import tango.util.log.LayoutDate;
+private import tango.util.log.Log;
 
 import daemon.server;
 import daemon.config;
@@ -112,6 +115,8 @@ void testServerTimeout(SteppingServer src, SteppingServer proxy) {
 }
 
 void main() {
+    Log.root.add(new AppendConsole(new LayoutDate));
+
     auto src = new SteppingServer("A", 23412);
     testLibTimeout(src);
     src = new SteppingServer("Src", 23414);
