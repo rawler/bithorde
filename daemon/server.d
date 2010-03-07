@@ -108,13 +108,13 @@ public:
         }
         foreach (key; selector) {
             auto c = cast(Connection)key.attachment;
-            if (c)
-                c.processTimeouts();
+            if (c) c.processTimeouts();
         }
         foreach (event; removeThese) {
             auto c = cast(Client)event.attachment;
             onClientDisconnect(c);
             selector.unregister(event.conduit);
+            c.close();
             delete c;
         }
     }
@@ -129,9 +129,8 @@ public:
         return asset;
     }
 protected:
-    void onClientConnect(Socket s)
+    void onClientConnect(Client c)
     {
-        auto c = new Client(this, s);
         Friend f;
         auto peername = c.peername;
         if (peername in offlineFriends) {
@@ -140,13 +139,8 @@ protected:
             f.c = c;
             router.registerFriend(f);
         }
-        selector.register(s, Event.Read, c);
 
-        // ATM, there may be stale data in the buffers from the HandShake that needs processing
-        // FIXME: internal API should be re-written so that the HandShake is handled in normal run-loop
-        while (c.processMessage()) {}
-
-        log.info("{} {} connected: {}", f?"Friend":"Client", peername, s.socket.remoteAddress);
+        log.info("{} {} connected: {}", f?"Friend":"Client", peername, c.remoteAddress);
     }
 
     void onClientDisconnect(Client c)
@@ -159,14 +153,53 @@ protected:
         log.info("{} {} disconnected", f?"Friend":"Client", c.peername);
     }
 
+    private bool _processMessageQueue(Client c) {
+        try {
+            while (c.processMessage()) {}
+            return true;
+        } catch (Exception e) {
+            char[] excInfo = "";
+            e.writeOut(delegate(char[] msg){excInfo ~= msg;});
+            log.fatal("Connection {} recieved triggered an unhandled exception; {}", c.peername, excInfo);
+            return false;
+        }
+    }
+
+    private bool _handshakeAndSetup(Socket s) {
+        bool abortSocket() {
+            s.shutdown();
+            s.close();
+            return false;
+        }
+        Client c;
+        try {
+            c = new Client(this, s);
+        } catch (Exception e) {
+            char[] excInfo = "";
+            e.writeOut(delegate(char[] msg){excInfo ~= msg;});
+            log.fatal("New connection triggered an unhandled exception; {}", excInfo);
+            return abortSocket();
+        }
+        onClientConnect(c);
+        selector.register(s, Event.Read, c);
+
+        // ATM, there may be stale data in the buffers from the HandShake that needs processing
+        // Perhaps try to rework internal API so that the HandShake is handled in normal run-loop?
+        if (!_processMessageQueue(c)) {
+            onClientDisconnect(c);
+            return abortSocket();
+        }
+        return true;
+    }
+
     bool processSelectEvent(SelectionKey event)
     {
         if (event.conduit is tcpServer) {
             assert(event.isReadable);
-            onClientConnect(tcpServer.accept());
+            _handshakeAndSetup(tcpServer.accept());
         } else if (event.conduit is unixServer) {
             assert(event.isReadable);
-            onClientConnect(unixServer.accept());
+            _handshakeAndSetup(unixServer.accept());
         } else {
             auto c = cast(Client)event.attachment;
             if (event.isError || event.isHangup || event.isInvalidHandle) {
@@ -174,7 +207,7 @@ protected:
             } else {
                 assert (event.isReadable);
                 if (c.readNewData())
-                    while (c.processMessage()) {}
+                    return _processMessageQueue(c);
                 else
                     return false;
             }
@@ -182,21 +215,16 @@ protected:
         return true;
     }
 
-    bool attemptConnect(InternetAddress friend) {
-        auto socket = new Socket();
-        socket.connect(friend);
-        onClientConnect(socket);
-        return true;
-    }
-
     void reconnectLoop() {
         auto socket = new Socket();
         while (true) try {
-            foreach (friend; offlineFriends.values) try {
-                socket.connect(friend.addr);
-                onClientConnect(socket);
-                socket = new Socket();
-            } catch (SocketException e) {}
+            foreach (friend; offlineFriends.values) {
+                try {
+                    socket.connect(friend.addr);
+                    _handshakeAndSetup(socket);
+                    socket = new Socket();
+                } catch (SocketException e) {}
+            }
             Thread.sleep(2);
         } catch (Exception e) {
             log.error("Caught unexpected exception in reconnectLoop: {}", e);

@@ -109,16 +109,19 @@ public:
     }
 
     ~this() {
-        close();
+        onClose();
     }
 
-    bool closed;
-    void close(bool reallyClose = true) {
+    final bool closed() { return !socket; }
+    void close() {
         if (closed)
             return;
-        closed = true;
-        if (reallyClose && socket)
-            socket.close();
+        socket.shutdown();
+        socket.close();
+        onClose();
+    }
+    void onClose() {
+        socket = null;
         foreach (ifr; inFlightRequests) {
             if (ifr.req)
                 ifr.req.abort(message.Status.DISCONNECTED);
@@ -165,7 +168,7 @@ public:
                         assert(read, "Selector indicated data, but failed reading");
                         while (processMessage()) {}
                     } else if (key.isError) {
-                        close(false);
+                        close();
                     }
                 }
             }
@@ -175,6 +178,7 @@ public:
 
     final char[] peername() { return _peername; }
     final char[] myname() { return _myname; }
+    final Address remoteAddress() { return socket.socket.remoteAddress; }
     char[] toString() {
         return peername;
     }
@@ -215,7 +219,7 @@ private:
         if (buf == data) {
             return data;
         } else {
-            assert((type & 0b0000_0111) == 0b0010);
+            assert((type & 0b0000_0111) == 0b0010, "Expected message type, but got something else");
             type >>= 3;
         }
         uint msglen = decode_val!(uint)(buf);
