@@ -86,6 +86,7 @@ void testServerTimeout(SteppingServer src, SteppingServer proxy) {
     src.step();
     for (int i=0; i < 100; i++)
         proxy.step();
+    Thread.sleep(0.1);
     Stdout("Opening Client...").newline;
     auto client = new Client(new LocalAddress(proxy.config.unixSocket), "libtest");
     Stdout("Client open, sending assetRequest").newline;
