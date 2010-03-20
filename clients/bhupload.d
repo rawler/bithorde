@@ -20,7 +20,7 @@ import lib.message;
 import lib.arguments;
 import clients.lib.progressbar;
 
-const uint CHUNK_SIZE = 4096;
+const uint CHUNK_SIZE = 32768;
 
 class UploadArguments : private Arguments {
 private:
