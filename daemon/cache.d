@@ -169,7 +169,7 @@ public:
         cleanup();
         scope(exit) cleanup();
 
-        auto map = new CacheMap(path.toString);
+        auto map = new CacheMap(path);
         map.add(0,15);
         assert(map.segments[0].start == 0);
         assert(map.segments[0].end == 15);
