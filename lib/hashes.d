@@ -4,42 +4,45 @@ private import tango.io.device.Array;
 private import tango.text.convert.Format;
 private import tango.text.Regex;
 
-public import dcrypt.crypto.Hash;
-private import dcrypt.crypto.hashes.SHA1;
-private import dcrypt.crypto.hashes.SHA256;
-private import dcrypt.crypto.hashes.ED2K;
-private import dcrypt.crypto.hashes.Tiger;
-private import dcrypt.crypto.TreeHash;
-private import dcrypt.misc.ByteConverter;
+public import tango.util.digest.Digest;
+private import tango.util.digest.Sha1;
+private import tango.util.digest.Sha256;
+private import tango.util.digest.Tiger;
 
+private static import base32 = lib.base32;
+private static import hex = lib.hex;
+private import lib.digest.ED2K;
+private import lib.digest.HashTree;
 private import lib.message;
 
 /**
  * The only function anyone need, really ;)
  */
-Hash hashFactory(TYPE:Hash)() {
+Digest hashFactory(TYPE:Digest)() {
     return new TYPE;
 }
 
-char[] base32NoPad(void[] input) {
-    return ByteConverter.base32Encode(input, false);
+char[] base32NoPad(ubyte[] input) {
+    return base32.encode(input, false);
 }
 
 struct HashDetail {
     HashType pbType;
     char[] name;
-    Hash function() factory;
-    char[] function(void[]) magnetFormatter;
+    Digest function() factory;
+    char[] function(ubyte[]) magnetFormatter;
     ubyte[] function(char[]) magnetDeformatter;
 }
 
 HashDetail[HashType] HashMap;
 
 static this() {
-    auto hashes = [HashDetail(HashType.SHA1, "sha1", &hashFactory!(SHA1), &base32NoPad, &ByteConverter.base32Decode),
-                   HashDetail(HashType.SHA256, "sha256", &hashFactory!(SHA256), &base32NoPad, &ByteConverter.base32Decode),
-                   HashDetail(HashType.TREE_TIGER, "tree:tiger", &hashFactory!(TreeHash!(Tiger)), &base32NoPad, &ByteConverter.base32Decode),
-                   HashDetail(HashType.ED2K, "ed2k", &hashFactory!(ED2K), &base32NoPad, &ByteConverter.base32Decode)];
+    auto hashes = [
+        HashDetail(HashType.SHA1, "sha1", &hashFactory!(Sha1), &base32NoPad, &base32.decode),
+        HashDetail(HashType.SHA256, "sha256", &hashFactory!(Sha256), &base32NoPad, &base32.decode),
+        HashDetail(HashType.TREE_TIGER, "tree:tiger", &hashFactory!(HashTree!(Tiger)), &base32NoPad, &base32.decode),
+        HashDetail(HashType.ED2K, "ed2k", &hashFactory!(ED2K), &base32NoPad, &base32.decode),
+    ];
     foreach (h; hashes)
         HashMap[h.pbType] = h;
 }
@@ -75,8 +78,8 @@ char[] formatED2K(Identifier[] ids, ulong length, char[] name = null) {
         }
     }
     if (hash)
-        return Format.convert("ed2k://|file|{}|{}|{}|/", name?name:"", length, ByteConverter.hexEncode(hash));
-    else 
+        return Format.convert("ed2k://|file|{}|{}|{}|/", name?name:"", length, hex.encode(hash));
+    else
         return null;
 }
 
@@ -102,10 +105,10 @@ Identifier[] parseMagnet(char[] magnetUri, out char[] name) {
 
 Identifier[] parseED2K(char[] ed2kUri, out char[] name) {
     Identifier[] retVal;
-    auto re = Regex(r"ed2k://\|file\|([^\|]*)\|\d*\|(\w+)\|");
+    auto re = Regex(r"ed2k://\|file\|(.*)\|.*\|([0-9A-Fa-f]+)\|");
     foreach (m; re.search(ed2kUri)) {
         name = m[1];
-        retVal ~= new Identifier(HashType.ED2K, ByteConverter.hexDecode(m[2]));
+        retVal ~= new Identifier(HashType.ED2K, hex.decode(m[2]));
     }
     return retVal;
 }

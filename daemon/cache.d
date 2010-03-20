@@ -281,7 +281,7 @@ public:
 class WriteableAsset : CachedAsset {
 protected:
     CacheMap cacheMap;
-    Hash[HashType] hashes;
+    Digest[HashType] hashes;
     uint hashingptr;
 public:
     this(CacheManager mgr, ubyte[] id) {
@@ -348,7 +348,7 @@ protected:
         asset.localId = _id.dup;
 
         foreach (type, hash; hashes) {
-            auto digest = hash.digest;
+            auto digest = hash.binaryDigest;
             auto hashId = new message.Identifier;
             hashId.type = type;
             hashId.id = digest.dup;
