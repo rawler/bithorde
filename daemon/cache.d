@@ -232,6 +232,10 @@ public:
         this.idxPath = path.dup.suffix(".idx");
         this.mgr.openAssets[this.id] = this;
     }
+    ~this() {
+        if (file)
+            close();
+    }
 
     void open() {
         if (idxPath.exists)
@@ -240,11 +244,11 @@ public:
     }
 
     void close() {
+        mgr.openAssets.remove(id);
         if (file) {
             file.close();
             file = null;
         }
-        mgr.openAssets.remove(id);
     }
 
     synchronized void aSyncRead(ulong offset, uint length, BHReadCallback cb) {
@@ -521,8 +525,8 @@ public:
         if (!localId) {
             log.trace("Unknown asset, forwarding {}", req);
             return forwardRequest();
-        } else if (auto asset = localId in openAssets) {
-            return fromCache(*asset);
+        } else if (localId in openAssets) {
+            return fromCache(openAssets[localId]);
         } else {
             return openAsset(localId);
         }
