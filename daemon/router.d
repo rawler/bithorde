@@ -45,9 +45,7 @@ public:
             assert(asset, "SUCCESS response, but no asset");
             backingAssets ~= asset;
             break;
-        case Status.NOTFOUND:
-        case Status.WOULD_LOOP:
-        case Status.TIMEOUT:
+        default:
             break;
         }
         waitingResponses -= 1;
