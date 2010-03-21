@@ -55,11 +55,10 @@ class SteppingServer : Server {
 }
 
 void testLibTimeout(SteppingServer s) {
-    Stdout("Testing ClientTimeout\n=====================\n").newline;
     s.step();
-    Stdout("Opening Client...").newline;
+    LOG.info("Opening Client...");
     auto client = new Client(new LocalAddress(s.config.unixSocket), "libtest");
-    Stdout("Client open, sending assetRequest").newline;
+    LOG.info("Client open, sending assetRequest");
     auto ids = [new Identifier(message.HashType.SHA1, cast(ubyte[])x"c1531277498f21cb9ded5741f7a0d66c66505bca")];
     bool gotTimeout = false;
     client.open(ids, delegate(IAsset asset, Status status, OpenOrUploadRequest req, OpenResponse resp) {
@@ -73,23 +72,22 @@ void testLibTimeout(SteppingServer s) {
         assert(req, "Invalid request");
         assert(!resp, "Got unexpected response");
     });
-    Stdout("Request sent, expecting Timeout").newline;
+    LOG.info("Request sent, expecting Timeout");
     client.run();
     if (gotTimeout)
-        Stdout("SUCCESS: Timeout gotten").newline;
+        LOG.info("SUCCESS: Timeout gotten");
     else
         assert(false, "Did not get timeout");
 }
 
 void testServerTimeout(SteppingServer src, SteppingServer proxy) {
-    Stdout("\nTesting ServerTimeout\n=====================").newline;
     src.step();
     for (int i=0; i < 100; i++)
         proxy.step();
     Thread.sleep(0.1);
-    Stdout("Opening Client...").newline;
+    LOG.info("Opening Client...");
     auto client = new Client(new LocalAddress(proxy.config.unixSocket), "libtest");
-    Stdout("Client open, sending assetRequest").newline;
+    LOG.info("Client open, sending assetRequest");
     auto ids = [new Identifier(message.HashType.SHA1, cast(ubyte[])x"c1531277498f21cb9ded5741f7a0d66c66505bca")];
     bool gotTimeout = false;
     auto sendTime = Clock.now;
@@ -106,20 +104,26 @@ void testServerTimeout(SteppingServer src, SteppingServer proxy) {
         assert(req, "Invalid request");
         assert(resp, "Did not get expected response");
     }, TimeSpan.fromMillis(500));
-    Stdout("Request sent, expecting Timeout").newline;
+    LOG.info("Request sent, expecting Timeout");
     client.run();
     if (gotTimeout)
-        Stdout("SUCCESS: NOTFOUND after Timeout").newline;
+        LOG.info("SUCCESS: NOTFOUND after Timeout");
     else
         assert(false, "Did not get timeout");
 
 }
 
+static Logger LOG;
+
 void main() {
     Log.root.add(new AppendConsole(new LayoutDate));
+    LOG = Log.lookup("libtest");
 
+    Stdout("\nTesting ClientTimeout\n=====================\n").newline;
     auto src = new SteppingServer("A", 23412);
     testLibTimeout(src);
+
+    Stdout("\nTesting ServerTimeout\n=====================\n").newline;
     src = new SteppingServer("Src", 23414);
     auto proxy = new SteppingServer("Proxy", 23415, [src]);
     testServerTimeout(src, proxy);
