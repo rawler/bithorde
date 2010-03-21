@@ -56,6 +56,10 @@ protected:
             close();
     }
 public:
+    ushort handle() {
+        return message.OpenResponse.handle;
+    }
+
     void aSyncRead(ulong offset, uint size, BHReadCallback readCallback) {
         auto req = new ReadRequest(readCallback);
         req.offset = offset;

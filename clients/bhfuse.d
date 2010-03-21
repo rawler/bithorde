@@ -1,20 +1,20 @@
 module clients.fuse;
 
-private import tango.core.Exception,
-               tango.io.Stdout,
-               tango.stdc.errno,
-               tango.stdc.posix.fcntl,
-               tango.stdc.posix.signal,
-               tango.stdc.posix.sys.stat,
-               tango.stdc.posix.sys.statvfs,
-               tango.stdc.posix.utime,
-               tango.stdc.string;
-
-private import tango.net.device.Socket : Socket, SocketType, ProtocolType;
+private import tango.core.Exception;
+private import tango.io.selector.Selector;
+private import tango.io.Stdout;
 private import tango.net.device.LocalSocket;
+private import tango.stdc.errno;
+private import tango.stdc.posix.fcntl;
+private import tango.stdc.posix.signal;
+private import tango.stdc.posix.sys.stat;
+private import tango.stdc.posix.sys.statvfs;
+private import tango.stdc.posix.utime;
+private import tango.stdc.string;
 
-private import lib.client,
-               lib.message;
+private import lib.client;
+private import lib.hashes;
+private import lib.message;
 
 extern (C):
 typedef int function(void *buf, char *name, stat_t *stbuf, off_t off) fuse_fill_dir_t;
@@ -73,12 +73,21 @@ struct fuse_file_info {
     int flags;
     ulong fh_old;
     int writepage;
-    uint direct_io = 1;
-    uint keep_cache = 1;
-    uint flush = 1;
-    uint padding = 29;
+    uint options; // The C struct uses a bitfield here. We use an int with accessors below
     ulong fh;
     ulong lock_owner;
+
+    bool direct_io() { return cast(bool)(options & (1<<0)); }
+    bool direct_io(bool b) { options |= (b<<0); return b; }
+
+    bool keep_cache() { return cast(bool)(options & (1<<1)); }
+    bool keep_cache(bool b) { options |= (b<<1); return b; }
+
+    bool flush() { return cast(bool)(options & (1<<2)); }
+    bool flush(bool b) { options |= (b<<2); return b; }
+
+    bool nonseekable() { return cast(bool)(options & (1<<3)); }
+    bool nonseekable(bool b) { options |= (b<<3); return b; }
 }
 
 int fuse_main_real(int argc, char** argv, fuse_operations *op,
@@ -86,28 +95,35 @@ int fuse_main_real(int argc, char** argv, fuse_operations *op,
 
 /*-------------- Main program below ---------------*/
 
-static IAsset[ubyte[]] fileMap;
+static RemoteAsset[128] assetMap; // TODO: dynamically grow
 static Client client;
 
-extern (D) IAsset openAsset(ubyte[] objectid) {
-    bool gotResponse = false;
-    IAsset retval;
-    pragma(msg, "BHFuse is currently out of commision (missing support for multi-id, and hashlink-parsing)");
-/+    client.open(HashType.SHA1, objectid, delegate void(IAsset asset, Status status) {
-        switch (status) {
-        case Status.SUCCESS:
-            retval = fileMap[objectid.dup] = asset;
-            break;
-        case Status.NOTFOUND:
-            break;
-        default:
-            Stderr.format("Got unknown status from BitHorde.open: {}", status).newline;
+extern (D) {
+    void driveUntil(ref bool doBreak) {
+        synchronized (client) {
+            while (!doBreak)
+                client.pump();
         }
-        gotResponse = true;
-    });+/
-    while (!gotResponse)
-        client.readAndProcessMessage();
-    return retval;
+    }
+
+    RemoteAsset openAsset(Identifier[] objectids) {
+        bool gotResponse = false;
+        RemoteAsset retval;
+        client.open(objectids, delegate void(IAsset asset, Status status, OpenOrUploadRequest req, OpenResponse resp) {
+            switch (status) {
+            case Status.SUCCESS:
+                retval = cast(RemoteAsset)asset;
+                break;
+            case Status.NOTFOUND:
+                break;
+            default:
+                Stderr.format("Got unknown status from BitHorde.open: {}", status).newline;
+            }
+            gotResponse = true;
+        });
+        driveUntil(gotResponse);
+        return retval;
+    }
 }
 
 static int bh_getattr(char *path, stat_t *stbuf)
@@ -120,21 +136,16 @@ static int bh_getattr(char *path, stat_t *stbuf)
         stbuf.st_mode = S_IFDIR | 0755;
         stbuf.st_nlink = 2;
     } else try {
-        ubyte[100] buf;
-        if (dpath.length > buf.length*2)
+        char[] name;
+        auto objectids = parseMagnet(dpath[1..length], name);
+        if (!objectids.length)
             return -ENOENT;
-        auto objectid = hexToBytes(dpath[1..length], buf);
-        IAsset asset;
-        if (objectid in fileMap) {
-            asset = fileMap[objectid];
-        } else {
-            asset = openAsset(objectid);
-        }
 
-        if (asset) {
+        if (auto asset = openAsset(objectids)) {
             stbuf.st_mode = S_IFREG | 0444;
             stbuf.st_nlink = 1;
             stbuf.st_size = asset.size;
+            asset.close();
         } else {
             res = -ENOENT;
         }
@@ -151,18 +162,20 @@ static int bh_open(char *path, fuse_file_info *fi)
         return -EACCES;
 
     auto pathLen = strlen(path);
-    if (pathLen < 2)
+    if (pathLen < 10)
         return -ENOENT;
-    try {
-        ubyte[100] buf;
-        if (pathLen > buf.length*2)
-            return -ENOENT;
-        ubyte[] objectid = hexToBytes(path[1..pathLen], buf);
+    else try {
+        char[] name;
+        auto objectids = parseMagnet(path[1..pathLen], name);
 
-        if ((objectid in fileMap) || openAsset(objectid))
+        if (auto asset = openAsset(objectids)) {
+            assetMap[asset.handle] = asset;
+            fi.fh = asset.handle;
+            fi.keep_cache = true;
             return 0;
-        else
+        } else {
             return -ENOENT;
+        }
     } catch (IllegalArgumentException) {
         return -ENOENT;
     }
@@ -171,22 +184,13 @@ static int bh_open(char *path, fuse_file_info *fi)
 static int bh_read(char *path, void *buf, size_t size, off_t offset,
                       fuse_file_info *fi)
 {
-    auto pathLen = strlen(path);
-    if (pathLen < 2)
-        return -ENOENT;
-    ubyte[] objectid;
-    try {
-        ubyte[100] oidbuf;
-        if (pathLen > oidbuf.length*2)
-            return -ENOENT;
-        objectid = hexToBytes(path[1..pathLen], oidbuf);
-    } catch (IllegalArgumentException)
-        return -ENOENT;
-    if (!(objectid in fileMap))
-        return -ENOENT;
-    auto asset = fileMap[objectid];
-    bool gotResponse = false;
+    if (!fi)
+        return -EBADF;
+    auto asset = assetMap[fi.fh];
+    if (!asset)
+        return -EBADF;
 
+    bool gotResponse = false;
     if (offset < asset.size) {
         if (offset + size > asset.size)
             size = asset.size - offset;
@@ -207,12 +211,19 @@ static int bh_read(char *path, void *buf, size_t size, off_t offset,
         return 0;
     }
 
-    while (true) synchronized(client) {
-        if (gotResponse)
-            break;
-        client.readAndProcessMessage();
-    }
+    driveUntil(gotResponse);
     return size;
+}
+
+static int bh_close(char *path, void *buf, size_t size, off_t offset,
+                      fuse_file_info *fi)
+{
+    if (!fi)
+        return -ENOENT;
+
+    auto asset = assetMap[fi.fh];
+    asset.close();
+    assetMap[fi.fh] = null;
 }
 
 static fuse_operations bh_oper = {

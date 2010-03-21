@@ -32,6 +32,7 @@ class Connection
 {
 protected:
     Socket socket;
+    Selector selector; // TODO: Break out standalone-driven-behavior into own client?
     ubyte[] frontbuf, backbuf, left;
     ByteBuffer msgbuf;
     char[] _myname, _peername;
@@ -96,6 +97,7 @@ public:
     this(Socket s, char[] myname)
     {
         this.socket = s;
+
         this.frontbuf = new ubyte[8192]; // TODO: Handle overflow
         this.backbuf = new ubyte[8192];
         this.left = [];
@@ -153,27 +155,35 @@ public:
         }
     }
 
-    void run() {
-        auto selector = new Selector;
-        selector.open(1,1);
-        selector.register(socket, Event.Read|Event.Error);
+    TimeSpan nextTimeOut() {
+        return timeouts.size ? (timeouts.peek.time-Clock.now) : TimeSpan.max;
+    }
 
-        while (!closed) {
-            auto timeout = timeouts.size ? (timeouts.peek.time-Clock.now) : TimeSpan.max;
-            if (selector.select(timeout) > 0) {
-                foreach (key; selector.selectedSet()) {
-                    assert(key.conduit is socket);
-                    if (key.isReadable) {
-                        auto read = readNewData;
-                        assert(read, "Selector indicated data, but failed reading");
-                        while (processMessage()) {}
-                    } else if (key.isError) {
-                        close();
-                    }
+    synchronized void pump() {
+        if (!selector) {
+            selector = new Selector();
+            selector.open(1,1);
+            selector.register(socket, Event.Read|Event.Error);
+        }
+
+        if (selector.select(nextTimeOut) > 0) {
+            foreach (key; selector.selectedSet()) {
+                assert(key.conduit is socket);
+                if (key.isReadable) {
+                    auto read = readNewData;
+                    assert(read, "Selector indicated data, but failed reading");
+                    while (processMessage()) {}
+                } else if (key.isError) {
+                    close();
                 }
             }
-            processTimeouts();
         }
+        processTimeouts();
+    }
+
+    void run() {
+        while (!closed)
+            pump();
     }
 
     final char[] peername() { return _peername; }
