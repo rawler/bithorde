@@ -20,7 +20,6 @@ private import daemon.config;
 private import daemon.friend;
 private import daemon.router;
 private import lib.asset;
-private import lib.client : bytesToHex;
 private import lib.connection;
 private import message = lib.message;
 

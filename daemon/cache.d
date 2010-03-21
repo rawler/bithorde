@@ -7,6 +7,7 @@ private import tango.io.device.FileMap;
 private import tango.io.FilePath;
 private import tango.math.random.Random;
 private import tango.util.log.Log;
+private import ascii = tango.text.Ascii;
 
 private import daemon.client;
 private import daemon.config;
@@ -14,6 +15,7 @@ private import daemon.router;
 private import lib.asset;
 private import lib.client;
 private import lib.hashes;
+private import hex = lib.hex;
 private import message = lib.message;
 private import lib.protobuf;
 alias message.HashType HashType;
@@ -228,7 +230,7 @@ public:
     this(CacheManager mgr, ubyte[] id) {
         this.mgr = mgr;
         this._id = id.dup;
-        this.path = mgr.assetDir.dup.append(bytesToHex(id));
+        this.path = mgr.assetDir.dup.append(ascii.toLower(hex.encode(id)));
         this.idxPath = path.dup.suffix(".idx");
         this.mgr.openAssets[this.id] = this;
     }
@@ -448,9 +450,9 @@ class AssetMetaData : ProtoBufMessage {
 
     char[] toString() {
         char[] retval = "AssetMetaData {\n";
-        retval ~= "     localId: " ~ bytesToHex(localId) ~ "\n";
+        retval ~= "     localId: " ~ hex.encode(localId) ~ "\n";
         foreach (hash; hashIds) {
-            retval ~= "     " ~ HashMap[hash.type].name ~ ": " ~ bytesToHex(hash.id) ~ "\n";
+            retval ~= "     " ~ HashMap[hash.type].name ~ ": " ~ hex.encode(hash.id) ~ "\n";
         }
         return retval ~ "}";
     }
@@ -494,7 +496,7 @@ public:
     IServerAsset findAsset(OpenRequest req, BHServerOpenCallback cb) {
         IServerAsset fromCache(CachedAsset asset) {
             asset.takeRef();
-            log.trace("serving {} from cache", bytesToHex(asset.id));
+            log.trace("serving {} from cache", hex.encode(asset.id));
             req.callback(asset, message.Status.SUCCESS);
             return asset;
         }

@@ -9,38 +9,6 @@ public import lib.asset;
 import lib.connection;
 import lib.protobuf;
 
-char[] bytesToHex(ubyte[] bytes) {
-    static char[] hex = "0123456789abcdef";
-    char[] retval = new char[bytes.length * 2];
-    foreach (idx, b; bytes) {
-        retval[2*idx]   = hex[b >> 4];
-        retval[2*idx+1] = hex[b & 0b00001111];
-    }
-    return retval;
-}
-
-ubyte[] hexToBytes(char[] hex, ubyte[] buf = null) {
-    if (!buf)
-        buf = new ubyte[hex.length / 2];
-    assert(buf.length*2 >= hex.length);
-    ubyte[] retval = buf[0..hex.length/2];
-    ubyte parseChar(uint idx) {
-        auto c = hex[idx];
-        if (('0' <= c) && (c <= '9'))
-            return cast(ubyte)(c-'0');
-        else if (('a' <= c) && (c <= 'f'))
-            return cast(ubyte)(c-'a'+10);
-        else if (('A' <= c) && (c <= 'F'))
-            return cast(ubyte)(c-'A'+10);
-        else
-            throw new IllegalArgumentException("Argument is not hex at pos: " ~ ItoA(idx));
-    }
-    foreach (idx, ref b; retval) {
-        b = (parseChar(2*idx) << 4) | parseChar(2*idx+1);
-    }
-    return retval;
-}
-
 class RemoteAsset : private message.OpenResponse, IAsset {
     class ReadRequest : message.ReadRequest {
         BHReadCallback _callback;

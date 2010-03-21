@@ -83,7 +83,7 @@ sleep 0.1
 wait $!
 verify_done cacheb/?????????????????????* || exit_error "Cached asset still has an index, indicating not done"
 verify_equal cacheb/?????????????????????* || exit_error "File wasn't cached properly"
-[ $(grep -c 'serving [0-9a-f]* from cache' a.log) -eq 1 ] || exit_error "File was doubly-transfered from node A"
+[ $(grep -c 'serving [0-9A-Fa-f]* from cache' a.log) -eq 1 ] || exit_error "File was doubly-transfered from node A"
 
 echo "Shutting down A..."
 quiet_stop $DAEMON1
