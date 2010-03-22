@@ -8,7 +8,8 @@ private import tango.util.container.more.Stack;
 private import tango.util.log.Log;
 
 import daemon.server;
-import daemon.cache;
+import daemon.cache.asset;
+import daemon.cache.manager;
 import lib.asset;
 import lib.client;
 import message = lib.message;
