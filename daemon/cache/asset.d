@@ -59,7 +59,14 @@ protected:
     AssetMetaData _metadata;
     AssetLifeCycleListener notify;
 public:
+    /************************************************************************************
+     * IncompleteAssetException is thrown if a not-fully-cached asset were to be Opened
+     * directly as a CachedAsset
+     * 
+     ***********************************************************************************/
+    // TODO: Should not be needed, fix cachemanager
     class IncompleteAssetException {}
+
     this(FilePath assetDir, ubyte[] id, AssetLifeCycleListener listener) {
         this._id = id.dup;
         this.path = assetDir.dup.append(ascii.toLower(hex.encode(id)));
@@ -73,12 +80,21 @@ public:
             close();
     }
 
+    /************************************************************************************
+     * Assets can be created with delayed-open. Useful for CachingAsset, which needs to
+     * exist when a forwarded request exists, but not create underlying files unless
+     * asset is found remotely.
+     ***********************************************************************************/
     void open() {
         if (idxPath.exists)
             throw new IncompleteAssetException;
         file = new File(path.toString, File.ReadExisting);
     }
 
+    /***********************************************************************************
+     * Asset is closed, unregistered, and resources closed. Afterwards, should be
+     * awaiting garbage collection.
+     **********************************************************************************/
     void close() {
         notify(this, AssetState.DEAD);
         if (file) {
@@ -87,6 +103,9 @@ public:
         }
     }
 
+    /************************************************************************************
+     * Read a single segment from the Asset
+     ***********************************************************************************/
     synchronized void aSyncRead(ulong offset, uint length, BHReadCallback cb) {
         assert(file);
         ubyte[] buf = tlsBuffer(length);
@@ -99,10 +118,16 @@ public:
         cb(this, message.Status.SUCCESS, null, resp); // TODO: should really hold reference to req
     }
 
+    /************************************************************************************
+     * Adding segments is not supported for CachedAsset
+     ***********************************************************************************/
     void add(ulong offset, ubyte[] data) {
         throw new IOException("Trying to write to a completed file");
     }
 
+    /************************************************************************************
+     * Find the size of the asset.
+     ***********************************************************************************/
     final ulong size() {
         assert(file);
         return file.length;
@@ -111,39 +136,49 @@ public:
     AssetMetaData metadata() {
         return _metadata;
     }
-
-    final HashType hashType() { return HashType.init; } // TODO: Change API to support multi-hash
     final AssetId id() { return _id; }
 
     mixin IRefCounted.Impl;
 }
 
+/****************************************************************************************
+ * WriteableAsset implements uploading to Assets, and forms a base for CachingAsset
+ ***************************************************************************************/
 class WriteableAsset : CachedAsset {
 protected:
     CacheMap cacheMap;
     Digest[HashType] hashes;
     uint hashingptr;
 public:
+    /************************************************************************************
+     * Create WriteableAsset, id will be auto-random-generated if not specified.
+     ***********************************************************************************/
     this(FilePath assetDir, AssetLifeCycleListener _listener) {
         auto id = new ubyte[32];
         rand.randomizeUniform!(ubyte[],false)(id);
         this(assetDir, id, _listener);
     }
-    this(FilePath assetDir, ubyte[] id, AssetLifeCycleListener _listener) {
+    this(FilePath assetDir, ubyte[] id, AssetLifeCycleListener _listener) { /// ditto
         foreach (k,hash; HashMap)
             hashes[hash.pbType] = hash.factory();
         super(assetDir, id, _listener);
         log = Log.lookup("daemon.cache.writeasset."~hex.encode(id[0..4]));
     }
 
+    /************************************************************************************
+     * Create new writeable asset and prepare for writing
+     ***********************************************************************************/
     void create(ulong size)
-    in { assert(size > 0); }
+    in { assert(size > 0); } // Zero-assets are not supported
     body {
         cacheMap = new CacheMap(idxPath);
         file = new File(path.toString, File.Style(File.Access.ReadWrite, File.Open.New));
         file.truncate(size);
     }
 
+    /************************************************************************************
+     * Regular opening for reading
+     ***********************************************************************************/
     void open() {
         cacheMap = new CacheMap(idxPath);
         super.open();
@@ -153,8 +188,12 @@ public:
         if (!cacheMap || cacheMap.has(offset, length))
             super.aSyncRead(offset, length, cb);
         else
-            throw new MissingSegmentException("Missing given segment");
+            throw new MissingSegmentException("Missing requested segment");
     }
+
+    /************************************************************************************
+     * Add a data-segment to the asset, and update the CacheMap
+     ***********************************************************************************/
     synchronized void add(ulong offset, ubyte[] data) {
         if (!cacheMap)
             throw new IOException("Trying to write to a completed file");
@@ -164,6 +203,9 @@ public:
         updateHashes();
     }
 protected:
+    /************************************************************************************
+     * Check if more data is available for hashing
+     ***********************************************************************************/
     void updateHashes() {
         auto zeroBlockSize = cacheMap.zeroBlockSize;
         if (zeroBlockSize > hashingptr) {
@@ -181,6 +223,9 @@ protected:
         }
     }
 
+    /************************************************************************************
+     * Post-finish hooks. Finalize the digests, add to assetMap, and remove the CacheMap
+     ***********************************************************************************/
     void finish() {
         assert(cacheMap.segcount == 1);
         assert(cacheMap.assetSize == file.length);
@@ -219,6 +264,9 @@ public:
         log = Log.lookup("daemon.cache.cachingasset."~hex.encode(id[0..4]));
     }
 
+    /************************************************************************************
+     * Callback for backing remoteAssets. Recieves openResponses for attempted opens
+     ***********************************************************************************/
     void remoteCallback(IServerAsset remoteAsset, message.Status status) {
         if (remoteAsset && (status == message.Status.SUCCESS)) {
             this.remoteAsset = remoteAsset;
@@ -233,7 +281,6 @@ public:
         cb(this, status);
     }
 
-    // TODO: Intercept and forward missing segments
     synchronized void aSyncRead(ulong offset, uint length, BHReadCallback cb) {
         auto r = new ForwardedRead;
         r.offset = offset;
@@ -242,6 +289,9 @@ public:
         r.tryRead();
     }
 protected:
+    /************************************************************************************
+     * Triggered when the underlying cache is complete.
+     ***********************************************************************************/
     void finish() {
         // TODO: Validate hashId:s
         super.finish();
@@ -253,6 +303,10 @@ private:
         super.aSyncRead(offset, length, cb);
     }
 
+    /************************************************************************************
+     * Every read-operation for non-cached data results in a ForwardedRead, which tracks
+     * a forwarded ReadRequest, recieves the response, and updates the CachingAsset.
+     ***********************************************************************************/
     class ForwardedRead {
         ulong offset;
         uint length;
@@ -269,7 +323,7 @@ private:
         }
         void callback(IAsset asset, message.Status status, message.ReadRequest req, message.ReadResponse resp) {
             if (status == message.Status.SUCCESS) {
-                if (cacheMap) // If Still open for writing, may have stale requests
+                if (cacheMap) // May no longer be open for writing, due to stale requests
                     add(resp.offset, resp.content);
                 tryRead();
             } else if ((status == message.Status.DISCONNECTED) && (status != lastStatus)) { // Hackish. We may have double-requested the same part of the file, so attempt to read it anyways

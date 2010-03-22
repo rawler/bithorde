@@ -17,11 +17,6 @@ private import daemon.client;
 private import daemon.config;
 private import daemon.router;
 
-private class IdMap {
-    AssetMetaData[] assets;
-    mixin MessageMixin!(PBField!("assets",    1)());
-}
-
 /****************************************************************************************
  * Overseeing Cache-manager, keeping state of all cache-assets, and mapping from id:s to
  * Assets.
@@ -42,7 +37,9 @@ protected:
         log = Log.lookup("daemon.cache.manager");
     }
 public:
-
+    /************************************************************************************
+     * Create a CacheManager with a given asset-directory and underlying Router-instance
+     ***********************************************************************************/
     this(FilePath assetDir, Router router) {
         if (!(assetDir.exists && assetDir.isFolder && assetDir.isWritable))
             throw new ConfigException(assetDir.toString ~ " must be an existing writable directory");
@@ -59,6 +56,10 @@ public:
             hashIdMap[message.HashType.ED2K] = null;
         }
     }
+
+    /************************************************************************************
+     * Implements IAssetSource.findAsset. Tries to get a hold of a certain asset.
+     ***********************************************************************************/
     IServerAsset findAsset(OpenRequest req, BHServerOpenCallback cb) {
         IServerAsset fromCache(CachedAsset asset) {
             asset.takeRef();
@@ -99,6 +100,9 @@ public:
             return openAsset(localId);
         }
     }
+    /************************************************************************************
+     * Implement uploading new assets to this Cache.
+     ***********************************************************************************/
     WriteableAsset uploadAsset(UploadRequest req) {
         try {
             auto newAsset = new WriteableAsset(assetDir, &_assetLifeCycleListener);
@@ -112,6 +116,9 @@ public:
     }
 
 private:
+    /************************************************************************************
+     * Listen to managed assets, and update appropriate indexes
+     ***********************************************************************************/
     void _assetLifeCycleListener(CachedAsset asset, AssetState state) {
         switch (state) {
         case AssetState.ALIVE:
@@ -126,6 +133,19 @@ private:
         }
     }
 
+
+    /*************************************************************************
+     * The IdMap is a dummy-object for storing the mapping between hashIds
+     * and localIds.
+     ************************************************************************/
+    class IdMap { // TODO: Re-work protobuf-lib so it isn't needed
+        AssetMetaData[] assets;
+        mixin MessageMixin!(PBField!("assets",    1)());
+    }
+
+    /*************************************************************************
+     * Load id-mappings through IdMap
+     ************************************************************************/
     void loadIdMap() {
         scope auto mapsrc = new IdMap();
         scope auto fileContent = cast(ubyte[])File.get(idMapPath.toString);
@@ -137,12 +157,18 @@ private:
         }
     }
 
+    /*************************************************************************
+     * Save id-mappings with IdMap
+     ************************************************************************/
     void saveIdMap() {
         scope auto map = new IdMap;
         map.assets = localIdMap.values;
         File.set(idMapPath.toString, map.encode());
     }
 
+    /*************************************************************************
+     * Add an asset to the id-maps
+     ************************************************************************/
     void addToIdMap(AssetMetaData asset) {
         localIdMap[asset.localId] = asset;
         foreach (id; asset.hashIds) {
