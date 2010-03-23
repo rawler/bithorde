@@ -1,3 +1,6 @@
+/****************************************************************************************
+ * Copyright: Ulrik Mikaelsson, All rights reserved
+ ***************************************************************************************/
 module clients.bhupload;
 
 import tango.core.Exception;
@@ -22,6 +25,9 @@ import clients.lib.progressbar;
 
 const uint CHUNK_SIZE = 32768;
 
+/****************************************************************************************
+ * BHUpload-implementation of Argument-parsing.
+ ***************************************************************************************/
 class UploadArguments : private Arguments {
 private:
     char[] sockPath;
@@ -29,6 +35,9 @@ private:
     bool verbose;
     bool progressBar;
 public:
+    /************************************************************************************
+     * Setup and configure underlying parser.
+     ***********************************************************************************/
     this() {
         this["verbose"].aliased('v').smush;
         this["progressBar"].aliased('p').params(1).restrict(autoBool).smush.defaults("auto");
@@ -36,6 +45,9 @@ public:
         this[null].title("file").required.params(1);
     }
 
+    /************************************************************************************
+     * Do the real parsing and convert to plain D-attributes.
+     ***********************************************************************************/
     bool parse(char[][] arguments) {
         if (!super.parse(arguments))
             throw new IllegalArgumentException("Failed to parse arguments\n:" ~ errors(&stderr.layout.sprint));
@@ -56,25 +68,29 @@ public:
     }
 }
 
+/****************************************************************************************
+ * Main BHUpload class, does the actual file-handling and sending to BitHorde
+ ***************************************************************************************/
 class BHUpload
 {
 private:
-    bool doRun;
-    RemoteAsset asset;
-    Client client;
+    RemoteAsset asset;    /// Writeable BitHorde asset
+    Client client;        /// BitHorde client instance
     int exitStatus;
     UploadArguments args;
-    File file;
-    ulong pos;
+    File file;            /// File to read from
+    ulong pos;            /// Send-position, for progressBar
 
-    ProgressBar pBar;
+    ProgressBar pBar;     /// ProgressBar, if desired
 public:
+    /************************************************************************************
+     * Setup from Args, create BitHorde-asset, and begin sending the file
+     ***********************************************************************************/
     this(UploadArguments args) {
         this.args = args;
         Address addr = new LocalAddress(args.sockPath);
         client = new Client(addr, "bhupload");
 
-        doRun = true;
         file = new File(args.file.toString);
 
         client.beginUpload(file.length, &onOpen);
@@ -85,19 +101,48 @@ public:
         client.close();
     }
 
+    /**************************************************************************
+     * Drive the main loop, pumping responses from bithorde to their handlers
+     *************************************************************************/
     void run()
     {
         client.run();
     }
 private:
+    /************************************************************************************
+     * Finalize pushing, and exit with status
+     ***********************************************************************************/
     void exit(int exitStatus) {
         client.close();
         this.exitStatus = exitStatus;
     }
 
+    /************************************************************************************
+     * Called-back from asset.beginUpload. If sucessful, start pushing the file
+     ***********************************************************************************/
+    void onOpen(IAsset asset, Status status, OpenOrUploadRequest req, OpenResponse resp) {
+        switch (status) {
+        case Status.SUCCESS:
+            if (args.verbose)
+                Stderr.format("File upload begun.").newline;
+            if (args.progressBar)
+                pBar = new ProgressBar(file.length, args.file.name ~ " : ", "kB", 1024);
+            this.asset = cast(RemoteAsset)asset;
+            sendFile();
+            break;
+        default:
+            Stderr.format("Got unknown status from BitHorde.open: {}", status).newline;
+            return exit(-1);
+        }
+    }
+
+    /************************************************************************************
+     * Since BitHorde does not reply to file-pushing, the entire file can safely be
+     * pushed in one go.
+     ***********************************************************************************/
     void sendFile() {
         pos = file.position;
-        while (doRun && pos < file.length) {
+        while (pos < file.length) {
             ubyte[CHUNK_SIZE] buf;
             auto read = file.read(buf);
             if (read > 0) {
@@ -120,34 +165,25 @@ private:
         }
     }
 
-    void onOpen(IAsset asset, Status status, OpenOrUploadRequest req, OpenResponse resp) {
-        switch (status) {
-        case Status.SUCCESS:
-            if (args.verbose)
-                Stderr.format("File upload begun.").newline;
-            if (args.progressBar)
-                pBar = new ProgressBar(file.length, args.file.name ~ " : ", "kB", 1024);
-            this.asset = cast(RemoteAsset)asset;
-            sendFile();
-            break;
-        default:
-            Stderr.format("Got unknown status from BitHorde.open: {}", status).newline;
-            return exit(-1);
-        }
-    }
-
+    /************************************************************************************
+     * When the entire file is pushed, bithorde will reply with calculated checksums.
+     * Print these, and exit
+     ***********************************************************************************/
     void onComplete(IAsset asset, Status status, MetaDataRequest req, MetaDataResponse resp) {
-        doRun = false;
         if (status == Status.SUCCESS) {
             Stdout(formatMagnet(resp.ids, pos, args.file.file)).newline;
             Stdout(formatED2K(resp.ids, pos, args.file.file)).newline;
-        }
-        else
+            exit(0);
+        } else {
             Stderr("Non-successful upload").newline;
-        exit(0);
+            exit(status);
+        }
     }
 }
 
+/****************************************************************************************
+ * Parse args, and run BHGet
+ ***************************************************************************************/
 int main(char[][] args)
 {
     auto arguments = new UploadArguments;

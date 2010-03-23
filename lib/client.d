@@ -131,6 +131,17 @@ public:
         foreach (asset; openAssets)
             delete asset;
     }
+
+    /************************************************************************************
+     * Attempt to open an asset identified by any of a set of ids.
+     *
+     * Params:
+     *     ids           =  A list of ids to match. Priorities, and outcome of conflicts
+     *                      in ID:s are undefined
+     *     openCallback  =  A callback to be notified when the open request has completed
+     *     timeout       =  (optional) How long to wait before automatically failing the
+     *                      request. Defaults to 500msec.
+     ***********************************************************************************/
     void open(message.Identifier[] ids,
               BHOpenCallback openCallback, TimeSpan timeout = TimeSpan.fromMillis(500)) {
         open(ids, openCallback, rand.uniformR2!(ulong)(1,ulong.max), timeout);
@@ -141,14 +152,18 @@ public:
         req.size = size;
         sendRequest(req);
     }
-package:
-    void open(message.Identifier[] ids, BHOpenCallback openCallback, ulong uuid, TimeSpan timeout) {
+protected:
+    /************************************************************************************
+     * Real open-function, but should only be used internally by bithorde.
+     ***********************************************************************************/
+    void open(message.Identifier[] ids, BHOpenCallback openCallback, ulong uuid,
+              TimeSpan timeout) {
         auto req = new OpenRequest(openCallback);
         req.ids = ids;
         req.uuid = uuid;
         sendRequest(req, timeout);
     }
-protected:
+
     synchronized void processOpenResponse(ubyte[] buf) {
         auto resp = new RemoteAsset(this);
         IAsset asset;

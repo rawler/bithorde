@@ -1,3 +1,6 @@
+/****************************************************************************************
+ * Copyright: Ulrik Mikaelsson, All rights reserved
+ ***************************************************************************************/
 module clients.bhget;
 
 import tango.core.Exception;
@@ -21,9 +24,12 @@ import lib.arguments;
 
 import clients.lib.progressbar;
 
-const uint CHUNK_SIZE = 4096;
-const uint PARALLEL_REQUESTS = 5;
+const uint CHUNK_SIZE = 4096;     /// How large chunks to fetch
+const uint PARALLEL_REQUESTS = 5; /// How many requests to keep running in parallell.
 
+/****************************************************************************************
+ * BHGet-implementation of Argument-parsing.
+ ***************************************************************************************/
 class GetArguments : protected Arguments {
 private:
     char[] sockPath;
@@ -33,6 +39,9 @@ private:
     bool progressBar;
     bool stdout;
 public:
+    /************************************************************************************
+     * Setup and configure underlying parser.
+     ***********************************************************************************/
     this() {
         this["verbose"].aliased('v').smush;
         this["progressBar"].aliased('p').params(1).restrict(autoBool).smush.defaults("auto");
@@ -41,6 +50,9 @@ public:
         this[null].title("uri").required.params(1);
     }
 
+    /************************************************************************************
+     * Do the real parsing and convert to plain D-attributes.
+     ***********************************************************************************/
     bool parse(char[][] arguments) {
         if (!super.parse(arguments))
             throw new IllegalArgumentException("Failed to parse arguments:\n" ~ errors(&stderr.layout.sprint));
@@ -62,6 +74,10 @@ public:
     }
 }
 
+/****************************************************************************************
+ * Class supporting recieving arbitary chunks in mixed-offset-order, and writing them to
+ * output in-order.
+ ***************************************************************************************/
 class SortedOutput {
 private:
     OutputStream _output;
@@ -73,7 +89,7 @@ public:
         _queue = new SortedMap!(ulong, ubyte[]);
     }
     ulong queue(ulong offset, ubyte[] data) {
-        assert(offset >= currentOffset); // Maybe should handle a buffer beginning earlier as well?
+        assert(offset >= currentOffset);
         if (offset == currentOffset) {
             _output.write(data);
             currentOffset += data.length;
@@ -90,17 +106,23 @@ public:
     }
 }
 
+/****************************************************************************************
+ * Main BHGet class, does the actual fetching, and sends to SortedOutput
+ ***************************************************************************************/
 class BHGet
 {
 private:
-    SortedOutput output;
-    IAsset asset;
-    Client client;
-    ulong orderOffset;
-    int exitStatus;
-    GetArguments args;
-    ProgressBar pBar;
+    SortedOutput output; /// Output in sorting fashion
+    IAsset asset;        /// Remote Asset in bithorde
+    Client client;       /// BitHorde-client
+    ulong orderOffset;   /// Which offset should be requested next?
+    int exitStatus;      /// When done, what's the exitStatus?
+    GetArguments args;   /// Args for the fetch
+    ProgressBar pBar;    /// Progressbar, if desired
 public:
+    /************************************************************************************
+     * Setup output and send async request for opening specified asset
+     ***********************************************************************************/
     this(GetArguments args) {
         this.args = args;
         Address addr = new LocalAddress(args.sockPath);
@@ -119,6 +141,9 @@ public:
         client.close();
     }
 
+    /**************************************************************************
+     * Drive the main loop, pumping responses from bithorde to their handlers
+     *************************************************************************/
     void run()
     {
         client.run();
@@ -130,31 +155,17 @@ public:
         }
     }
 private:
+    /************************************************************************************
+     * Finalize fetching, and exit with status
+     ***********************************************************************************/
     void exit(int exitStatus) {
         client.close();
         this.exitStatus = exitStatus;
     }
 
-    void onRead(IAsset asset, Status status, ReadRequest req, ReadResponse resp) {
-        assert(asset == this.asset);
-        if (output.queue(resp.offset, resp.content) >= asset.size)
-            exit(0);
-        else
-            orderData();
-        if (pBar)
-            pBar.update(orderOffset);
-    }
-
-    void orderData() {
-        auto length = asset.size - orderOffset;
-        if (length > CHUNK_SIZE)
-            length = CHUNK_SIZE;
-        if (length > 0) {
-            this.asset.aSyncRead(orderOffset, length, &onRead);
-            orderOffset += length;
-        }
-    }
-
+    /************************************************************************************
+     * Callback for when asset-open response is recieved.
+     ***********************************************************************************/
     void onOpen(IAsset asset, Status status, OpenOrUploadRequest req, OpenResponse resp) {
         switch (status) {
         case Status.SUCCESS:
@@ -165,6 +176,10 @@ private:
                 pBar = new ProgressBar(asset.size, (args.name ? args.name : "<unnamed>") ~ " : ", "kB", 1024);
 
             this.asset = asset;
+
+            // Send out the amount of requests that we should hold-in-flight
+            // Note: Bithorde will automatically limit segment-orders to the size of the asset,
+            //       so works even when assetsize < PARALLEL_REQUESTS*CHUNK_SIZE
             for (uint i; i < PARALLEL_REQUESTS; i++)
                 orderData();
             break;
@@ -176,8 +191,39 @@ private:
             return exit(-1);
         }
     }
+
+    /************************************************************************************
+     * Orders the next needed chunk of data.
+     ***********************************************************************************/
+    void orderData() {
+        auto length = asset.size - orderOffset;
+        if (length > CHUNK_SIZE)
+            length = CHUNK_SIZE;
+        if (length > 0) {
+            this.asset.aSyncRead(orderOffset, length, &onRead);
+            orderOffset += length;
+        }
+    }
+
+    /************************************************************************************
+     * When new data arrives, order more, or exit if done
+     ***********************************************************************************/
+    void onRead(IAsset asset, Status status, ReadRequest req, ReadResponse resp) {
+        assert(asset == this.asset);
+        assert(req.size == resp.content.length); // TODO: Support non-aligned responses?
+        if (output.queue(resp.offset, resp.content) >= asset.size)
+            exit(0);
+        else
+            orderData();
+        if (pBar)
+            pBar.update(orderOffset);
+    }
+
 }
 
+/****************************************************************************************
+ * Parse args, and run BHGet
+ ***************************************************************************************/
 int main(char[][] args)
 {
     auto arguments = new GetArguments;

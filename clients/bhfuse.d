@@ -1,3 +1,6 @@
+/****************************************************************************************
+ * Copyright: Ulrik Mikaelsson, All rights reserved
+ ***************************************************************************************/
 module clients.fuse;
 
 private import tango.core.Exception;

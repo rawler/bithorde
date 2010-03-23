@@ -2,6 +2,9 @@ module lib.arguments;
 
 import tango.text.Arguments : _Arguments = Arguments;
 
+/****************************************************************************************
+ * Extended tango Arguments-parser with support for bool arguments
+ ***************************************************************************************/
 abstract class Arguments : protected _Arguments {
     const char[][] autoBool = ["auto", "yes", "no", "y", "n", "1", "0"];
 public:
