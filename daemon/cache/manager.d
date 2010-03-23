@@ -15,7 +15,7 @@ import daemon.cache.asset;
 private import daemon.cache.metadata;
 private import daemon.client;
 private import daemon.config;
-private import daemon.router;
+private import daemon.routing.router;
 
 /****************************************************************************************
  * Overseeing Cache-manager, keeping state of all cache-assets, and mapping from id:s to

@@ -16,11 +16,14 @@ private import tango.util.log.Log;
 
 import daemon.server;
 import daemon.config;
-import daemon.friend;
+import daemon.routing.friend;
 
 import lib.client;
 import lib.message;
 
+/****************************************************************************************
+ * A stepping-server is a test-mockup allowing us to drive a server one request at a time
+ ***************************************************************************************/
 class SteppingServer : Server {
     Semaphore sem;
     Thread thread;
@@ -54,6 +57,9 @@ class SteppingServer : Server {
     }
 }
 
+/****************************************************************************************
+ * Verifies that the bithorde lib times out stale requests correctly.
+ ***************************************************************************************/
 void testLibTimeout(SteppingServer s) {
     s.step();
     LOG.info("Opening Client...");
@@ -80,6 +86,9 @@ void testLibTimeout(SteppingServer s) {
         assert(false, "Did not get timeout");
 }
 
+/****************************************************************************************
+ * Verifies that the bithorde server times out stale forwarded requests correctly.
+ ***************************************************************************************/
 void testServerTimeout(SteppingServer src, SteppingServer proxy) {
     src.step();
     for (int i=0; i < 100; i++)
@@ -113,8 +122,10 @@ void testServerTimeout(SteppingServer src, SteppingServer proxy) {
 
 }
 
+/// Log for all the tests
 static Logger LOG;
 
+/// Execute all the tests in order
 void main() {
     Log.root.add(new AppendConsole(new LayoutDate));
     LOG = Log.lookup("libtest");

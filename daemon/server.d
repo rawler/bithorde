@@ -17,8 +17,8 @@ private import tango.util.log.Log;
 private import daemon.cache.manager;
 private import daemon.client;
 private import daemon.config;
-private import daemon.friend;
-private import daemon.router;
+private import daemon.routing.friend;
+private import daemon.routing.router;
 private import lib.asset;
 private import lib.connection;
 private import message = lib.message;
@@ -65,7 +65,7 @@ public:
         }
 
         // Setup helper functions, routing and caching
-        this.router = new Router(this);
+        this.router = new Router();
         this.cacheMgr = new CacheManager(config.cachedir, router);
 
         // Setup friend connections
@@ -135,7 +135,7 @@ protected:
         if (peername in offlineFriends) {
             f = offlineFriends[peername];
             offlineFriends.remove(peername);
-            f.c = c;
+            f.connected(c);
             router.registerFriend(f);
         }
 
@@ -146,7 +146,7 @@ protected:
     {
         auto f = router.unregisterFriend(c);
         if (f) {
-            f.c = null;
+            f.disconnected();
             offlineFriends[f.name] = f;
         }
         log.info("{} {} disconnected", f?"Friend":"Client", c.peername);

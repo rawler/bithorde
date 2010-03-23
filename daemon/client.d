@@ -4,6 +4,7 @@ private import tango.core.Exception;
 private import tango.core.Memory;
 private import tango.math.random.Random;
 private import tango.net.device.Socket;
+private import tango.time.Time;
 private import tango.util.container.more.Stack;
 private import tango.util.log.Log;
 
@@ -140,6 +141,12 @@ public:
             asset.unRef();
         openAssets = null;
     }
+
+    /************************************************************************************
+     * Re-declared _open from lib.Client to make it publicly visible in the daemon.
+     ***********************************************************************************/
+    void open(message.Identifier[] ids, BHOpenCallback openCallback, ulong uuid,
+              TimeSpan timeout) { super.open(ids, openCallback, uuid, timeout); }
 protected:
     void processOpenRequest(ubyte[] buf)
     {
@@ -194,7 +201,7 @@ protected:
 
     void processMetaDataRequest(ubyte[] buf) {
         // Create anon class to satisfy abstract abort().
-        // MetaData is always local and never async, so don't need full storage
+        // MetaData is always local and never async, so don't need full state
         scope auto req = new class message.MetaDataRequest {
             void abort(message.Status s) {}
         };

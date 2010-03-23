@@ -8,7 +8,7 @@ private import Text = tango.text.Util;
 private import tango.text.Unicode;
 private import tango.util.Convert;
 
-private import daemon.friend;
+private import daemon.routing.friend;
 
 class ConfigException : Exception
 {
