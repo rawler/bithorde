@@ -13,7 +13,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- **************************************************************************************/
+ ***************************************************************************************/
 module lib.client;
 
 private import tango.core.Exception;
@@ -25,7 +25,14 @@ public import lib.asset;
 import lib.connection;
 import lib.protobuf;
 
+/****************************************************************************************
+ * RemoteAsset is the basic BitHorde object for tracking a remotely open asset form the
+ * client-side.
+ ***************************************************************************************/
 class RemoteAsset : private message.OpenResponse, IAsset {
+    /************************************************************************************
+     * Internal ReadRequest object, for tracking in-flight readrequests.
+     ***********************************************************************************/
     class ReadRequest : message.ReadRequest {
         BHReadCallback _callback;
         this(BHReadCallback cb) {
@@ -39,6 +46,9 @@ class RemoteAsset : private message.OpenResponse, IAsset {
             _callback(this.outer, s, this, null);
         }
     }
+    /************************************************************************************
+     * Internal MetaDataRequest object, for tracking in-flight readrequests.
+     ***********************************************************************************/
     class MetaDataRequest : message.MetaDataRequest {
         BHMetaDataCallback _callback;
         this(BHMetaDataCallback cb) {
@@ -64,6 +74,9 @@ private:
             return _req;
     }
 protected:
+    /************************************************************************************
+     * RemoteAssets should only be created from the Client
+     ***********************************************************************************/
     this(Client c) {
         this.client = c;
     }
@@ -110,8 +123,25 @@ public:
     }
 }
 
+/****************************************************************************************
+ * The Client class handles an ongoing client-session with a remote Bithorde-node. The
+ * Client is the main-point of the Client API. To access BitHorde, just create a Client
+ * with some address, and start fetching.
+ *
+ * Worth mentioning is that the entire client API is asynchronous, meaning that no remote
+ * calls return anything immediately, but later through a required callback.
+ *
+ * The Client also needs to be driven by the application in some manner, either by
+ * continually calling pump(), or yielding to run(), which will run the client until
+ * it is closed.
+ *
+ * The Client is not thread-safe at this moment.
+ ***************************************************************************************/
 class Client : Connection {
 private:
+    /************************************************************************************
+     * Internal outgoing UploadRequest object
+     ***********************************************************************************/
     class UploadRequest : message.UploadRequest {
         BHOpenCallback callback;
         this(BHOpenCallback cb) {
@@ -121,6 +151,10 @@ private:
             callback(null, s, this, null);
         }
     }
+
+    /************************************************************************************
+     * Internal outgoing OpenRequest object
+     ***********************************************************************************/
     class OpenRequest : message.OpenRequest {
         BHOpenCallback callback;
         this(BHOpenCallback cb) {
@@ -132,20 +166,21 @@ private:
     }
     RemoteAsset[uint] openAssets;
 public:
-    this (Socket s, char[] name)
-    {
-        super(s, name);
-    }
+    /************************************************************************************
+     * Create a BitHorde client by name and an IPv4Address, or a LocalAddress.
+     ***********************************************************************************/
     this (Address addr, char[] name)
     {
         auto socket = new Socket(addr.addressFamily, SocketType.STREAM, ProtocolType.IP);
         socket.connect(addr);
         this(socket, name);
     }
+    this (Socket s, char[] name) { super(s, name); }
+
     ~this ()
     {
         foreach (asset; openAssets)
-            delete asset;
+            asset.close();
     }
 
     /************************************************************************************
@@ -163,10 +198,22 @@ public:
         open(ids, openCallback, rand.uniformR2!(ulong)(1,ulong.max), timeout);
     }
 
+    /************************************************************************************
+     * Create a new remote asset for uploading
+     ***********************************************************************************/
     void beginUpload(ulong size, BHOpenCallback cb) {
         auto req = new UploadRequest(cb);
         req.size = size;
         sendRequest(req);
+    }
+
+    /************************************************************************************
+     * Run until closed. Assumes that the calling application is event-driven, by the
+     * callbacks triggerd when recieving responses from BitHorde (or on timeout:s).
+     ***********************************************************************************/
+    void run() {
+        while (!closed)
+            pump();
     }
 protected:
     /************************************************************************************

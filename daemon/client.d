@@ -13,7 +13,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- **************************************************************************************/
+ ***************************************************************************************/
 module daemon.client;
 
 private import tango.core.Exception;
@@ -34,6 +34,10 @@ import lib.protobuf;
 
 alias void delegate(IServerAsset, message.Status status) BHServerOpenCallback;
 
+/****************************************************************************************
+ * Many intermittent server structures are managed using refcounts. This is the interface
+ * and implementation for them
+ ***************************************************************************************/
 interface IRefCounted {
     template Impl() {
     private:
@@ -51,11 +55,19 @@ interface IRefCounted {
     void unRef();
 }
 
+/****************************************************************************************
+ * Interface for the various forms of server-assets. (CachedAsset, CachingAsset,
+ * ForwardedAsset...)
+ ***************************************************************************************/
 interface IServerAsset : IAsset, IRefCounted {}
 interface IAssetSource {
     IServerAsset findAsset(daemon.client.OpenRequest req, BHServerOpenCallback cb);
 }
 
+/****************************************************************************************
+ * Structure for an incoming OpenRequest. Store the details of the request, should it
+ * need to be asynchronously forwarded before completion.
+ ***************************************************************************************/
 class OpenRequest : message.OpenRequest {
     Client client;
     this(Client c) {
@@ -85,6 +97,9 @@ class OpenRequest : message.OpenRequest {
     }
 }
 
+/****************************************************************************************
+ * Structure for an incoming UploadReuest.
+ ***************************************************************************************/
 class UploadRequest : message.UploadRequest {
     Client client;
     this(Client c) {
@@ -112,6 +127,9 @@ class UploadRequest : message.UploadRequest {
     }
 }
 
+/****************************************************************************************
+ * Structure for an incoming ReadRequest
+ ***************************************************************************************/
 class ReadRequest : message.ReadRequest {
     Client client;
 public:
@@ -251,6 +269,9 @@ protected:
         }
     }
 private:
+    /************************************************************************************
+     * Allocates an unused file handle for the transaction.
+     ***********************************************************************************/
     ushort allocateFreeHandle()
     {
         if (freeFileHandles.size > 0)

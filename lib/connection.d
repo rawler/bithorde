@@ -13,7 +13,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- **************************************************************************************/
+ ***************************************************************************************/
 module lib.connection;
 
 private import tango.core.Exception;
@@ -27,6 +27,10 @@ private import tango.util.container.more.Stack;
 private import lib.protobuf;
 public import message = lib.message;
 
+/****************************************************************************************
+ * Structure describing a still-unanswered request from BitHorde. Wraps the actual
+ * request up with a timeout-time.
+ ***************************************************************************************/
 struct InFlightRequest {
     Time time;
     message.RPCRequest req;
@@ -34,6 +38,11 @@ struct InFlightRequest {
         return this.time.opCmp(other.time);
     }
 }
+
+/****************************************************************************************
+ * On Timed out requests, their request-id enters the Linger-queue for a while, in order
+ * to not reuse until moderately safe from conflicts.
+ ***************************************************************************************/
 struct LingerId {
     Time time;
     int rpcId;
@@ -41,9 +50,16 @@ struct LingerId {
         return this.time.opCmp(other.time);
     }
 }
+
+/// Queue-types
 alias Heap!(InFlightRequest*, true) TimedRequestQueue;
+/// ditto
 alias Heap!(LingerId, true) LingerIdQueue;
 
+/****************************************************************************************
+ * All underlying BitHorde connections run through this class. Deals with low-level
+ * serialization and request-id-mapping.
+ ***************************************************************************************/
 class Connection
 {
 protected:
@@ -54,17 +70,20 @@ protected:
     char[] _myname, _peername;
 
 protected:
-    // inFlightRequests contains actual requests, and is the allocation-heap for IFR:s
+    /// inFlightRequests contains actual requests, and is the allocation-heap for IFR:s
     InFlightRequest[] inFlightRequests;
-    // timeouts contains references to inFlightRequests, sorted on timeout-time. Needs care and attention
+    /// timeouts contains references to inFlightRequests, sorted on timeout-time. Needs care and attention
     public TimedRequestQueue timeouts;
-    // Free reusable ids
+    /// Free reusable request-ids
     Stack!(ushort,100) _freeIds;
-    // Ids that can't be re-used for a while, to avoid conflicting responses
+    /// Ids that can't be re-used for a while, to avoid conflicting responses
     LingerIdQueue lingerIds;
-    // Last resort, new-id allocation
+    /// Last resort, new-id allocation
     ushort nextid;
 
+    /************************************************************************************
+     * Allocate a requestId for given request
+     ***********************************************************************************/
     ushort allocRequest(message.RPCRequest target) {
         if (_freeIds.size) {
             target.rpcId = _freeIds.pop();
@@ -88,6 +107,10 @@ protected:
         }
         return target.rpcId;
     }
+
+    /************************************************************************************
+     * Release the requestId for given request, after completion
+     ***********************************************************************************/
     message.RPCRequest releaseRequest(message.RPCResponse msg) {
         if (msg.rpcId >= inFlightRequests.length)
             return null;
@@ -102,6 +125,10 @@ protected:
             _freeIds.push(msg.rpcId);
         return req;
     }
+
+    /************************************************************************************
+     * Force-release the requestId for given request, and put it in the linger-queue;
+     ***********************************************************************************/
     void lingerRequest(message.RPCRequest req) {
         LingerId li;
         li.rpcId = req.rpcId;
@@ -110,6 +137,9 @@ protected:
         inFlightRequests[req.rpcId] = InFlightRequest.init;
     }
 public:
+    /************************************************************************************
+     * Create named connection, and perform HandShake
+     ***********************************************************************************/
     this(Socket s, char[] myname)
     {
         this.socket = s;
@@ -131,6 +161,10 @@ public:
     }
 
     final bool closed() { return !socket; }
+
+    /************************************************************************************
+     * Trigger closing of the connection
+     ***********************************************************************************/
     void close() {
         if (closed)
             return;
@@ -138,6 +172,10 @@ public:
         socket.close();
         onClose();
     }
+
+    /************************************************************************************
+     * Send DISCONNECTED notifications to all waiting callbacks.
+     ***********************************************************************************/
     void onClose() {
         socket = null;
         foreach (ifr; inFlightRequests) {
@@ -146,6 +184,9 @@ public:
         }
     }
 
+    /************************************************************************************
+     * Read any new data from underlying socket. Blocks until data is available.
+     ***********************************************************************************/
     synchronized bool readNewData() {
         swapBufs();
         int read = socket.read(frontbuf[left.length..length]);
@@ -156,6 +197,9 @@ public:
             return false;
     }
 
+    /************************************************************************************
+     * Process a single message read from previous readNewData()
+     ***********************************************************************************/
     synchronized bool processMessage()
     {
         auto buf = left;
@@ -163,6 +207,9 @@ public:
         return buf != left;
     }
 
+    /************************************************************************************
+     * Process waiting timeouts expected to fire up until now.
+     ***********************************************************************************/
     synchronized void processTimeouts() {
         while (timeouts.size && (Clock.now > timeouts.peek.time)) {
             auto req = timeouts.pop.req;
@@ -171,10 +218,16 @@ public:
         }
     }
 
+    /************************************************************************************
+     * Figure next TimeOut, which is either time to the first timeout, or TimeSpan.max
+     ***********************************************************************************/
     TimeSpan nextTimeOut() {
         return timeouts.size ? (timeouts.peek.time-Clock.now) : TimeSpan.max;
     }
 
+    /************************************************************************************
+     * Run exactly one cycle of readNewData, processMessage*, processTimeouts
+     ***********************************************************************************/
     synchronized void pump() {
         if (!selector) {
             selector = new Selector();
@@ -197,27 +250,29 @@ public:
         processTimeouts();
     }
 
-    void run() {
-        while (!closed)
-            pump();
-    }
-
     final char[] peername() { return _peername; }
     final char[] myname() { return _myname; }
     final Address remoteAddress() { return socket.socket.remoteAddress; }
     char[] toString() {
         return peername;
     }
+
+    /************************************************************************************
+     * The concept of "trusted" Clients means clients allowed to perform special
+     * operations, such as uploading new assets.
+     ***********************************************************************************/
     bool isTrusted() {
         return socket.socket.remoteAddress.addressFamily == AddressFamily.UNIX;
     }
 private:
+    /// Initiate HandShake
     void sayHello() {
         scope auto handshake = new message.HandShake;
         handshake.name = _myname;
         handshake.protoversion = 1;
         sendMessage(handshake);
     }
+    /// Complete HandShake
     void expectHello() {
         while (!processMessage()) {
             readNewData();
@@ -225,11 +280,16 @@ private:
         if (!_peername)
             throw new AssertException("Other side did not greet with handshake", __FILE__, __LINE__);
     }
+
+    /************************************************************************************
+     * The connection works on a double-buffered system. swapBufs swaps the buffers, and
+     * copies any remainder from old frontbuf to new frontbuf.
+     ***********************************************************************************/
     void swapBufs() {
         auto remainder = left.length;
-        if ((remainder * 2) > backbuf.length) { // Alloc new backbuf
-            auto newsize = remainder * 2;       // TODO: Implement some upper-limit
-            delete backbuf;
+        if ((remainder * 2) > backbuf.length) { // When old frontBuf was more than half-full
+            auto newsize = remainder * 2;       // Alloc new backbuf
+            delete backbuf;                     // TODO: Implement some upper-limit
             backbuf = new ubyte[newsize];
         }
         backbuf[0..remainder] = left; // Copy remainder to backbuf
@@ -238,6 +298,10 @@ private:
         backbuf = left;               // And new backbuf is our current frontbuf
         left = frontbuf[0..remainder];
     }
+
+    /************************************************************************************
+     * Attempt to decode and process a single message from a buffer
+     ***********************************************************************************/
     ubyte[] decodeMessage(ubyte[] data)
     {
         auto buf = data;
@@ -269,6 +333,9 @@ private:
         }
     }
 package:
+    /************************************************************************************
+     * Send any kind of message, just serialize and push
+     ***********************************************************************************/
     synchronized void sendMessage(message.Message m) {
         msgbuf.reset();
         m.encode(msgbuf);
@@ -276,10 +343,15 @@ package:
         encode_val!(ushort)((m.typeId << 3) | 0b0000_0010, msgbuf);
         socket.write(msgbuf.data);
     }
+
+    /************************************************************************************
+     * Send a request, with optional timeout, and register in corresponding idMaps.
+     ***********************************************************************************/
     synchronized void sendRequest(message.RPCRequest req) {
         // TODO: Randomize?
         sendRequest(req, TimeSpan.fromMillis(500));
     }
+    /// ditto
     synchronized void sendRequest(message.RPCRequest req, TimeSpan timeout) {
         auto rpcId = allocRequest(req);
         req.timeout = timeout.millis;
@@ -290,6 +362,10 @@ package:
         timeouts.push(ifr);
     }
 protected:
+    /************************************************************************************
+     * HandShakes are the only thing Connection handles by itself. After initialization,
+     * they are illegal.
+     ***********************************************************************************/
     void processHandShake(ubyte[] msg) {
         if (_peername)
             throw new AssertException("HandShake recieved after initialization", __FILE__, __LINE__);

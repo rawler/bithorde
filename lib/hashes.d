@@ -1,4 +1,6 @@
 /****************************************************************************************
+ * Implementation of all the BitHorde-supported Hashes
+ *
  *   Copyright: Copyright (C) 2009-2010 Ulrik Mikaelsson. All rights reserved
  *
  *   License:
@@ -13,7 +15,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- **************************************************************************************/
+ ***************************************************************************************/
 module lib.hashes;
 
 private import tango.io.device.Array;
@@ -31,17 +33,23 @@ private import lib.digest.ED2K;
 private import lib.digest.HashTree;
 private import lib.message;
 
-/**
+/****************************************************************************************
  * The only function anyone need, really ;)
- */
+ ***************************************************************************************/
 Digest hashFactory(TYPE:Digest)() {
     return new TYPE;
 }
 
+/****************************************************************************************
+ * Wrapper for bas32 without padding
+ ***************************************************************************************/
 char[] base32NoPad(ubyte[] input) {
     return base32.encode(input, false);
 }
 
+/****************************************************************************************
+ * Structure for details of each configured Hash.
+ ***************************************************************************************/
 struct HashDetail {
     HashType pbType;
     char[] name;
@@ -52,6 +60,9 @@ struct HashDetail {
 
 HashDetail[HashType] HashMap;
 
+/****************************************************************************************
+ * Statically configure supported HashType:s
+ ***************************************************************************************/
 static this() {
     auto hashes = [
         HashDetail(HashType.SHA1, "sha1", &hashFactory!(Sha1), &base32NoPad, &base32.decode),
@@ -63,6 +74,9 @@ static this() {
         HashMap[h.pbType] = h;
 }
 
+/****************************************************************************************
+ * Format asset details into Magnet URI.
+ ***************************************************************************************/
 char[] formatMagnet(Identifier[] ids, ulong length, char[] name = null)
 in {
     assert(ids.length > 0);
@@ -85,6 +99,9 @@ in {
     return cast(char[])array.slice;
 }
 
+/****************************************************************************************
+ * Format asset details into ED2K URI.
+ ***************************************************************************************/
 char[] formatED2K(Identifier[] ids, ulong length, char[] name = null) {
     ubyte[] hash;
     foreach (id; ids) {
@@ -99,6 +116,9 @@ char[] formatED2K(Identifier[] ids, ulong length, char[] name = null) {
         return null;
 }
 
+/****************************************************************************************
+ * Parse any supported URI-format
+ ***************************************************************************************/
 Identifier[] parseUri(char[] uri, out char[] name) {
     auto retVal = parseMagnet(uri, name);
     if (!retVal)
@@ -106,6 +126,9 @@ Identifier[] parseUri(char[] uri, out char[] name) {
     return retVal;
 }
 
+/****************************************************************************************
+ * Parse magnet-URI:s
+ ***************************************************************************************/
 Identifier[] parseMagnet(char[] magnetUri, out char[] name) {
     Identifier[] retVal;
     auto name_re = Regex(r"dn=([^&]+)");
@@ -119,6 +142,9 @@ Identifier[] parseMagnet(char[] magnetUri, out char[] name) {
     return retVal;
 }
 
+/****************************************************************************************
+ * Parse ED2K-URI:s.
+ ***************************************************************************************/
 Identifier[] parseED2K(char[] ed2kUri, out char[] name) {
     Identifier[] retVal;
     auto re = Regex(r"ed2k://\|file\|(.*)\|.*\|([0-9A-Fa-f]+)\|");

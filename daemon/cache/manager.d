@@ -13,7 +13,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- **************************************************************************************/
+ ***************************************************************************************/
 
 module daemon.cache.manager;
 
@@ -113,6 +113,7 @@ public:
             return openAsset(localId);
         }
     }
+
     /************************************************************************************
      * Implement uploading new assets to this Cache.
      ***********************************************************************************/
@@ -145,7 +146,6 @@ private:
             break;
         }
     }
-
 
     /*************************************************************************
      * The IdMap is a dummy-object for storing the mapping between hashIds

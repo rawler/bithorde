@@ -149,7 +149,7 @@ public:
     AssetMetaData metadata() {
         return _metadata;
     }
-    final AssetId id() { return _id; }
+    final ubyte[] id() { return _id; }
 
     mixin IRefCounted.Impl;
 }

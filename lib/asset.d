@@ -13,20 +13,23 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- **************************************************************************************/
+ ***************************************************************************************/
 module lib.asset;
 
 import lib.message;
 
-alias ubyte[] AssetId;
 alias ushort  AssetHandle;
 
+/****************************************************************************************
+ * Definitition of a BitHorde asset
+ ***************************************************************************************/
 interface IAsset {
     void aSyncRead(ulong offset, uint length, BHReadCallback);
     ulong size();
     void close();
 }
 
+/// Callbacks for requests
 alias void delegate(IAsset, Status status, OpenOrUploadRequest, OpenResponse) BHOpenCallback;
 alias void delegate(IAsset, Status status, ReadRequest, ReadResponse) BHReadCallback;
 alias void delegate(IAsset, Status status, MetaDataRequest, MetaDataResponse) BHMetaDataCallback;

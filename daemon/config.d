@@ -13,7 +13,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- **************************************************************************************/
+ ***************************************************************************************/
 module daemon.config;
 
 private import tango.io.device.File;
@@ -26,11 +26,17 @@ private import tango.util.Convert;
 
 private import daemon.routing.friend;
 
+/****************************************************************************************
+ * Exception thrown when config failed parsing
+ ***************************************************************************************/
 class ConfigException : Exception
 {
     this (char[] msg) { super(msg); }
 }
 
+/****************************************************************************************
+ * Convert string values into boolean values
+ ***************************************************************************************/
 bool parseBool(char[] value) {
     switch (toLower(value)) {
         case "yes", "true", "1":
@@ -42,6 +48,9 @@ bool parseBool(char[] value) {
     }
 }
 
+/****************************************************************************************
+ * Parses the BitHorded Config File
+ ***************************************************************************************/
 class Config
 {
     char[] name;
@@ -52,6 +61,9 @@ class Config
     Friend[char[]] friends;
     bool doDebug = false;
 
+    /************************************************************************************
+     * Create Config object from file
+     ***********************************************************************************/
     this (char[] configFileName) {
         scope auto configFile = new File(configFileName, File.ReadExisting);
         scope auto config = new MapInput!(char)(configFile);
@@ -79,6 +91,9 @@ class Config
     this() {
     }
 
+    /************************************************************************************
+     * Check that all required options were given
+     ***********************************************************************************/
     void validate() {
         if (!name)
             throw new ConfigException("Missing server.name");
@@ -88,6 +103,9 @@ class Config
         }
     }
 private:
+    /**************************************************************************
+     * Parse server.* - options
+     *************************************************************************/
     void parseServerOption(char[] option, char[] value) {
         switch (option) {
         case "port":
@@ -116,6 +134,9 @@ private:
         }
     }
 
+    /************************************************************************************
+     * Parse friend.* - options
+     ***********************************************************************************/
     void parseFriendOption(char[] option, char[] value) {
         auto friendName = Text.head(option, ".", option);
         if (!option)

@@ -1,4 +1,7 @@
 /****************************************************************************************
+ * D template-based implementation of Protocol Buffers. Built for efficency and high
+ * performance rather than flexibility or completeness.
+ *
  *   Copyright: Copyright (C) 2009-2010 Ulrik Mikaelsson. All rights reserved
  *
  *   License:
@@ -13,12 +16,13 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- **************************************************************************************/
+ ***************************************************************************************/
 module lib.protobuf;
 
-/**
- * Buffer implementation designed to be filled BACKWARDS, to increase performance of prefix-length encoding.
- */
+/****************************************************************************************
+ * Buffer implementation designed to be filled BACKWARDS, to increase performance of
+ * prefix-length encodings.
+ ***************************************************************************************/
 final class PBuffer(T) {
 private:
     uint pos;
@@ -60,6 +64,19 @@ public:
 }
 alias PBuffer!(ubyte) ByteBuffer;
 
+interface ProtoBufMessage {
+    ubyte[] encode(ByteBuffer buf = new ByteBuffer);
+    void decode(ubyte[] buf);
+}
+
+/// Basic Types
+enum WireType {
+    varint = 0,
+    fixed64 = 1,
+    length_delim = 2,
+    fixed32 = 5,
+}
+
 void encode_val(T : ubyte[])(T value, ByteBuffer buf) {
     buf.prepend(cast(ubyte[])value);
     encode_val(value.length, buf);
@@ -71,11 +88,6 @@ T decode_val(T : ubyte[])(ref ubyte[] buf) {
     auto retval = cast(T)buf[0 .. vlen];
     buf = buf[vlen .. length];
     return retval;
-}
-
-interface ProtoBufMessage {
-    ubyte[] encode(ByteBuffer buf = new ByteBuffer);
-    void decode(ubyte[] buf);
 }
 
 void encode_val(T : long)(T i, ByteBuffer buffer) {
@@ -109,14 +121,6 @@ T decode_val(T : long)(ref ubyte[] buf) {
     return T.init;
 }
 
-///// Basic Types /////
-enum WireType {
-    varint = 0,
-    fixed64 = 1,
-    length_delim = 2,
-    fixed32 = 5,
-}
-
 struct PBField(char[] _name, uint _id) {
     char[] name = _name;
     uint id = _id;
@@ -125,16 +129,6 @@ struct PBField(char[] _name, uint _id) {
     else
         WireType wType = WireType.length_delim;
 };
-
-char[] ItoA(uint i) {
-    char[] digits = "0123456789";
-    char[] retval;
-    do {
-        retval = digits[i%10] ~ retval;
-        i /= 10;
-    } while (i > 0)
-    return retval;
-}
 
 public {
     void write(T:int)(uint descriptor, T value, ByteBuffer buf) {
