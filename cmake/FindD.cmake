@@ -256,7 +256,7 @@ macro(compile_d_files target objects_list)
 			COMMAND "${DC}"
 			ARGS ${FLAGS_tmp} ${d_source_p_tmp} -c -of${d_obj_tmp}
 			COMMENT "Building ${d_obj_out_tmp}"
-			DEPENDS ${d_source_p} ${depends_tmp}
+			DEPENDS ${d_source_p_tmp} ${depends_tmp}
 			WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 		    )
 	endforeach (d_source_p_tmp ${SOURCES_tmp})
