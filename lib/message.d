@@ -21,6 +21,7 @@ module lib.message;
 
 private import tango.core.Exception;
 private import tango.core.Memory;
+private import tango.core.sync.Mutex;
 private import tango.util.container.more.Stack;
 
 private import lib.protobuf;
@@ -41,19 +42,25 @@ enum Type
 
 public abstract class Message : ProtoBufMessage {
 private:
+    static Mutex listMutex;
     static Stack!(void*, 100) _freeList;
+    static this () {
+        listMutex = new Mutex();
+    }
     new(size_t sz) {
         assert(sz <= 100, "Error, allocating too much");
-        if (_freeList.size)
-            return _freeList.pop();
-        else
-            return GC.malloc(128);
+        synchronized (listMutex) {
+            if (_freeList.size)
+                return _freeList.pop();
+        } // Else
+        return GC.malloc(128);
     }
     delete(void * p) {
-        if (_freeList.unused)
-            _freeList.push(p);
-        else
-            GC.free(p);
+        synchronized (listMutex) {
+            if (_freeList.unused)
+                return _freeList.push(p);
+        } // Else
+        GC.free(p);
     }
 protected:
 public:
