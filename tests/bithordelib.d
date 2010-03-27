@@ -93,7 +93,7 @@ void testLibTimeout(SteppingServer s) {
         }
         assert(req, "Invalid request");
         assert(!resp, "Got unexpected response");
-    });
+    }, TimeSpan.fromMillis(500));
     LOG.info("Request sent, expecting Timeout");
     client.run();
     if (gotTimeout)

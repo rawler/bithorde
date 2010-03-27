@@ -15,7 +15,7 @@
 # limitations under the License.
 
 cd $(dirname $0)
-BINDIR="../.."
+BINDIR="../../bin"
 SERVER="$BINDIR/bithorded"
 BHUPLOAD="$BINDIR/bhupload"
 BHGET="$BINDIR/bhget"

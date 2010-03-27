@@ -16,7 +16,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  ***************************************************************************************/
-module daemon.cache.common;
+module daemon.cache.metadata;
 
 import lib.hashes;
 import hex = lib.hex;

@@ -1,15 +1,18 @@
 *~
 *.o
 *.pyc
-dsss.last
+
+# CMake and Make-files
+CMakeFiles/*
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+*.*.deps
 
 # Built executables
-bithorded
+bin/
 tests/protobuf
 tests/bithordelib
-bhget
-bhfuse
-bhupload
 
 # Releases-dir
 releases
