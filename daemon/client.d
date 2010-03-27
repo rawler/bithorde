@@ -167,7 +167,7 @@ public:
         this.cacheMgr = server.cacheMgr;
         this.log = Log.lookup("daemon.client");
         super(s, server.name);
-        this.log = Log.lookup("daemon.client."~_peername);
+        this.log = Log.lookup("daemon.client."~peername);
     }
     ~this()
     {

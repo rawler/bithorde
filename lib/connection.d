@@ -70,6 +70,13 @@ protected:
     char[] _myname, _peername;
 
 protected:
+    class InvalidMessage : Exception {
+        this (char[] msg="Invalid message recieved") { super(msg); }
+    }
+    class InvalidResponse : InvalidMessage {
+        this () { super("Invalid response recieved"); }
+    }
+
     /// inFlightRequests contains actual requests, and is the allocation-heap for IFR:s
     InFlightRequest[] inFlightRequests;
     /// timeouts contains references to inFlightRequests, sorted on timeout-time. Needs care and attention
@@ -109,15 +116,15 @@ protected:
     }
 
     /************************************************************************************
-     * Release the requestId for given request, after completion
+     * Release the requestId for given request, after completion. Throws
      ***********************************************************************************/
     message.RPCRequest releaseRequest(message.RPCResponse msg) {
         if (msg.rpcId >= inFlightRequests.length)
-            return null;
+            throw new InvalidResponse;
         auto ifr = &inFlightRequests[msg.rpcId];
         auto req = ifr.req;
         if (!req)
-            return null;
+            throw new InvalidResponse;
         msg.request = req;
         timeouts.remove(ifr);
         inFlightRequests[msg.rpcId] = InFlightRequest.init;
@@ -264,6 +271,25 @@ public:
     bool isTrusted() {
         return socket.socket.remoteAddress.addressFamily == AddressFamily.UNIX;
     }
+
+    /************************************************************************************
+     * Process a single Message
+     ***********************************************************************************/
+    void process(message.Type type, ubyte[] msg) {
+        with (message) switch (type) {
+        case Type.HandShake: processHandShake(msg); break;
+        case Type.OpenRequest: processOpenRequest(msg); break;
+        case Type.UploadRequest: processUploadRequest(msg); break;
+        case Type.OpenResponse: processOpenResponse(msg); break;
+        case Type.Close: processClose(msg); break;
+        case Type.ReadRequest: processReadRequest(msg); break;
+        case Type.ReadResponse: processReadResponse(msg); break;
+        case Type.DataSegment: processDataSegment(msg); break;
+        case Type.MetaDataRequest: processMetaDataRequest(msg); break;
+        case Type.MetaDataResponse: processMetaDataResponse(msg); break;
+        default: throw new InvalidMessage;
+        }
+    }
 private:
     /// Initiate HandShake
     void sayHello() {
@@ -317,18 +343,7 @@ private:
             return data; // Not enough data in buffer
         } else {
             auto msg = buf[0..msglen];
-            with (message) switch (type) {
-            case Type.HandShake: processHandShake(msg); break;
-            case Type.OpenRequest: processOpenRequest(msg); break;
-            case Type.UploadRequest: processUploadRequest(msg); break;
-            case Type.OpenResponse: processOpenResponse(msg); break;
-            case Type.Close: processClose(msg); break;
-            case Type.ReadRequest: processReadRequest(msg); break;
-            case Type.ReadResponse: processReadResponse(msg); break;
-            case Type.DataSegment: processDataSegment(msg); break;
-            case Type.MetaDataRequest: processMetaDataRequest(msg); break;
-            case Type.MetaDataResponse: processMetaDataResponse(msg); break;
-            }
+            process(type, msg);
             return buf[msglen..length];
         }
     }

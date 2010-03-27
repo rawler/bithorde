@@ -20,6 +20,7 @@ private import tango.core.Exception;
 private import tango.math.random.Random;
 private import tango.net.device.Socket;
 private import tango.time.Time;
+private import tango.util.log.Log;
 
 public import lib.asset;
 import lib.connection;
@@ -164,7 +165,10 @@ private:
             callback(null, s, this, null);
         }
     }
+private:
     RemoteAsset[uint] openAssets;
+    protected Logger log;
+
 public:
     /************************************************************************************
      * Create a BitHorde client by name and an IPv4Address, or a LocalAddress.
@@ -175,7 +179,11 @@ public:
         socket.connect(addr);
         this(socket, name);
     }
-    this (Socket s, char[] name) { super(s, name); }
+    this (Socket s, char[] name) {
+        this.log = Log.lookup("lib.client");
+        super(s, name);
+        this.log = Log.lookup("daemon.client."~peername);
+    }
 
     ~this ()
     {
@@ -216,6 +224,14 @@ public:
             pump();
     }
 protected:
+    void process(message.Type type, ubyte[] msg) {
+        try {
+            super.process(type, msg);
+        } catch (InvalidMessage exc) {
+            log.warn(exc.toString);
+        }
+    }
+
     /************************************************************************************
      * Real open-function, but should only be used internally by bithorde.
      ***********************************************************************************/
