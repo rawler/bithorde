@@ -10,9 +10,10 @@ Makefile
 *.*.deps
 
 # Built executables
-bin/
-tests/protobuf
-tests/bithordelib
+/bin/
+/tests/protobuf
+/tests/bithordelib
+/build/
 
 # Releases-dir
 releases
