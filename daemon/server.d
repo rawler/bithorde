@@ -168,7 +168,7 @@ protected:
         log.info("{} {} disconnected", f?"Friend":"Client", c.peername);
     }
 
-    private bool _processMessageQueue(Client c) {
+    protected bool _processMessageQueue(Client c) {
         try {
             while (c.processMessage()) {}
             return true;

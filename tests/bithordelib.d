@@ -18,6 +18,7 @@ module tests.libbithorde;
 
 private import tango.core.Thread;
 private import tango.core.sync.Semaphore;
+private import tango.core.tools.TraceExceptions;
 private import tango.io.FilePath;
 private import tango.io.selector.model.ISelector;
 private import tango.io.Stdout;
@@ -63,24 +64,34 @@ class SteppingServer : Server {
         thread.start();
     }
 
-    bool processSelectEvent(SelectionKey event) {
+    bool _processMessageQueue(daemon.client.Client c) {
         sem.wait();
-        return super.processSelectEvent(event);
+        return super._processMessageQueue(c);
     }
 
-    void step() {
-        sem.notify();
+    void step(int steps=1) {
+        for (;steps>0; steps--)
+            sem.notify();
     }
 }
+
+/****************************************************************************************
+ * Helper to setup a client connected to a server.
+ ***************************************************************************************/
+Client createClient(SteppingServer s, char[] name="libtest") {
+    LOG.info("Opening Client...");
+    return new Client(new LocalAddress(s.config.unixSocket), name);
+}
+
+/*----------------------- Actual tests begin here -------------------------------------*/
 
 /****************************************************************************************
  * Verifies that the bithorde lib times out stale requests correctly.
  ***************************************************************************************/
 void testLibTimeout(SteppingServer s) {
     s.step();
-    LOG.info("Opening Client...");
-    auto client = new Client(new LocalAddress(s.config.unixSocket), "libtest");
     LOG.info("Client open, sending assetRequest");
+    auto client = createClient(s);
     auto ids = [new Identifier(message.HashType.SHA1, cast(ubyte[])x"c1531277498f21cb9ded5741f7a0d66c66505bca")];
     bool gotTimeout = false;
     client.open(ids, delegate(IAsset asset, Status status, OpenOrUploadRequest req, OpenResponse resp) {
@@ -107,11 +118,9 @@ void testLibTimeout(SteppingServer s) {
  ***************************************************************************************/
 void testServerTimeout(SteppingServer src, SteppingServer proxy) {
     src.step();
-    for (int i=0; i < 100; i++)
-        proxy.step();
+    proxy.step(100);
     Thread.sleep(0.1);
-    LOG.info("Opening Client...");
-    auto client = new Client(new LocalAddress(proxy.config.unixSocket), "libtest");
+    auto client = createClient(proxy);
     LOG.info("Client open, sending assetRequest");
     auto ids = [new Identifier(message.HashType.SHA1, cast(ubyte[])x"c1531277498f21cb9ded5741f7a0d66c66505bca")];
     bool gotTimeout = false;
@@ -138,6 +147,34 @@ void testServerTimeout(SteppingServer src, SteppingServer proxy) {
 
 }
 
+/****************************************************************************************
+ * Tests uploading an asset
+ ***************************************************************************************/
+void testAssetUpload(SteppingServer dst) {
+    const char[] testData = "ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvz";
+    const int times = 5;
+    dst.step(100);
+    Thread.sleep(0.1);
+    auto client = createClient(dst);
+    LOG.info("Client open, uploading asset");
+    client.beginUpload(testData.length*times, delegate(IAsset _asset, Status status, OpenOrUploadRequest req, OpenResponse resp) {
+        auto asset = cast(RemoteAsset)_asset;
+        assert(asset && (status == Status.SUCCESS), "Failed opening");
+        for (int i = 0; i < times; i++)
+            asset.sendDataSegment(i*testData.length,cast(ubyte[])testData);
+
+        asset.requestMetaData(delegate (IAsset asset, Status status, MetaDataRequest req, MetaDataResponse resp) {
+            assert(asset && (status == Status.SUCCESS), "Failed digesting");
+            LOG.info("SUCCESS! Digest is {}", resp.ids[0].id);
+            client.close();
+        });
+    });
+    LOG.info("Request sent, expecting Timeout");
+    client.run();
+}
+
+/*----------------------- Actual tests begin here -------------------------------------*/
+
 /// Log for all the tests
 static Logger LOG;
 
@@ -154,4 +191,7 @@ void main() {
     src = new SteppingServer("Src", 23414);
     auto proxy = new SteppingServer("Proxy", 23415, [src]);
     testServerTimeout(src, proxy);
+
+    Stdout("\nTesting AssetUpload\n=====================\n").newline;
+    testAssetUpload(src);
 }
