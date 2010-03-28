@@ -244,8 +244,12 @@ protected:
         resp.rpcId = req.rpcId;
         try {
             auto asset = cast(CachedAsset)openAssets[req.handle];
-            resp.status = message.Status.SUCCESS;
-            resp.ids = asset.metadata.hashIds;
+            if (asset && asset.metadata) {
+                resp.status = message.Status.SUCCESS;
+                resp.ids = asset.metadata.hashIds;
+            } else {
+                resp.status = message.Status.INVALID_HANDLE;
+            }
         } catch (ArrayBoundsException e) {
             log.error("MetaDataRequest on invalid handle");
             resp.status = message.Status.INVALID_HANDLE;
