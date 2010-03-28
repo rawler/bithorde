@@ -83,6 +83,11 @@ class SteppingServer : Server {
         sem = new Semaphore(steps);
         sem.notify;
     }
+
+    void shutdown() {
+        running = false;
+        step(1000);
+    }
 }
 
 /****************************************************************************************
@@ -110,7 +115,7 @@ void testLibTimeout(SteppingServer s) {
     client.open(ids, delegate(IAsset asset, Status status, OpenOrUploadRequest req, OpenResponse resp) {
         assert(!asset, "Asset is not null");
         if (status == Status.TIMEOUT) {
-            gotTimeout = true;
+            LOG.info("SUCCESS: Timeout gotten");
             client.close();
         } else {
             assert(false, "Expected Timeout but got other status " ~ toString(status));
@@ -120,10 +125,6 @@ void testLibTimeout(SteppingServer s) {
     }, TimeSpan.fromMillis(500));
     LOG.info("Request sent, expecting Timeout");
     client.run();
-    if (gotTimeout)
-        LOG.info("SUCCESS: Timeout gotten");
-    else
-        assert(false, "Did not get timeout");
 }
 
 /****************************************************************************************
@@ -228,7 +229,6 @@ void testAssetFetchWithTimeout(SteppingServer src, Identifier[] ids) {
     });
     t.isDaemon = true;
     t.start();
-    LOG.info("Request sent, expecting Timeout");
     client.run();
 }
 
@@ -244,12 +244,13 @@ void main() {
     LOG = Log.lookup("libtest");
 
     Stdout("\nTesting ClientTimeout\n=====================\n").newline;
-    auto src = new SteppingServer("A", 23412);
+    auto src = new SteppingServer("Src", 23412);
+    scope(exit) src.shutdown();
     testLibTimeout(src);
 
     Stdout("\nTesting ServerTimeout\n=====================\n").newline;
-    src = new SteppingServer("Src", 23414);
     auto proxy = new SteppingServer("Proxy", 23415, [src]);
+    scope(exit) proxy.shutdown();
     testServerTimeout(src, proxy);
 
     Stdout("\nTesting AssetUpload\n===================\n").newline;

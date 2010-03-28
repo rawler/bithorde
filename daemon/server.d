@@ -49,6 +49,7 @@ package:
     Thread reconnectThread;
     ServerSocket tcpServer;
     LocalServerSocket unixServer;
+    bool running = true;
 
     static Logger log;
     static this() {
@@ -62,6 +63,7 @@ public:
         // Setup basics
         this.config = config;
         this.name = config.name;
+        this.running = true;
 
         // Setup selector
         this.selector = new Selector;
@@ -98,11 +100,12 @@ public:
     }
 
     void run() {
-        this.reconnectThread = new Thread(&reconnectLoop);
-        this.reconnectThread.isDaemon = true;
-        this.reconnectThread.start();
+        reconnectThread = new Thread(&reconnectLoop);
+        scope(exit) { running = false; reconnectThread.join(); } // Make sure to clean up
+        reconnectThread.isDaemon = true;
+        reconnectThread.start();
 
-        while (true)
+        while (running)
             pump();
     }
 
@@ -232,7 +235,7 @@ protected:
 
     void reconnectLoop() {
         auto socket = new Socket();
-        while (true) try {
+        while (running) try {
             foreach (friend; offlineFriends.values) {
                 try {
                     socket.connect(friend.addr);
