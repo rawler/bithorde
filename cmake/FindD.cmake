@@ -1,4 +1,4 @@
-## FindD.cmake is Copyright (C) 2009 "SokoL_SD" of the QtD-project (http://dsource.org/projects/qtd/)
+## FindD.cmake is Copyright (C) 2009 "Alexey Prokhin" of the QtD-project (http://dsource.org/projects/qtd/)
 ## ----------------------------------------------------------------------------
 ## Boost Software License - Version 1.0 - August 17th, 2003
 ##
