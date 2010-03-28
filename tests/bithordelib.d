@@ -65,7 +65,11 @@ class SteppingServer : Server {
     }
 
     bool _processMessageQueue(daemon.client.Client c) {
-        sem.wait();
+        Semaphore oldSem;
+        do {
+            oldSem = sem;
+            sem.wait();
+        } while (sem != oldSem); // Make sure semaphore wasn't reset
         return super._processMessageQueue(c);
     }
 
@@ -73,14 +77,23 @@ class SteppingServer : Server {
         for (;steps>0; steps--)
             sem.notify();
     }
+
+    void reset(uint steps=0) {
+        auto oldsem = sem;
+        sem = new Semaphore(steps);
+        sem.notify;
+    }
 }
 
 /****************************************************************************************
  * Helper to setup a client connected to a server.
  ***************************************************************************************/
 Client createClient(SteppingServer s, char[] name="libtest") {
+    Thread.sleep(0.1); // Ensure server has time to get up
     LOG.info("Opening Client...");
-    return new Client(new LocalAddress(s.config.unixSocket), name);
+    auto retval = new Client(new LocalAddress(s.config.unixSocket), name);
+    Thread.sleep(0.1); // Ensure first request is not merged with handshake, for server-stepping to work.
+    return retval;
 }
 
 /*----------------------- Actual tests begin here -------------------------------------*/
@@ -144,13 +157,14 @@ void testServerTimeout(SteppingServer src, SteppingServer proxy) {
         LOG.info("SUCCESS: NOTFOUND after Timeout");
     else
         assert(false, "Did not get timeout");
-
 }
 
 /****************************************************************************************
  * Tests uploading an asset
  ***************************************************************************************/
-void testAssetUpload(SteppingServer dst) {
+Identifier[] testAssetUpload(SteppingServer dst) {
+    Identifier[] retVal;
+
     const char[] testData = "ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvz";
     const int times = 5;
     dst.step(100);
@@ -165,13 +179,59 @@ void testAssetUpload(SteppingServer dst) {
 
         asset.requestMetaData(delegate (IAsset asset, Status status, MetaDataRequest req, MetaDataResponse resp) {
             assert(asset && (status == Status.SUCCESS), "Failed digesting");
-            LOG.info("SUCCESS! Digest is {}", resp.ids[0].id);
+            retVal = resp.ids;
+            LOG.info("SUCCESS! Digest is {}", retVal[0].id);
             client.close();
         });
     });
     LOG.info("Request sent, expecting Timeout");
     client.run();
+
+    return retVal;
 }
+
+/****************************************************************************************
+ * Tests fetching an asset with timeouts. Verifies that bithordelib handles retrying on
+ * timeouts.
+ ***************************************************************************************/
+void testAssetFetchWithTimeout(SteppingServer src, Identifier[] ids) {
+    const chunkSize = 5;
+
+    src.reset(3);
+
+    auto client = createClient(src);
+    LOG.info("Client open, trying to open asset");
+
+    uint pos;
+    RemoteAsset asset;
+
+    void gotResponse(IAsset asset, Status status, ReadRequest req, ReadResponse resp) {
+        assert(status == Status.SUCCESS, "Read should have succeded, but got status " ~ toString(status));
+        pos += chunkSize;
+        if (pos < asset.size)
+            asset.aSyncRead(pos, chunkSize, &gotResponse);
+        else {
+            LOG.info("SUCCESS: Got asset despite timeout");
+            client.close();
+        }
+    }
+
+    client.open(ids, delegate(IAsset _asset, Status status, OpenOrUploadRequest req, OpenResponse resp) {
+        asset = cast(RemoteAsset)_asset;
+        assert(asset && (status == Status.SUCCESS), "Failed opening");
+
+        asset.aSyncRead(pos, chunkSize, &gotResponse, 500);
+    });
+    auto t = new Thread(delegate() { // After 1 second, let the server respond
+        Thread.sleep(1);
+        src.step(1000);
+    });
+    t.isDaemon = true;
+    t.start();
+    LOG.info("Request sent, expecting Timeout");
+    client.run();
+}
+
 
 /*----------------------- Actual tests begin here -------------------------------------*/
 
@@ -192,6 +252,9 @@ void main() {
     auto proxy = new SteppingServer("Proxy", 23415, [src]);
     testServerTimeout(src, proxy);
 
-    Stdout("\nTesting AssetUpload\n=====================\n").newline;
-    testAssetUpload(src);
+    Stdout("\nTesting AssetUpload\n===================\n").newline;
+    auto ids = testAssetUpload(src);
+
+    Stdout("\nTesting Asset Fetching With Retries\n===================================\n").newline;
+    testAssetFetchWithTimeout(src, ids);
 }

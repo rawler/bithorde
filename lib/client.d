@@ -36,15 +36,22 @@ class RemoteAsset : private message.OpenResponse, IAsset {
      ***********************************************************************************/
     class ReadRequest : message.ReadRequest {
         BHReadCallback _callback;
-        this(BHReadCallback cb) {
+        ushort retries;
+        this(BHReadCallback cb, ushort retries=0) {
             this.handle = this.outer.handle;
+            this.retries = retries;
             _callback = cb;
         }
-        void callback(message.ReadResponse resp) {
-            _callback(this.outer, resp.status, this, resp);
+        void callback(message.Status s, message.ReadResponse resp) {
+            if ((s == message.Status.TIMEOUT) && retries) {
+                retries -= 1;
+                client.sendRequest(this);
+            } else {
+                _callback(this.outer, s, this, resp);
+            }
         }
         void abort(message.Status s) {
-            _callback(this.outer, s, this, null);
+            callback(s, null);
         }
     }
     /************************************************************************************
@@ -90,8 +97,14 @@ public:
         return message.OpenResponse.handle;
     }
 
+    /************************************************************************************
+     * aSyncRead as of IAsset. With or without explicit retry-count
+     ***********************************************************************************/
     void aSyncRead(ulong offset, uint size, BHReadCallback readCallback) {
-        auto req = new ReadRequest(readCallback);
+        aSyncRead(offset, size, readCallback, 5);
+    }
+    void aSyncRead(ulong offset, uint size, BHReadCallback readCallback, ushort retries) { /// ditto
+        auto req = new ReadRequest(readCallback, retries);
         req.offset = offset;
         req.size = size;
         client.sendRequest(req);
@@ -267,7 +280,7 @@ protected:
         resp.decode(buf);
         auto req = cast(RemoteAsset.ReadRequest)releaseRequest(resp);
         assert(req, "ReadResponse, but not MetaDataRequest");
-        req.callback(resp);
+        req.callback(resp.status, resp);
     }
     synchronized void processMetaDataResponse(ubyte[] buf) {
         scope auto resp = new message.MetaDataResponse;
