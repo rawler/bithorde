@@ -198,10 +198,12 @@ public:
         this.log = Log.lookup("daemon.client."~peername);
     }
 
-    ~this ()
+    void close()
     {
-        foreach (asset; openAssets)
+        auto assets = openAssets.values;
+        foreach (asset; assets)
             asset.close();
+        super.close();
     }
 
     /************************************************************************************
