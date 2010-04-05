@@ -23,7 +23,6 @@
     ---
     char[] blah = "Hello there, my name is Jeff.";
 
-// TODO: Fix example
     scope encodebuf = new char[allocateEncodeSize(cast(ubyte[])blah)];
     char[] encoded = encode(cast(ubyte[])blah, encodebuf);
 
