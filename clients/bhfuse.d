@@ -111,10 +111,24 @@ int fuse_main_real(int argc, char** argv, fuse_operations *op,
 
 /*-------------- Main program below ---------------*/
 
-static RemoteAsset[128] assetMap; // TODO: dynamically grow
 static Client client;
 
 extern (D) {
+    struct AssetMap {
+        static RemoteAsset[] _assetMap;
+        RemoteAsset opIndex(uint idx) {
+            return _assetMap[idx];
+        }
+        RemoteAsset opIndexAssign(RemoteAsset asset, uint idx) in {
+            assert(idx < 32768, "Not sensible with thousands of open assets");
+        } body {
+            if (idx >= _assetMap.length)
+                _assetMap.length = (_assetMap.length*2) + 2; // Grow
+            return _assetMap[idx] = asset;
+        }
+    }
+    static AssetMap assetMap;
+
     void driveUntil(ref bool doBreak) {
         synchronized (client) {
             while (!doBreak)
