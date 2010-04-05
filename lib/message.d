@@ -84,6 +84,21 @@ enum Status {
     DISCONNECTED = 5,
     TIMEOUT = 6,
 }
+char[] statusToString(Status s) {
+    static char[][] _map = [
+        "NONE",
+        "SUCCESS",
+        "NOTFOUND",
+        "INVALID_HANDLE",
+        "WOULD_LOOP",
+        "DISCONNECTED",
+        "TIMEOUT",
+    ];
+    if (s >= _map.length)
+        return "<unknown>";
+    else
+        return _map[s];
+}
 
 abstract class RPCMessage : Message {
     ushort rpcId;    // Local-link request id
