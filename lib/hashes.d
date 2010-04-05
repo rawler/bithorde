@@ -66,7 +66,6 @@ HashDetail[HashType] HashMap;
 static this() {
     auto hashes = [
         HashDetail(HashType.SHA1, "sha1", &hashFactory!(Sha1), &base32NoPad, &base32.decode),
-        HashDetail(HashType.SHA256, "sha256", &hashFactory!(Sha256), &base32NoPad, &base32.decode),
         HashDetail(HashType.TREE_TIGER, "tree:tiger", &hashFactory!(HashTree!(Tiger)), &base32NoPad, &base32.decode),
         HashDetail(HashType.ED2K, "ed2k", &hashFactory!(ED2K), &base32NoPad, &base32.decode),
     ];
