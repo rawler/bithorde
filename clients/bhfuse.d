@@ -111,7 +111,7 @@ int fuse_main_real(int argc, char** argv, fuse_operations *op,
 
 /*-------------- Main program below ---------------*/
 
-static Client client;
+static SimpleClient client;
 
 extern (D) {
     struct AssetMap {
@@ -266,7 +266,7 @@ extern (D):
 int main(char[][] args)
 {
     auto addr = new LocalAddress("/tmp/bithorde");
-    client = new Client(addr, "bhfuse");
+    client = new SimpleClient(addr, "bhfuse");
 
     scope char** argv = cast(char**)new char*[args.length];
     foreach (idx,arg; args) {

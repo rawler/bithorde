@@ -17,7 +17,6 @@
 module lib.connection;
 
 private import tango.core.Exception;
-private import tango.io.selector.Selector;
 private import tango.net.device.Berkeley;
 private import tango.net.device.Socket;
 private import tango.time.Clock;
@@ -64,7 +63,6 @@ class Connection
 {
 protected:
     Socket socket;
-    Selector selector; // TODO: Break out standalone-driven-behavior into own client?
     ubyte[] frontbuf, backbuf, left;
     ByteBuffer msgbuf;
     char[] _myname, _peername;
@@ -151,7 +149,7 @@ public:
     {
         this.socket = s;
 
-        this.frontbuf = new ubyte[8192]; // TODO: Handle overflow
+        this.frontbuf = new ubyte[8192];
         this.backbuf = new ubyte[8192];
         this.left = [];
         this.msgbuf = new ByteBuffer(8192);
@@ -230,31 +228,6 @@ public:
      ***********************************************************************************/
     TimeSpan nextTimeOut() {
         return timeouts.size ? (timeouts.peek.time-Clock.now) : TimeSpan.max;
-    }
-
-    /************************************************************************************
-     * Run exactly one cycle of readNewData, processMessage*, processTimeouts
-     ***********************************************************************************/
-    synchronized void pump() {
-        if (!selector) {
-            selector = new Selector();
-            selector.open(1,1);
-            selector.register(socket, Event.Read|Event.Error);
-        }
-
-        if (selector.select(nextTimeOut) > 0) {
-            foreach (key; selector.selectedSet()) {
-                assert(key.conduit is socket);
-                if (key.isReadable) {
-                    auto read = readNewData;
-                    assert(read, "Selector indicated data, but failed reading");
-                    while (processMessage()) {}
-                } else if (key.isError) {
-                    close();
-                }
-            }
-        }
-        processTimeouts();
     }
 
     final char[] peername() { return _peername; }

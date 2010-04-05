@@ -127,7 +127,7 @@ class BHGet
 private:
     SortedOutput output; /// Output in sorting fashion
     IAsset asset;        /// Remote Asset in bithorde
-    Client client;       /// BitHorde-client
+    SimpleClient client; /// BitHorde-client
     ulong orderOffset;   /// Which offset should be requested next?
     int exitStatus;      /// When done, what's the exitStatus?
     GetArguments args;   /// Args for the fetch
@@ -139,7 +139,7 @@ public:
     this(GetArguments args) {
         this.args = args;
         Address addr = new LocalAddress(args.sockPath);
-        client = new Client(addr, "bhget");
+        client = new SimpleClient(addr, "bhget");
 
         if (args.stdout)
             output = new SortedOutput(Stdout);

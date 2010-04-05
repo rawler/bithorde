@@ -17,6 +17,7 @@
 module lib.client;
 
 private import tango.core.Exception;
+private import tango.io.selector.Selector;
 private import tango.math.random.Random;
 private import tango.net.device.Socket;
 private import tango.time.Time;
@@ -145,9 +146,7 @@ public:
  * Worth mentioning is that the entire client API is asynchronous, meaning that no remote
  * calls return anything immediately, but later through a required callback.
  *
- * The Client also needs to be driven by the application in some manner, either by
- * continually calling pump(), or yielding to run(), which will run the client until
- * it is closed.
+ * Most applications will want to use the SimpleClient for basic operations.
  *
  * The Client is not thread-safe at this moment.
  ***************************************************************************************/
@@ -192,6 +191,10 @@ public:
         socket.connect(addr);
         this(socket, name);
     }
+
+    /************************************************************************************
+     * Create BitHorde client on provided Socket
+     ***********************************************************************************/
     this (Socket s, char[] name) {
         this.log = Log.lookup("lib.client");
         super(s, name);
@@ -228,15 +231,6 @@ public:
         auto req = new UploadRequest(cb);
         req.size = size;
         sendRequest(req);
-    }
-
-    /************************************************************************************
-     * Run until closed. Assumes that the calling application is event-driven, by the
-     * callbacks triggerd when recieving responses from BitHorde (or on timeout:s).
-     ***********************************************************************************/
-    void run() {
-        while (!closed)
-            pump();
     }
 protected:
     void process(message.Type type, ubyte[] msg) {
@@ -308,5 +302,61 @@ protected:
     }
     void processMetaDataRequest(ubyte[] buf) {
         throw new AssertException("Danger Danger! This client should not get requests!", __FILE__, __LINE__);
+    }
+}
+
+/****************************************************************************************
+ * Client with standalone pump() and run()-mechanisms. Appropriate for most client-
+ * applications.
+ ***************************************************************************************/
+class SimpleClient : Client {
+private:
+    Selector selector;
+public:
+    /************************************************************************************
+     * Create client by name, and connect to given address.
+     *
+     * The SimpleClient is driven by the application in some manner, either by
+     * continually calling pump(), or yielding to run(), which will run the client until
+     * it is closed.
+     ***********************************************************************************/
+    this (Address addr, char[] name)
+    {
+        super(addr, name);
+    }
+
+    /************************************************************************************
+     * Run exactly one cycle of readNewData, processMessage*, processTimeouts
+     ***********************************************************************************/
+    synchronized void pump() {
+        if (!selector) {
+            selector = new Selector();
+            selector.open(1,1);
+            selector.register(socket, Event.Read|Event.Error);
+        }
+
+        if (selector.select(nextTimeOut) > 0) {
+            foreach (key; selector.selectedSet()) {
+                assert(key.conduit is socket);
+                if (key.isReadable) {
+                    auto read = readNewData;
+                    assert(read, "Selector indicated data, but failed reading");
+                    while (processMessage()) {}
+                } else if (key.isError) {
+                    close();
+                }
+            }
+        }
+        processTimeouts();
+    }
+
+    /************************************************************************************
+     * Run until closed. Assumes that the calling application is completely event-driven,
+     * by the callbacks triggered when recieving responses from BitHorde (or on
+     * timeout:s).
+     ***********************************************************************************/
+    void run() {
+        while (!closed)
+            pump();
     }
 }

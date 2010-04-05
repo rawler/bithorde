@@ -88,7 +88,7 @@ class BHUpload
 {
 private:
     RemoteAsset asset;    /// Writeable BitHorde asset
-    Client client;        /// BitHorde client instance
+    SimpleClient client;  /// BitHorde client instance
     int exitStatus;
     UploadArguments args;
     File file;            /// File to read from
@@ -102,7 +102,7 @@ public:
     this(UploadArguments args) {
         this.args = args;
         Address addr = new LocalAddress(args.sockPath);
-        client = new Client(addr, "bhupload");
+        client = new SimpleClient(addr, "bhupload");
 
         file = new File(args.file.toString);
 

@@ -93,10 +93,10 @@ class SteppingServer : Server {
 /****************************************************************************************
  * Helper to setup a client connected to a server.
  ***************************************************************************************/
-Client createClient(SteppingServer s, char[] name="libtest") {
+SimpleClient createClient(SteppingServer s, char[] name="libtest") {
     Thread.sleep(0.1); // Ensure server has time to get up
     LOG.info("Opening Client...");
-    auto retval = new Client(new LocalAddress(s.config.unixSocket), name);
+    auto retval = new SimpleClient(new LocalAddress(s.config.unixSocket), name);
     Thread.sleep(0.1); // Ensure first request is not merged with handshake, for server-stepping to work.
     return retval;
 }
