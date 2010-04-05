@@ -167,7 +167,7 @@ static int bh_getattr(char *path, stat_t *stbuf)
         stbuf.st_nlink = 2;
     } else try {
         char[] name;
-        auto objectids = parseMagnet(dpath[1..length], name);
+        auto objectids = parseUri(dpath[1..length], name);
         if (!objectids.length)
             return -ENOENT;
 
@@ -196,7 +196,7 @@ static int bh_open(char *path, fuse_file_info *fi)
         return -ENOENT;
     else try {
         char[] name;
-        auto objectids = parseMagnet(path[1..pathLen], name);
+        auto objectids = parseUri(path[1..pathLen], name);
 
         if (auto asset = openAsset(objectids)) {
             assetMap[asset.handle] = asset;

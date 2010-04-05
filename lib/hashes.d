@@ -19,8 +19,9 @@
 module lib.hashes;
 
 private import tango.io.device.Array;
+private import tango.net.Uri;
 private import tango.text.convert.Format;
-private import tango.text.Regex;
+private import tango.text.Util;
 
 public import tango.util.digest.Digest;
 private import tango.util.digest.Sha1;
@@ -59,6 +60,7 @@ struct HashDetail {
 }
 
 HashDetail[HashType] HashMap;
+HashDetail[char[]] HashNameMap;
 
 /****************************************************************************************
  * Statically configure supported HashType:s
@@ -69,8 +71,10 @@ static this() {
         HashDetail(HashType.TREE_TIGER, "tree:tiger", &hashFactory!(HashTree!(Tiger)), &base32NoPad, &base32.decode),
         HashDetail(HashType.ED2K, "ed2k", &hashFactory!(ED2K), &base32NoPad, &base32.decode),
     ];
-    foreach (h; hashes)
+    foreach (h; hashes) {
         HashMap[h.pbType] = h;
+        HashNameMap[h.name] = h;
+    }
 }
 
 /****************************************************************************************
@@ -119,24 +123,40 @@ char[] formatED2K(Identifier[] ids, ulong length, char[] name = null) {
  * Parse any supported URI-format
  ***************************************************************************************/
 Identifier[] parseUri(char[] uri, out char[] name) {
-    auto retVal = parseMagnet(uri, name);
-    if (!retVal)
-        retVal = parseED2K(uri, name);
-    return retVal;
+    auto uri_ = new Uri(uri);
+    switch (uri_.scheme) {
+    case "magnet":
+        return parseMagnet(uri_, name);
+    case "ed2k":
+        return parseED2K(uri_, name);
+    default:
+        return null;
+    }
 }
 
 /****************************************************************************************
  * Parse magnet-URI:s
  ***************************************************************************************/
-Identifier[] parseMagnet(char[] magnetUri, out char[] name) {
+Identifier[] parseMagnet(Uri magnetUri, out char[] name) {
     Identifier[] retVal;
-    auto name_re = Regex(r"dn=([^&]+)");
-    foreach (m; name_re.search(magnetUri))
-        name = m[1];
-    foreach (hash; HashMap) {
-        auto hash_re = Regex(r"xt=urn:"~hash.name~r":(\w+)");
-        foreach (m; hash_re.search(magnetUri))
-            retVal ~= new Identifier(hash.pbType, hash.magnetDeformatter(m[1]));
+    foreach (part; delimit(magnetUri.query, "&")) {
+        char[] value;
+        char[] key = head(part, "=", value);
+        switch (key) {
+            case "dn":
+                name = value.dup;
+                break;
+            case "xt":
+                value = chopl(value, "urn:");
+                value = tail(value, ":", key);
+                if (key in HashNameMap) {
+                    auto hashType = HashNameMap[key];
+                    retVal ~= new Identifier(hashType.pbType, hashType.magnetDeformatter(value));
+                }
+                break;
+            default:
+                break;
+        }
     }
     return retVal;
 }
@@ -144,12 +164,12 @@ Identifier[] parseMagnet(char[] magnetUri, out char[] name) {
 /****************************************************************************************
  * Parse ED2K-URI:s.
  ***************************************************************************************/
-Identifier[] parseED2K(char[] ed2kUri, out char[] name) {
+Identifier[] parseED2K(Uri ed2kUri, out char[] name) {
     Identifier[] retVal;
-    auto re = Regex(r"ed2k://\|file\|(.*)\|.*\|([0-9A-Fa-f]+)\|");
-    foreach (m; re.search(ed2kUri)) {
-        name = m[1];
-        retVal ~= new Identifier(HashType.ED2K, hex.decode(m[2]));
-    }
+    auto components = delimit(ed2kUri.host, "|");
+    if (components.length >= 3)
+        name = components[2].dup;
+    if (components.length >= 5)
+        retVal ~= new Identifier(HashType.ED2K, hex.decode(components[4]));
     return retVal;
 }
