@@ -35,6 +35,7 @@ private:
     IAsset[] backingAssets;
     BHServerOpenCallback openCallback;
     RequestCompleted notify;
+    uint reqnum;
 package:
     uint waitingResponses;
 public:
@@ -61,8 +62,8 @@ public:
      * Implements IServerAsset.size - size of the asset
      ***********************************************************************************/
     void aSyncRead(ulong offset, uint length, BHReadCallback cb) {
-        // TODO: Spread load on all available clients
-        backingAssets[0].aSyncRead(offset, length, cb);
+        auto forwardIdx = (reqnum++) % backingAssets.length; // Round-robin over available backingAssets
+        backingAssets[forwardIdx].aSyncRead(offset, length, cb);
     }
 
     /************************************************************************************
