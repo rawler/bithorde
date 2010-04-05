@@ -24,7 +24,7 @@ import tango.net.InternetAddress;
 import tango.net.device.Berkeley;
 import tango.net.device.LocalSocket;
 import tango.net.device.Socket;
-import tango.text.convert.Layout;
+import tango.text.convert.Format;
 import tango.time.Clock;
 import tango.util.container.SortedMap;
 import tango.util.Convert;
@@ -175,6 +175,20 @@ private:
         client.close();
         this.exitStatus = exitStatus;
     }
+    /************************************************************************************
+     * Exit with error-message
+     ***********************************************************************************/
+    void exit_error(int status, char[] msg, ...) {
+        Stderr("ERROR: ");
+        Format.convert(delegate uint(char[] s) {
+                auto count = Stderr.stream.write (s);
+                if (count is Stderr.Eof)
+                    Stderr.conduit.error ("FormatOutput :: unexpected Eof");
+                return count;
+            }, _arguments, _argptr, msg);
+        Stderr.newline;
+        exit(status);
+    }
 
     /************************************************************************************
      * Callback for when asset-open response is recieved.
@@ -197,11 +211,9 @@ private:
                 orderData();
             break;
         case Status.NOTFOUND:
-            Stderr("Asset not found in BitHorde").newline;
-            return exit(-1);
+            return exit_error(-1, "Asset not found in BitHorde");
         default:
-            Stderr.format("Got unknown status from BitHorde.open: {}", status).newline;
-            return exit(-1);
+            return exit_error(-1, "Got unknown status from BitHorde.open: {}", statusToString(status));
         }
     }
 
@@ -223,7 +235,13 @@ private:
      ***********************************************************************************/
     void onRead(IAsset asset, Status status, ReadRequest req, ReadResponse resp) {
         assert(asset == this.asset);
-        assert(req.size == resp.content.length); // TODO: Support non-aligned responses?
+        if (status != Status.SUCCESS)
+            return exit_error(-1, "Read-failure, status {}", statusToString(status));
+        if (req.size != resp.content.length)
+            return exit_error(-1, "Segment-mismatch, got more or less than asked for.");
+        if (req.offset != resp.offset)
+            return exit_error(-1, "Segment-mismatch, wrong offset");
+
         if (output.queue(resp.offset, resp.content) >= asset.size)
             exit(0);
         else
