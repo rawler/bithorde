@@ -74,19 +74,16 @@ class OpenRequest : message.OpenRequest {
         client = c;
     }
     final void callback(IServerAsset asset, message.Status status) {
-        if (client) {
+        if (!client.closed) {
             scope auto resp = new message.OpenResponse;
             resp.rpcId = rpcId;
             resp.status = status;
-            switch (status) {
-            case message.Status.SUCCESS:
+            if (status == message.Status.SUCCESS) {
+                // Allocate handle, and add to map
                 auto handle = client.allocateFreeHandle;
                 client.openAssets[handle] = asset;
                 resp.handle = handle;
                 resp.size = asset.size;
-                break;
-            default:
-                break;
             }
             client.sendMessage(resp);
         }
@@ -106,17 +103,15 @@ class UploadRequest : message.UploadRequest {
         client = c;
     }
     final void callback(IServerAsset asset, message.Status status) {
-        if (client) {
+        if (!client.closed) {
             scope auto resp = new message.OpenResponse;
             resp.rpcId = rpcId;
             resp.status = status;
-            switch (status) {
-            case message.Status.SUCCESS:
+            if (status == message.Status.SUCCESS) {
+                // Allocate handle, and add to map
                 auto handle = client.allocateFreeHandle;
                 client.openAssets[handle] = asset;
                 resp.handle = handle;
-                break;
-            // TODO: And else?
             }
             client.sendMessage(resp);
         }
