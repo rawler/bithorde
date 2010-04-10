@@ -307,14 +307,14 @@ static int bh_read(char *path, void *buf, size_t size, off_t offset,
     if (!fi)
         return -EBADF;
     auto asset = client.assetMap[fi.fh];
-    if (!asset)
-        return -EBADF;
 
     if (offset < asset.size) {
         if (offset + size > asset.size)
             size = asset.size - offset;
 
         for (auto retry=2; retry > 0; retry--) try {
+            if (!asset)
+                return -EBADF;
             bool gotResponse = false;
             asset.aSyncRead(offset, size, delegate void(IAsset asset, Status status, ReadRequest req, ReadResponse resp) {
                 switch (status) {
@@ -324,6 +324,8 @@ static int bh_read(char *path, void *buf, size_t size, off_t offset,
                         size = resp.content.length - adjust;
                     buf[0..size] = resp.content[adjust .. adjust+size];
                     break;
+                case Status.DISCONNECTED:
+                    break;
                 default:
                     size = 0;
                 }
@@ -331,6 +333,7 @@ static int bh_read(char *path, void *buf, size_t size, off_t offset,
             });
             client.driveUntil(gotResponse);
         } catch (BHFuseClient.ReconnectedException e) {
+            asset = client.assetMap[fi.fh];
             continue; // Retry request
         } catch (BHFuseClient.DisconnectedException e) {
             return -ENOTCONN;
