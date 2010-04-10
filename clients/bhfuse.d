@@ -19,6 +19,7 @@ module clients.fuse;
 private import tango.core.Exception;
 private import tango.io.selector.Selector;
 private import tango.io.Stdout;
+private import tango.net.device.Berkeley : Address;
 private import tango.net.device.LocalSocket;
 private import tango.stdc.errno;
 private import tango.stdc.posix.fcntl;
@@ -34,6 +35,8 @@ private import lib.message;
 
 extern (C):
 typedef int function(void *buf, char *name, stat_t *stbuf, off_t off) fuse_fill_dir_t;
+
+alias void fuse_t;
 
 struct fuse_conn_info {
     uint proto_major;
@@ -106,14 +109,35 @@ struct fuse_file_info {
     bool nonseekable(bool b) { options |= (b<<3); return b; }
 }
 
+struct fuse_context {
+        /** Pointer to the fuse object */
+        fuse_t* fuse;
+
+        /** User ID of the calling process */
+        uid_t uid;
+
+        /** Group ID of the calling process */
+        gid_t gid;
+
+        /** Thread ID of the calling process */
+        pid_t pid;
+
+        /** Private filesystem data */
+        void *private_data;
+
+        /** Umask of the calling process (introduced in version 2.8) */
+        mode_t umask;
+};
+
 int fuse_main_real(int argc, char** argv, fuse_operations *op,
        size_t op_size, void *user_data);
+fuse_context* fuse_get_context();
+void fuse_exit(fuse_t* fuse);
 
 /*-------------- Main program below ---------------*/
-
-static SimpleClient client;
-
 extern (D) {
+    static BHFuseClient client;
+
     struct AssetMap {
         static RemoteAsset[] _assetMap;
         RemoteAsset opIndex(uint idx) {
@@ -126,33 +150,51 @@ extern (D) {
                 _assetMap.length = (_assetMap.length*2) + 2; // Grow
             return _assetMap[idx] = asset;
         }
-    }
-    static AssetMap assetMap;
 
-    void driveUntil(ref bool doBreak) {
-        synchronized (client) {
-            while (!doBreak)
-                client.pump();
+        void invalidate() { // TODO: Clear, and prepare for possible reconnection
+
         }
     }
 
-    RemoteAsset openAsset(Identifier[] objectids) {
-        bool gotResponse = false;
-        RemoteAsset retval;
-        client.open(objectids, delegate void(IAsset asset, Status status, OpenOrUploadRequest req, OpenResponse resp) {
-            switch (status) {
-            case Status.SUCCESS:
-                retval = cast(RemoteAsset)asset;
-                break;
-            case Status.NOTFOUND:
-                break;
-            default:
-                Stderr.format("Got unknown status from BitHorde.open: {}", status).newline;
-            }
-            gotResponse = true;
-        });
-        driveUntil(gotResponse);
-        return retval;
+    class BHFuseClient : SimpleClient {
+        private Address _remoteAddr;
+        AssetMap assetMap;
+
+        this(Address addr, char[] myname) {
+            _remoteAddr = addr;
+            super(addr, myname);
+        }
+
+        void onDisconnected() {
+            assetMap.invalidate();
+            super.onDisconnected();
+            auto ctx = fuse_get_context(); // TODO: Instead, try to wait a short while and reconnect
+            fuse_exit(ctx.fuse);
+        }
+
+        RemoteAsset openAsset(Identifier[] objectids) {
+            bool gotResponse = false;
+            RemoteAsset retval;
+            open(objectids, delegate void(IAsset asset, Status status, OpenOrUploadRequest req, OpenResponse resp) {
+                switch (status) {
+                case Status.SUCCESS:
+                    retval = cast(RemoteAsset)asset;
+                    break;
+                case Status.NOTFOUND:
+                    break;
+                default:
+                    Stderr.format("Got unknown status from BitHorde.open: {}", status).newline;
+                }
+                gotResponse = true;
+            });
+            driveUntil(gotResponse);
+            return retval;
+        }
+
+        synchronized void driveUntil(ref bool doBreak) {
+            while (!doBreak)
+                client.pump();
+        }
     }
 }
 
@@ -171,7 +213,7 @@ static int bh_getattr(char *path, stat_t *stbuf)
         if (!objectids.length)
             return -ENOENT;
 
-        if (auto asset = openAsset(objectids)) {
+        if (auto asset = client.openAsset(objectids)) {
             stbuf.st_mode = S_IFREG | 0444;
             stbuf.st_nlink = 1;
             stbuf.st_size = asset.size;
@@ -198,8 +240,8 @@ static int bh_open(char *path, fuse_file_info *fi)
         char[] name;
         auto objectids = parseUri(path[1..pathLen], name);
 
-        if (auto asset = openAsset(objectids)) {
-            assetMap[asset.handle] = asset;
+        if (auto asset = client.openAsset(objectids)) {
+            client.assetMap[asset.handle] = asset;
             fi.fh = asset.handle;
             fi.keep_cache = true;
             return 0;
@@ -216,7 +258,7 @@ static int bh_read(char *path, void *buf, size_t size, off_t offset,
 {
     if (!fi)
         return -EBADF;
-    auto asset = assetMap[fi.fh];
+    auto asset = client.assetMap[fi.fh];
     if (!asset)
         return -EBADF;
 
@@ -241,7 +283,7 @@ static int bh_read(char *path, void *buf, size_t size, off_t offset,
         return 0;
     }
 
-    driveUntil(gotResponse);
+    client.driveUntil(gotResponse);
     return size;
 }
 
@@ -251,9 +293,9 @@ static int bh_close(char *path, void *buf, size_t size, off_t offset,
     if (!fi)
         return -ENOENT;
 
-    auto asset = assetMap[fi.fh];
+    auto asset = client.assetMap[fi.fh];
     asset.close();
-    assetMap[fi.fh] = null;
+    client.assetMap[fi.fh] = null;
 }
 
 static fuse_operations bh_oper = {
@@ -266,7 +308,7 @@ extern (D):
 int main(char[][] args)
 {
     auto addr = new LocalAddress("/tmp/bithorde");
-    client = new SimpleClient(addr, "bhfuse");
+    client = new BHFuseClient(addr, "bhfuse");
 
     scope char** argv = cast(char**)new char*[args.length];
     foreach (idx,arg; args) {

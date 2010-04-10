@@ -146,10 +146,9 @@ public:
     /************************************************************************************
      * Create named connection, and perform HandShake
      ***********************************************************************************/
-    this(Socket s, char[] myname)
+    this(char[] myname)
     {
         this._myname = myname;
-        handshake(s);
     }
 
     ~this() {
@@ -160,6 +159,12 @@ public:
      * Initialise connection members
      ***********************************************************************************/
     protected void reset() {
+        this._freeIds = _freeIds.init;
+        this.timeouts = timeouts.init;
+        this.lingerIds = lingerIds.init;
+        this.nextid = nextid.init;
+        this._peername = _peername.init;
+
         this.frontbuf = new ubyte[8192];
         this.backbuf = new ubyte[8192];
         this.left = [];

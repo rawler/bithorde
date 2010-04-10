@@ -332,6 +332,17 @@ public:
     }
 
     /************************************************************************************
+     * Intercept new connection and create Selector for it
+     ***********************************************************************************/
+    protected Socket connect(Address addr) {
+        auto retval = super.connect(addr);
+        selector = new Selector();
+        selector.open(1,1);
+        selector.register(retval, Event.Read|Event.Error);
+        return retval;
+    }
+
+    /************************************************************************************
      * Handle remote-side-initiated disconnect. Can be supplemented/overridden in
      * subclasses.
      ***********************************************************************************/
@@ -343,21 +354,15 @@ public:
      * Run exactly one cycle of readNewData, processMessage*, processTimeouts
      ***********************************************************************************/
     synchronized void pump() {
-        if (!selector) {
-            selector = new Selector();
-            selector.open(1,1);
-            selector.register(socket, Event.Read|Event.Error);
-        }
-
         if (selector.select(nextTimeOut) > 0) {
             foreach (key; selector.selectedSet()) {
                 assert(key.conduit is socket);
                 if (key.isReadable) {
                     auto read = readNewData();
-                    if (read == IConduit.Eof)
-                        onDisconnected();
-                    else
+                    if (read)
                         while (processMessage()) {}
+                    else
+                        onDisconnected();
                 } else if (key.isError) {
                     onDisconnected();
                 }
