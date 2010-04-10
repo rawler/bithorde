@@ -17,6 +17,7 @@
 module lib.connection;
 
 private import tango.core.Exception;
+private import tango.io.model.IConduit;
 private import tango.net.device.Berkeley;
 private import tango.net.device.Socket;
 private import tango.time.Clock;
@@ -147,22 +148,37 @@ public:
      ***********************************************************************************/
     this(Socket s, char[] myname)
     {
-        this.socket = s;
-
-        this.frontbuf = new ubyte[8192];
-        this.backbuf = new ubyte[8192];
-        this.left = [];
-        this.msgbuf = new ByteBuffer(8192);
-        if (s.socket.addressFamily is AddressFamily.INET)
-            this.socket.socket.setNoDelay(true);
-        this.inFlightRequests = new InFlightRequest[16];
         this._myname = myname;
-        sayHello();
-        expectHello();
+        handshake(s);
     }
 
     ~this() {
         onClose();
+    }
+
+    /************************************************************************************
+     * Initialise connection members
+     ***********************************************************************************/
+    protected void reset() {
+        this.frontbuf = new ubyte[8192];
+        this.backbuf = new ubyte[8192];
+        this.left = [];
+        this.msgbuf = new ByteBuffer(8192);
+        this.inFlightRequests = new InFlightRequest[16];
+    }
+
+    /************************************************************************************
+     * Bind open Socket to this connection and performs handshake
+     ***********************************************************************************/
+    protected void handshake(Socket s) {
+        reset();
+
+        this.socket = s;
+        if (s.socket.addressFamily is AddressFamily.INET)
+            this.socket.socket.setNoDelay(true);
+
+        sayHello();
+        expectHello();
     }
 
     final bool closed() { return !socket; }
@@ -181,7 +197,7 @@ public:
     /************************************************************************************
      * Send DISCONNECTED notifications to all waiting callbacks.
      ***********************************************************************************/
-    void onClose() {
+    protected void onClose() {
         socket = null;
         foreach (ifr; inFlightRequests) {
             if (ifr.req)

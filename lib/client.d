@@ -180,16 +180,13 @@ private:
 private:
     RemoteAsset[uint] openAssets;
     protected Logger log;
-
 public:
     /************************************************************************************
      * Create a BitHorde client by name and an IPv4Address, or a LocalAddress.
      ***********************************************************************************/
     this (Address addr, char[] name)
     {
-        auto socket = new Socket(addr.addressFamily, SocketType.STREAM, ProtocolType.IP);
-        socket.connect(addr);
-        this(socket, name);
+        this(connect(addr), name);
     }
 
     /************************************************************************************
@@ -199,6 +196,15 @@ public:
         this.log = Log.lookup("lib.client");
         super(s, name);
         this.log = Log.lookup("daemon.client."~peername);
+    }
+
+    /************************************************************************************
+     * Connect to specified address
+     ***********************************************************************************/
+    protected Socket connect(Address addr) {
+        auto socket = new Socket(addr.addressFamily, SocketType.STREAM, ProtocolType.IP);
+        socket.connect(addr);
+        return socket;
     }
 
     void close()
@@ -326,6 +332,14 @@ public:
     }
 
     /************************************************************************************
+     * Handle remote-side-initiated disconnect. Can be supplemented/overridden in
+     * subclasses.
+     ***********************************************************************************/
+    protected void onDisconnected() {
+        close();
+    }
+
+    /************************************************************************************
      * Run exactly one cycle of readNewData, processMessage*, processTimeouts
      ***********************************************************************************/
     synchronized void pump() {
@@ -339,11 +353,13 @@ public:
             foreach (key; selector.selectedSet()) {
                 assert(key.conduit is socket);
                 if (key.isReadable) {
-                    auto read = readNewData;
-                    assert(read, "Selector indicated data, but failed reading");
-                    while (processMessage()) {}
+                    auto read = readNewData();
+                    if (read == IConduit.Eof)
+                        onDisconnected();
+                    else
+                        while (processMessage()) {}
                 } else if (key.isError) {
-                    close();
+                    onDisconnected();
                 }
             }
         }
