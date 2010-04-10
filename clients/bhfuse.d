@@ -17,6 +17,7 @@
 module clients.fuse;
 
 private import tango.core.Exception;
+private import tango.core.Thread;
 private import tango.io.selector.Selector;
 private import tango.io.Stdout;
 private import tango.net.device.Berkeley : Address;
@@ -110,23 +111,12 @@ struct fuse_file_info {
 }
 
 struct fuse_context {
-        /** Pointer to the fuse object */
-        fuse_t* fuse;
-
-        /** User ID of the calling process */
-        uid_t uid;
-
-        /** Group ID of the calling process */
-        gid_t gid;
-
-        /** Thread ID of the calling process */
-        pid_t pid;
-
-        /** Private filesystem data */
-        void *private_data;
-
-        /** Umask of the calling process (introduced in version 2.8) */
-        mode_t umask;
+    fuse_t* fuse;       /// Pointer to the fuse object
+    uid_t uid;          /// User ID of the calling process
+    gid_t gid;          /// Group ID of the calling process
+    pid_t pid;          /// Thread ID of the calling process
+    void *private_data; /// Private filesystem data
+    mode_t umask;       /// Umask of the calling process (introduced in version 2.8)
 };
 
 int fuse_main_real(int argc, char** argv, fuse_operations *op,
@@ -139,10 +129,17 @@ extern (D) {
     static BHFuseClient client;
 
     struct AssetMap {
-        static RemoteAsset[] _assetMap;
+        RemoteAsset[] _assetMap;
+
+        /********************************************************************************
+         * Read out an asset by index
+         *******************************************************************************/
         RemoteAsset opIndex(uint idx) {
             return _assetMap[idx];
         }
+        /********************************************************************************
+         * Assign an asset to index
+         *******************************************************************************/
         RemoteAsset opIndexAssign(RemoteAsset asset, uint idx) in {
             assert(idx < 32768, "Not sensible with thousands of open assets");
         } body {
@@ -151,8 +148,11 @@ extern (D) {
             return _assetMap[idx] = asset;
         }
 
-        void invalidate() { // TODO: Clear, and prepare for possible reconnection
-
+        void recycleThrough(RemoteAsset delegate(Identifier[] objectids) openMethod) {
+            foreach (ref asset; _assetMap) {
+                if (asset)
+                    asset = openMethod(asset.requestIds);
+            }
         }
     }
 
@@ -165,33 +165,77 @@ extern (D) {
             super(addr, myname);
         }
 
-        void onDisconnected() {
-            assetMap.invalidate();
-            super.onDisconnected();
-            auto ctx = fuse_get_context(); // TODO: Instead, try to wait a short while and reconnect
-            fuse_exit(ctx.fuse);
+        /********************************************************************************
+         * Thrown when theres no hope of reconnecting. At this point, Fuse is already
+         * prepared for shutting down.
+         *******************************************************************************/
+        class DisconnectedException : Exception {
+            this() { super("Disconnected"); }
         }
 
+        /********************************************************************************
+         * Thrown when reconnect has succeeded. Recieving code should retry last attempt
+         *******************************************************************************/
+        class ReconnectedException : Exception {
+            this() { super("Reconnected"); }
+        }
+
+        /********************************************************************************
+         * Tries to reconnect. Will not return normally, only return is either
+         * ReconnectedException, which will allow calling code to trigger retry, or
+         * DisconnectedException, at which point fuse will already be prepared for
+         * termination
+         *******************************************************************************/
+        void onDisconnected() {
+            super.onDisconnected();
+
+            bool tryReconnect() {
+                try connect(_remoteAddr);
+                catch (Exception e) return false;
+
+                assetMap.recycleThrough(&openAsset);
+                throw new ReconnectedException; // Success! Inform callers
+            }
+            for (uint reconnectAttempts = 3; (reconnectAttempts > 0) && !tryReconnect(); reconnectAttempts--)
+                Thread.sleep(3);
+
+            // Will only get here if no reconnect-attempt succeeded. Terminate FUSE and inform callers
+            auto ctx = fuse_get_context();
+            fuse_exit(ctx.fuse);
+            throw new DisconnectedException;
+        }
+
+        /********************************************************************************
+         * Try to Asset, while driving client
+         *******************************************************************************/
         RemoteAsset openAsset(Identifier[] objectids) {
-            bool gotResponse = false;
             RemoteAsset retval;
-            open(objectids, delegate void(IAsset asset, Status status, OpenOrUploadRequest req, OpenResponse resp) {
-                switch (status) {
-                case Status.SUCCESS:
-                    retval = cast(RemoteAsset)asset;
-                    break;
-                case Status.NOTFOUND:
-                    break;
-                default:
-                    Stderr.format("Got unknown status from BitHorde.open: {}", status).newline;
-                }
-                gotResponse = true;
-            });
-            driveUntil(gotResponse);
+            for (auto retries = 2; retries > 0; retries--) try {
+                bool gotResponse = false;
+                open(objectids, delegate void(IAsset asset, Status status, OpenOrUploadRequest req, OpenResponse resp) {
+                    switch (status) {
+                    case Status.SUCCESS:
+                        retval = cast(RemoteAsset)asset;
+                        break;
+                    case Status.NOTFOUND:
+                        break;
+                    default:
+                        Stderr.format("Got unknown status from BitHorde.open: {}", status).newline;
+                    }
+                    gotResponse = true;
+                });
+                driveUntil(gotResponse);
+                break;
+            } catch (ReconnectedException e) { continue; } // Retry
+
             return retval;
         }
 
-        synchronized void driveUntil(ref bool doBreak) {
+        /********************************************************************************
+         * Lets threads take turns pumping the client, until it signals satisfaction
+         * through the referenced doBreak boolean
+         *******************************************************************************/
+        void driveUntil(ref bool doBreak) {
             while (!doBreak)
                 client.pump();
         }
@@ -223,6 +267,8 @@ static int bh_getattr(char *path, stat_t *stbuf)
         }
     } catch (IllegalArgumentException) {
         res = -ENOENT;
+    } catch (BHFuseClient.DisconnectedException) {
+        return -ENOTCONN;
     }
 
     return res;
@@ -250,6 +296,8 @@ static int bh_open(char *path, fuse_file_info *fi)
         }
     } catch (IllegalArgumentException) {
         return -ENOENT;
+    } catch (BHFuseClient.DisconnectedException) {
+        return -ENOTCONN;
     }
 }
 
@@ -262,28 +310,35 @@ static int bh_read(char *path, void *buf, size_t size, off_t offset,
     if (!asset)
         return -EBADF;
 
-    bool gotResponse = false;
     if (offset < asset.size) {
         if (offset + size > asset.size)
             size = asset.size - offset;
-        asset.aSyncRead(offset, size, delegate void(IAsset asset, Status status, ReadRequest req, ReadResponse resp) {
-            switch (status) {
-            case Status.SUCCESS:
-                auto adjust = offset - resp.offset;
-                if (adjust + size > resp.content.length)
-                    size = resp.content.length - adjust;
-                buf[0..size] = resp.content[adjust .. adjust+size];
-                break;
-            default:
-                size = 0;
-            }
-            gotResponse = true;
-        });
+
+        for (auto retry=2; retry > 0; retry--) try {
+            bool gotResponse = false;
+            asset.aSyncRead(offset, size, delegate void(IAsset asset, Status status, ReadRequest req, ReadResponse resp) {
+                switch (status) {
+                case Status.SUCCESS:
+                    auto adjust = offset - resp.offset;
+                    if (adjust + size > resp.content.length)
+                        size = resp.content.length - adjust;
+                    buf[0..size] = resp.content[adjust .. adjust+size];
+                    break;
+                default:
+                    size = 0;
+                }
+                gotResponse = true;
+            });
+            client.driveUntil(gotResponse);
+        } catch (BHFuseClient.ReconnectedException e) {
+            continue; // Retry request
+        } catch (BHFuseClient.DisconnectedException e) {
+            return -ENOTCONN;
+        }
     } else {
         return 0;
     }
 
-    client.driveUntil(gotResponse);
     return size;
 }
 
@@ -294,7 +349,8 @@ static int bh_close(char *path, void *buf, size_t size, off_t offset,
         return -ENOENT;
 
     auto asset = client.assetMap[fi.fh];
-    asset.close();
+    try asset.close();
+    catch (BHFuseClient.ReconnectedException e) {} // Do Nothing
     client.assetMap[fi.fh] = null;
 }
 

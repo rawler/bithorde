@@ -97,6 +97,9 @@ public:
     ushort handle() {
         return message.OpenResponse.handle;
     }
+    message.Identifier[] requestIds() {
+        return openRequest.ids;
+    }
 
     /************************************************************************************
      * aSyncRead as of IAsset. With or without explicit retry-count
@@ -186,7 +189,8 @@ public:
      ***********************************************************************************/
     this (Address addr, char[] name)
     {
-        this(connect(addr), name);
+        super(name);
+        connect(addr);
     }
 
     /************************************************************************************
@@ -194,7 +198,8 @@ public:
      ***********************************************************************************/
     this (Socket s, char[] name) {
         this.log = Log.lookup("lib.client");
-        super(s, name);
+        super(name);
+        handshake(s);
         this.log = Log.lookup("daemon.client."~peername);
     }
 
@@ -204,6 +209,7 @@ public:
     protected Socket connect(Address addr) {
         auto socket = new Socket(addr.addressFamily, SocketType.STREAM, ProtocolType.IP);
         socket.connect(addr);
+        handshake(socket);
         return socket;
     }
 
