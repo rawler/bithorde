@@ -138,6 +138,16 @@ Identifier[] parseUri(char[] uri, out char[] name) {
  * Parse magnet-URI:s
  ***************************************************************************************/
 Identifier[] parseMagnet(Uri magnetUri, out char[] name) {
+    bool isBase32Alphas(char[] str) {
+        foreach (c; str) {
+            if (!(c >= '2' && c <= '7') &&
+                !(c >= 'A' && c <= 'Z') &&
+                c != '=')
+                return false;
+        }
+        return true;
+    }
+
     Identifier[] retVal;
     foreach (part; delimit(magnetUri.query, "&")) {
         char[] value;
@@ -149,7 +159,7 @@ Identifier[] parseMagnet(Uri magnetUri, out char[] name) {
             case "xt":
                 value = chopl(value, "urn:");
                 value = tail(value, ":", key);
-                if (key in HashNameMap) {
+                if (key in HashNameMap && isBase32Alphas(value)) {
                     auto hashType = HashNameMap[key];
                     retVal ~= new Identifier(hashType.pbType, hashType.magnetDeformatter(value));
                 }
