@@ -1,0 +1,41 @@
+About BitHorde
+==============
+
+BitHorde is a fast and light content distribution system, aimed for high-performance
+de-centralized content distribution.
+
+Key features are;
+  * High Performance/Efficency - Because your CPU-cycles and RAM have better things to do
+  * No Downloading Required/Direct Access - Why wait, if you've got the bandwidth?
+  * Content Oriented - An asset is an asset is an asset.
+  * FUSE Access - Any app can use BitHorde through FUSE
+
+Read More at the WebSite_.
+
+.. _WebSite: http://www.bithorde.org/
+
+Using BitHorde
+==============
+
+At this stage, bithorde is still at an alpha stage. Tread lightly, and beware of 
+gremlins.
+
+That said, copy the example config, modify to your hearts desires, and start bithorded.
+After that, you can use bhupload and bhget to upload/fetch from BitHorde, and bhfuse to
+mount BitHorde to a given mountpoint, for other applications to gain direct access.
+
+Building BitHorde
+=================
+
+BitHorde is written in D using the Tango stdlib, and is using CMake for build management.
+BitHorde is currently only tested for Linux (will possibly work on other POSIX-systems).
+Once libtango, a d-compiler (LDC suggested), make and cmake is installed, something
+like this should do;
+
+::
+
+  mkdir build && cd build
+  cmake ..
+  make
+
+Good Luck, and don't hesitate to ask around if you encounter problems.
