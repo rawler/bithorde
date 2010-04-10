@@ -34,6 +34,8 @@ private import daemon.cache.metadata;
 private import daemon.cache.map;
 private import daemon.client;
 
+const LOCALID_LENGTH = 32;
+
 private static ThreadLocal!(ubyte[]) tls_buf;
 private static this() {
     tls_buf = new ThreadLocal!(ubyte[]);
@@ -167,7 +169,7 @@ public:
      * Create WriteableAsset, id will be auto-random-generated if not specified.
      ***********************************************************************************/
     this(FilePath assetDir, AssetLifeCycleListener _listener) {
-        auto id = new ubyte[32];
+        auto id = new ubyte[LOCALID_LENGTH];
         rand.randomizeUniform!(ubyte[],false)(id);
         this(assetDir, id, _listener);
     }

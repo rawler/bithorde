@@ -20,6 +20,7 @@ module daemon.cache.manager;
 private import tango.core.Exception;
 private import tango.io.device.File;
 private import tango.io.FilePath;
+private import tango.text.Util;
 private import tango.util.log.Log;
 
 private import lib.protobuf;
@@ -60,9 +61,10 @@ public:
         this.router = router;
 
         idMapPath = this.assetDir.dup.append("index.protobuf");
-        if (idMapPath.exists)
+        if (idMapPath.exists) {
             loadIdMap();
-        else {
+            garbageCollect();
+        } else {
             hashIdMap[message.HashType.SHA1] = null;
             hashIdMap[message.HashType.SHA256] = null;
             hashIdMap[message.HashType.TREE_TIGER] = null;
@@ -168,6 +170,36 @@ private:
             foreach (id; asset.hashIds)
                 hashIdMap[id.type][id.id] = asset;
         }
+    }
+
+    /*************************************************************************
+     * Walks through assets in dir, purging those not referenced by the idmap
+     ************************************************************************/
+    void garbageCollect() {
+        log.info("Beginning garbage collection");
+        localIdMap = localIdMap.init;
+        foreach (typeMap; hashIdMap) {
+            foreach (asset; typeMap) {
+                localIdMap[asset.localId] = asset;
+            }
+        }
+        saveIdMap();
+        ubyte[LOCALID_LENGTH] idbuf;
+        auto path = assetDir.dup.append("dummy");
+        ulong cleaned;
+        foreach (fileInfo; assetDir) {
+            char[] name, suffix;
+            name = head(fileInfo.name, ".", suffix);
+            if (name.length==(idbuf.length*2) && (suffix=="idx" || suffix=="")) {
+                auto id = hex.decode(name, idbuf);
+                if (!(id in localIdMap)) {
+                    path.name = fileInfo.name;
+                    path.remove();
+                    cleaned += fileInfo.bytes;
+                }
+            }
+        }
+        log.info("Garbage collection done. {} KB freed", (cleaned + 512) / 1024);
     }
 
     /*************************************************************************
