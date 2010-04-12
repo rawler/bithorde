@@ -237,8 +237,8 @@ private:
         assert(asset == this.asset);
         if (status != Status.SUCCESS)
             return exit_error(-1, "Read-failure, status {}", statusToString(status));
-        if (req.size != resp.content.length)
-            return exit_error(-1, "Segment-mismatch, got more or less than asked for.");
+        if (req.size > resp.content.length)
+            return exit_error(-1, "Segment-mismatch, got less than asked for.");
         if (req.offset != resp.offset)
             return exit_error(-1, "Segment-mismatch, wrong offset");
 
