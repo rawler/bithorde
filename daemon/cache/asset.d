@@ -77,7 +77,6 @@ public:
     /************************************************************************************
      * IncompleteAssetException is thrown if a not-fully-cached asset were to be Opened
      * directly as a CachedAsset
-     * 
      ***********************************************************************************/
     // TODO: Should not be needed, fix cachemanager
     class IncompleteAssetException {}
@@ -89,6 +88,7 @@ public:
         this.notify = listener;
         notify(this, AssetState.ALIVE);
         log = Log.lookup("daemon.cache.cachedasset."~hex.encode(id[0..4]));
+        open();
     }
     ~this() {
         if (file)
@@ -96,12 +96,10 @@ public:
     }
 
     /************************************************************************************
-     * Assets can be created with delayed-open. Useful for CachingAsset, which needs to
-     * exist when a forwarded request exists, but not create underlying files unless
-     * asset is found remotely.
+     * Open actual underlying file
      ***********************************************************************************/
-    void open() {
-        if (idxPath.exists)
+    protected void open() {
+        if (idxPath.exists) // TODO: Should be verified by CacheManager
             throw new IncompleteAssetException;
         file = new File(path.toString, File.ReadExisting);
     }
@@ -166,35 +164,18 @@ public:
     /************************************************************************************
      * Create WriteableAsset, id will be auto-random-generated if not specified.
      ***********************************************************************************/
-    this(FilePath assetDir, AssetLifeCycleListener _listener) {
+    this(FilePath assetDir, ulong size, AssetLifeCycleListener _listener) {
         auto id = new ubyte[LOCALID_LENGTH];
         rand.randomizeUniform!(ubyte[],false)(id);
-        this(assetDir, id, _listener);
+        this(assetDir, id, _listener); // Super-class opens underlying file
+        file.truncate(size);           // We resize it to right size
+
     }
     this(FilePath assetDir, ubyte[] id, AssetLifeCycleListener _listener) { /// ditto
         foreach (k,hash; HashMap)
             hashes[hash.pbType] = hash.factory();
         super(assetDir, id, _listener);
         log = Log.lookup("daemon.cache.writeasset."~hex.encode(id[0..4]));
-    }
-
-    /************************************************************************************
-     * Create new writeable asset and prepare for writing
-     ***********************************************************************************/
-    void create(ulong size)
-    in { assert(size > 0); } // Zero-assets are not supported
-    body {
-        cacheMap = new CacheMap(idxPath);
-        file = new File(path.toString, File.Style(File.Access.ReadWrite, File.Open.New));
-        file.truncate(size);
-    }
-
-    /************************************************************************************
-     * Regular opening for reading
-     ***********************************************************************************/
-    void open() {
-        cacheMap = new CacheMap(idxPath);
-        super.open();
     }
 
     synchronized void aSyncRead(ulong offset, uint length, BHReadCallback cb) {
@@ -216,6 +197,14 @@ public:
         updateHashes();
     }
 protected:
+    /************************************************************************************
+     * Open existing for read/write
+     ***********************************************************************************/
+    void open() {
+        cacheMap = new CacheMap(idxPath);
+        file = new File(path.toString, File.Style(File.Access.ReadWrite, File.Open.Create));
+    }
+
     /************************************************************************************
      * Check if more data is available for hashing
      ***********************************************************************************/
@@ -266,32 +255,20 @@ protected:
  * caching asset, still not completely locally available.
  ***************************************************************************************/
 class CachingAsset : WriteableAsset {
-    BHServerOpenCallback cb;
     IServerAsset remoteAsset;
     message.Identifier[] reqHashIds;
 public:
-    this (FilePath assetDir, BHServerOpenCallback cb, message.Identifier[] reqHashIds, AssetLifeCycleListener _listener) {
-        this.cb = cb;
+    this (FilePath assetDir, message.Identifier[] reqHashIds, IServerAsset remoteAsset, AssetLifeCycleListener _listener) {
         this.reqHashIds = reqHashIds;
-        super(assetDir, _listener);
+        this.remoteAsset = remoteAsset;
+        super(assetDir, remoteAsset.size, _listener);
         log = Log.lookup("daemon.cache.cachingasset."~hex.encode(id[0..4]));
-    }
 
-    /************************************************************************************
-     * Callback for backing remoteAssets. Recieves openResponses for attempted opens
-     ***********************************************************************************/
-    void remoteCallback(IServerAsset remoteAsset, message.Status status) {
-        if (remoteAsset && (status == message.Status.SUCCESS)) {
-            this.remoteAsset = remoteAsset;
-            create(remoteAsset.size);
-            log.trace("Caching remoteAsset of size {}", size);
-
-            _metadata = new AssetMetaData;
-            _metadata.localId = id;
-            _metadata.hashIds = reqHashIds;
-            notify(this, AssetState.GOTIDS);
-        }
-        cb(this, status);
+        log.trace("Caching remoteAsset of size {}", size);
+        _metadata = new AssetMetaData;
+        _metadata.localId = id;
+        _metadata.hashIds = reqHashIds;
+        notify(this, AssetState.GOTIDS);
     }
 
     synchronized void aSyncRead(ulong offset, uint length, BHReadCallback cb) {

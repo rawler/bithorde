@@ -72,26 +72,31 @@ public:
         }
     }
 
+    private void _forwardedCallback(OpenRequest req, IServerAsset asset, message.Status status) {
+        if (status == message.Status.SUCCESS)
+            req.callback(new CachingAsset(assetDir, req.ids, asset, &_assetLifeCycleListener), status);
+        else
+            req.callback(null, status);
+    }
+
     /************************************************************************************
      * Implements IAssetSource.findAsset. Tries to get a hold of a certain asset.
      ***********************************************************************************/
-    void findAsset(OpenRequest req, BHServerOpenCallback cb) {
+    void findAsset(OpenRequest req) {
         void fromCache(CachedAsset asset) {
             log.trace("serving {} from cache", hex.encode(asset.id));
             req.callback(asset, message.Status.SUCCESS);
         }
         void openAsset(ubyte[] localId) {
             try {
-                auto newAsset = new CachedAsset(assetDir, localId, &_assetLifeCycleListener);
-                newAsset.open();
-                fromCache(newAsset);
+                fromCache(new CachedAsset(assetDir, localId, &_assetLifeCycleListener));
             } catch (IOException e) {
                 log.error("While opening asset: {}", e);
             }
         }
         void forwardRequest() {
-            auto asset = new CachingAsset(assetDir, cb, req.ids, &_assetLifeCycleListener);
-            router.findAsset(req, &asset.remoteCallback);
+            req.pushCallback(&_forwardedCallback);
+            router.findAsset(req);
         }
 
         ubyte[] localId;
@@ -115,14 +120,13 @@ public:
     /************************************************************************************
      * Implement uploading new assets to this Cache.
      ***********************************************************************************/
-    WriteableAsset uploadAsset(UploadRequest req) {
+    void uploadAsset(UploadRequest req) {
         try {
-            auto newAsset = new WriteableAsset(assetDir, &_assetLifeCycleListener);
-            newAsset.create(req.size);
-            return newAsset;
+            auto asset = new WriteableAsset(assetDir, req.size, &_assetLifeCycleListener);
+            req.callback(asset, message.Status.SUCCESS);
         } catch (IOException e) {
             log.error("While opening upload asset: {}", e);
-            return null;
+            req.callback(null, message.Status.NOTFOUND);
         }
     }
 

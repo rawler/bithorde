@@ -137,14 +137,12 @@ public:
         }
     }
 
-    void findAsset(OpenRequest req, BHServerOpenCallback cb) {
-        return cacheMgr.findAsset(req, cb);
+    void findAsset(OpenRequest req) {
+        return cacheMgr.findAsset(req);
     }
 
-    IServerAsset uploadAsset(UploadRequest req) {
-        auto asset = cacheMgr.uploadAsset(req);
-        req.callback(asset, message.Status.SUCCESS);
-        return asset;
+    void uploadAsset(UploadRequest req) {
+        cacheMgr.uploadAsset(req);
     }
 protected:
     void onClientConnect(Client c)

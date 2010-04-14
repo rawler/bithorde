@@ -32,7 +32,11 @@ import lib.client;
 import message = lib.message;
 import lib.protobuf;
 
-alias void delegate(IServerAsset, message.Status status) BHServerOpenCallback;
+/****************************************************************************************
+ * Delegate-signature for request-notification-recievers. Reciever is responsible for
+ * triggering a new req.callback, with appropriate responses.
+ ***************************************************************************************/
+alias void delegate(OpenRequest req, IServerAsset, message.Status status) BHServerOpenCallback;
 
 /****************************************************************************************
  * Interface for the various forms of server-assets. (CachedAsset, CachingAsset,
@@ -40,7 +44,7 @@ alias void delegate(IServerAsset, message.Status status) BHServerOpenCallback;
  ***************************************************************************************/
 interface IServerAsset : IAsset {}
 interface IAssetSource {
-    void findAsset(daemon.client.OpenRequest req, BHServerOpenCallback cb);
+    void findAsset(daemon.client.OpenRequest req);
 }
 
 /****************************************************************************************
@@ -49,10 +53,14 @@ interface IAssetSource {
  ***************************************************************************************/
 class OpenRequest : message.OpenRequest {
     Client client;
+    BHServerOpenCallback[4] _callbacks;
+    ushort _callbackCounter;
     this(Client c) {
         client = c;
+        pushCallback(&_callback);
     }
-    final void callback(IServerAsset asset, message.Status status) {
+    final void _callback(OpenRequest req, IServerAsset asset, message.Status status) {
+        assert(this is req);
         if (!client.closed) {
             scope auto resp = new message.OpenResponse;
             resp.rpcId = rpcId;
@@ -67,6 +75,13 @@ class OpenRequest : message.OpenRequest {
             client.sendMessage(resp);
         }
         delete this;
+    }
+    final void callback(IServerAsset asset, message.Status status) {
+        _callbacks[--_callbackCounter](this, asset, status);
+    }
+    final void pushCallback(BHServerOpenCallback cb) {
+        assert(_callbackCounter < _callbacks.length);
+        _callbacks[_callbackCounter++] = cb;
     }
     void abort(message.Status s) {
         callback(null, s);
@@ -94,7 +109,6 @@ class UploadRequest : message.UploadRequest {
             }
             client.sendMessage(resp);
         }
-        delete this;
     }
     void abort(message.Status s) {
         callback(null, s);
@@ -119,7 +133,6 @@ public:
             resp.status = status;
             client.sendMessage(resp);
         }
-        delete this;
     }
     void abort(message.Status s) {
         callback(null, s, null, null);
@@ -158,7 +171,7 @@ protected:
         ulong uuid = req.uuid;
         if (uuid == 0)
             uuid = rand.uniformR2!(ulong)(1,ulong.max);
-        server.findAsset(req, &req.callback);
+        server.findAsset(req);
     }
 
     void processUploadRequest(ubyte[] buf)

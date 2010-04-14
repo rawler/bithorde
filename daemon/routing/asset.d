@@ -41,10 +41,9 @@ public:
     /************************************************************************************
      * Create new ForwardedAsset from a request, and save callbacks
      ***********************************************************************************/
-    this (daemon.client.OpenRequest req, BHServerOpenCallback cb, RequestCompleted notify)
+    this (daemon.client.OpenRequest req, RequestCompleted notify)
     {
         this.req = req;
-        this.openCallback = cb;
         this.notify = notify;
     }
     ~this() {
@@ -95,7 +94,7 @@ package:
      ***********************************************************************************/
     void doCallback() {
         notify(req);
-        openCallback(this, (backingAssets.length > 0) ? Status.SUCCESS : Status.NOTFOUND);
+        req.callback(this, (backingAssets.length > 0) ? Status.SUCCESS : Status.NOTFOUND);
     }
 }
 
