@@ -137,7 +137,7 @@ public:
         }
     }
 
-    IServerAsset findAsset(OpenRequest req, BHServerOpenCallback cb) {
+    void findAsset(OpenRequest req, BHServerOpenCallback cb) {
         return cacheMgr.findAsset(req, cb);
     }
 

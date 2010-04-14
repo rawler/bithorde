@@ -75,27 +75,23 @@ public:
     /************************************************************************************
      * Implements IAssetSource.findAsset. Tries to get a hold of a certain asset.
      ***********************************************************************************/
-    IServerAsset findAsset(OpenRequest req, BHServerOpenCallback cb) {
-        IServerAsset fromCache(CachedAsset asset) {
-            asset.takeRef();
+    void findAsset(OpenRequest req, BHServerOpenCallback cb) {
+        void fromCache(CachedAsset asset) {
             log.trace("serving {} from cache", hex.encode(asset.id));
             req.callback(asset, message.Status.SUCCESS);
-            return asset;
         }
-        IServerAsset openAsset(ubyte[] localId) {
+        void openAsset(ubyte[] localId) {
             try {
                 auto newAsset = new CachedAsset(assetDir, localId, &_assetLifeCycleListener);
                 newAsset.open();
-                return fromCache(newAsset);
+                fromCache(newAsset);
             } catch (IOException e) {
                 log.error("While opening asset: {}", e);
-                return null;
             }
         }
-        IServerAsset forwardRequest() {
+        void forwardRequest() {
             auto asset = new CachingAsset(assetDir, cb, req.ids, &_assetLifeCycleListener);
-            asset.takeRef();
-            return router.findAsset(req, &asset.remoteCallback);
+            router.findAsset(req, &asset.remoteCallback);
         }
 
         ubyte[] localId;
@@ -108,11 +104,11 @@ public:
         }
         if (!localId) {
             log.trace("Unknown asset, forwarding {}", req);
-            return forwardRequest();
+            forwardRequest();
         } else if (localId in openAssets) {
-            return fromCache(openAssets[localId]);
+            fromCache(openAssets[localId]);
         } else {
-            return openAsset(localId);
+            openAsset(localId);
         }
     }
 
@@ -123,7 +119,6 @@ public:
         try {
             auto newAsset = new WriteableAsset(assetDir, &_assetLifeCycleListener);
             newAsset.create(req.size);
-            newAsset.takeRef();
             return newAsset;
         } catch (IOException e) {
             log.error("While opening upload asset: {}", e);

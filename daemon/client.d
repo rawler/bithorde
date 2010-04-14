@@ -35,33 +35,12 @@ import lib.protobuf;
 alias void delegate(IServerAsset, message.Status status) BHServerOpenCallback;
 
 /****************************************************************************************
- * Many intermittent server structures are managed using refcounts. This is the interface
- * and implementation for them
- ***************************************************************************************/
-interface IRefCounted {
-    template Impl() {
-    private:
-        uint refcount;
-    public:
-        void takeRef() {
-            refcount++;
-        }
-        void unRef() {
-            if (--refcount <= 0)
-                delete this;
-        }
-    }
-    void takeRef();
-    void unRef();
-}
-
-/****************************************************************************************
  * Interface for the various forms of server-assets. (CachedAsset, CachingAsset,
  * ForwardedAsset...)
  ***************************************************************************************/
-interface IServerAsset : IAsset, IRefCounted {}
+interface IServerAsset : IAsset {}
 interface IAssetSource {
-    IServerAsset findAsset(daemon.client.OpenRequest req, BHServerOpenCallback cb);
+    void findAsset(daemon.client.OpenRequest req, BHServerOpenCallback cb);
 }
 
 /****************************************************************************************
@@ -164,12 +143,6 @@ public:
         super(s, server.name);
         this.log = Log.lookup("daemon.client."~peername);
     }
-    ~this()
-    {
-        foreach (asset; openAssets)
-            asset.unRef();
-        openAssets = null;
-    }
 
     /************************************************************************************
      * Re-declared _open from lib.Client to make it publicly visible in the daemon.
@@ -261,7 +234,6 @@ protected:
             IServerAsset asset = openAssets[req.handle];
             openAssets.remove(req.handle);
             freeFileHandles.push(req.handle);
-            asset.unRef();
         } catch (ArrayBoundsException e) {
             log.error("tried to Close invalid handle");
             return;

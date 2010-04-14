@@ -41,7 +41,7 @@ public:
      * Implements IAssetSource.find. Unless request is already under forwarding, forward
      * to all connected friends.
      ***********************************************************************************/
-    ForwardedAsset findAsset(daemon.client.OpenRequest req, BHServerOpenCallback cb) {
+    void findAsset(daemon.client.OpenRequest req, BHServerOpenCallback cb) {
         if (req.uuid in openRequests)
             req.callback(null, Status.WOULD_LOOP);
         else
@@ -80,10 +80,9 @@ private:
      * requests.
      ***********************************************************************************/
     // TODO: Exception-handling; what if sending to friend fails?
-    ForwardedAsset forwardOpenRequest(daemon.client.OpenRequest req, BHServerOpenCallback cb) {
+    void forwardOpenRequest(daemon.client.OpenRequest req, BHServerOpenCallback cb) {
         bool forwarded = false;
         auto asset = new ForwardedAsset(req, cb, &openRequestCompleted);
-        asset.takeRef();
         foreach (friend; connectedFriends) {
             auto client = friend.c;
             if (client != req.client) {
@@ -96,10 +95,8 @@ private:
         if (!forwarded) {
             asset.doCallback();
             delete asset;
-            return null;
         } else {
             openRequests[req.uuid] = asset;
-            return asset;
         }
     }
 }

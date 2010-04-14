@@ -152,8 +152,6 @@ public:
         return _metadata;
     }
     final ubyte[] id() { return _id; }
-
-    mixin IRefCounted.Impl;
 }
 
 /****************************************************************************************
@@ -310,7 +308,6 @@ protected:
     void finish() {
         // TODO: Validate hashId:s
         super.finish();
-        remoteAsset.unRef();
         remoteAsset = null;
     }
 private:

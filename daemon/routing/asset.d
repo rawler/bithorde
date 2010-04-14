@@ -29,7 +29,6 @@ alias void delegate(daemon.client.OpenRequest) RequestCompleted;
  * A forwarded asset SHOULD have one or more BackingAssets.
  ***************************************************************************************/
 private class ForwardedAsset : IServerAsset {
-    mixin IRefCounted.Impl; /// A refcounted asset
 private:
     daemon.client.OpenRequest req;
     IAsset[] backingAssets;
