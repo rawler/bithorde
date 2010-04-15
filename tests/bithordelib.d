@@ -87,6 +87,7 @@ class SteppingServer : Server {
     void shutdown() {
         running = false;
         step(1000);
+        super.shutdown();
     }
 }
 
@@ -232,6 +233,59 @@ void testAssetFetchWithTimeout(SteppingServer src, Identifier[] ids) {
     client.run();
 }
 
+/****************************************************************************************
+ * Tests restarting a partial asset from a restarted server.
+ ***************************************************************************************/
+void testRestartWithPartialAsset(SteppingServer src, Identifier[] ids) {
+    const chunkSize = 5;
+    src.reset(1000);
+
+    auto proxy = new SteppingServer("RestartProxy", 23416, [src]);
+    proxy.reset(1000);
+    auto client = createClient(proxy);
+    LOG.info("Client open, trying to open asset");
+
+    uint pos;
+    RemoteAsset asset;
+
+    void gotResponse1(IAsset asset, Status status, ReadRequest req, ReadResponse resp) {
+        assert(status == Status.SUCCESS, "First-Read should have succeded, but got status " ~ toString(status));
+        client.close();
+    }
+    client.open(ids, delegate(IAsset _asset, Status status, OpenOrUploadRequest req, OpenResponse resp) {
+        asset = cast(RemoteAsset)_asset;
+        assert(asset && (status == Status.SUCCESS), "Failed opening, status is " ~ statusToString(status));
+
+        asset.aSyncRead(0, chunkSize, &gotResponse1, 500);
+    });
+    client.run();
+    LOG.info("Shutting down server");
+    proxy.shutdown();
+    LOG.info("Restarting server");
+    proxy = new SteppingServer("RestartProxy", 23416, [src]);
+    proxy.reset(1000);
+    LOG.info("Reconnection client");
+    client = createClient(proxy);
+
+    void gotResponse2(IAsset asset, Status status, ReadRequest req, ReadResponse resp) {
+        assert(status == Status.SUCCESS, "Read should have succeded, but got status " ~ toString(status));
+        pos += chunkSize;
+        if (pos < asset.size)
+            asset.aSyncRead(pos, chunkSize, &gotResponse2);
+        else {
+            LOG.info("SUCCESS: Got asset even after restart timeout");
+            client.close();
+        }
+    }
+    LOG.info("Retrying fetch");
+    client.open(ids, delegate(IAsset _asset, Status status, OpenOrUploadRequest req, OpenResponse resp) {
+        asset = cast(RemoteAsset)_asset;
+        assert(asset && (status == Status.SUCCESS), "Failed opening");
+
+        asset.aSyncRead(pos, chunkSize, &gotResponse2, 500);
+    });
+    client.run();
+}
 
 /*----------------------- Actual tests begin here -------------------------------------*/
 
@@ -256,6 +310,9 @@ void main() {
     Stdout("\nTesting AssetUpload\n===================\n").newline;
     auto ids = testAssetUpload(src);
 
-    Stdout("\nTesting Asset Fetching With Retries\n===================================\n").newline;
+    Stdout("\nTesting Asset Fetching With Retry on Timeouts\n=============================================\n").newline;
     testAssetFetchWithTimeout(src, ids);
+
+    Stdout("\nTesting Restarting During Partial Asset\n=======================================\n").newline;
+    testRestartWithPartialAsset(src, ids);
 }

@@ -78,9 +78,6 @@ public:
      * IncompleteAssetException is thrown if a not-fully-cached asset were to be Opened
      * directly as a CachedAsset
      ***********************************************************************************/
-    // TODO: Should not be needed, fix cachemanager
-    class IncompleteAssetException {}
-
     this(FilePath assetDir, ubyte[] id, AssetLifeCycleListener listener) {
         this._id = id.dup;
         this.path = assetDir.dup.append(ascii.toLower(hex.encode(id)));
@@ -99,21 +96,29 @@ public:
      * Open actual underlying file
      ***********************************************************************************/
     protected void open() {
-        if (idxPath.exists) // TODO: Should be verified by CacheManager
-            throw new IncompleteAssetException;
+        assert(!idxPath.exists);
         file = new File(path.toString, File.ReadExisting);
     }
 
-    /***********************************************************************************
+    /************************************************************************************
      * Asset is closed, unregistered, and resources closed. Afterwards, should be
      * awaiting garbage collection.
-     **********************************************************************************/
+     ***********************************************************************************/
     void close() {
         notify(this, AssetState.DEAD);
         if (file) {
             file.close();
             file = null;
         }
+    }
+
+    /************************************************************************************
+     * TODO: Implement, _metadata can not currently be counted on
+     * Implements IServerAsset.hashIds()
+     ***********************************************************************************/
+    Identifier[] hashIds() {
+        assert(false, "Needs implementation");
+        return _metadata.hashIds;
     }
 
     /************************************************************************************

@@ -42,7 +42,9 @@ alias void delegate(OpenRequest req, IServerAsset, message.Status status) BHServ
  * Interface for the various forms of server-assets. (CachedAsset, CachingAsset,
  * ForwardedAsset...)
  ***************************************************************************************/
-interface IServerAsset : IAsset {}
+interface IServerAsset : IAsset {
+    message.Identifier[] hashIds();
+}
 interface IAssetSource {
     void findAsset(daemon.client.OpenRequest req);
 }

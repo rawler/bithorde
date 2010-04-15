@@ -20,6 +20,7 @@ module daemon.cache.manager;
 private import tango.core.Exception;
 private import tango.io.device.File;
 private import tango.io.FilePath;
+private import tango.text.Ascii;
 private import tango.text.Util;
 private import tango.util.log.Log;
 
@@ -72,11 +73,36 @@ public:
         }
     }
 
+    /************************************************************************************
+     * Tries to find localId for specified hashIds. First match applies.
+     ***********************************************************************************/
+    ubyte[] findLocalId(message.Identifier[] hashIds) {
+        foreach (id; hashIds) {
+            if ((id.type in hashIdMap) && (id.id in hashIdMap[id.type])) {
+                auto assetMeta = hashIdMap[id.type][id.id];
+                return assetMeta.localId;
+            }
+        }
+        return null;
+    }
+
+    private FilePath assetPath(ubyte[] localId) {
+        return assetDir.dup.append(ascii.toLower(hex.encode(localId)));
+    }
+    private FilePath idxPath(ubyte[] localId) {
+        return assetPath(localId).cat(".idx");
+    }
+
+    /************************************************************************************
+     * Recieves responses for forwarded requests, and decides on caching.
+     ***********************************************************************************/
     private void _forwardedCallback(OpenRequest req, IServerAsset asset, message.Status status) {
-        if (status == message.Status.SUCCESS)
+        if (status == message.Status.SUCCESS) {
+            auto localId = findLocalId(asset.hashIds);
             req.callback(new CachingAsset(assetDir, req.ids, asset, &_assetLifeCycleListener), status);
-        else
+        } else {
             req.callback(null, status);
+        }
     }
 
     /************************************************************************************
@@ -99,20 +125,19 @@ public:
             router.findAsset(req);
         }
 
-        ubyte[] localId;
-        foreach (id; req.ids) {
-            if (id.id in hashIdMap[id.type]) {
-                auto assetMeta = hashIdMap[id.type][id.id];
-                localId = assetMeta.localId;
-                break;
-            }
-        }
+        log.trace("Looking up hashIds");
+        auto localId = findLocalId(req.ids);
         if (!localId) {
             log.trace("Unknown asset, forwarding {}", req);
             forwardRequest();
         } else if (localId in openAssets) {
+            log.trace("Found asset in openAssets");
             fromCache(openAssets[localId]);
+        } else if (idxPath(localId).exists) {
+            log.trace("Incomplete asset, forwarding {}", req);
+            forwardRequest();
         } else {
+            log.trace("Trying to open asset");
             openAsset(localId);
         }
     }

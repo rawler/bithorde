@@ -92,12 +92,6 @@ public:
 
         log.info("Started");
     }
-    ~this() {
-        if (tcpServer)
-            tcpServer.socket.detach();
-        if (unixServer)
-            unixServer.socket.detach();
-    }
 
     void run() {
         reconnectThread = new Thread(&reconnectLoop);
@@ -107,6 +101,20 @@ public:
 
         while (running)
             pump();
+    }
+
+    /************************************************************************************
+     * Prepares for shutdown. Closes sockets, open files and connections
+     ***********************************************************************************/
+    void shutdown() {
+        if (tcpServer) {
+            tcpServer.socket.shutdown(SocketShutdown.BOTH);
+            tcpServer.socket.detach();
+        }
+        if (unixServer) {
+            tcpServer.socket.shutdown(SocketShutdown.BOTH);
+            unixServer.socket.detach();
+        }
     }
 
     protected void pump()

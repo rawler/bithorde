@@ -57,6 +57,14 @@ public:
     }
 
     /************************************************************************************
+     * Implement IServerAsset.hashIds
+     ***********************************************************************************/
+    Identifier[] hashIds() {
+        // TODO: OpenResponse should also include hashIds, which should be preffered
+        return req.ids;
+    }
+
+    /************************************************************************************
      * Implements IServerAsset.size - size of the asset
      ***********************************************************************************/
     void aSyncRead(ulong offset, uint length, BHReadCallback cb) {
