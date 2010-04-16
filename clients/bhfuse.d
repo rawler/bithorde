@@ -30,6 +30,7 @@ private import tango.stdc.posix.sys.statvfs;
 private import tango.stdc.posix.utime;
 private import tango.stdc.string;
 
+private import lib.arguments;
 private import lib.client;
 private import lib.hashes;
 private import lib.message;
@@ -119,10 +120,14 @@ struct fuse_context {
     mode_t umask;       /// Umask of the calling process (introduced in version 2.8)
 };
 
-int fuse_main_real(int argc, char** argv, fuse_operations *op,
-       size_t op_size, void *user_data);
+int fuse_main_real(int argc, char** argv, fuse_operations *op, size_t op_size,
+        void *user_data);
 fuse_context* fuse_get_context();
 void fuse_exit(fuse_t* fuse);
+fuse_t* fuse_setup (int argc, char** argv, fuse_operations *op, size_t op_size,
+        char** mountpoint, int* multithreaded, void* user_data);
+int fuse_loop (fuse_t* f);
+void fuse_teardown (fuse_t* fuse, char * mountpoint);
 
 /*-------------- Main program below ---------------*/
 extern (D) {
@@ -242,6 +247,9 @@ extern (D) {
     }
 }
 
+/****************************************************************************************
+ * GETATTR Fuse-operation-handler
+ ***************************************************************************************/
 static int bh_getattr(char *path, stat_t *stbuf)
 {
     int res = 0;
@@ -274,6 +282,9 @@ static int bh_getattr(char *path, stat_t *stbuf)
     return res;
 }
 
+/****************************************************************************************
+ * OPEN Fuse-operation-handler
+ ***************************************************************************************/
 static int bh_open(char *path, fuse_file_info *fi)
 {
     if((fi.flags & 3) != O_RDONLY)
@@ -301,6 +312,9 @@ static int bh_open(char *path, fuse_file_info *fi)
     }
 }
 
+/****************************************************************************************
+ * READ Fuse-operation-handler
+ ***************************************************************************************/
 static int bh_read(char *path, void *buf, size_t size, off_t offset,
                       fuse_file_info *fi)
 {
@@ -345,35 +359,94 @@ static int bh_read(char *path, void *buf, size_t size, off_t offset,
     return size;
 }
 
-static int bh_close(char *path, void *buf, size_t size, off_t offset,
-                      fuse_file_info *fi)
+/****************************************************************************************
+ * RELEASE Fuse-operation-handler
+ ***************************************************************************************/
+static int bh_release(char *path, fuse_file_info *fi)
 {
     if (!fi)
         return -ENOENT;
 
-    auto asset = client.assetMap[fi.fh];
-    try asset.close();
-    catch (BHFuseClient.ReconnectedException e) {} // Do Nothing
-    client.assetMap[fi.fh] = null;
+    try {
+        auto asset = client.assetMap[fi.fh];
+        if (asset) {
+            client.assetMap[fi.fh] = null;
+            asset.close();
+        }
+    } catch {} // Whatever goes wring, Do Nothing
+
+    return 0;
 }
 
+/****************************************************************************************
+ * BHFUSE-operations-matrix
+ ***************************************************************************************/
 static fuse_operations bh_oper = {
     getattr : &bh_getattr,
     open    : &bh_open,
     read    : &bh_read,
+    release : &bh_release,
 };
 
 extern (D):
+/****************************************************************************************
+ * BHFuse-implementation of Argument-parsing.
+ ***************************************************************************************/
+class FUSEArguments : protected Arguments {
+private:
+    char[] sockPath;
+    char[] mountpoint;
+    bool do_debug;
+public:
+    /************************************************************************************
+     * Setup and configure underlying parser.
+     ***********************************************************************************/
+    this() {
+        this["debug"].aliased('d').smush;
+        this["unixsocket"].aliased('u').params(1).smush.defaults("/tmp/bithorde");
+        this[null].title("mountpoint").required.params(1);
+    }
+
+    /************************************************************************************
+     * Do the real parsing and convert to plain D-attributes.
+     ***********************************************************************************/
+    bool parse(char[][] arguments) {
+        if (!super.parse(arguments))
+            throw new IllegalArgumentException("Failed to parse arguments:\n" ~ errors(&stderr.layout.sprint));
+
+        do_debug = this["debug"].set;
+        sockPath = this["unixsocket"].assigned[0];
+        mountpoint = this[null].assigned[0];
+
+        return true;
+    }
+}
+
 int main(char[][] args)
 {
-    auto addr = new LocalAddress("/tmp/bithorde");
+    auto arguments = new FUSEArguments;
+    try {
+        arguments.parse(args[1..length]);
+    } catch (IllegalArgumentException e) {
+        if (e.msg)
+            Stderr(e.msg).newline;
+        Stderr.format("Usage: {} [--debug|-d] [--unixsocket|u=/tmp/bithorde] <mount-point>", args[0]).newline;
+        return -1;
+    }
+
+    auto addr = new LocalAddress(arguments.sockPath);
     client = new BHFuseClient(addr, "bhfuse");
 
-    scope char** argv = cast(char**)new char*[args.length];
-    foreach (idx,arg; args) {
-        arg.length = arg.length + 1;
-        arg[length-1] = 0;
-        argv[idx] = arg.ptr;
-    }
-    return fuse_main_real(args.length, argv, &bh_oper, bh_oper.sizeof, null);
+    auto cmountpoint = arguments.mountpoint~'\0';
+    auto cbinname = args[0] ~ '\0';
+    auto argv = new char*[0];
+    argv ~= cbinname.ptr;
+    if (arguments.do_debug)
+        argv ~= "-d\0".ptr;
+    argv ~= cmountpoint.ptr;
+    char* parsedmountpoint;
+    int multithreaded;
+    auto fusehandle = fuse_setup(argv.length, argv.ptr, &bh_oper, bh_oper.sizeof, &parsedmountpoint, &multithreaded, null);
+    scope (exit) fuse_teardown(fusehandle, parsedmountpoint);
+    return fuse_loop(fusehandle);
 }
