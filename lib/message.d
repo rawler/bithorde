@@ -83,6 +83,7 @@ enum Status {
     WOULD_LOOP = 4,
     DISCONNECTED = 5,
     TIMEOUT = 6,
+    NOTENOUGHRESOURCES = 7,
 }
 char[] statusToString(Status s) {
     static char[][] _map = [
