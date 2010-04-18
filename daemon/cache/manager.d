@@ -62,6 +62,7 @@ public:
         if (!(assetDir.exists && assetDir.isFolder && assetDir.isWritable))
             throw new ConfigException(assetDir.toString ~ " must be an existing writable directory");
         this.assetDir = assetDir;
+        this.maxSize = maxSize;
         this.router = router;
 
         idMapPath = this.assetDir.dup.append("index.protobuf");
@@ -128,13 +129,15 @@ public:
             }
             return loser;
         }
+        log.trace("Making room for new asset of {}MB. MaxSize is {}MB", size/(1024*1024), this.maxSize);
         if (this.maxSize == 0)
             return true;
         auto maxSize = this.maxSize * 1024 * 1024;
         if (size > (maxSize / 2))
             return false; // Will not cache individual assets larger than half the cacheSize
-        garbageCollect();
         auto targetSize = maxSize - size;
+        log.trace("This cache is {}MB, roof is {}MB for upload", this.size/(1024*1024), targetSize / (1024*1024));
+        garbageCollect();
         while (this.size > targetSize) {
             auto loser = pickLoser;
             if (!loser)
@@ -220,8 +223,12 @@ public:
      ***********************************************************************************/
     void uploadAsset(UploadRequest req) {
         try {
-            auto asset = new WriteableAsset(assetDir, req.size, &_assetLifeCycleListener);
-            req.callback(asset, message.Status.SUCCESS);
+            if (_makeRoom(req.size)) {
+                auto asset = new WriteableAsset(assetDir, req.size, &_assetLifeCycleListener);
+                req.callback(asset, message.Status.SUCCESS);
+            } else {
+                req.callback(null, message.Status.NORESOURCES);
+            }
         } catch (IOException e) {
             log.error("While opening upload asset: {}", e);
             req.callback(null, message.Status.NOTFOUND);
