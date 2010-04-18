@@ -126,6 +126,7 @@ private:
             break;
         case "cachesize":
             this.cacheMaxSize = to!(ulong)(value);
+            break;
         case "logfile":
             this.logfile = new FilePath(value);
             break;
