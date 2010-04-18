@@ -84,7 +84,7 @@ public:
 
         // Setup helper functions, routing and caching
         this.router = new Router();
-        this.cacheMgr = new CacheManager(config.cachedir, router);
+        this.cacheMgr = new CacheManager(config.cachedir, config.cacheMaxSize, router);
 
         // Setup friend connections
         foreach (f;config.friends)
@@ -141,7 +141,6 @@ public:
             onClientDisconnect(c);
             selector.unregister(event.conduit);
             c.close();
-            delete c;
         }
     }
 

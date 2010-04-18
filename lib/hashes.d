@@ -94,7 +94,8 @@ in {
     }
     if (name)
         append("dn={}", name);
-    append("xl={}", length);
+    if (length > 0)
+        append("xl={}", length);
     foreach (id; ids) {
         auto hash = HashMap[id.type];
         append("xt=urn:{}:{}", hash.name, hash.magnetFormatter(id.id));

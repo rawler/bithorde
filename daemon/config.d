@@ -57,6 +57,7 @@ class Config
     ushort port = 1337;
     char[] unixSocket = "/tmp/bithorde";
     FilePath cachedir;
+    ulong cacheMaxSize;                        /// Maximum cacheSize, in MB
     FilePath logfile;
     Friend[char[]] friends;
     bool doDebug = false;
@@ -123,6 +124,8 @@ private:
         case "cachedir":
             this.cachedir = new FilePath(value);
             break;
+        case "cachesize":
+            this.cacheMaxSize = to!(ulong)(value);
         case "logfile":
             this.logfile = new FilePath(value);
             break;

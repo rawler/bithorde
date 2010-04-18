@@ -22,8 +22,10 @@ private import tango.io.device.File;
 private import tango.io.FilePath;
 private import tango.text.Ascii;
 private import tango.text.Util;
+private import tango.time.Time;
 private import tango.util.log.Log;
 
+private import lib.hashes;
 private import lib.protobuf;
 
 import daemon.cache.asset;
@@ -43,6 +45,7 @@ protected:
     AssetMetaData hashIdMap[message.HashType][ubyte[]];
     FilePath idMapPath;
     FilePath assetDir;
+    ulong maxSize;
     Router router;
     AssetMetaData localIdMap[ubyte[]];
     CachedAsset[ubyte[]] openAssets;
@@ -55,7 +58,7 @@ public:
     /************************************************************************************
      * Create a CacheManager with a given asset-directory and underlying Router-instance
      ***********************************************************************************/
-    this(FilePath assetDir, Router router) {
+    this(FilePath assetDir, ulong maxSize, Router router) {
         if (!(assetDir.exists && assetDir.isFolder && assetDir.isWritable))
             throw new ConfigException(assetDir.toString ~ " must be an existing writable directory");
         this.assetDir = assetDir;
@@ -86,11 +89,54 @@ public:
         return null;
     }
 
+    /************************************************************************************
+     * Gets the size this cache is occupying, in bytes.
+     ***********************************************************************************/
+    ulong size() {
+        ulong retval;
+        foreach (fileInfo; assetDir) {
+            retval += fileInfo.bytes;
+        }
+        return retval;
+    }
+
     private FilePath assetPath(ubyte[] localId) {
         return assetDir.dup.append(ascii.toLower(hex.encode(localId)));
     }
     private FilePath idxPath(ubyte[] localId) {
-        return assetPath(localId).cat(".idx");
+        return idxPath(assetPath(localId));
+    }
+    private FilePath idxPath(FilePath assetPath) {
+        return assetPath.cat(".idx");
+    }
+
+    /************************************************************************************
+     * Makes room in cache for new asset of given size. May fail, in which case it
+     * returns false.
+     ***********************************************************************************/
+    private bool _makeRoom(ulong size) {
+        AssetMetaData pickLoser() {
+            AssetMetaData loser;
+            Time loserMtime = Time.max;
+            foreach (asset; this.localIdMap) {
+                auto path = assetPath(asset.localId);
+                auto mtime = path.modified;
+                if (mtime < loserMtime) {
+                    loser = asset;
+                    loserMtime = mtime;
+                }
+            }
+            return loser;
+        }
+        auto maxSize = this.maxSize * 1024 * 1024;
+        if (size > (maxSize / 2))
+            return false; // Will not cache individual assets larger than half the cacheSize
+        garbageCollect();
+        auto targetSize = maxSize - size;
+        while (this.size > targetSize) {
+            this.purgeAsset(pickLoser);
+        }
+        return true;
     }
 
     /************************************************************************************
@@ -99,10 +145,31 @@ public:
     private void _forwardedCallback(OpenRequest req, IServerAsset asset, message.Status status) {
         if (status == message.Status.SUCCESS) {
             auto localId = findLocalId(asset.hashIds);
+            if (!localId)
+                _makeRoom(asset.size);
             req.callback(new CachingAsset(assetDir, req.ids, localId, asset, &_assetLifeCycleListener), status);
         } else {
             req.callback(null, status);
         }
+    }
+
+    /************************************************************************************
+     * Remove an asset from cache.
+     * TODO: Fail if asset is being locked by someone using it.
+     ***********************************************************************************/
+    bool purgeAsset(AssetMetaData asset) {
+        log.info("Purging {}", formatMagnet(asset.hashIds, 0, null));
+        if (asset.localId in localIdMap)
+            localIdMap.remove(asset.localId);
+        foreach (hashId; asset.hashIds) {
+            if ((hashId.type in hashIdMap) && (hashId.id in hashIdMap[hashId.type]))
+                hashIdMap[hashId.type].remove(hashId.id);
+        }
+        auto aPath = assetPath(asset.localId);
+        if (aPath.exists) aPath.remove();
+        auto iPath = idxPath(aPath);
+        if (iPath.exists) iPath.remove();
+        return true;
     }
 
     /************************************************************************************

@@ -186,7 +186,7 @@ public:
         expectHello();
     }
 
-    final bool closed() { return !socket; }
+    final bool closed() { return (socket is null); }
 
     /************************************************************************************
      * Trigger closing of the connection
