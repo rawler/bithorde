@@ -45,7 +45,7 @@ protected:
     AssetMetaData hashIdMap[message.HashType][ubyte[]];
     FilePath idMapPath;
     FilePath assetDir;
-    ulong maxSize;
+    ulong maxSize;            /// Maximum allowed storage-capacity of this cache, in MB. 0=unlimited
     Router router;
     AssetMetaData localIdMap[ubyte[]];
     CachedAsset[ubyte[]] openAssets;
@@ -128,13 +128,18 @@ public:
             }
             return loser;
         }
+        if (this.maxSize == 0)
+            return true;
         auto maxSize = this.maxSize * 1024 * 1024;
         if (size > (maxSize / 2))
             return false; // Will not cache individual assets larger than half the cacheSize
         garbageCollect();
         auto targetSize = maxSize - size;
         while (this.size > targetSize) {
-            this.purgeAsset(pickLoser);
+            auto loser = pickLoser;
+            if (!loser)
+                return false;
+            this.purgeAsset(loser);
         }
         return true;
     }
@@ -145,9 +150,10 @@ public:
     private void _forwardedCallback(OpenRequest req, IServerAsset asset, message.Status status) {
         if (status == message.Status.SUCCESS) {
             auto localId = findLocalId(asset.hashIds);
-            if (!localId)
-                _makeRoom(asset.size);
-            req.callback(new CachingAsset(assetDir, req.ids, localId, asset, &_assetLifeCycleListener), status);
+            if (!localId && !_makeRoom(asset.size))
+                req.callback(null, message.Status.NORESOURCES);
+            else
+                req.callback(new CachingAsset(assetDir, req.ids, localId, asset, &_assetLifeCycleListener), status);
         } else {
             req.callback(null, status);
         }

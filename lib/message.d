@@ -83,7 +83,7 @@ enum Status {
     WOULD_LOOP = 4,
     DISCONNECTED = 5,
     TIMEOUT = 6,
-    NOTENOUGHRESOURCES = 7,
+    NORESOURCES = 7,
 }
 char[] statusToString(Status s) {
     static char[][] _map = [
@@ -94,6 +94,7 @@ char[] statusToString(Status s) {
         "WOULD_LOOP",
         "DISCONNECTED",
         "TIMEOUT",
+        "NORESOURCES",
     ];
     if (s >= _map.length)
         return "<unknown>";
