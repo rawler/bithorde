@@ -263,10 +263,13 @@ class CachingAsset : WriteableAsset {
     IServerAsset remoteAsset;
     message.Identifier[] reqHashIds;
 public:
-    this (FilePath assetDir, message.Identifier[] reqHashIds, IServerAsset remoteAsset, AssetLifeCycleListener _listener) {
+    this (FilePath assetDir, message.Identifier[] reqHashIds, ubyte[] localId, IServerAsset remoteAsset, AssetLifeCycleListener _listener) {
         this.reqHashIds = reqHashIds;
         this.remoteAsset = remoteAsset;
-        super(assetDir, remoteAsset.size, _listener);
+        if (localId)
+            super(assetDir, localId, _listener);
+        else
+            super(assetDir, remoteAsset.size, _listener);
         log = Log.lookup("daemon.cache.cachingasset."~hex.encode(id[0..4]));
 
         log.trace("Caching remoteAsset of size {}", size);

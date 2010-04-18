@@ -99,7 +99,7 @@ public:
     private void _forwardedCallback(OpenRequest req, IServerAsset asset, message.Status status) {
         if (status == message.Status.SUCCESS) {
             auto localId = findLocalId(asset.hashIds);
-            req.callback(new CachingAsset(assetDir, req.ids, asset, &_assetLifeCycleListener), status);
+            req.callback(new CachingAsset(assetDir, req.ids, localId, asset, &_assetLifeCycleListener), status);
         } else {
             req.callback(null, status);
         }
