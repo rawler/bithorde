@@ -150,11 +150,10 @@ private:
 
         switch (option) {
         case "addr":
-            auto host = Text.head(value, ":", value);
+            friend.addr = Text.head(value, ":", value);
             if (!value)
                 throw new ConfigException("Wrong format on " ~ friendName ~ ".addr. Should be <host>:<port>");
-            auto port = to!(ushort)(value);
-            friend.addr = new InternetAddress(host, port);
+            friend.port = to!(ushort)(value);
             break;
         default:
             throw new ConfigException("Unknown friend option: " ~ friendName ~ "." ~ option);

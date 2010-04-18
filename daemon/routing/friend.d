@@ -31,13 +31,19 @@ package:
     char[] _name;
     public char[] name() { return _name; }
 
-    /// Mutable _addr may be changed during the lifetime of the object
-    InternetAddress _addr;
-    public InternetAddress addr() { return _addr; }
-    public InternetAddress addr(InternetAddress v) { return _addr = v; }
+    /// Mutable _addr and port may be changed during the lifetime of the object
+    private char[] _addr;
+    public char[] addr() { return _addr; }
+    public char[] addr(char[] v) { return _addr = v; }
+
+    /// Ditto
+    private ushort _port;
+    public ushort port() { return _port; }
+    public ushort port(ushort v) { return _port = v; }
 
     /// Set to a client instance, if friend is currently connected
     Client c;
+
     public bool isConnected() { return c !is null; }
     public void connected(Client c) { this.c = c; }
     public void disconnected() { this.c = null; }
@@ -46,9 +52,12 @@ public:
     {
         _name = name;
     }
-    this(char[] name, InternetAddress addr)
-    {
-        this(name);
-        _addr = addr;
+
+    /************************************************************************************
+     * Tries to resolve configured addr and port to an InternetAddress. May raise a
+     * SocketException if addr fails to resolve to an IP.
+     ***********************************************************************************/
+    public InternetAddress findAddress() {
+        return new InternetAddress(_addr, _port);
     }
 }

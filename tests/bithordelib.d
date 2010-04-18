@@ -53,8 +53,12 @@ class SteppingServer : Server {
         c.cachedir = new FilePath("cache-test-"~name);
         if (!c.cachedir.exists)
             c.cachedir.createFolder();
-        foreach (srv; friends)
-            c.friends[srv.name] = new Friend(srv.name, new InternetAddress("localhost", srv.config.port));
+        foreach (srv; friends) {
+            auto f = new Friend(srv.name);
+            f.addr = "localhost";
+            f.port = srv.config.port;
+            c.friends[srv.name] = f;
+        }
 
         sem = new Semaphore;
         super(c);

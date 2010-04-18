@@ -243,7 +243,7 @@ protected:
         while (running) try {
             foreach (friend; offlineFriends.values) {
                 try {
-                    socket.connect(friend.addr);
+                    socket.connect(friend.findAddress);
                     _handshakeAndSetup(socket);
                     socket = new Socket();
                 } catch (SocketException e) {}
