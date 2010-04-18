@@ -448,5 +448,8 @@ int main(char[][] args)
     int multithreaded;
     auto fusehandle = fuse_setup(argv.length, argv.ptr, &bh_oper, bh_oper.sizeof, &parsedmountpoint, &multithreaded, null);
     scope (exit) fuse_teardown(fusehandle, parsedmountpoint);
-    return fuse_loop(fusehandle);
+    if (fusehandle)
+        return fuse_loop(fusehandle);
+    else
+        return 0;
 }
