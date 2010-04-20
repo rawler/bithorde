@@ -261,6 +261,8 @@ protected:
         auto req = new OpenRequest(openCallback);
         req.ids = ids;
         req.uuid = uuid;
+        req.handle = 0;
+        while (req.handle in openAssets) req.handle++; // Find first free handle
         sendRequest(req, timeout);
     }
 

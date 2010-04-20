@@ -35,11 +35,13 @@ message Open {
     repeated Identifier ids = 2;
     required uint64 uuid = 3;
     required uint32 timeout = 4;
+    optional uint32 handle = 5;
   }
   message Upload {
     required uint32 reqId = 1;
     required uint64 size = 2;
     required uint32 timeout = 3;
+    optional uint32 handle = 5;
   }
   message Response {
     required uint32 reqId = 1;

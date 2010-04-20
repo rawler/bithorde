@@ -143,6 +143,7 @@ class HandShake : Message {
 }
 
 package class OpenOrUploadRequest : RPCRequest {
+    ushort handle;     // Requested handle
 }
 
 class OpenRequest : OpenOrUploadRequest {
@@ -152,16 +153,18 @@ class OpenRequest : OpenOrUploadRequest {
     mixin MessageMixin!(PBField!("rpcId",    1)(),
                         PBField!("ids",      2)(),
                         PBField!("uuid",     3)(),
-                        PBField!("timeout",  4)());
+                        PBField!("timeout",  4)(),
+                        PBField!("handle",   5)());
 
     Type typeId() { return Type.OpenRequest; }
 }
 
 class UploadRequest : OpenOrUploadRequest {
     ulong size;        // Size of opened asset
-    mixin MessageMixin!(PBField!("rpcId",     1)(),
-                        PBField!("size",      2)(),
-                        PBField!("timeout",   3)());
+    mixin MessageMixin!(PBField!("rpcId",    1)(),
+                        PBField!("size",     2)(),
+                        PBField!("timeout",  3)(),
+                        PBField!("handle",   5)());
 
     Type typeId() { return Type.UploadRequest; }
 }

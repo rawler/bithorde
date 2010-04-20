@@ -69,7 +69,7 @@ class OpenRequest : message.OpenRequest {
             resp.status = status;
             if (status == message.Status.SUCCESS) {
                 // Allocate handle, and add to map
-                auto handle = client.allocateFreeHandle;
+                auto handle = client.allocateFreeHandle(this.handle);
                 client.openAssets[handle] = asset;
                 resp.handle = handle;
                 resp.size = asset.size;
@@ -105,7 +105,7 @@ class UploadRequest : message.UploadRequest {
             resp.status = status;
             if (status == message.Status.SUCCESS) {
                 // Allocate handle, and add to map
-                auto handle = client.allocateFreeHandle;
+                auto handle = client.allocateFreeHandle(this.handle);
                 client.openAssets[handle] = asset;
                 resp.handle = handle;
             }
@@ -257,8 +257,9 @@ protected:
 private:
     /************************************************************************************
      * Allocates an unused file handle for the transaction.
+     * requestedHandle - Just a suggestion, may not end up being what's allocated
      ***********************************************************************************/
-    ushort allocateFreeHandle()
+    ushort allocateFreeHandle(uint requestedHandle)
     {
         if (freeFileHandles.size > 0)
             return freeFileHandles.pop();
