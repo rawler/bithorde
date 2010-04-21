@@ -128,11 +128,15 @@ public:
         assert(file);
         ubyte[] buf = tlsBuffer(length);
         file.seek(offset);
-        auto got = file.read(buf);
+        int got = file.read(buf);
         auto resp = new lib.message.ReadResponse;
-        resp.status = message.Status.SUCCESS;
-        resp.offset = offset;
-        resp.content = buf[0..got];
+        if (got == file.Eof) {
+            resp.status = message.Status.NOTFOUND;
+        } else {
+            resp.status = message.Status.SUCCESS;
+            resp.offset = offset;
+            resp.content = buf[0..got];
+        }
         cb(this, message.Status.SUCCESS, null, resp); // TODO: should really hold reference to req
     }
 
