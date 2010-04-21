@@ -29,6 +29,9 @@ private import tango.stdc.posix.sys.stat;
 private import tango.stdc.posix.sys.statvfs;
 private import tango.stdc.posix.utime;
 private import tango.stdc.string;
+private import tango.util.log.AppendConsole;
+private import tango.util.log.LayoutDate;
+private import tango.util.log.Log;
 
 private import lib.arguments;
 private import lib.client;
@@ -436,6 +439,8 @@ int main(char[][] args)
 
     auto addr = new LocalAddress(arguments.sockPath);
     client = new BHFuseClient(addr, "bhfuse");
+
+    Log.root.add(new AppendConsole(new LayoutDate));
 
     auto cmountpoint = arguments.mountpoint~'\0';
     auto cbinname = args[0] ~ '\0';

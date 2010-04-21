@@ -249,7 +249,7 @@ protected:
         try {
             super.process(type, msg);
         } catch (InvalidMessage exc) {
-            log.warn(exc.toString);
+            log.warn("Exception in processing Message: {}", exc);
         }
     }
 
