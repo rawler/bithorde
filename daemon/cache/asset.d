@@ -87,10 +87,6 @@ public:
         log = Log.lookup("daemon.cache.cachedasset."~hex.encode(id[0..4]));
         open();
     }
-    ~this() {
-        if (file)
-            close();
-    }
 
     /************************************************************************************
      * Open actual underlying file
