@@ -27,6 +27,9 @@ public import lib.asset;
 import lib.connection;
 import lib.protobuf;
 
+alias void delegate(Object) DEvent;
+extern (C) void rt_attachDisposeEvent(Object h, DEvent e);
+
 /****************************************************************************************
  * RemoteAsset is the basic BitHorde object for tracking a remotely open asset form the
  * client-side.
@@ -74,6 +77,10 @@ class RemoteAsset : private message.OpenResponse, IAsset {
 private:
     Client client;
     bool closed;
+    void clientGone(Object o) {
+        assert(o is this.client);
+        this.client = null;
+    }
 
     message.OpenRequest _req;
     final message.OpenRequest openRequest() {
@@ -87,6 +94,7 @@ protected:
      * RemoteAssets should only be created from the Client
      ***********************************************************************************/
     this(Client c) {
+        rt_attachDisposeEvent(c, &clientGone); // Add hook for invalidating client-reference
         this.client = c;
     }
     ~this() {
@@ -133,11 +141,14 @@ public:
 
     void close() {
         closed = true;
-        auto req = new message.Close;
-        req.handle = handle;
-        if (!client.closed)
-            client.sendMessage(req);
-        client.openAssets.remove(handle);
+        if (client) {
+            if (!client.closed) {
+                scope req = new message.Close;
+                req.handle = handle;
+                client.sendMessage(req);
+            }
+            client.openAssets.remove(handle);
+        }
     }
 }
 
