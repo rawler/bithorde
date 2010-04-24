@@ -78,7 +78,6 @@ private:
     Client client;
     bool closed;
     void clientGone(Object o) {
-        assert(o is this.client);
         this.client = null;
     }
 

@@ -99,7 +99,7 @@ public:
 
     void run() {
         reconnectThread = new Thread(&reconnectLoop);
-        scope(exit) { running = false; reconnectThread.join(); } // Make sure to clean up
+        scope(exit) { shutdown(); } // Make sure to clean up
         reconnectThread.isDaemon = true;
         reconnectThread.start();
 
@@ -110,15 +110,17 @@ public:
     /************************************************************************************
      * Prepares for shutdown. Closes sockets, open files and connections
      ***********************************************************************************/
-    void shutdown() {
+    synchronized void shutdown() {
         running = false;
         if (tcpServer) {
-            tcpServer.socket.shutdown(SocketShutdown.BOTH);
-            tcpServer.socket.detach();
+            tcpServer.shutdown();
+            tcpServer.detach();
+            tcpServer = null;
         }
         if (unixServer) {
-            tcpServer.socket.shutdown(SocketShutdown.BOTH);
-            unixServer.socket.detach();
+            unixServer.shutdown();
+            unixServer.detach();
+            unixServer = null;
         }
     }
 

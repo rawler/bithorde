@@ -22,6 +22,8 @@ private import tango.core.Runtime;
 private import tango.io.Console;
 private import tango.io.Stdout;
 private import tango.stdc.posix.signal;
+private import tango.stdc.posix.unistd;
+private import tango.stdc.stdlib;
 private import tango.util.log.AppendConsole;
 private import tango.util.log.AppendFile;
 private import tango.util.log.LayoutDate;
@@ -30,9 +32,16 @@ private import tango.util.log.Log;
 private import daemon.config;
 private import daemon.server;
 
-extern (C) {
-    int fork();
-    void exit(int);
+Server s;
+
+extern (C) void exit_handler(int sig) {
+    if (s) {
+        Log.root.info("Shutting down on signal {}", sig);
+        s.shutdown();
+        s = null;
+    } else {
+        Log.root.fatal("Forcing quit");
+    }
 }
 
 /**
@@ -48,6 +57,9 @@ public int main(char[][] args)
     // Hack, since Tango doesn't set MSG_NOSIGNAL on send/recieve, we have to explicitly ignore SIGPIPE
     signal(SIGPIPE, SIG_IGN);
 
+    // Exit_handler
+    signal(SIGTERM, &exit_handler);
+
     // Parse config
     auto config = new Config(args[1]);
 
@@ -58,8 +70,7 @@ public int main(char[][] args)
         Log.root.add(new AppendFile(config.logfile.toString, new LayoutDate));
 
     // Try to setup server instance
-    scope Server s = new Server(config);
-
+    s = new Server(config);
     // Daemonize
     if (!config.doDebug) {
         Cin.input.close();
