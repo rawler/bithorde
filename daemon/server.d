@@ -93,6 +93,10 @@ public:
         log.info("Started");
     }
 
+    ~this() {
+        running = false;
+    }
+
     void run() {
         reconnectThread = new Thread(&reconnectLoop);
         scope(exit) { running = false; reconnectThread.join(); } // Make sure to clean up
@@ -107,6 +111,7 @@ public:
      * Prepares for shutdown. Closes sockets, open files and connections
      ***********************************************************************************/
     void shutdown() {
+        running = false;
         if (tcpServer) {
             tcpServer.socket.shutdown(SocketShutdown.BOTH);
             tcpServer.socket.detach();
@@ -156,7 +161,8 @@ protected:
     {
         Friend f;
         auto peername = c.peername;
-        if (peername in offlineFriends) {
+
+        synchronized (this) if (peername in offlineFriends) {
             f = offlineFriends[peername];
             offlineFriends.remove(peername);
             f.connected(c);
@@ -171,7 +177,7 @@ protected:
         auto f = router.unregisterFriend(c);
         if (f) {
             f.disconnected();
-            offlineFriends[f.name] = f;
+            synchronized (this) offlineFriends[f.name] = f;
         }
         log.info("{} {} disconnected", f?"Friend":"Client", c.peername);
     }
@@ -241,14 +247,14 @@ protected:
     void reconnectLoop() {
         auto socket = new Socket();
         while (running) try {
-            foreach (friend; offlineFriends.values) {
+            synchronized (this) foreach (friend; offlineFriends.values) {
                 try {
                     socket.connect(friend.findAddress);
                     _handshakeAndSetup(socket);
                     socket = new Socket();
                 } catch (SocketException e) {}
             }
-            Thread.sleep(2);
+            Thread.sleep(15);
         } catch (Exception e) {
             log.error("Caught unexpected exception in reconnectLoop: {}", e);
         }
