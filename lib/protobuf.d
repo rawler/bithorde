@@ -19,6 +19,9 @@
  ***************************************************************************************/
 module lib.protobuf;
 
+import tango.core.Exception;
+import tango.util.MinMax;
+
 /****************************************************************************************
  * Buffer implementation designed to be filled BACKWARDS, to increase performance of
  * prefix-length encodings.
@@ -68,6 +71,8 @@ interface ProtoBufMessage {
     ubyte[] encode(ByteBuffer buf = new ByteBuffer);
     void decode(ubyte[] buf);
 }
+
+class DecodeException : Exception { this(char[] msg) { super(msg); } }
 
 /// Basic Types
 enum WireType {
@@ -180,14 +185,37 @@ template MessageMixin(fields...) {
     }
 
     final void decode(ubyte[] buf) {
+        void consume_wtype(ubyte wtype) {
+            alias tango.util.MinMax.min!(int) int_min;
+            switch (wtype) {
+                case WireType.varint:
+                    decode_val!(ulong)(buf);
+                    break;
+                case WireType.fixed64:
+                    buf = buf[int_min(8,buf.length)..length];
+                    break;
+                case WireType.length_delim:
+                    auto msglen = decode_val!(uint)(buf);
+                    buf = buf[int_min(msglen,buf.length)..length];
+                    break;
+                case WireType.fixed32:
+                    buf = buf[int_min(4,buf.length)..length];
+                    break;
+                default:
+                    throw new DecodeException("Unkown WireType in message");
+            }
+        }
+
         while (buf.length > 0) {
             auto descriptor = decode_val!(uint)(buf);
-            switch (descriptor) {
+            try switch (descriptor) {
                 foreach (int i, f; fields) {
                     case (fields[i].id<<3)|fields[i].wType:
                         read(mixin("this."~fields[i].name), buf);
                         break;
                 }
+            } catch (tango.core.Exception.SwitchException e) {
+                consume_wtype(descriptor & 0b00000111);
             }
         }
     }

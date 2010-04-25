@@ -39,6 +39,20 @@ class Person : ProtoBufMessage
     }
 }
 
+class Person2 : ProtoBufMessage
+{
+    uint id;
+    char[] name;
+    char[] addr;
+    mixin MessageMixin!(PBField!("id",   1)(),
+                        PBField!("name", 2)(),
+                        PBField!("addr", 3)());
+    bool opEquals(Person other) {
+        return (this.id == other.id) &&
+               (this.name == other.name);
+    }
+}
+
 class Friends : ProtoBufMessage
 {
     Person[] people;
@@ -158,10 +172,32 @@ bool test_repeated_enc()
     }
 }
 
+bool test_skip_unknown()
+{
+    Stdout ("Testing Forward-Compatibility by skipping unknown attributes...");
+    auto newVersionFriend = new Person2;
+    newVersionFriend.name = "arne";
+    newVersionFriend.id = 5;
+    newVersionFriend.addr = "Experimental Street 1";
+    auto bb = new ByteBuffer;
+    auto buf = newVersionFriend.encode(bb);
+    debug (protobuf) Stdout(buf).newline();
+    Person y = new Person;
+    y.decode(buf);
+    if (newVersionFriend == y) {
+        Stdout("[PASS]").newline;
+        return true;
+    } else {
+        Stdout("[FAIL]").newline;
+        return false;
+    }
+}
+
 void main()
 {
     test_varintenc;
     test_wt_ld_enc;
     test_object_enc;
     test_repeated_enc;
+    test_skip_unknown;
 }
