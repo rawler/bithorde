@@ -144,7 +144,10 @@ private:
             sendFile();
             break;
         default:
-            Stderr.format("Got unknown status from BitHorde.open: {}", status).newline;
+            if (resp)
+                Stderr.format("Got unexpected status from BitHorde.open: {}", statusToString(status)).newline;
+            else
+                Stderr.format("Client-side aborted with failure-code: {}", statusToString(status)).newline;
             return exit(-1);
         }
     }
