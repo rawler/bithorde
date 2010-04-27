@@ -358,7 +358,7 @@ package:
      ***********************************************************************************/
     synchronized void sendRequest(message.RPCRequest req) {
         // TODO: Randomize?
-        sendRequest(req, TimeSpan.fromMillis(2000));
+        sendRequest(req, TimeSpan.fromMillis(4000));
     }
     /// ditto
     synchronized void sendRequest(message.RPCRequest req, TimeSpan timeout) {
