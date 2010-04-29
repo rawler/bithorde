@@ -249,8 +249,13 @@ protected:
     void reconnectLoop() {
         auto socket = new Socket();
         while (running) try {
-            synchronized (this) foreach (friend; offlineFriends.values) {
+            // Copy friends-list, since it may be modified
+            synchronized auto offlineFriends = this.offlineFriends.values; 
+            foreach (friend; offlineFriends) {
                 try {
+                    if (friend.isConnected)
+                        // Friend may have connected while trying to connect others
+                        continue;
                     socket.connect(friend.findAddress);
                     _handshakeAndSetup(socket);
                     socket = new Socket();
