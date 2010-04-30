@@ -210,7 +210,6 @@ public:
         this.log = Log.lookup("lib.client");
         super(name);
         handshake(s);
-        this.log = Log.lookup("daemon.client."~peername);
     }
 
     /************************************************************************************
