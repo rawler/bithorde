@@ -247,19 +247,32 @@ protected:
     }
 
     void reconnectLoop() {
+        /********************************************************************************
+         * Tries to (re)connect to single friend.
+         * Returns: True if the socket has been consumed, False otherwise
+         *******************************************************************************/
+        bool tryConnectFriend(Friend f, Socket s) {
+            bool consumed = false;
+            try {
+                s.connect(f.findAddress);
+                consumed = true;
+                _handshakeAndSetup(s);
+            } catch (SocketException e) {
+            } catch (Exception e) {
+                log.error("Caught unexpected exception {} while connecting to friend '{}'", e, f.name);
+            }
+            return consumed;
+        }
+
         auto socket = new Socket();
         while (running) try {
             // Copy friends-list, since it may be modified
-            synchronized auto offlineFriends = this.offlineFriends.values; 
+            synchronized (this) auto offlineFriends = this.offlineFriends.values;
             foreach (friend; offlineFriends) {
-                try {
-                    if (friend.isConnected)
-                        // Friend may have connected while trying to connect others
-                        continue;
-                    socket.connect(friend.findAddress);
-                    _handshakeAndSetup(socket);
+                if ((!friend.isConnected) && tryConnectFriend(friend, socket))
                     socket = new Socket();
-                } catch (SocketException e) {}
+                    // Friend may have connected while trying to connect others
+                    continue;
             }
             Thread.sleep(15);
         } catch (Exception e) {
