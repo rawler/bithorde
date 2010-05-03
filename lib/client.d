@@ -199,6 +199,7 @@ public:
      ***********************************************************************************/
     this (Address addr, char[] name)
     {
+        this.log = Log.lookup("lib.client");
         super(name);
         connect(addr);
     }
