@@ -24,6 +24,8 @@ private import tango.net.device.Berkeley;
 private import tango.net.device.LocalSocket;
 private import tango.net.device.Socket;
 private import tango.net.InternetAddress;
+private import tango.stdc.signal;
+private import unistd = tango.stdc.posix.unistd;
 private import Text = tango.text.Util;
 private import tango.time.Clock;
 private import tango.util.container.more.Stack;
@@ -39,6 +41,30 @@ private import lib.asset;
 private import lib.connection;
 private import message = lib.message;
 
+version (linux) {
+    extern (C) int eventfd(uint initval, int flags);
+    class EventFD : ISelectable {
+        int _handle;
+        Handle fileHandle() { return cast(Handle)_handle; }
+        this() {
+            _handle = eventfd(0, 0);
+        }
+        ~this() {
+            unistd.close (_handle);
+        }
+        void signal() {
+            static ulong add = 1;
+            unistd.write(_handle, &add, add.sizeof);
+        }
+        void clear() {
+            static ulong res;
+            unistd.read(_handle, &res, res.sizeof);
+        }
+    }
+} else {
+    static assert(0, "Server needs abort-implementation for non-linux OS");
+}
+
 class Server : IAssetSource
 {
 package:
@@ -50,6 +76,7 @@ package:
     ServerSocket tcpServer;
     LocalServerSocket unixServer;
     bool running = true;
+    EventFD evfd;               /// Used for sending events breaking select
 
     static Logger log;
     static this() {
@@ -67,7 +94,11 @@ public:
 
         // Setup selector
         this.selector = new Selector;
-        this.selector.open(10,10);
+        this.selector.open(10, 10);
+
+        // Setup event selector
+        this.evfd = new EventFD;
+        this.selector.register(evfd, Event.Read);
 
         // Setup servers
         log.info("Listening to tcp-port {}", config.port);
@@ -122,6 +153,7 @@ public:
             unixServer.detach();
             unixServer = null;
         }
+        evfd.signal();
     }
 
     protected void pump()
@@ -231,6 +263,8 @@ protected:
         } else if (event.conduit is unixServer) {
             assert(event.isReadable);
             _handshakeAndSetup(unixServer.accept());
+        } else if (event.conduit is evfd) {
+            evfd.clear();
         } else {
             auto c = cast(Client)event.attachment;
             if (event.isError || event.isHangup || event.isInvalidHandle) {

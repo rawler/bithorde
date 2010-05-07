@@ -41,6 +41,7 @@ extern (C) void exit_handler(int sig) {
         s = null;
     } else {
         Log.root.fatal("Forcing quit");
+        exit(-1);
     }
 }
 
