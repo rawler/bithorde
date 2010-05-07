@@ -301,8 +301,9 @@ protected:
         auto socket = new Socket();
         while (running) try {
             // Copy friends-list, since it may be modified
-            synchronized (this) auto offlineFriends = this.offlineFriends.values;
-            foreach (friend; offlineFriends) {
+            Friend[] tmpOfflineFriends;
+            synchronized (this) tmpOfflineFriends = this.offlineFriends.values;
+            foreach (friend; tmpOfflineFriends) {
                 if ((!friend.isConnected) && tryConnectFriend(friend, socket))
                     socket = new Socket();
                     // Friend may have connected while trying to connect others
