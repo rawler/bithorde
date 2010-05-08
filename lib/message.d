@@ -48,12 +48,12 @@ private:
         listMutex = new Mutex();
     }
     new(size_t sz) {
-        assert(sz <= 100, "Error, allocating too much");
+        assert(sz <= 200, "Error, allocating too much");
         synchronized (listMutex) {
             if (_freeList.size)
                 return _freeList.pop();
         } // Else
-        return GC.malloc(128);
+        return GC.malloc(200);
     }
     delete(void * p) {
         synchronized (listMutex) {
