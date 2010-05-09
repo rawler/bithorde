@@ -87,6 +87,7 @@ package:
         switch (status) {
         case Status.SUCCESS:
             assert(asset, "SUCCESS response, but no asset");
+            assert(asset.size > 0, "Empty asset");
             backingAssets ~= asset;
             break;
         default:

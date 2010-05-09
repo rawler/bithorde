@@ -207,7 +207,7 @@ protected:
      ***********************************************************************************/
     void open() {
         cacheMap = new CacheMap(idxPath);
-        file = new File(path.toString, File.Style(File.Access.ReadWrite, File.Open.Create));
+        file = new File(path.toString, File.Style(File.Access.ReadWrite, File.Open.Sedate));
     }
 
     /************************************************************************************
