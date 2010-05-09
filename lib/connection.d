@@ -255,7 +255,7 @@ public:
 
     final char[] peername() { return _peername; }
     final char[] myname() { return _myname; }
-    final Address remoteAddress() { return socket ? null : socket.socket.remoteAddress; }
+    final Address remoteAddress() { return socket ? socket.socket.remoteAddress : null; }
     char[] toString() {
         return peername;
     }
