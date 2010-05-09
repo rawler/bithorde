@@ -214,6 +214,8 @@ public:
      * Read any new data from underlying socket. Blocks until data is available.
      ***********************************************************************************/
     synchronized bool readNewData() {
+        if (closed)
+            throw new IOException("Connection closed");
         swapBufs();
         int read = socket.read(frontbuf[left.length..length]);
         if (read > 0) {
@@ -253,7 +255,7 @@ public:
 
     final char[] peername() { return _peername; }
     final char[] myname() { return _myname; }
-    final Address remoteAddress() { return socket.socket.remoteAddress; }
+    final Address remoteAddress() { return socket ? null : socket.socket.remoteAddress; }
     char[] toString() {
         return peername;
     }
@@ -263,6 +265,8 @@ public:
      * operations, such as uploading new assets.
      ***********************************************************************************/
     bool isTrusted() {
+        if (closed)
+            return false;
         return socket.socket.remoteAddress.addressFamily == AddressFamily.UNIX;
     }
 
@@ -346,6 +350,8 @@ package:
      * Send any kind of message, just serialize and push
      ***********************************************************************************/
     synchronized void sendMessage(message.Message m) {
+        if (closed)
+            throw new IOException("Connection closed");
         msgbuf.reset();
         m.encode(msgbuf);
         encode_val!(uint)(msgbuf.length, msgbuf);
