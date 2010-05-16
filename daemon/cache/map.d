@@ -149,9 +149,9 @@ public:
             segments[i] |= onew;
         } else {
             // Insert, need to ensure we have space, and shift trailing segments up a position
-            if (++_segcount > segments.length)
+            if ((++_segcount) > segments.length)
                 ensureIdxAvail(segments.length*2);
-            for (auto j=_segcount;j>i;j--)
+            for (auto j=_segcount-1;j>i;j--)
                 segments[j] = segments[j-1];
             segments[i] = onew;
         }
@@ -246,6 +246,11 @@ public:
         assert(map.has(35,5) == true);
         assert(map.has(45,5) == true);
         assert(map.has(46,5) == false);
+
+        // Now test inserting many segments, to verify it expands correctly
+        map.add(1000, 5);
+        for (int i=0; i < 20; i++)
+            map.add(10*i, 5);
     }
 }
 
