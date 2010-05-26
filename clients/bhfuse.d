@@ -18,6 +18,7 @@ module clients.fuse;
 
 private import tango.core.Exception;
 private import tango.core.Thread;
+private import tango.io.FilePath;
 private import tango.io.selector.Selector;
 private import tango.io.Stdout;
 private import tango.net.device.Berkeley : Address;
@@ -442,6 +443,8 @@ int main(char[][] args)
 
     Log.root.add(new AppendConsole(new LayoutDate));
 
+    auto mountdir = FilePath(arguments.mountpoint).absolute("/");
+    mountdir.create();
     auto cmountpoint = arguments.mountpoint~'\0';
     auto cbinname = args[0] ~ '\0';
     auto argv = new char*[0];
@@ -451,6 +454,7 @@ int main(char[][] args)
     argv ~= cmountpoint.ptr;
     char* parsedmountpoint;
     int multithreaded;
+
     auto fusehandle = fuse_setup(argv.length, argv.ptr, &bh_oper, bh_oper.sizeof, &parsedmountpoint, &multithreaded, null);
     scope (exit) fuse_teardown(fusehandle, parsedmountpoint);
     if (fusehandle)
