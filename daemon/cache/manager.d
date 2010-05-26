@@ -78,13 +78,13 @@ public:
     }
 
     /************************************************************************************
-     * Tries to find localId for specified hashIds. First match applies.
+     * Tries to find assetMetaData for specified hashIds. First match applies.
      ***********************************************************************************/
-    ubyte[] findLocalId(message.Identifier[] hashIds) {
+    AssetMetaData findLocalAsset(message.Identifier[] hashIds) {
         foreach (id; hashIds) {
             if ((id.type in hashIdMap) && (id.id in hashIdMap[id.type])) {
                 auto assetMeta = hashIdMap[id.type][id.id];
-                return assetMeta.localId;
+                return assetMeta;
             }
         }
         return null;
@@ -152,11 +152,20 @@ public:
      ***********************************************************************************/
     private void _forwardedCallback(OpenRequest req, IServerAsset asset, message.Status status) {
         if (status == message.Status.SUCCESS) {
-            auto localId = findLocalId(asset.hashIds);
-            if (!localId && !_makeRoom(asset.size))
+            auto localAsset = findLocalAsset(asset.hashIds);
+            if (!localAsset && !_makeRoom(asset.size))
                 req.callback(null, message.Status.NORESOURCES);
-            else
-                req.callback(new CachingAsset(assetDir, req.ids, localId, asset, &_assetLifeCycleListener), status);
+            else {
+                auto localId = localAsset ? localAsset.localId : null;
+                try {
+                    req.callback(new CachingAsset(assetDir, req.ids, localId, asset, &_assetLifeCycleListener), status);
+                } catch (IOException e) {
+                    log.error("While opening asset: {}", e);
+                    if (localAsset)
+                        purgeAsset(localAsset);
+                    req.callback(null, message.Status.ERROR);
+                }
+            }
         } else {
             req.callback(null, status);
         }
@@ -189,11 +198,14 @@ public:
             log.trace("serving {} from cache", hex.encode(asset.id));
             req.callback(asset, message.Status.SUCCESS);
         }
-        void openAsset(ubyte[] localId) {
+        void openAsset(AssetMetaData localAsset)
+        in { assert(localAsset); }
+        body {
             try {
-                fromCache(new CachedAsset(assetDir, localId, &_assetLifeCycleListener));
+                fromCache(new CachedAsset(assetDir, localAsset.localId, &_assetLifeCycleListener));
             } catch (IOException e) {
                 log.error("While opening asset: {}", e);
+                purgeAsset(localAsset);
             }
         }
         void forwardRequest() {
@@ -202,8 +214,9 @@ public:
         }
 
         log.trace("Looking up hashIds");
-        auto localId = findLocalId(req.ids);
-        if (!localId) {
+        auto localAsset = findLocalAsset(req.ids);
+        auto localId = localAsset ? localAsset.localId : null;
+        if (!localAsset) {
             log.trace("Unknown asset, forwarding {}", req);
             forwardRequest();
         } else if (localId in openAssets) {
@@ -214,7 +227,7 @@ public:
             forwardRequest();
         } else {
             log.trace("Trying to open asset");
-            openAsset(localId);
+            openAsset(localAsset);
         }
     }
 
