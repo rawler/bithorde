@@ -17,6 +17,7 @@ enum Status {
   DISCONNECTED = 5;
   TIMEOUT = 6;
   NORESOURCES = 7;
+  ERROR = 8;
 }
 
 message Identifier {
