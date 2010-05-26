@@ -228,7 +228,7 @@ extern (D) {
                     case Status.NOTFOUND:
                         break;
                     default:
-                        Stderr.format("Got unknown status from BitHorde.open: {}", status).newline;
+                        Stderr.format("Got unknown status from BitHorde.open: {}", statusToString(status)).newline;
                     }
                     gotResponse = true;
                 });
