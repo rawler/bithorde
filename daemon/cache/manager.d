@@ -119,13 +119,21 @@ public:
         AssetMetaData pickLoser() {
             AssetMetaData loser;
             Time loserMtime = Time.max;
+            scope AssetMetaData[] toPurge;
             foreach (asset; this.localIdMap) {
                 auto path = assetPath(asset.localId);
-                auto mtime = path.modified;
-                if (mtime < loserMtime) {
-                    loser = asset;
-                    loserMtime = mtime;
+                try {
+                    auto mtime = path.modified;
+                    if (mtime < loserMtime) {
+                        loser = asset;
+                        loserMtime = mtime;
+                    }
+                } catch (IOException e) {
+                    toPurge ~= asset;
                 }
+            }
+            foreach (staleAsset; toPurge) {
+                purgeAsset(staleAsset);
             }
             return loser;
         }
