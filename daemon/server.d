@@ -18,6 +18,7 @@ module daemon.server;
 
 private import tango.core.Exception;
 private import tango.core.Thread;
+private import tango.core.tools.TraceExceptions;
 private import tango.io.FilePath;
 private import tango.io.selector.Selector;
 private import tango.net.device.Berkeley;
