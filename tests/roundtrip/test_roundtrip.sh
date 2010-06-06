@@ -20,7 +20,7 @@ SERVER="$BINDIR/bithorded"
 BHUPLOAD="$BINDIR/bhupload"
 BHGET="$BINDIR/bhget"
 TESTFILE=testfile
-TESTSIZE=16
+TESTSIZE=4
 
 function clean() {
     rm -rf cache? *.log "$TESTFILE"{,.new}
