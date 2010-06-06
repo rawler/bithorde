@@ -37,6 +37,10 @@ private import daemon.client;
 private import daemon.config;
 private import daemon.routing.router;
 
+class MetaData : daemon.cache.metadata.AssetMetaData {
+    BaseAsset openAsset;
+}
+
 /****************************************************************************************
  * Overseeing Cache-manager, keeping state of all cache-assets, and mapping from id:s to
  * Assets.
@@ -45,13 +49,12 @@ private import daemon.routing.router;
  ***************************************************************************************/
 class CacheManager : IAssetSource {
 protected:
-    AssetMetaData hashIdMap[message.HashType][ubyte[]];
+    MetaData hashIdMap[message.HashType][ubyte[]];
     FilePath idMapPath;
     FilePath assetDir;
     ulong maxSize;            /// Maximum allowed storage-capacity of this cache, in MB. 0=unlimited
     Router router;
-    AssetMetaData localIdMap[ubyte[]];
-    BaseAsset[ubyte[]] openAssets;
+    MetaData localIdMap[ubyte[]];
 
     static Logger log;
     static this() {
@@ -83,7 +86,7 @@ public:
     /************************************************************************************
      * Tries to find assetMetaData for specified hashIds. First match applies.
      ***********************************************************************************/
-    AssetMetaData findLocalAsset(message.Identifier[] hashIds) {
+    MetaData findLocalAsset(message.Identifier[] hashIds) {
         foreach (id; hashIds) {
             if ((id.type in hashIdMap) && (id.id in hashIdMap[id.type])) {
                 auto assetMeta = hashIdMap[id.type][id.id];
@@ -126,10 +129,10 @@ public:
      * returns false.
      ***********************************************************************************/
     private bool _makeRoom(ulong size) {
-        AssetMetaData pickLoser() {
-            AssetMetaData loser;
+        MetaData pickLoser() {
+            MetaData loser;
             Time loserMtime = Time.max;
-            scope AssetMetaData[] toPurge;
+            scope MetaData[] toPurge;
             foreach (asset; this.localIdMap) {
                 auto path = assetPath(asset.localId);
                 try {
@@ -176,7 +179,7 @@ public:
             else {
                 bool foundAsset = localAsset !is null;
                 if (!localAsset) {
-                    localAsset = new AssetMetaData();
+                    localAsset = new MetaData();
                     localAsset.localId = new ubyte[LOCALID_LENGTH];
                     localAsset.hashIds = asset.hashIds;
                     rand.randomizeUniform!(ubyte[],false)(localAsset.localId);
@@ -184,7 +187,9 @@ public:
                 try {
                     auto path = assetPath(localAsset.localId);
                     assert(cast(bool)path.exists == foundAsset);
-                    req.callback(new CachingAsset(path, localAsset, asset, &_assetLifeCycleListener), status);
+                    auto cachingAsset = new CachingAsset(path, localAsset, asset, &_assetLifeCycleListener);
+                    localAsset.openAsset = cachingAsset;
+                    req.callback(cachingAsset, status);
                 } catch (IOException e) {
                     log.error("While opening asset: {}", e);
                     if (localAsset)
@@ -201,7 +206,7 @@ public:
      * Remove an asset from cache.
      * TODO: Fail if asset is being locked by someone using it.
      ***********************************************************************************/
-    bool purgeAsset(AssetMetaData asset) {
+    bool purgeAsset(MetaData asset) {
         log.info("Purging {}", formatMagnet(asset.hashIds, 0, null));
         if (asset.localId in localIdMap)
             localIdMap.remove(asset.localId);
@@ -220,19 +225,21 @@ public:
      * Implements IAssetSource.findAsset. Tries to get a hold of a certain asset.
      ***********************************************************************************/
     void findAsset(OpenRequest req) {
-        void fromCache(AssetMetaData meta, BaseAsset asset) {
+        void fromCache(MetaData meta, BaseAsset asset) {
             log.trace("serving {} from cache", hex.encode(meta.localId));
+            meta.openAsset = asset;
             req.callback(asset, message.Status.SUCCESS);
         }
-        void openAsset(AssetMetaData localAsset)
-        in { assert(localAsset); }
+        void openAsset(MetaData meta)
+        in { assert(meta); }
         body {
             try {
-                auto path = assetPath(localAsset.localId);
-                fromCache(localAsset, new BaseAsset(path, localAsset, &_assetLifeCycleListener));
+                auto path = assetPath(meta.localId);
+                auto openAsset = new BaseAsset(path, meta, &_assetLifeCycleListener);
+                fromCache(meta, openAsset);
             } catch (IOException e) {
                 log.error("While opening asset: {}", e);
-                purgeAsset(localAsset);
+                purgeAsset(meta);
                 req.callback(null, message.Status.ERROR);
             }
         }
@@ -244,12 +251,13 @@ public:
         log.trace("Looking up hashIds");
         auto localAsset = findLocalAsset(req.ids);
         auto localId = localAsset ? localAsset.localId : null;
+        
         if (!localAsset) {
             log.trace("Unknown asset, forwarding {}", req);
             forwardRequest();
-        } else if (localId in openAssets) {
-            log.trace("Found asset in openAssets");
-            fromCache(localAsset, openAssets[localId]);
+        } else if (localAsset.openAsset) {
+            log.trace("Asset already open");
+            fromCache(localAsset, localAsset.openAsset);
         } else if (idxPath(localId).exists) {
             log.trace("Incomplete asset, forwarding {}", req);
             forwardRequest();
@@ -265,7 +273,7 @@ public:
     void uploadAsset(UploadRequest req) {
         try {
             if (_makeRoom(req.size)) {
-                AssetMetaData meta = new AssetMetaData;
+                MetaData meta = new MetaData;
                 auto localId = meta.localId = new ubyte[LOCALID_LENGTH];
                 rand.randomizeUniform!(ubyte[],false)(localId);
                 auto path = assetPath(localId);
@@ -287,14 +295,8 @@ private:
      ***********************************************************************************/
     void _assetLifeCycleListener(BaseAsset asset, AssetState state) {
         switch (state) {
-        case AssetState.ALIVE:
-            openAssets[asset.metadata.localId] = asset;
-            break;
         case AssetState.GOTIDS:
-            addToIdMap(asset.metadata);
-            break;
-        case AssetState.DEAD:
-            openAssets.remove(asset.metadata.localId);
+            addToIdMap(cast(MetaData)asset.metadata);
             break;
         }
     }
@@ -304,7 +306,7 @@ private:
      * and localIds.
      ************************************************************************/
     class IdMap { // TODO: Re-work protobuf-lib so it isn't needed
-        AssetMetaData[] assets;
+        MetaData[] assets;
         mixin MessageMixin!(PBField!("assets",    1)());
     }
 
@@ -364,7 +366,7 @@ private:
     /*************************************************************************
      * Add an asset to the id-maps
      ************************************************************************/
-    void addToIdMap(AssetMetaData asset) {
+    void addToIdMap(MetaData asset) {
         localIdMap[asset.localId] = asset;
         foreach (id; asset.hashIds) {
             hashIdMap[id.type][id.id] = asset;

@@ -58,7 +58,7 @@ class MissingSegmentException : Exception {
     this(char[] msg) { super(msg); }
 }
 
-enum AssetState { ALIVE, GOTIDS, DEAD }
+enum AssetState { GOTIDS }
 alias void delegate(BaseAsset, AssetState) AssetLifeCycleListener;
 
 /****************************************************************************************
@@ -84,7 +84,6 @@ public:
         this.idxPath = path.dup.suffix(".idx");
         this.notify = listener;
         this._metadata = metadata;
-        notify(this, AssetState.ALIVE);
         log = Log.lookup("daemon.cache.baseasset."~path.name[0..8]);
 
         assert(!idxPath.exists);
@@ -96,7 +95,6 @@ public:
      * awaiting garbage collection.
      ***********************************************************************************/
     void close() {
-        notify(this, AssetState.DEAD);
         super.close();
     }
 
