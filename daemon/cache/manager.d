@@ -22,6 +22,7 @@ private import tango.core.WeakRef;
 private import tango.io.device.File;
 private import tango.io.FilePath;
 private import tango.math.random.Random;
+version (Posix) import tango.stdc.posix.sys.stat;
 private import tango.text.Ascii;
 private import tango.text.Util;
 private import tango.time.Time;
@@ -98,7 +99,14 @@ public:
     ulong size() {
         ulong retval;
         foreach (fileInfo; assetDir) {
-            retval += fileInfo.bytes;
+            version (Posix) {
+                stat_t s;
+                assert(stat((fileInfo.path~'\0').ptr, &s) == 0);
+                version (linux) retval += s.st_blocks * 512;
+                else static assert(0, "Needs to port block-size for non-Linux POSIX.");
+            } else {
+                retval += fileInfo.bytes;
+            }
         }
         return retval;
     }
