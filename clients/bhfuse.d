@@ -165,6 +165,14 @@ extern (D) {
         }
     }
 
+    class BitHordeException : Exception {
+        Status status;
+        this(Status status) {
+            this.status = status;
+            super(statusToString(status));
+        }
+    }
+
     class BHFuseClient : SimpleClient {
         private Address _remoteAddr;
         AssetMap assetMap;
@@ -222,14 +230,11 @@ extern (D) {
             for (auto retries = 2; retries > 0; retries--) try {
                 bool gotResponse = false;
                 open(objectids, delegate void(IAsset asset, Status status, OpenOrUploadRequest req, OpenResponse resp) {
-                    switch (status) {
-                    case Status.SUCCESS:
+                    if (status == Status.SUCCESS) {
                         retval = cast(RemoteAsset)asset;
-                        break;
-                    case Status.NOTFOUND:
-                        break;
-                    default:
-                        Stderr.format("Got unknown status from BitHorde.open: {}", statusToString(status)).newline;
+                    } else {
+                        Stderr.format("Got non-success status from BitHorde.open: {}", statusToString(status)).newline;
+                        throw new BitHordeException(status);
                     }
                     gotResponse = true;
                 });
@@ -256,7 +261,6 @@ extern (D) {
  ***************************************************************************************/
 static int bh_getattr(char *path, stat_t *stbuf)
 {
-    int res = 0;
     char[] dpath = path[0..strlen(path)];
 
     memset(stbuf, 0, stat_t.sizeof);
@@ -274,16 +278,23 @@ static int bh_getattr(char *path, stat_t *stbuf)
             stbuf.st_nlink = 1;
             stbuf.st_size = asset.size;
             asset.close();
+            return 0; // Success
         } else {
-            res = -ENOENT;
+            return -ENOENT;
+        }
+    } catch (BitHordeException e) {
+        switch (e.status) {
+            case Status.NORESOURCES:
+                return -ENOMEM;
+                break;
+            default:
+                return -ENOENT;
         }
     } catch (IllegalArgumentException) {
-        res = -ENOENT;
+        return -ENOENT;
     } catch (BHFuseClient.DisconnectedException) {
         return -ENOTCONN;
     }
-
-    return res;
 }
 
 /****************************************************************************************
@@ -308,6 +319,14 @@ static int bh_open(char *path, fuse_file_info *fi)
             return 0;
         } else {
             return -ENOENT;
+        }
+    } catch (BitHordeException e) {
+        switch (e.status) {
+            case Status.NORESOURCES:
+                return -ENOMEM;
+                break;
+            default:
+                return -ENOENT;
         }
     } catch (IllegalArgumentException) {
         return -ENOENT;
