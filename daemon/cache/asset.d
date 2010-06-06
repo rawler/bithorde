@@ -22,7 +22,7 @@ private import tango.core.Exception;
 private import tango.core.Thread;
 private import tango.io.device.File;
 private import tango.io.FilePath;
-private import tango.math.random.Random;
+version (Posix) private import tango.stdc.posix.unistd;
 private import ascii = tango.text.Ascii;
 private import tango.util.log.Log;
 
@@ -59,41 +59,36 @@ class MissingSegmentException : Exception {
 }
 
 enum AssetState { ALIVE, GOTIDS, DEAD }
-alias void delegate(CachedAsset, AssetState) AssetLifeCycleListener;
+alias void delegate(BaseAsset, AssetState) AssetLifeCycleListener;
 
 /****************************************************************************************
  * Base for all kinds of cached assets. Provides basic reading functionality
  ***************************************************************************************/
-class CachedAsset : IServerAsset {
+class BaseAsset : private File, public IServerAsset {
 protected:
     FilePath path;
     FilePath idxPath;
-    ubyte[] _id;
-    File file;
     Logger log;
     AssetMetaData _metadata;
     AssetLifeCycleListener notify;
 public:
     /************************************************************************************
      * IncompleteAssetException is thrown if a not-fully-cached asset were to be Opened
-     * directly as a CachedAsset
+     * directly as a BaseAsset
      ***********************************************************************************/
-    this(FilePath assetDir, ubyte[] id, AssetLifeCycleListener listener) {
-        this._id = id.dup;
-        this.path = assetDir.dup.append(ascii.toLower(hex.encode(id)));
+    this(FilePath path, AssetMetaData metadata, AssetLifeCycleListener listener) {
+        this(path, metadata, File.ReadExisting, listener);
+    }
+    protected this(FilePath path, AssetMetaData metadata, File.Style style, AssetLifeCycleListener listener) {
+        this.path = path;
         this.idxPath = path.dup.suffix(".idx");
         this.notify = listener;
+        this._metadata = metadata;
         notify(this, AssetState.ALIVE);
-        log = Log.lookup("daemon.cache.cachedasset."~hex.encode(id[0..4]));
-        open();
-    }
+        log = Log.lookup("daemon.cache.baseasset."~path.name[0..8]);
 
-    /************************************************************************************
-     * Open actual underlying file
-     ***********************************************************************************/
-    protected void open() {
         assert(!idxPath.exists);
-        file = new File(path.toString, File.ReadExisting);
+        super(path.toString, style);
     }
 
     /************************************************************************************
@@ -102,10 +97,7 @@ public:
      ***********************************************************************************/
     void close() {
         notify(this, AssetState.DEAD);
-        if (file) {
-            file.close();
-            file = null;
-        }
+        super.close();
     }
 
     /************************************************************************************
@@ -121,12 +113,15 @@ public:
      * Read a single segment from the Asset
      ***********************************************************************************/
     synchronized void aSyncRead(ulong offset, uint length, BHReadCallback cb) {
-        assert(file);
         ubyte[] buf = tlsBuffer(length);
-        file.seek(offset);
-        int got = file.read(buf);
+        version (Posix) { // Posix has pread() for atomic seek+read
+            auto got = pread(fileHandle, buf.ptr, length, offset);
+        } else {
+            seek(offset);
+            auto got = read(buf);
+        }
         auto resp = new lib.message.ReadResponse;
-        if (got == file.Eof) {
+        if (got == Eof) {
             resp.status = message.Status.NOTFOUND;
         } else {
             resp.status = message.Status.SUCCESS;
@@ -137,7 +132,7 @@ public:
     }
 
     /************************************************************************************
-     * Adding segments is not supported for CachedAsset
+     * Adding segments is not supported for BaseAsset
      ***********************************************************************************/
     void add(ulong offset, ubyte[] data) {
         throw new IOException("Trying to write to a completed file");
@@ -147,40 +142,38 @@ public:
      * Find the size of the asset.
      ***********************************************************************************/
     final ulong size() {
-        assert(file);
-        return file.length;
+        return length;
     }
 
     AssetMetaData metadata() {
         return _metadata;
     }
-    final ubyte[] id() { return _id; }
 }
 
 /****************************************************************************************
  * WriteableAsset implements uploading to Assets, and forms a base for CachingAsset
  ***************************************************************************************/
-class WriteableAsset : CachedAsset {
+class WriteableAsset : BaseAsset {
 protected:
     CacheMap cacheMap;
     Digest[HashType] hashes;
     uint hashingptr;
 public:
     /************************************************************************************
-     * Create WriteableAsset, id will be auto-random-generated if not specified.
+     * Create WriteableAsset by path and size
      ***********************************************************************************/
-    this(FilePath assetDir, ulong size, AssetLifeCycleListener _listener) {
-        auto id = new ubyte[LOCALID_LENGTH];
-        rand.randomizeUniform!(ubyte[],false)(id);
-        this(assetDir, id, _listener); // Super-class opens underlying file
-        file.truncate(size);           // We resize it to right size
-
+    this(FilePath path, AssetMetaData metadata, ulong size, AssetLifeCycleListener _listener) {
+//         auto id = new ubyte[LOCALID_LENGTH];
+//         rand.randomizeUniform!(ubyte[],false)(id);
+        this(path, metadata, File.Style(File.Access.ReadWrite, File.Open.Sedate), _listener); // Super-class opens underlying file
+        truncate(size);           // We resize it to right size
     }
-    this(FilePath assetDir, ubyte[] id, AssetLifeCycleListener _listener) { /// ditto
+    protected this(FilePath path, AssetMetaData metadata, File.Style style, AssetLifeCycleListener _listener) { /// ditto
         foreach (k,hash; HashMap)
             hashes[hash.pbType] = hash.factory();
-        super(assetDir, id, _listener);
-        log = Log.lookup("daemon.cache.writeasset."~hex.encode(id[0..4]));
+        super(path, metadata, style, _listener);
+        cacheMap = new CacheMap(idxPath);
+        log = Log.lookup("daemon.cache.writeasset."~path.name[0..8]);
     }
 
     synchronized void aSyncRead(ulong offset, uint length, BHReadCallback cb) {
@@ -196,20 +189,16 @@ public:
     synchronized void add(ulong offset, ubyte[] data) {
         if (!cacheMap)
             throw new IOException("Trying to write to a completed file");
-        file.seek(offset);
-        file.write(data);
+        version (Posix) { // Posix has pwrite() for atomic write+seek
+            auto written = pwrite(fileHandle, data.ptr, data.length, offset);
+        } else {
+            seek(offset);
+            auto written = write(data);
+        }
         cacheMap.add(offset, data.length);
         updateHashes();
     }
 protected:
-    /************************************************************************************
-     * Open existing for read/write
-     ***********************************************************************************/
-    void open() {
-        cacheMap = new CacheMap(idxPath);
-        file = new File(path.toString, File.Style(File.Access.ReadWrite, File.Open.Sedate));
-    }
-
     /************************************************************************************
      * Check if more data is available for hashing
      ***********************************************************************************/
@@ -217,13 +206,13 @@ protected:
         auto zeroBlockSize = cacheMap.zeroBlockSize;
         if (zeroBlockSize > hashingptr) {
             scope auto newdata = new ubyte[zeroBlockSize - hashingptr];
-            file.seek(hashingptr);
-            auto read = file.read(newdata);
+            seek(hashingptr);
+            auto read = read(newdata);
             assert(read == newdata.length);
             foreach (hash; hashes) {
                 hash.update(newdata);
             }
-            if (zeroBlockSize == file.length)
+            if (zeroBlockSize == length)
                 finish();
             else
                 hashingptr = zeroBlockSize;
@@ -235,10 +224,8 @@ protected:
      ***********************************************************************************/
     void finish() {
         assert(cacheMap.segcount == 1);
-        assert(cacheMap.assetSize == file.length);
+        assert(cacheMap.assetSize == length);
         log.trace("Asset complete");
-        _metadata = new AssetMetaData;
-        _metadata.localId = _id.dup;
 
         foreach (type, hash; hashes) {
             auto digest = hash.binaryDigest;
@@ -263,19 +250,12 @@ class CachingAsset : WriteableAsset {
     IServerAsset remoteAsset;
     message.Identifier[] reqHashIds;
 public:
-    this (FilePath assetDir, message.Identifier[] reqHashIds, ubyte[] localId, IServerAsset remoteAsset, AssetLifeCycleListener _listener) {
+    this (FilePath path, AssetMetaData metadata, IServerAsset remoteAsset, AssetLifeCycleListener _listener) {
         this.reqHashIds = reqHashIds;
         this.remoteAsset = remoteAsset;
-        if (localId)
-            super(assetDir, localId, _listener);
-        else
-            super(assetDir, remoteAsset.size, _listener);
-        log = Log.lookup("daemon.cache.cachingasset."~hex.encode(id[0..4]));
-
+        super(path, metadata, remoteAsset.size, _listener); // TODO: Verify remoteAsset.size against local file
+        log = Log.lookup("daemon.cache.cachingasset." ~ path.name[0..8]);
         log.trace("Caching remoteAsset of size {}", size);
-        _metadata = new AssetMetaData;
-        _metadata.localId = id;
-        _metadata.hashIds = reqHashIds;
         notify(this, AssetState.GOTIDS);
     }
 

@@ -18,8 +18,10 @@
 module daemon.cache.manager;
 
 private import tango.core.Exception;
+private import tango.core.WeakRef;
 private import tango.io.device.File;
 private import tango.io.FilePath;
+private import tango.math.random.Random;
 private import tango.text.Ascii;
 private import tango.text.Util;
 private import tango.time.Time;
@@ -48,7 +50,7 @@ protected:
     ulong maxSize;            /// Maximum allowed storage-capacity of this cache, in MB. 0=unlimited
     Router router;
     AssetMetaData localIdMap[ubyte[]];
-    CachedAsset[ubyte[]] openAssets;
+    BaseAsset[ubyte[]] openAssets;
 
     static Logger log;
     static this() {
@@ -164,9 +166,17 @@ public:
             if (!localAsset && !_makeRoom(asset.size))
                 req.callback(null, message.Status.NORESOURCES);
             else {
-                auto localId = localAsset ? localAsset.localId : null;
+                bool foundAsset = localAsset !is null;
+                if (!localAsset) {
+                    localAsset = new AssetMetaData();
+                    localAsset.localId = new ubyte[LOCALID_LENGTH];
+                    localAsset.hashIds = asset.hashIds;
+                    rand.randomizeUniform!(ubyte[],false)(localAsset.localId);
+                }
                 try {
-                    req.callback(new CachingAsset(assetDir, req.ids, localId, asset, &_assetLifeCycleListener), status);
+                    auto path = assetPath(localAsset.localId);
+                    assert(cast(bool)path.exists == foundAsset);
+                    req.callback(new CachingAsset(path, localAsset, asset, &_assetLifeCycleListener), status);
                 } catch (IOException e) {
                     log.error("While opening asset: {}", e);
                     if (localAsset)
@@ -202,18 +212,20 @@ public:
      * Implements IAssetSource.findAsset. Tries to get a hold of a certain asset.
      ***********************************************************************************/
     void findAsset(OpenRequest req) {
-        void fromCache(CachedAsset asset) {
-            log.trace("serving {} from cache", hex.encode(asset.id));
+        void fromCache(AssetMetaData meta, BaseAsset asset) {
+            log.trace("serving {} from cache", hex.encode(meta.localId));
             req.callback(asset, message.Status.SUCCESS);
         }
         void openAsset(AssetMetaData localAsset)
         in { assert(localAsset); }
         body {
             try {
-                fromCache(new CachedAsset(assetDir, localAsset.localId, &_assetLifeCycleListener));
+                auto path = assetPath(localAsset.localId);
+                fromCache(localAsset, new BaseAsset(path, localAsset, &_assetLifeCycleListener));
             } catch (IOException e) {
                 log.error("While opening asset: {}", e);
                 purgeAsset(localAsset);
+                req.callback(null, message.Status.ERROR);
             }
         }
         void forwardRequest() {
@@ -229,7 +241,7 @@ public:
             forwardRequest();
         } else if (localId in openAssets) {
             log.trace("Found asset in openAssets");
-            fromCache(openAssets[localId]);
+            fromCache(localAsset, openAssets[localId]);
         } else if (idxPath(localId).exists) {
             log.trace("Incomplete asset, forwarding {}", req);
             forwardRequest();
@@ -245,7 +257,12 @@ public:
     void uploadAsset(UploadRequest req) {
         try {
             if (_makeRoom(req.size)) {
-                auto asset = new WriteableAsset(assetDir, req.size, &_assetLifeCycleListener);
+                AssetMetaData meta = new AssetMetaData;
+                auto localId = meta.localId = new ubyte[LOCALID_LENGTH];
+                rand.randomizeUniform!(ubyte[],false)(localId);
+                auto path = assetPath(localId);
+                assert(!path.exists());
+                auto asset = new WriteableAsset(path, meta, req.size, &_assetLifeCycleListener);
                 req.callback(asset, message.Status.SUCCESS);
             } else {
                 req.callback(null, message.Status.NORESOURCES);
@@ -260,16 +277,16 @@ private:
     /************************************************************************************
      * Listen to managed assets, and update appropriate indexes
      ***********************************************************************************/
-    void _assetLifeCycleListener(CachedAsset asset, AssetState state) {
+    void _assetLifeCycleListener(BaseAsset asset, AssetState state) {
         switch (state) {
         case AssetState.ALIVE:
-            openAssets[asset.id] = asset;
+            openAssets[asset.metadata.localId] = asset;
             break;
         case AssetState.GOTIDS:
             addToIdMap(asset.metadata);
             break;
         case AssetState.DEAD:
-            openAssets.remove(asset.id);
+            openAssets.remove(asset.metadata.localId);
             break;
         }
     }

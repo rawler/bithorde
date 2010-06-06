@@ -39,7 +39,7 @@ import lib.protobuf;
 alias void delegate(OpenRequest req, IServerAsset, message.Status status) BHServerOpenCallback;
 
 /****************************************************************************************
- * Interface for the various forms of server-assets. (CachedAsset, CachingAsset,
+ * Interface for the various forms of server-assets. (BaseAsset, CachingAsset,
  * ForwardedAsset...)
  ***************************************************************************************/
 interface IServerAsset : IAsset {
@@ -209,7 +209,7 @@ protected:
         scope auto req = new message.DataSegment();
         req.decode(buf);
         try {
-            auto asset = cast(CachedAsset)openAssets[req.handle];
+            auto asset = cast(BaseAsset)openAssets[req.handle];
             asset.add(req.offset, req.content);
         } catch (ArrayBoundsException e) {
             log.error("DataSegment to invalid handle");
@@ -226,7 +226,7 @@ protected:
         scope auto resp = new message.MetaDataResponse;
         resp.rpcId = req.rpcId;
         try {
-            auto asset = cast(CachedAsset)openAssets[req.handle];
+            auto asset = cast(BaseAsset)openAssets[req.handle];
             if (asset && asset.metadata) {
                 resp.status = message.Status.SUCCESS;
                 resp.ids = asset.metadata.hashIds;
