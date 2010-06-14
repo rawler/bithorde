@@ -78,6 +78,7 @@ public:
      ***********************************************************************************/
     this(FilePath path, AssetMetaData metadata, AssetLifeCycleListener listener) {
         this(path, metadata, File.ReadExisting, listener);
+        assert(!idxPath.exists);
     }
     protected this(FilePath path, AssetMetaData metadata, File.Style style, AssetLifeCycleListener listener) {
         this.path = path;
@@ -86,7 +87,6 @@ public:
         this._metadata = metadata;
         log = Log.lookup("daemon.cache.baseasset."~path.name[0..8]);
 
-        assert(!idxPath.exists);
         super(path.toString, style);
     }
 

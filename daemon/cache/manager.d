@@ -37,8 +37,20 @@ private import daemon.client;
 private import daemon.config;
 private import daemon.routing.router;
 
+alias WeakReference!(File) AssetRef;
+
 class MetaData : daemon.cache.metadata.AssetMetaData {
-    BaseAsset openAsset;
+    private AssetRef _openAsset;
+    this() {
+        _openAsset = new AssetRef(null);
+    }
+    BaseAsset setAsset(BaseAsset asset) {
+        _openAsset.set(asset);
+        return asset;
+    }
+    BaseAsset getAsset() {
+        return cast(BaseAsset)_openAsset();
+    }
 }
 
 /****************************************************************************************
@@ -188,7 +200,7 @@ public:
                     auto path = assetPath(localAsset.localId);
                     assert(cast(bool)path.exists == foundAsset);
                     auto cachingAsset = new CachingAsset(path, localAsset, asset, &_assetLifeCycleListener);
-                    localAsset.openAsset = cachingAsset;
+                    localAsset.setAsset(cachingAsset);
                     req.callback(cachingAsset, status);
                 } catch (IOException e) {
                     log.error("While opening asset: {}", e);
@@ -227,7 +239,7 @@ public:
     void findAsset(OpenRequest req) {
         void fromCache(MetaData meta, BaseAsset asset) {
             log.trace("serving {} from cache", hex.encode(meta.localId));
-            meta.openAsset = asset;
+            meta.setAsset(asset);
             req.callback(asset, message.Status.SUCCESS);
         }
         void openAsset(MetaData meta)
@@ -255,9 +267,9 @@ public:
         if (!localAsset) {
             log.trace("Unknown asset, forwarding {}", req);
             forwardRequest();
-        } else if (localAsset.openAsset) {
+        } else if (localAsset.getAsset()) {
             log.trace("Asset already open");
-            fromCache(localAsset, localAsset.openAsset);
+            fromCache(localAsset, localAsset.getAsset());
         } else if (idxPath(localId).exists) {
             log.trace("Incomplete asset, forwarding {}", req);
             forwardRequest();
