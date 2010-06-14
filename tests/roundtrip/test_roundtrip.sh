@@ -64,9 +64,11 @@ function daemons_start() {
     trap daemons_stop EXIT
     "$SERVER" a.config &> a.log &
     DAEMON1=$!
+    echo Daemon A is $DAEMON1
     "$SERVER" b.config &> b.log &
     DAEMON2=$!
-    sleep 0.1
+    echo Daemon B is $DAEMON2
+    sleep 0.3
 }
 
 function quiet_stop() {
