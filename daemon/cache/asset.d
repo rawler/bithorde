@@ -203,12 +203,12 @@ protected:
     void updateHashes() {
         auto zeroBlockSize = cacheMap.zeroBlockSize;
         if (zeroBlockSize > hashingptr) {
-            scope auto newdata = new ubyte[zeroBlockSize - hashingptr];
-            seek(hashingptr);
-            auto read = read(newdata);
-            assert(read == newdata.length);
+            auto bufsize = zeroBlockSize - hashingptr;
+            auto buf = tlsBuffer(bufsize);
+            auto got = pread(fileHandle, buf.ptr, bufsize, hashingptr);
+            assert(got == bufsize);
             foreach (hash; hashes) {
-                hash.update(newdata);
+                hash.update(buf[0..bufsize]);
             }
             if (zeroBlockSize == length)
                 finish();
