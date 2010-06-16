@@ -51,13 +51,6 @@ private static ubyte[] tlsBuffer(uint size) {
     return buf;
 }
 
-/****************************************************************************************
- * Assets throws this error when the requested segment is missing
- ***************************************************************************************/
-class MissingSegmentException : Exception {
-    this(char[] msg) { super(msg); }
-}
-
 enum AssetState { GOTIDS }
 alias void delegate(BaseAsset, AssetState) AssetLifeCycleListener;
 
@@ -161,8 +154,6 @@ public:
      * Create WriteableAsset by path and size
      ***********************************************************************************/
     this(FilePath path, AssetMetaData metadata, ulong size, AssetLifeCycleListener _listener) {
-//         auto id = new ubyte[LOCALID_LENGTH];
-//         rand.randomizeUniform!(ubyte[],false)(id);
         this(path, metadata, File.Style(File.Access.ReadWrite, File.Open.Sedate), _listener); // Super-class opens underlying file
         truncate(size);           // We resize it to right size
     }
@@ -175,10 +166,8 @@ public:
     }
 
     synchronized void aSyncRead(ulong offset, uint length, BHReadCallback cb) {
-        if (!cacheMap || cacheMap.has(offset, length))
-            super.aSyncRead(offset, length, cb);
-        else
-            throw new MissingSegmentException("Missing requested segment");
+        assert(!this.cacheMap || this.cacheMap.has(offset, length), "Checking cacheMap expected before aSyncRead");
+        super.aSyncRead(offset, length, cb);
     }
 
     /************************************************************************************
@@ -290,11 +279,10 @@ private:
         // TODO: Limit re-tries
 
         void tryRead() {
-            try {
+            if (!cacheMap || cacheMap.has(offset, length))
                 realRead(offset, length, cb);
-            } catch (MissingSegmentException e) {
+            else
                 remoteAsset.aSyncRead(offset, length, &callback);
-            }
         }
         void callback(IAsset asset, message.Status status, message.ReadRequest req, message.ReadResponse resp) {
             if (status == message.Status.SUCCESS) {
