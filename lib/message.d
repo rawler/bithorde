@@ -134,6 +134,12 @@ class Identifier : ProtoBufMessage {
     ubyte[] id;
     mixin MessageMixin!(PBField!("type", 1)(),
                         PBField!("id",   2)());
+    /************************************************************************************
+     * Return new deep-copied instance of the Identifier
+     ***********************************************************************************/
+    Identifier dup() {
+        return new Identifier(type, id.dup);
+    }
 }
 
 class HandShake : Message {

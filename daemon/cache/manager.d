@@ -193,7 +193,9 @@ public:
                 if (!localAsset) {
                     localAsset = new MetaData();
                     localAsset.localId = new ubyte[LOCALID_LENGTH];
-                    localAsset.hashIds = asset.hashIds;
+                    localAsset.hashIds = asset.hashIds.dup;
+                    foreach (ref v; localAsset.hashIds)
+                        v = v.dup;
                     rand.randomizeUniform!(ubyte[],false)(localAsset.localId);
                 }
                 try {
@@ -326,6 +328,7 @@ private:
      * Load id-mappings through IdMap
      ************************************************************************/
     void loadIdMap() {
+        log.info("Loading fresh Id-Maps");
         scope auto mapsrc = new IdMap();
         scope auto fileContent = cast(ubyte[])File.get(idMapPath.toString);
         mapsrc.decode(fileContent);
