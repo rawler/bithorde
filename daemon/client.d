@@ -135,6 +135,7 @@ public:
             resp.status = status;
             client.sendMessage(resp);
         }
+        delete this;
     }
     void abort(message.Status s) {
         callback(null, s, null, null);

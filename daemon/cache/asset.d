@@ -279,9 +279,10 @@ private:
         // TODO: Limit re-tries
 
         void tryRead() {
-            if (!cacheMap || cacheMap.has(offset, length))
+            if (!cacheMap || cacheMap.has(offset, length)) {
                 realRead(offset, length, cb);
-            else
+                delete this;
+            } else
                 remoteAsset.aSyncRead(offset, length, &callback);
         }
         void callback(IAsset asset, message.Status status, message.ReadRequest req, message.ReadResponse resp) {
@@ -295,6 +296,7 @@ private:
             } else {
                 // TODO: Report back error
             }
+            delete req;
         }
     }
 }

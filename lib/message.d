@@ -115,10 +115,6 @@ abstract class RPCRequest : RPCMessage {
 
 abstract class RPCResponse : RPCMessage {
     RPCRequest request;
-    ~this() {
-        if (request)
-            delete request;
-    }
 }
 
 private import lib.asset;
