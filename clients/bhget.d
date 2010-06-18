@@ -37,7 +37,7 @@ import lib.arguments;
 
 import clients.lib.progressbar;
 
-const uint CHUNK_SIZE = 4096;     /// How large chunks to fetch
+const uint CHUNK_SIZE = 16384;    /// How large chunks to fetch
 const uint PARALLEL_REQUESTS = 5; /// How many requests to keep running in parallell.
 
 /****************************************************************************************
