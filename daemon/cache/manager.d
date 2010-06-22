@@ -39,20 +39,6 @@ private import daemon.routing.router;
 
 alias WeakReference!(File) AssetRef;
 
-class MetaData : daemon.cache.metadata.AssetMetaData {
-    private AssetRef _openAsset;
-    this() {
-        _openAsset = new AssetRef(null);
-    }
-    BaseAsset setAsset(BaseAsset asset) {
-        _openAsset.set(asset);
-        return asset;
-    }
-    BaseAsset getAsset() {
-        return cast(BaseAsset)_openAsset();
-    }
-}
-
 /****************************************************************************************
  * Overseeing Cache-manager, keeping state of all cache-assets, and mapping from id:s to
  * Assets.
@@ -60,6 +46,26 @@ class MetaData : daemon.cache.metadata.AssetMetaData {
  * Copyright: Ulrik Mikaelsson, All rights reserved
  ***************************************************************************************/
 class CacheManager : IAssetSource {
+    class MetaData : daemon.cache.metadata.AssetMetaData {
+        private AssetRef _openAsset;
+        this() {
+            _openAsset = new AssetRef(null);
+        }
+        BaseAsset setAsset(BaseAsset asset) {
+            _openAsset.set(asset);
+            return asset;
+        }
+        BaseAsset getAsset() {
+            return cast(BaseAsset)_openAsset();
+        }
+        FilePath assetPath() {
+            return assetDir.dup.append(ascii.toLower(hex.encode(localId)));
+        }
+        FilePath idxPath() {
+            return assetPath.cat(".idx");
+        }
+    }
+
 protected:
     MetaData hashIdMap[message.HashType][ubyte[]];
     FilePath idMapPath;
@@ -126,16 +132,6 @@ public:
         return retval;
     }
 
-    private FilePath assetPath(ubyte[] localId) {
-        return assetDir.dup.append(ascii.toLower(hex.encode(localId)));
-    }
-    private FilePath idxPath(ubyte[] localId) {
-        return idxPath(assetPath(localId));
-    }
-    private FilePath idxPath(FilePath assetPath) {
-        return assetPath.cat(".idx");
-    }
-
     /************************************************************************************
      * Makes room in cache for new asset of given size. May fail, in which case it
      * returns false.
@@ -146,9 +142,8 @@ public:
             Time loserMtime = Time.max;
             scope MetaData[] toPurge;
             foreach (asset; this.localIdMap) {
-                auto path = assetPath(asset.localId);
                 try {
-                    auto mtime = path.modified;
+                    auto mtime = asset.assetPath.modified;
                     if (mtime < loserMtime) {
                         loser = asset;
                         loserMtime = mtime;
@@ -199,7 +194,7 @@ public:
                     rand.randomizeUniform!(ubyte[],false)(localAsset.localId);
                 }
                 try {
-                    auto path = assetPath(localAsset.localId);
+                    auto path = localAsset.assetPath;
                     assert(cast(bool)path.exists == foundAsset);
                     auto cachingAsset = new CachingAsset(path, localAsset, asset, &_assetLifeCycleListener);
                     localAsset.setAsset(cachingAsset);
@@ -228,9 +223,9 @@ public:
             if ((hashId.type in hashIdMap) && (hashId.id in hashIdMap[hashId.type]))
                 hashIdMap[hashId.type].remove(hashId.id);
         }
-        auto aPath = assetPath(asset.localId);
+        auto aPath = asset.assetPath;
         if (aPath.exists) aPath.remove();
-        auto iPath = idxPath(aPath);
+        auto iPath = asset.idxPath;
         if (iPath.exists) iPath.remove();
         return true;
     }
@@ -248,7 +243,7 @@ public:
         in { assert(meta); }
         body {
             try {
-                auto path = assetPath(meta.localId);
+                auto path = meta.assetPath;
                 auto openAsset = new BaseAsset(path, meta, &_assetLifeCycleListener);
                 fromCache(meta, openAsset);
             } catch (IOException e) {
@@ -264,15 +259,14 @@ public:
 
         log.trace("Looking up hashIds");
         auto localAsset = findLocalAsset(req.ids);
-        auto localId = localAsset ? localAsset.localId : null;
-        
+
         if (!localAsset) {
             log.trace("Unknown asset, forwarding {}", req);
             forwardRequest();
         } else if (localAsset.getAsset()) {
             log.trace("Asset already open");
             fromCache(localAsset, localAsset.getAsset());
-        } else if (idxPath(localId).exists) {
+        } else if (localAsset.idxPath.exists) {
             log.trace("Incomplete asset, forwarding {}", req);
             forwardRequest();
         } else {
@@ -290,7 +284,7 @@ public:
                 MetaData meta = new MetaData;
                 auto localId = meta.localId = new ubyte[LOCALID_LENGTH];
                 rand.randomizeUniform!(ubyte[],false)(localId);
-                auto path = assetPath(localId);
+                auto path = meta.assetPath;
                 assert(!path.exists());
                 auto asset = new WriteableAsset(path, meta, req.size, &_assetLifeCycleListener);
                 req.callback(asset, message.Status.SUCCESS);
