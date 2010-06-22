@@ -20,6 +20,7 @@
 module lib.protobuf;
 
 import tango.core.Exception;
+import tango.core.Traits;
 import tango.util.MinMax;
 
 /****************************************************************************************
@@ -162,16 +163,14 @@ public {
         member = decode_val!(T)(buf);
     }
     void read(T:ProtoBufMessage)(ref T member, ref ubyte[] buf) {
-        member = new T;
         auto msglen = decode_val!(uint)(buf);
         member.decode(buf[0..msglen]);
         buf = buf[msglen..length];
     }
-    void read(T:ProtoBufMessage)(ref T[] members, ref ubyte[] buf) {
-        auto t = new T;
+    void read(T:ProtoBufMessage)(ref T[] members, T allocated, ref ubyte[] buf) {
         auto msglen = decode_val!(uint)(buf);
-        t.decode(buf[0..msglen]);
-        members ~= t;
+        allocated.decode(buf[0..msglen]);
+        members ~= allocated;
         buf = buf[msglen..length];
     }
 }
@@ -211,7 +210,13 @@ template MessageMixin(fields...) {
             try switch (descriptor) {
                 foreach (int i, f; fields) {
                     case (fields[i].id<<3)|fields[i].wType:
-                        read(mixin("this."~fields[i].name), buf);
+                        auto field = mixin("this."~fields[i].name); // Note, read-only. Since mixin will evalutate to variable declaration, cannot be written to
+                        static if (is(typeof(field) : ProtoBufMessage))
+                            field = new typeof(field);
+                        static if (is(typeof(field[0]) : ProtoBufMessage))
+                            read(mixin("this."~fields[i].name), new typeof(field[0]), buf);
+                        else
+                            read(mixin("this."~fields[i].name), buf);
                         break;
                 }
             } catch (tango.core.Exception.SwitchException e) {
