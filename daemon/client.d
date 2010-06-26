@@ -21,7 +21,6 @@ private import tango.core.Memory;
 private import tango.math.random.Random;
 private import tango.net.device.Socket;
 private import tango.time.Time;
-private import tango.util.container.more.Stack;
 private import tango.util.log.Log;
 
 import daemon.server;
@@ -69,9 +68,7 @@ class OpenRequest : message.OpenRequest {
             resp.status = status;
             if (status == message.Status.SUCCESS) {
                 // Allocate handle, and add to map
-                auto handle = client.allocateFreeHandle(this.handle);
                 client.openAssets[handle] = asset;
-                resp.handle = handle;
                 resp.size = asset.size;
             }
             client.sendMessage(resp);
@@ -105,9 +102,7 @@ class UploadRequest : message.UploadRequest {
             resp.status = status;
             if (status == message.Status.SUCCESS) {
                 // Allocate handle, and add to map
-                auto handle = client.allocateFreeHandle(this.handle);
                 client.openAssets[handle] = asset;
-                resp.handle = handle;
             }
             client.sendMessage(resp);
         }
@@ -147,8 +142,6 @@ private:
     Server server;
     CacheManager cacheMgr;
     IServerAsset[uint] openAssets;
-    Stack!(ushort, 64) freeFileHandles;
-    ushort nextNewHandle;
     Logger log;
 public:
     this (Server server, Socket s)
@@ -249,22 +242,9 @@ protected:
         try {
             IServerAsset asset = openAssets[req.handle];
             openAssets.remove(req.handle);
-            freeFileHandles.push(req.handle);
         } catch (ArrayBoundsException e) {
             log.error("tried to Close invalid handle");
             return;
         }
-    }
-private:
-    /************************************************************************************
-     * Allocates an unused file handle for the transaction.
-     * requestedHandle - Just a suggestion, may not end up being what's allocated
-     ***********************************************************************************/
-    ushort allocateFreeHandle(uint requestedHandle)
-    {
-        if (freeFileHandles.size > 0)
-            return freeFileHandles.pop();
-        else
-            return nextNewHandle++;
     }
 }

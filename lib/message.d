@@ -175,11 +175,9 @@ class UploadRequest : OpenOrUploadRequest {
 
 class OpenResponse : RPCResponse {
     Status status;     // Status of request
-    ushort handle;     // Assigned handle
     ulong size;        // Size of opened asset
     mixin MessageMixin!(PBField!("rpcId",     1)(),
                         PBField!("status",    2)(),
-                        PBField!("handle",    3)(),
                         PBField!("size",      4)());
 
     Type typeId() { return Type.OpenResponse; }

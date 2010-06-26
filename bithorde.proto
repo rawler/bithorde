@@ -47,7 +47,6 @@ message Open {
   message Response {
     required uint32 reqId = 1;
     required Status status = 2;
-    optional uint32 handle = 3;
     optional uint32 size = 4;
   }
 }

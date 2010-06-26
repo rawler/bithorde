@@ -21,6 +21,7 @@ private import tango.io.selector.Selector;
 private import tango.math.random.Random;
 private import tango.net.device.Socket;
 private import tango.time.Time;
+private import tango.util.container.more.Stack;
 private import tango.util.log.Log;
 
 public import lib.asset;
@@ -101,9 +102,7 @@ protected:
             close();
     }
 public:
-    ushort handle() {
-        return message.OpenResponse.handle;
-    }
+    ushort handle;
     message.Identifier[] requestIds() {
         return openRequest.ids;
     }
@@ -146,7 +145,7 @@ public:
                 req.handle = handle;
                 client.sendMessage(req);
             }
-            client.openAssets.remove(handle);
+            client.onAssetClosed(this);
         }
     }
 }
@@ -192,6 +191,8 @@ private:
     }
 private:
     RemoteAsset[uint] openAssets;
+    Stack!(ushort) freeAssetHandles;
+    ushort nextNewHandle;
     protected Logger log;
 public:
     /************************************************************************************
@@ -251,6 +252,7 @@ public:
      ***********************************************************************************/
     void beginUpload(ulong size, BHOpenCallback cb) {
         auto req = new UploadRequest(cb);
+        req.handle = this.allocateFreeHandle();
         req.size = size;
         sendRequest(req);
     }
@@ -271,9 +273,29 @@ protected:
         auto req = new OpenRequest(openCallback);
         req.ids = ids;
         req.uuid = uuid;
-        req.handle = 0;
-        while (req.handle in openAssets) req.handle++; // Find first free handle
+        req.handle = allocateFreeHandle;
         sendRequest(req, timeout);
+    }
+
+
+
+    /************************************************************************************
+     * Cleanup after a closed RemoteAsset
+     ***********************************************************************************/
+    protected void onAssetClosed(RemoteAsset asset) {
+        openAssets.remove(asset.handle);
+        freeAssetHandles.push(asset.handle);
+    }
+
+    /************************************************************************************
+     * Allocates an unused file handle for the transaction.
+     ***********************************************************************************/
+    protected ushort allocateFreeHandle()
+    {
+        if (freeAssetHandles.size > 0)
+            return freeAssetHandles.pop();
+        else
+            return nextNewHandle++;
     }
 
     synchronized void processOpenResponse(ubyte[] buf) {
@@ -284,15 +306,18 @@ protected:
             openAssets[resp.handle] = resp;
             asset = resp;
         }
-        auto basereq = releaseRequest(resp);
-        if (basereq.typeId == message.Type.UploadRequest) {
-            auto req = cast(UploadRequest)basereq;
-            assert(req, "OpenResponse, but not OpenOrUploadRequest");
-            req.callback(asset, resp.status, req, resp);
-        } else if (basereq.typeId == message.Type.OpenRequest) {
-            auto req = cast(OpenRequest)basereq;
-            assert(req, "OpenResponse, but not OpenOrUploadRequest");
-            req.callback(asset, resp.status, req, resp);
+        auto basereq = cast(message.OpenOrUploadRequest)releaseRequest(resp);
+        if (basereq) {
+            resp.handle = basereq.handle;
+            if (basereq.typeId == message.Type.UploadRequest) {
+                auto req = cast(UploadRequest)basereq;
+                req.callback(asset, resp.status, req, resp);
+            } else if (basereq.typeId == message.Type.OpenRequest) {
+                auto req = cast(OpenRequest)basereq;
+                req.callback(asset, resp.status, req, resp);
+            }
+        } else {
+            assert(basereq, "OpenResponse, but not OpenOrUploadRequest");
         }
     }
     synchronized void processReadResponse(ubyte[] buf) {
