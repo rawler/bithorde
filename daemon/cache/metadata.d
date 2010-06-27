@@ -20,18 +20,18 @@ module daemon.cache.metadata;
 
 import lib.hashes;
 import hex = lib.hex;
-import message = lib.message;
+private import lib.message;
 private import lib.protobuf;
 
 /****************************************************************************************
  * AssetMetaData holds the mapping between the different ids of an asset
  ***************************************************************************************/
 class AssetMetaData : ProtoBufMessage {
-    ubyte[] localId;                /// Local assetId
-    message.Identifier[] hashIds;   /// HashIds
+    mixin(PBField!(ubyte[], "localId"));        /// Local assetId
+    mixin(PBField!(Identifier[], "hashIds"));   /// HashIds
 
-    mixin MessageMixin!(PBField!("localId",   1)(),
-                        PBField!("hashIds",   2)());
+    mixin ProtoBufCodec!(PBMapping("localId",   1),
+                         PBMapping("hashIds",   2));
 
     char[] toString() {
         char[] retval = "AssetMetaData {\n";

@@ -83,8 +83,9 @@ class CacheManager : IAssetSource {
      ***********************************************************************************/
     private MetaData newMetaAsset() {
         auto newMeta = new MetaData();
-        newMeta.localId = new ubyte[LOCALID_LENGTH];
-        rand.randomizeUniform!(ubyte[],false)(newMeta.localId);
+        auto localId = new ubyte[LOCALID_LENGTH];
+        rand.randomizeUniform!(ubyte[],false)(localId);
+        newMeta.localId = localId;
         return newMeta;
     }
 
@@ -321,8 +322,8 @@ private:
      * and localIds.
      ************************************************************************/
     class IdMap { // TODO: Re-work protobuf-lib so it isn't needed
-        MetaData[] assets;
-        mixin MessageMixin!(PBField!("assets",    1)());
+        mixin(PBField!(MetaData[], "assets"));
+        mixin ProtoBufCodec!(PBMapping("assets",    1));
     }
 
     /*************************************************************************

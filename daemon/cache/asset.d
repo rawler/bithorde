@@ -214,12 +214,14 @@ protected:
         assert(cacheMap.assetSize == length);
         log.trace("Asset complete");
 
+        _metadata.hashIds = new message.Identifier[hashes.length];
+        uint i;
         foreach (type, hash; hashes) {
             auto digest = hash.binaryDigest;
             auto hashId = new message.Identifier;
             hashId.type = type;
             hashId.id = digest.dup;
-            _metadata.hashIds ~= hashId;
+            _metadata.hashIds[i++] = hashId;
         }
 
         notify(this, AssetState.GOTIDS);

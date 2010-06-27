@@ -127,15 +127,6 @@ T decode_val(T : long)(ref ubyte[] buf) {
     return T.init;
 }
 
-struct PBField(char[] _name, uint _id) {
-    char[] name = _name;
-    uint id = _id;
-    static if ( is( typeof(mixin(_name)) : int) )
-        WireType wType = WireType.varint;
-    else
-        WireType wType = WireType.length_delim;
-};
-
 public {
     void write(T:int)(uint descriptor, T value, ByteBuffer buf) {
         encode_val(value, buf);
@@ -173,54 +164,71 @@ public {
         members ~= allocated;
         buf = buf[msglen..length];
     }
+
+    void consume_wtype(ubyte wtype, ref ubyte[] buf) {
+        alias tango.util.MinMax.min!(int) int_min;
+        switch (wtype) {
+            case WireType.varint:
+                decode_val!(ulong)(buf);
+                break;
+            case WireType.fixed64:
+                buf = buf[int_min(8,buf.length)..length];
+                break;
+            case WireType.length_delim:
+                auto msglen = decode_val!(uint)(buf);
+                buf = buf[int_min(msglen,buf.length)..length];
+                break;
+            case WireType.fixed32:
+                buf = buf[int_min(4,buf.length)..length];
+                break;
+            default:
+                throw new DecodeException("Unknown WireType in message");
+        }
+    }
 }
 
-template MessageMixin(fields...) {
+template _WTypeForDType(type) {
+    const _WTypeForDType =  is(type: int) ? WireType.varint : WireType.length_delim;
+}
+
+struct PBMapping {
+    char[] name;
+    uint id;
+};
+
+template PBField(T, char[] name) {
+    const PBField = T.stringof ~ " _pb_" ~ name ~ ";\n"
+        ~ T.stringof~" "~name~"() { return this._pb_"~name~"; }\n"
+        ~ T.stringof~" "~name~"("~T.stringof~" val) { return this._pb_"~name~"=val; }\n";
+}
+
+template ProtoBufCodec(fields...) {
     final ubyte[] encode(ByteBuffer buf = new ByteBuffer) {
-        foreach_reverse (int i, f; fields)
-            write((fields[i].id<<3) | fields[i].wType,
-                  mixin("this."~fields[i].name), buf);
+        foreach_reverse (int i, f; fields) {
+            const code = (fields[i].id << 3) | _WTypeForDType!(typeof(mixin("this._pb_"~fields[i].name)));
+            write(code, mixin("this._pb_"~fields[i].name), buf);
+        }
         return buf.data;
     }
 
     final void decode(ubyte[] buf) {
-        void consume_wtype(ubyte wtype) {
-            alias tango.util.MinMax.min!(int) int_min;
-            switch (wtype) {
-                case WireType.varint:
-                    decode_val!(ulong)(buf);
-                    break;
-                case WireType.fixed64:
-                    buf = buf[int_min(8,buf.length)..length];
-                    break;
-                case WireType.length_delim:
-                    auto msglen = decode_val!(uint)(buf);
-                    buf = buf[int_min(msglen,buf.length)..length];
-                    break;
-                case WireType.fixed32:
-                    buf = buf[int_min(4,buf.length)..length];
-                    break;
-                default:
-                    throw new DecodeException("Unkown WireType in message");
-            }
-        }
-
         while (buf.length > 0) {
             auto descriptor = decode_val!(uint)(buf);
             try switch (descriptor) {
                 foreach (int i, f; fields) {
-                    case (fields[i].id<<3)|fields[i].wType:
-                        auto field = mixin("this."~fields[i].name); // Note, read-only. Since mixin will evalutate to variable declaration, cannot be written to
+                    const code = (fields[i].id << 3) | _WTypeForDType!(typeof(mixin("this._pb_"~fields[i].name)));
+                    case code:
+                        auto field = mixin("this._pb_"~fields[i].name); // Note, read-only. Since mixin will evalutate to variable declaration, cannot be written to
                         static if (is(typeof(field) : ProtoBufMessage))
                             field = new typeof(field);
                         static if (is(typeof(field[0]) : ProtoBufMessage))
-                            read(mixin("this."~fields[i].name), new typeof(field[0]), buf);
+                            read(mixin("this._pb_"~fields[i].name), new typeof(field[0]), buf);
                         else
-                            read(mixin("this."~fields[i].name), buf);
+                            read(mixin("this._pb_"~fields[i].name), buf);
                         break;
                 }
             } catch (tango.core.Exception.SwitchException e) {
-                consume_wtype(descriptor & 0b00000111);
+                consume_wtype(descriptor & 0b00000111, buf);
             }
         }
     }

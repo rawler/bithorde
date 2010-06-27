@@ -24,10 +24,10 @@ import lib.protobuf;
 
 class Person : ProtoBufMessage
 {
-    uint id;
-    char[] name;
-    mixin MessageMixin!(PBField!("id",   1)(),
-                        PBField!("name", 2)());
+    mixin(PBField!(uint,"id"));
+    mixin(PBField!(char[],"name"));
+    mixin ProtoBufCodec!(PBMapping("id",   1),
+                         PBMapping("name", 2));
 
     char[] toString() {
         return Format.convert("{} {{\n id: {}\n name: {}\n}}",this.classinfo.name, this.id, this.name);
@@ -41,12 +41,12 @@ class Person : ProtoBufMessage
 
 class Person2 : ProtoBufMessage
 {
-    uint id;
-    char[] name;
-    char[] addr;
-    mixin MessageMixin!(PBField!("id",   1)(),
-                        PBField!("name", 2)(),
-                        PBField!("addr", 3)());
+    mixin(PBField!(uint, "id"));
+    mixin(PBField!(char[], "name"));
+    mixin(PBField!(char[], "addr"));
+    mixin ProtoBufCodec!(PBMapping("id",   1),
+                         PBMapping("name", 2),
+                         PBMapping("addr", 3));
     bool opEquals(Person other) {
         return (this.id == other.id) &&
                (this.name == other.name);
@@ -55,8 +55,8 @@ class Person2 : ProtoBufMessage
 
 class Friends : ProtoBufMessage
 {
-    Person[] people;
-    mixin MessageMixin!(PBField!("people", 1)());
+    mixin(PBField!(Person[],"people"));
+    mixin ProtoBufCodec!(PBMapping("people", 1));
 
     char[] toString() {
         auto retval = this.classinfo.name ~ "{\n people: [\n";
@@ -152,9 +152,7 @@ bool test_repeated_enc()
     onlyFriend.name = "arne";
     onlyFriend.id = 5;
     Friends x = new Friends;
-    x.people ~= onlyFriend;
-    x.people ~= onlyFriend;
-    x.people ~= onlyFriend;
+    x.people = [onlyFriend, onlyFriend, onlyFriend];
     debug (protobuf) Stdout(x).newline();
     auto bb = new ByteBuffer;
     ubyte[] buf;

@@ -105,11 +105,11 @@ char[] statusToString(Status s) {
 }
 
 abstract class RPCMessage : Message {
-    ushort rpcId;    // Local-link request id
+    mixin(PBField!(ushort, "rpcId"));    // Local-link request id
 }
 
 abstract class RPCRequest : RPCMessage {
-    ushort timeout;
+    mixin(PBField!(ushort, "timeout"));
     abstract void abort(Status s);
 }
 
@@ -126,10 +126,10 @@ class Identifier : ProtoBufMessage {
         this.id = id;
     }
     this() {}
-    HashType type;
-    ubyte[] id;
-    mixin MessageMixin!(PBField!("type", 1)(),
-                        PBField!("id",   2)());
+    mixin(PBField!(HashType, "type"));
+    mixin(PBField!(ubyte[], "id"));
+    mixin ProtoBufCodec!(PBMapping("type", 1),
+                         PBMapping("id",   2));
     /************************************************************************************
      * Return new deep-copied instance of the Identifier
      ***********************************************************************************/
@@ -139,108 +139,108 @@ class Identifier : ProtoBufMessage {
 }
 
 class HandShake : Message {
-    char[] name;
-    ubyte protoversion;
-    mixin MessageMixin!(PBField!("name", 1)(),
-                        PBField!("protoversion", 2)());
+    mixin(PBField!(char[], "name"));
+    mixin(PBField!(ubyte, "protoversion"));
+    mixin ProtoBufCodec!(PBMapping("name", 1),
+                         PBMapping("protoversion", 2));
     Type typeId() { return Type.HandShake; }
 }
 
 package class OpenOrUploadRequest : RPCRequest {
-    ushort handle;     // Requested handle
+    mixin(PBField!(ushort, "handle"));     // Requested handle
 }
 
 class OpenRequest : OpenOrUploadRequest {
-    Identifier ids[];  // Asset-Id:s to look for
-    ulong uuid;        // UUID to avoid loops
+    mixin(PBField!(Identifier[], "ids"));  // Asset-Id:s to look for
+    mixin(PBField!(ulong, "uuid"));        // UUID to avoid loops
 
-    mixin MessageMixin!(PBField!("rpcId",    1)(),
-                        PBField!("ids",      2)(),
-                        PBField!("uuid",     3)(),
-                        PBField!("timeout",  4)(),
-                        PBField!("handle",   5)());
+    mixin ProtoBufCodec!(PBMapping("rpcId",    1),
+                         PBMapping("ids",      2),
+                         PBMapping("uuid",     3),
+                         PBMapping("timeout",  4),
+                         PBMapping("handle",   5));
 
     Type typeId() { return Type.OpenRequest; }
 }
 
 class UploadRequest : OpenOrUploadRequest {
-    ulong size;        // Size of opened asset
-    mixin MessageMixin!(PBField!("rpcId",    1)(),
-                        PBField!("size",     2)(),
-                        PBField!("timeout",  3)(),
-                        PBField!("handle",   5)());
+    mixin(PBField!(ulong, "size"));        // Size of opened asset
+    mixin ProtoBufCodec!(PBMapping("rpcId",    1),
+                         PBMapping("size",     2),
+                         PBMapping("timeout",  3),
+                         PBMapping("handle",   5));
 
     Type typeId() { return Type.UploadRequest; }
 }
 
 class OpenResponse : RPCResponse {
-    Status status;     // Status of request
-    ulong size;        // Size of opened asset
-    mixin MessageMixin!(PBField!("rpcId",     1)(),
-                        PBField!("status",    2)(),
-                        PBField!("size",      4)());
+    mixin(PBField!(Status, "status"));     // Status of request
+    mixin(PBField!(ulong, "size"));        // Size of opened asset
+    mixin ProtoBufCodec!(PBMapping("rpcId",     1),
+                         PBMapping("status",    2),
+                         PBMapping("size",      4));
 
     Type typeId() { return Type.OpenResponse; }
 }
 
 class ReadRequest : RPCRequest {
-    ushort handle;     // Asset handle to read from
-    ulong offset;      // Requested segment start
-    uint size;         // Requested segment length
-    mixin MessageMixin!(PBField!("rpcId",     1)(),
-                        PBField!("handle",    2)(),
-                        PBField!("offset",    3)(),
-                        PBField!("size",      4)(),
-                        PBField!("timeout",   5)());
+    mixin(PBField!(ushort, "handle"));     // Asset handle to read from
+    mixin(PBField!(ulong, "offset"));      // Requested segment start
+    mixin(PBField!(uint, "size"));         // Requested segment length
+    mixin ProtoBufCodec!(PBMapping("rpcId",     1),
+                         PBMapping("handle",    2),
+                         PBMapping("offset",    3),
+                         PBMapping("size",      4),
+                         PBMapping("timeout",   5));
 
     Type typeId() { return Type.ReadRequest; }
 }
 
 class ReadResponse : RPCResponse {
-    Status status;     // Status of request
-    ulong offset;      // Returned segment start
-    ubyte[] content;   // Returned data
-    mixin MessageMixin!(PBField!("rpcId",     1)(),
-                        PBField!("status",    2)(),
-                        PBField!("offset",    3)(),
-                        PBField!("content",   4)());
+    mixin(PBField!(Status, "status"));     // Status of request
+    mixin(PBField!(ulong, "offset"));      // Returned segment start
+    mixin(PBField!(ubyte[], "content"));   // Returned data
+    mixin ProtoBufCodec!(PBMapping("rpcId",     1),
+                         PBMapping("status",    2),
+                         PBMapping("offset",    3),
+                         PBMapping("content",   4));
 
     Type typeId() { return Type.ReadResponse; }
 }
 
 class DataSegment : Message {
-    ushort handle;     // Asset handle for the data
-    ulong offset;      // Content start offset
-    ubyte[] content;   // Content to write
-    mixin MessageMixin!(PBField!("handle",    1)(),
-                        PBField!("offset",    2)(),
-                        PBField!("content",   3)());
+    mixin(PBField!(ushort, "handle"));     // Asset handle for the data
+    mixin(PBField!(ulong, "offset"));      // Content start offset
+    mixin(PBField!(ubyte[], "content"));   // Content to write
+    mixin ProtoBufCodec!(PBMapping("handle",    1),
+                         PBMapping("offset",    2),
+                         PBMapping("content",   3));
 
     Type typeId() { return Type.DataSegment; }
 }
 
 class MetaDataRequest : RPCRequest {
-    ushort handle;     // Asset handle for the data
-    mixin MessageMixin!(PBField!("rpcId",     1)(),
-                        PBField!("handle",    2)(),
-                        PBField!("timeout",   3)());
+    mixin(PBField!(ushort, "handle"));     // Asset handle for the data
+    mixin ProtoBufCodec!(PBMapping("rpcId",     1),
+                         PBMapping("handle",    2),
+                         PBMapping("timeout",   3));
 
     Type typeId() { return Type.MetaDataRequest; }
 }
 
 class MetaDataResponse : RPCResponse {
-    Status status;
-    Identifier[] ids;
-    mixin MessageMixin!(PBField!("rpcId",     1)(),
-                        PBField!("status",    2)(),
-                        PBField!("ids",       3)());
+    mixin(PBField!(Status, "status"));
+    mixin(PBField!(Identifier[], "ids"));
+    mixin ProtoBufCodec!(PBMapping("rpcId",     1),
+                         PBMapping("status",    2),
+                         PBMapping("ids",       3));
 
     Type typeId() { return Type.MetaDataResponse; }
 }
 
 class Close : Message {
-    ushort handle;     // AssetHandle to release
-    mixin MessageMixin!(PBField!("handle",    1)());
+    mixin(PBField!(ushort, "handle"));     // AssetHandle to release
+    mixin ProtoBufCodec!(PBMapping("handle",    1));
 
     Type typeId() { return Type.Close; }
 }
