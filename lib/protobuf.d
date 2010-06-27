@@ -198,15 +198,17 @@ struct PBMapping {
 
 template PBField(T, char[] name) {
     const PBField = T.stringof ~ " _pb_" ~ name ~ ";\n"
+        ~ "bool "~name~"IsSet;\n"
         ~ T.stringof~" "~name~"() { return this._pb_"~name~"; }\n"
-        ~ T.stringof~" "~name~"("~T.stringof~" val) { return this._pb_"~name~"=val; }\n";
+        ~ T.stringof~" "~name~"("~T.stringof~" val) { "~name~"IsSet=true; return this._pb_"~name~"=val; }\n";
 }
 
 template ProtoBufCodec(fields...) {
     final ubyte[] encode(ByteBuffer buf = new ByteBuffer) {
         foreach_reverse (int i, f; fields) {
             const code = (fields[i].id << 3) | _WTypeForDType!(typeof(mixin("this._pb_"~fields[i].name)));
-            write(code, mixin("this._pb_"~fields[i].name), buf);
+            if (mixin("this."~fields[i].name~"IsSet"))
+                write(code, mixin("this._pb_"~fields[i].name), buf);
         }
         return buf.data;
     }
@@ -229,6 +231,7 @@ template ProtoBufCodec(fields...) {
                             read(mixin("this._pb_"~fields[i].name), new typeof(field[0]), buf);
                         else
                             read(mixin("this._pb_"~fields[i].name), buf);
+                        mixin("this."~fields[i].name~"IsSet=true;");
                         break;
                 }
             } catch (tango.core.Exception.SwitchException e) {

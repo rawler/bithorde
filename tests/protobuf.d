@@ -26,8 +26,8 @@ class Person : ProtoBufMessage
 {
     mixin(PBField!(uint,"id"));
     mixin(PBField!(char[],"name"));
-    mixin ProtoBufCodec!(PBMapping("id",   1),
-                         PBMapping("name", 2));
+    mixin ProtoBufCodec!(PBMapping("id",       1),
+                         PBMapping("name",     2));
 
     char[] toString() {
         return Format.convert("{} {{\n id: {}\n name: {}\n}}",this.classinfo.name, this.id, this.name);
@@ -191,6 +191,32 @@ bool test_skip_unknown()
     }
 }
 
+bool test_unset()
+{
+    Stdout ("Testing IsSet-functionality...");
+    auto a = new Person;
+    a.name = "arne";
+    assert(!a.idIsSet, "Id should not be marked as set");
+    auto bb = new ByteBuffer;
+    auto buf = a.encode(bb);
+    debug (protobuf) Stdout(buf).newline();
+    Person b = new Person;
+    b.decode(buf);
+    assert(!b.idIsSet, "Id should still not be marked as set");
+    b.id = 5;
+    assert(b.idIsSet, "Id should now be marked as set");
+    buf = b.encode(bb);
+    a = new Person;
+    a.decode(buf);
+    if (a.idIsSet) {
+        Stdout("[PASS]").newline;
+        return true;
+    } else {
+        Stdout("[FAIL]").newline;
+        return false;
+    }
+}
+
 void main()
 {
     test_varintenc;
@@ -198,4 +224,5 @@ void main()
     test_object_enc;
     test_repeated_enc;
     test_skip_unknown;
+    test_unset;
 }
