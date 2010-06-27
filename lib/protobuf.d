@@ -211,13 +211,17 @@ template ProtoBufCodec(fields...) {
         return buf.data;
     }
 
+    debug import tango.util.log.Log;
     final void decode(ubyte[] buf) {
         while (buf.length > 0) {
             auto descriptor = decode_val!(uint)(buf);
-            try switch (descriptor) {
+            try switch (descriptor>>3) {
                 foreach (int i, f; fields) {
-                    const code = (fields[i].id << 3) | _WTypeForDType!(typeof(mixin("this._pb_"~fields[i].name)));
-                    case code:
+                    case fields[i].id:
+                        debug {
+                            if ((descriptor & 0b0111) != _WTypeForDType!(typeof(mixin("this._pb_"~fields[i].name))))
+                                Log.lookup("bithorde").warn("Field with wrong WType parsed");
+                        } 
                         auto field = mixin("this._pb_"~fields[i].name); // Note, read-only. Since mixin will evalutate to variable declaration, cannot be written to
                         static if (is(typeof(field) : ProtoBufMessage))
                             field = new typeof(field);
