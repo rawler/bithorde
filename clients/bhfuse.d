@@ -246,6 +246,29 @@ extern (D) {
         }
 
         /********************************************************************************
+         * Try to stat() asset, while driving client
+         *******************************************************************************/
+        OpenResponse statAsset(Identifier[] objectids) {
+            OpenResponse retval;
+            for (auto retries = 2; retries > 0; retries--) try {
+                bool gotResponse = false;
+                stat(objectids, delegate void(IAsset asset, Status status, OpenOrUploadRequest req, OpenResponse resp) {
+                    if (status == Status.SUCCESS) {
+                        retval = resp;
+                    } else {
+                        Stderr.format("Got non-success status from BitHorde.open: {}", statusToString(status)).newline;
+                        throw new BitHordeException(status);
+                    }
+                    gotResponse = true;
+                });
+                driveUntil(gotResponse);
+                break;
+            } catch (ReconnectedException e) { continue; } // Retry
+
+            return retval;
+        }
+
+        /********************************************************************************
          * Lets threads take turns pumping the client, until it signals satisfaction
          * through the referenced doBreak boolean
          *******************************************************************************/
@@ -267,17 +290,17 @@ static int bh_getattr(char *path, stat_t *stbuf)
     if (dpath == "/") {
         stbuf.st_mode = S_IFDIR | 0755;
         stbuf.st_nlink = 2;
+        return 0;
     } else try {
         char[] name;
         auto objectids = parseUri(dpath[1..length], name);
         if (!objectids.length)
             return -ENOENT;
 
-        if (auto asset = client.openAsset(objectids)) {
+        if (auto asset = client.statAsset(objectids)) {
             stbuf.st_mode = S_IFREG | 0444;
             stbuf.st_nlink = 1;
             stbuf.st_size = asset.size;
-            asset.close();
             return 0; // Success
         } else {
             return -ENOENT;

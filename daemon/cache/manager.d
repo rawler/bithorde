@@ -215,12 +215,16 @@ public:
     private void _forwardedCallback(OpenRequest req, IServerAsset asset, message.Status status) {
         if (status == message.Status.SUCCESS) {
             auto metaAsset = findMetaAsset(asset.hashIds);
-            if (!metaAsset && !_makeRoom(asset.size))
-                req.callback(null, message.Status.NORESOURCES);
-            else {
-                bool foundAsset = metaAsset !is null;
-                if (!metaAsset)
+            bool foundAsset = metaAsset !is null;
+            if (!metaAsset && req.handleIsSet) {
+                if (_makeRoom(asset.size))
                     metaAsset = newMetaAssetWithHashIds(asset.hashIds);
+                else
+                    return req.callback(null, message.Status.NORESOURCES);
+            }
+            if (!metaAsset) {
+                req.callback(asset, status); // Just forward without caching
+            } else { // 
                 try {
                     auto path = metaAsset.assetPath;
                     assert(cast(bool)path.exists == foundAsset);

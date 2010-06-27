@@ -244,7 +244,15 @@ public:
      ***********************************************************************************/
     void open(message.Identifier[] ids,
               BHOpenCallback openCallback, TimeSpan timeout = TimeSpan.fromMillis(3000)) {
-        open(ids, openCallback, rand.uniformR2!(ulong)(1,ulong.max), timeout);
+        open(ids, true, openCallback, rand.uniformR2!(ulong)(1,ulong.max), timeout);
+    }
+
+    /************************************************************************************
+     * Query about an asset without binding it to handle.
+     ***********************************************************************************/
+    void stat(message.Identifier[] ids, BHOpenCallback openCallback,
+        TimeSpan timeout = TimeSpan.fromMillis(3000)) {
+        open(ids, false, openCallback, rand.uniformR2!(ulong)(1,ulong.max), timeout);
     }
 
     /************************************************************************************
@@ -268,16 +276,15 @@ protected:
     /************************************************************************************
      * Real open-function, but should only be used internally by bithorde.
      ***********************************************************************************/
-    void open(message.Identifier[] ids, BHOpenCallback openCallback, ulong uuid,
+    void open(message.Identifier[] ids, bool do_bind, BHOpenCallback openCallback, ulong uuid,
               TimeSpan timeout) {
         auto req = new OpenRequest(openCallback);
         req.ids = ids;
         req.uuid = uuid;
-        req.handle = allocateFreeHandle;
+        if (do_bind)
+            req.handle = allocateFreeHandle;
         sendRequest(req, timeout);
     }
-
-
 
     /************************************************************************************
      * Cleanup after a closed RemoteAsset
@@ -302,13 +309,15 @@ protected:
         auto resp = new RemoteAsset(this);
         IAsset asset;
         resp.decode(buf);
-        if (resp.status == message.Status.SUCCESS) {
-            openAssets[resp.handle] = resp;
-            asset = resp;
-        }
         auto basereq = cast(message.OpenOrUploadRequest)releaseRequest(resp);
         if (basereq) {
-            resp.handle = basereq.handle;
+            if (basereq.handleIsSet) {
+                resp.handle = basereq.handle;
+                if (resp.status == message.Status.SUCCESS) {
+                    openAssets[resp.handle] = resp;
+                    asset = resp;
+                }
+            }
             if (basereq.typeId == message.Type.UploadRequest) {
                 auto req = cast(UploadRequest)basereq;
                 req.callback(asset, resp.status, req, resp);
@@ -324,7 +333,7 @@ protected:
         scope auto resp = new message.ReadResponse;
         resp.decode(buf);
         auto req = cast(RemoteAsset.ReadRequest)releaseRequest(resp);
-        assert(req, "ReadResponse, but not MetaDataRequest");
+        assert(req, "ReadResponse, but not ReadRequest");
         req.callback(resp.status, resp);
     }
     synchronized void processMetaDataResponse(ubyte[] buf) {

@@ -42,7 +42,7 @@ message Open {
     required uint32 reqId = 1;
     required uint64 size = 2;
     required uint32 timeout = 3;
-    optional uint32 handle = 5;
+    required uint32 handle = 5;
   }
   message Response {
     required uint32 reqId = 1;

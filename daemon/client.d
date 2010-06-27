@@ -67,8 +67,8 @@ class OpenRequest : message.OpenRequest {
             resp.rpcId = rpcId;
             resp.status = status;
             if (status == message.Status.SUCCESS) {
-                // Allocate handle, and add to map
-                client.openAssets[handle] = asset;
+                if (this.handleIsSet) // Add handle, to map
+                    client.openAssets[handle] = asset;
                 resp.size = asset.size;
             }
             client.sendMessage(resp);
@@ -156,8 +156,8 @@ public:
     /************************************************************************************
      * Re-declared _open from lib.Client to make it publicly visible in the daemon.
      ***********************************************************************************/
-    void open(message.Identifier[] ids, BHOpenCallback openCallback, ulong uuid,
-              TimeSpan timeout) { super.open(ids, openCallback, uuid, timeout); }
+    void open(message.Identifier[] ids, bool do_bind, BHOpenCallback openCallback, ulong uuid,
+              TimeSpan timeout) { super.open(ids, do_bind, openCallback, uuid, timeout); }
 protected:
     void processOpenRequest(ubyte[] buf)
     {

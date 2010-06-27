@@ -88,7 +88,8 @@ private:
             if (client != req.client) {
                 asset.waitingResponses += 1;
                 // TODO: Randomize timeouts
-                client.open(req.ids, &asset.addBackingAsset, req.uuid, TimeSpan.fromMillis(req.timeout-50));
+                // TODO: Don't require bound handle if downstream doesn't need it.
+                client.open(req.ids, true, &asset.addBackingAsset, req.uuid, TimeSpan.fromMillis(req.timeout-50));
                 forwarded = true;
             }
         }
