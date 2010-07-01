@@ -220,10 +220,13 @@ protected:
         scope auto resp = new message.MetaDataResponse;
         resp.rpcId = req.rpcId;
         try {
-            auto asset = cast(BaseAsset)openAssets[req.handle];
-            if (asset && asset.metadata) {
-                resp.status = message.Status.SUCCESS;
-                resp.ids = asset.metadata.hashIds;
+            auto asset = openAssets[req.handle];
+            if (asset) {
+                resp.ids = asset.hashIds;
+                if (resp.ids)
+                    resp.status = message.Status.SUCCESS;
+                else
+                    resp.status = message.Status.ERROR;
             } else {
                 resp.status = message.Status.INVALID_HANDLE;
             }

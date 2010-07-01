@@ -51,8 +51,7 @@ private static ubyte[] tlsBuffer(uint size) {
     return buf;
 }
 
-enum AssetState { GOTIDS }
-alias void delegate(BaseAsset, AssetState) AssetLifeCycleListener;
+alias void delegate(Identifier[]) HashIdsListener;
 
 /****************************************************************************************
  * Base for all kinds of cached assets. Provides basic reading functionality
@@ -63,20 +62,20 @@ protected:
     FilePath idxPath;
     Logger log;
     AssetMetaData _metadata;
-    AssetLifeCycleListener notify;
+    HashIdsListener updateHashIds;
 public:
     /************************************************************************************
      * IncompleteAssetException is thrown if a not-fully-cached asset were to be Opened
      * directly as a BaseAsset
      ***********************************************************************************/
-    this(FilePath path, AssetMetaData metadata, AssetLifeCycleListener listener) {
-        this(path, metadata, File.ReadExisting, listener);
+    this(FilePath path, AssetMetaData metadata, HashIdsListener updateHashIds) {
+        this(path, metadata, File.ReadExisting, updateHashIds);
         assert(!idxPath.exists);
     }
-    protected this(FilePath path, AssetMetaData metadata, File.Style style, AssetLifeCycleListener listener) {
+    protected this(FilePath path, AssetMetaData metadata, File.Style style, HashIdsListener updateHashIds) {
         this.path = path;
         this.idxPath = path.dup.suffix(".idx");
-        this.notify = listener;
+        this.updateHashIds = updateHashIds;
         this._metadata = metadata;
         log = Log.lookup("daemon.cache.baseasset."~path.name[0..8]);
 
@@ -92,12 +91,14 @@ public:
     }
 
     /************************************************************************************
-     * TODO: Implement, _metadata can not currently be counted on
      * Implements IServerAsset.hashIds()
+     * TODO: IServerAsset perhaps should be migrated to MetaData?
      ***********************************************************************************/
     Identifier[] hashIds() {
-        assert(false, "Needs implementation");
-        return _metadata.hashIds;
+        if (_metadata)
+            return _metadata.hashIds;
+        else
+            return null;
     }
 
     /************************************************************************************
@@ -135,10 +136,6 @@ public:
     final ulong size() {
         return length;
     }
-
-    AssetMetaData metadata() {
-        return _metadata;
-    }
 }
 
 /****************************************************************************************
@@ -153,14 +150,14 @@ public:
     /************************************************************************************
      * Create WriteableAsset by path and size
      ***********************************************************************************/
-    this(FilePath path, AssetMetaData metadata, ulong size, AssetLifeCycleListener _listener) {
-        this(path, metadata, File.Style(File.Access.ReadWrite, File.Open.Sedate), _listener); // Super-class opens underlying file
+    this(FilePath path, AssetMetaData metadata, ulong size, HashIdsListener updateHashIds) {
+        this(path, metadata, File.Style(File.Access.ReadWrite, File.Open.Sedate), updateHashIds); // Super-class opens underlying file
         truncate(size);           // We resize it to right size
     }
-    protected this(FilePath path, AssetMetaData metadata, File.Style style, AssetLifeCycleListener _listener) { /// ditto
+    protected this(FilePath path, AssetMetaData metadata, File.Style style, HashIdsListener updateHashIds) { /// ditto
         foreach (k,hash; HashMap)
             hashes[hash.pbType] = hash.factory();
-        super(path, metadata, style, _listener);
+        super(path, metadata, style, updateHashIds);
         cacheMap = new CacheMap(idxPath);
         log = Log.lookup("daemon.cache.writeasset."~path.name[0..8]);
     }
@@ -206,25 +203,28 @@ protected:
         }
     }
 
+    import tango.io.Stdout;
     /************************************************************************************
      * Post-finish hooks. Finalize the digests, add to assetMap, and remove the CacheMap
      ***********************************************************************************/
     void finish() {
+        assert(updateHashIds);
+        assert(cacheMap);
         assert(cacheMap.segcount == 1);
         assert(cacheMap.assetSize == length);
         log.trace("Asset complete");
 
-        _metadata.hashIds = new message.Identifier[hashes.length];
+        auto hashIds = new message.Identifier[hashes.length];
         uint i;
         foreach (type, hash; hashes) {
             auto digest = hash.binaryDigest;
             auto hashId = new message.Identifier;
             hashId.type = type;
             hashId.id = digest.dup;
-            _metadata.hashIds[i++] = hashId;
+            hashIds[i++] = hashId;
         }
 
-        notify(this, AssetState.GOTIDS);
+        updateHashIds(hashIds);
 
         cacheMap.path.remove();
         delete cacheMap;
@@ -237,15 +237,12 @@ protected:
  ***************************************************************************************/
 class CachingAsset : WriteableAsset {
     IServerAsset remoteAsset;
-    message.Identifier[] reqHashIds;
 public:
-    this (FilePath path, AssetMetaData metadata, IServerAsset remoteAsset, AssetLifeCycleListener _listener) {
-        this.reqHashIds = reqHashIds;
+    this (FilePath path, AssetMetaData metadata, IServerAsset remoteAsset, HashIdsListener updateHashIds) {
         this.remoteAsset = remoteAsset;
-        super(path, metadata, remoteAsset.size, _listener); // TODO: Verify remoteAsset.size against local file
+        super(path, metadata, remoteAsset.size, updateHashIds); // TODO: Verify remoteAsset.size against local file
         log = Log.lookup("daemon.cache.cachingasset." ~ path.name[0..8]);
         log.trace("Caching remoteAsset of size {}", size);
-        notify(this, AssetState.GOTIDS);
     }
 
     synchronized void aSyncRead(ulong offset, uint length, BHReadCallback cb) {
@@ -259,7 +256,7 @@ protected:
     /************************************************************************************
      * Triggered when the underlying cache is complete.
      ***********************************************************************************/
-    void finish() {
+    void finish() body {
         // TODO: Validate hashId:s
         super.finish();
         remoteAsset = null;

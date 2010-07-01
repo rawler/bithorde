@@ -62,7 +62,7 @@ class CacheManager : IAssetSource {
                 return null;
             } else {
                 try {
-                    return setAsset(new BaseAsset(assetPath, this, &_assetLifeCycleListener));
+                    return setAsset(new BaseAsset(assetPath, this, &updateHashIds));
                 } catch (IOException e) {
                     log.error("While opening asset: {}", e);
                     purgeAsset(this);
@@ -75,6 +75,10 @@ class CacheManager : IAssetSource {
         }
         FilePath idxPath() {
             return assetPath.cat(".idx");
+        }
+        void updateHashIds(message.Identifier[] ids) {
+            this.hashIds = ids;
+            addToIdMap(this);
         }
     }
 
@@ -97,6 +101,7 @@ class CacheManager : IAssetSource {
         newMeta.hashIds = hashIds.dup;
         foreach (ref v; newMeta.hashIds)
             v = v.dup;
+        addToIdMap(newMeta);
         return newMeta;
     }
 
@@ -228,7 +233,7 @@ public:
                 try {
                     auto path = metaAsset.assetPath;
                     assert(cast(bool)path.exists == foundAsset);
-                    auto cachingAsset = new CachingAsset(path, metaAsset, asset, &_assetLifeCycleListener);
+                    auto cachingAsset = new CachingAsset(path, metaAsset, asset, &metaAsset.updateHashIds);
                     metaAsset.setAsset(cachingAsset);
                     req.callback(cachingAsset, status);
                 } catch (IOException e) {
@@ -276,13 +281,13 @@ public:
         }
 
         log.trace("Looking up hashIds");
-        auto localAsset = findMetaAsset(req.ids);
+        auto metaAsset = findMetaAsset(req.ids);
 
-        if (!localAsset) {
+        if (!metaAsset) {
             log.trace("Unknown asset, forwarding {}", req);
             forwardRequest();
-        } else if (auto asset = localAsset.getAsset()) {
-            fromCache(localAsset, asset);
+        } else if (auto asset = metaAsset.getAsset()) {
+            fromCache(metaAsset, asset);
         } else {
             log.trace("Incomplete asset, forwarding {}", req);
             forwardRequest();
@@ -298,7 +303,7 @@ public:
                 MetaData meta = newMetaAsset();
                 auto path = meta.assetPath;
                 assert(!path.exists());
-                auto asset = new WriteableAsset(path, meta, req.size, &_assetLifeCycleListener);
+                auto asset = new WriteableAsset(path, meta, req.size, &meta.updateHashIds);
                 req.callback(asset, message.Status.SUCCESS);
             } else {
                 req.callback(null, message.Status.NORESOURCES);
@@ -310,17 +315,6 @@ public:
     }
 
 private:
-    /************************************************************************************
-     * Listen to managed assets, and update appropriate indexes
-     ***********************************************************************************/
-    void _assetLifeCycleListener(BaseAsset asset, AssetState state) {
-        switch (state) {
-        case AssetState.GOTIDS:
-            addToIdMap(cast(MetaData)asset.metadata);
-            break;
-        }
-    }
-
     /*************************************************************************
      * The IdMap is a dummy-object for storing the mapping between hashIds
      * and localIds.
