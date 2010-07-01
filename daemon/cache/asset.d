@@ -148,7 +148,7 @@ class WriteableAsset : BaseAsset {
 protected:
     CacheMap cacheMap;
     Digest[HashType] hashes;
-    uint hashingptr;
+    ulong hashedPtr;
 public:
     /************************************************************************************
      * Create WriteableAsset by path and size
@@ -191,10 +191,10 @@ protected:
      ***********************************************************************************/
     void updateHashes() {
         auto zeroBlockSize = cacheMap.zeroBlockSize;
-        if (zeroBlockSize > hashingptr) {
-            auto bufsize = zeroBlockSize - hashingptr;
+        if (zeroBlockSize > hashedPtr) {
+            auto bufsize = zeroBlockSize - hashedPtr;
             auto buf = tlsBuffer(bufsize);
-            auto got = pread(fileHandle, buf.ptr, bufsize, hashingptr);
+            auto got = pread(fileHandle, buf.ptr, bufsize, hashedPtr);
             assert(got == bufsize);
             foreach (hash; hashes) {
                 hash.update(buf[0..bufsize]);
@@ -202,7 +202,7 @@ protected:
             if (zeroBlockSize == length)
                 finish();
             else
-                hashingptr = zeroBlockSize;
+                hashedPtr = zeroBlockSize;
         }
     }
 
