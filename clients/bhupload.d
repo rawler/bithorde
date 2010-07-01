@@ -191,7 +191,7 @@ private:
             Stdout(formatED2K(resp.ids, pos, args.file.file)).newline;
             exit(0);
         } else {
-            Stderr("Non-successful upload").newline;
+            Stderr("Non-successful upload", statusToString(status)).newline;
             exit(status);
         }
     }
