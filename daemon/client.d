@@ -63,7 +63,7 @@ class OpenRequest : message.OpenRequest {
     final void _callback(OpenRequest req, IServerAsset asset, message.Status status) {
         assert(this is req);
         if (!client.closed) {
-            scope auto resp = new message.OpenResponse;
+            scope resp = new message.OpenResponse;
             resp.rpcId = rpcId;
             resp.status = status;
             if (status == message.Status.SUCCESS) {
@@ -97,7 +97,7 @@ class UploadRequest : message.UploadRequest {
     }
     final void callback(IServerAsset asset, message.Status status) {
         if (!client.closed) {
-            scope auto resp = new message.OpenResponse;
+            scope resp = new message.OpenResponse;
             resp.rpcId = rpcId;
             resp.status = status;
             if (status == message.Status.SUCCESS) {
@@ -123,7 +123,7 @@ public:
     }
     final void callback(IAsset asset, message.Status status, message.ReadRequest remoteReq, message.ReadResponse remoteResp) {
         if (client) {
-            scope auto resp = new message.ReadResponse;
+            scope resp = new message.ReadResponse;
             resp.rpcId = rpcId;
             resp.offset = remoteResp.offset;
             resp.content = remoteResp.content;
@@ -191,7 +191,7 @@ protected:
             asset = openAssets[req.handle];
         } catch (ArrayBoundsException e) {
             delete req;
-            scope auto resp = new message.ReadResponse;
+            scope resp = new message.ReadResponse;
             resp.rpcId = req.rpcId;
             resp.status = message.Status.INVALID_HANDLE;
             return sendMessage(resp);
@@ -200,7 +200,7 @@ protected:
     }
 
     void processDataSegment(ubyte[] buf) {
-        scope auto req = new message.DataSegment();
+        scope req = new message.DataSegment();
         req.decode(buf);
         try {
             auto asset = cast(BaseAsset)openAssets[req.handle];
@@ -213,11 +213,11 @@ protected:
     void processMetaDataRequest(ubyte[] buf) {
         // Create anon class to satisfy abstract abort().
         // MetaData is always local and never async, so don't need full state
-        scope auto req = new class message.MetaDataRequest {
+        scope req = new class message.MetaDataRequest {
             void abort(message.Status s) {}
         };
         req.decode(buf);
-        scope auto resp = new message.MetaDataResponse;
+        scope resp = new message.MetaDataResponse;
         resp.rpcId = req.rpcId;
         try {
             auto asset = openAssets[req.handle];
@@ -239,7 +239,7 @@ protected:
 
     void processClose(ubyte[] buf)
     {
-        scope auto req = new message.Close;
+        scope req = new message.Close;
         req.decode(buf);
         log.trace("closing handle {}", req.handle);
         try {

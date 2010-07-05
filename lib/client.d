@@ -330,14 +330,14 @@ protected:
         }
     }
     synchronized void processReadResponse(ubyte[] buf) {
-        scope auto resp = new message.ReadResponse;
+        scope resp = new message.ReadResponse;
         resp.decode(buf);
         auto req = cast(RemoteAsset.ReadRequest)releaseRequest(resp);
         assert(req, "ReadResponse, but not ReadRequest");
         req.callback(resp.status, resp);
     }
     synchronized void processMetaDataResponse(ubyte[] buf) {
-        scope auto resp = new message.MetaDataResponse;
+        scope resp = new message.MetaDataResponse;
         resp.decode(buf);
         auto req = cast(RemoteAsset.MetaDataRequest)releaseRequest(resp);
         assert(req, "MetaDataResponse, but not MetaDataRequest");

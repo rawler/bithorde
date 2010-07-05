@@ -290,7 +290,7 @@ public:
 private:
     /// Initiate HandShake
     void sayHello() {
-        scope auto handshake = new message.HandShake;
+        scope handshake = new message.HandShake;
         handshake.name = _myname;
         handshake.protoversion = 1;
         sendMessage(handshake);
@@ -383,7 +383,7 @@ protected:
     void processHandShake(ubyte[] msg) {
         if (_peername)
             throw new AssertException("HandShake recieved after initialization", __FILE__, __LINE__);
-        scope auto handshake = new message.HandShake;
+        scope handshake = new message.HandShake;
         handshake.decode(msg);
         _peername = handshake.name.dup;
         assert(handshake.protoversion == 1);

@@ -329,8 +329,8 @@ private:
      ************************************************************************/
     void loadIdMap() {
         log.info("Loading fresh Id-Maps");
-        scope auto mapsrc = new IdMap();
-        scope auto fileContent = cast(ubyte[])File.get(idMapPath.toString);
+        scope mapsrc = new IdMap();
+        scope fileContent = cast(ubyte[])File.get(idMapPath.toString);
         mapsrc.decode(fileContent);
         foreach (asset; mapsrc.assets) {
             localIdMap[asset.localId] = asset;
@@ -373,7 +373,7 @@ private:
      * Save id-mappings with IdMap
      ************************************************************************/
     void saveIdMap() {
-        scope auto map = new IdMap;
+        scope map = new IdMap;
         map.assets = localIdMap.values;
         File.set(idMapPath.toString, map.encode());
     }
