@@ -24,6 +24,7 @@ private import tango.io.FilePath;
 private import tango.math.random.Random;
 version (Posix) import tango.stdc.posix.sys.stat;
 private import tango.text.Ascii;
+private import tango.text.convert.Format;
 private import tango.text.Util;
 private import tango.time.Time;
 private import tango.util.log.Log;
@@ -161,7 +162,9 @@ public:
         foreach (fileInfo; assetDir) {
             version (Posix) {
                 stat_t s;
-                assert(stat((fileInfo.path~'\0').ptr, &s) == 0);
+                char[256] filepath = void;
+                auto statres = stat(Format.sprint(filepath, "{}/{}\0", fileInfo.path, fileInfo.name).ptr, &s);
+                assert(statres == 0);
                 version (linux) retval += s.st_blocks * 512;
                 else static assert(0, "Needs to port block-size for non-Linux POSIX.");
             } else {
