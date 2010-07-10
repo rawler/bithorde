@@ -84,8 +84,8 @@ bool test_varintenc() {
             auto middle = new ByteBuffer;
             encode_val(i, middle);
             auto data = middle.data;
-            uint roundtrip = decode_val!(uint)(data);
-            if (i == roundtrip) {
+            uint roundtrip;
+            if (decode_val!(uint)(data, roundtrip) && (i == roundtrip)) {
                 debug (protobuf) Stdout.format("{} == {} (middle: {})", i, roundtrip, middle).newline;
             } else {
                 debug (protobuf) Stdout.format("{} != {} (middle: {})", i, roundtrip, middle).newline;
@@ -107,8 +107,8 @@ bool test_wt_ld_enc() {
         auto middle = new ByteBuffer;
         encode_val(testdata, middle);
         auto data = middle.data;
-        ubyte[] roundtrip = decode_val!(ubyte[])(data);
-        if (testdata == roundtrip) {
+        ubyte[] roundtrip;
+        if (decode_val!(ubyte[])(data, roundtrip) && (testdata == roundtrip)) {
             debug (protobuf) Stdout.format("{} == {} (middle: {})", testdata, roundtrip, middle).newline;
         } else {
             debug (protobuf) Stdout.format("{} != {} (middle: {})", testdata, roundtrip, middle).newline;

@@ -230,8 +230,18 @@ public:
     synchronized bool processMessage()
     {
         auto buf = left;
-        left = decodeMessage(buf);
-        return buf != left;
+        message.Type type;
+        size_t msglen;
+        if (decode_val!(message.Type)(buf, type) && decode_val!(size_t)(buf, msglen) && (buf.length >= msglen)) {
+            assert((type & 0b0000_0111) == 0b0010, "Expected message type, but got something else");
+            type >>= 3;
+
+            left = buf[msglen..length]; // Make sure to remove message from queue before processing
+            process(type, buf[0..msglen]);
+            return true;
+        } else {
+            return false;
+        }
     }
 
     /************************************************************************************
@@ -321,41 +331,20 @@ private:
         backbuf = left;               // And new backbuf is our current frontbuf
         left = frontbuf[0..remainder];
     }
-
-    /************************************************************************************
-     * Attempt to decode and process a single message from a buffer
-     ***********************************************************************************/
-    ubyte[] decodeMessage(ubyte[] data)
-    {
-        auto buf = data;
-        auto type = decode_val!(message.Type)(buf);
-        if (buf == data) {
-            return data;
-        } else {
-            assert((type & 0b0000_0111) == 0b0010, "Expected message type, but got something else");
-            type >>= 3;
-        }
-        uint msglen = decode_val!(uint)(buf);
-        if (buf == data || buf.length < msglen) {
-            return data; // Not enough data in buffer
-        } else {
-            auto msg = buf[0..msglen];
-            process(type, msg);
-            return buf[msglen..length];
-        }
-    }
 package:
     /************************************************************************************
      * Send any kind of message, just serialize and push
      ***********************************************************************************/
-    synchronized void sendMessage(message.Message m) {
+    synchronized ubyte[] sendMessage(message.Message m) {
         if (closed)
             throw new IOException("Connection closed");
         msgbuf.reset();
         m.encode(msgbuf);
         encode_val!(uint)(msgbuf.length, msgbuf);
         encode_val!(ushort)((m.typeId << 3) | 0b0000_0010, msgbuf);
-        socket.write(msgbuf.data);
+        auto buf = msgbuf.data;
+        socket.write(buf);
+        return buf;
     }
 
     /************************************************************************************

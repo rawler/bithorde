@@ -70,7 +70,7 @@ alias PBuffer!(ubyte) ByteBuffer;
 
 interface ProtoBufMessage {
     ubyte[] encode(ByteBuffer buf = new ByteBuffer);
-    void decode(ubyte[] buf);
+    bool decode(ubyte[] buf);
 }
 
 class DecodeException : Exception { this(char[] msg) { super(msg); } }
@@ -88,12 +88,15 @@ void encode_val(T : ubyte[])(T value, ByteBuffer buf) {
     encode_val(value.length, buf);
 }
 
-T decode_val(T : ubyte[])(ref ubyte[] buf) {
-    uint vlen = decode_val!(uint)(buf);
-    assert(buf.length >= vlen);
-    auto retval = cast(T)buf[0 .. vlen];
-    buf = buf[vlen .. length];
-    return retval;
+bool decode_val(T : ubyte[])(ref ubyte[] buf, out T result) {
+    uint vlen;
+    if (decode_val!(uint)(buf, vlen) && (buf.length >= vlen)) {
+        result = cast(T)buf[0 .. vlen];
+        buf = buf[vlen .. length];
+        return true;
+    } else {
+        return false;
+    }
 }
 
 void encode_val(T : long)(T i, ByteBuffer buffer) {
@@ -113,7 +116,7 @@ void encode_val(T : long)(T i, ByteBuffer buffer) {
     buffer.charge(encbytes);
 }
 
-T decode_val(T : long)(ref ubyte[] buf) {
+bool decode_val(T : long)(ref ubyte[] buf, out T result) {
     T retval = cast(T)0;
     uint idx = 0;
     foreach (b; buf) {
@@ -121,10 +124,11 @@ T decode_val(T : long)(ref ubyte[] buf) {
         if (!(b & 0b10000000))
         {
             buf = buf[idx .. length];
-            return retval;
+            result = retval;
+            return true;
         }
     }
-    return T.init;
+    return false;
 }
 
 public {
@@ -147,40 +151,57 @@ public {
             write(descriptor, value, buf);
     }
 
-    void read(T:int)(ref T member, ref ubyte[] buf) {
-        member = decode_val!(T)(buf);
+    bool read(T:int)(out T member, ref ubyte[] buf) {
+        return decode_val!(T)(buf, member);
     }
-    void read(T:ubyte[])(ref T member, ref ubyte[] buf) {
-        member = decode_val!(T)(buf);
+    bool read(T:ubyte[])(ref T member, ref ubyte[] buf) {
+        return decode_val!(T)(buf, member);
     }
-    void read(T:ProtoBufMessage)(ref T member, ref ubyte[] buf) {
-        auto msglen = decode_val!(uint)(buf);
-        member.decode(buf[0..msglen]);
-        buf = buf[msglen..length];
+    bool read(T:ProtoBufMessage)(ref T member, ref ubyte[] buf) {
+        size_t msglen;
+        if (decode_val!(size_t)(buf, msglen) && (buf.length >= msglen)) {
+            member.decode(buf[0..msglen]);
+            buf = buf[msglen..length];
+            return true;
+        } else {
+            return false;
+        }
     }
-    void read(T:ProtoBufMessage)(ref T[] members, T allocated, ref ubyte[] buf) {
-        auto msglen = decode_val!(uint)(buf);
-        allocated.decode(buf[0..msglen]);
-        members ~= allocated;
-        buf = buf[msglen..length];
+    bool read(T:ProtoBufMessage)(ref T[] members, T allocated, ref ubyte[] buf) {
+        uint msglen;
+        if (decode_val!(size_t)(buf, msglen) && (buf.length >= msglen)) {
+            allocated.decode(buf[0..msglen]);
+            members ~= allocated;
+            buf = buf[msglen..length];
+            return true;
+        } else {
+            return false;
+        }
     }
 
-    void consume_wtype(ubyte wtype, ref ubyte[] buf) {
+    bool consume_wtype(ubyte wtype, ref ubyte[] buf) {
         alias tango.util.MinMax.min!(int) int_min;
         switch (wtype) {
             case WireType.varint:
-                decode_val!(ulong)(buf);
-                break;
+                uint _int;
+                return decode_val!(uint)(buf, _int);
             case WireType.fixed64:
-                buf = buf[int_min(8,buf.length)..length];
-                break;
+                if (buf.length >= 8) {
+                    buf = buf[8..length];
+                    return true;
+                } else {
+                    return false;
+                }
             case WireType.length_delim:
-                auto msglen = decode_val!(uint)(buf);
-                buf = buf[int_min(msglen,buf.length)..length];
-                break;
+                ubyte[] _buf;
+                return decode_val!(ubyte[])(buf, _buf);
             case WireType.fixed32:
-                buf = buf[int_min(4,buf.length)..length];
-                break;
+                if (buf.length >= 8) {
+                    buf = buf[4..length];
+                    return true;
+                } else {
+                    return false;
+                }
             default:
                 throw new DecodeException("Unknown WireType in message");
         }
@@ -214,29 +235,34 @@ template ProtoBufCodec(fields...) {
     }
 
     debug import tango.util.log.Log;
-    final void decode(ubyte[] buf) {
+    final bool decode(ubyte[] buf) {
         while (buf.length > 0) {
-            auto descriptor = decode_val!(uint)(buf);
-            try switch (descriptor>>3) {
-                foreach (int i, f; fields) {
-                    case fields[i].id:
-                        debug {
-                            if ((descriptor & 0b0111) != _WTypeForDType!(typeof(mixin("this._pb_"~fields[i].name))))
-                                Log.lookup("bithorde").warn("Field with wrong WType parsed");
-                        } 
-                        auto field = mixin("this._pb_"~fields[i].name); // Note, read-only. Since mixin will evalutate to variable declaration, cannot be written to
-                        static if (is(typeof(field) : ProtoBufMessage))
-                            field = new typeof(field);
-                        static if (is(typeof(field[0]) : ProtoBufMessage))
-                            read(mixin("this._pb_"~fields[i].name), new typeof(field[0]), buf);
-                        else
-                            read(mixin("this._pb_"~fields[i].name), buf);
-                        mixin("this."~fields[i].name~"IsSet=true;");
-                        break;
+            uint descriptor;
+            if (decode_val!(uint)(buf, descriptor)) {
+                try switch (descriptor>>3) {
+                    foreach (int i, f; fields) {
+                        case fields[i].id:
+                            debug {
+                                if ((descriptor & 0b0111) != _WTypeForDType!(typeof(mixin("this._pb_"~fields[i].name))))
+                                    Log.lookup("bithorde").warn("Field with wrong WType parsed");
+                            }
+                            auto field = mixin("this._pb_"~fields[i].name); // Note, read-only. Since mixin will evalutate to variable declaration, cannot be written to
+                            static if (is(typeof(field) : ProtoBufMessage))
+                                field = new typeof(field);
+                            static if (is(typeof(field[0]) : ProtoBufMessage))
+                                read(mixin("this._pb_"~fields[i].name), new typeof(field[0]), buf);
+                            else
+                                read(mixin("this._pb_"~fields[i].name), buf);
+                            mixin("this."~fields[i].name~"IsSet=true;");
+                            break;
+                    }
+                } catch (tango.core.Exception.SwitchException e) {
+                    consume_wtype(descriptor & 0b00000111, buf);
                 }
-            } catch (tango.core.Exception.SwitchException e) {
-                consume_wtype(descriptor & 0b00000111, buf);
+            } else {
+                return false;
             }
         }
+        return true;
     }
 }
