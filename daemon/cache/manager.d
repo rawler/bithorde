@@ -238,6 +238,7 @@ public:
                     assert(cast(bool)path.exists == foundAsset);
                     auto cachingAsset = new CachingAsset(path, metaAsset, asset, &metaAsset.updateHashIds);
                     metaAsset.setAsset(cachingAsset);
+                    log.trace("Responding with status {}", message.statusToString(status));
                     req.callback(cachingAsset, status);
                 } catch (IOException e) {
                     log.error("While opening asset: {}", e);
@@ -247,6 +248,7 @@ public:
                 }
             }
         } else {
+            log.info("Forward search failed with error-code {}", message.statusToString(status));
             req.callback(null, status);
         }
     }
