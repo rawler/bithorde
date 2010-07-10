@@ -316,6 +316,8 @@ protected:
                 if (resp.status == message.Status.SUCCESS) {
                     openAssets[resp.handle] = resp;
                     asset = resp;
+                } else {
+                    freeAssetHandles.push(resp.handle);
                 }
             }
             if (basereq.typeId == message.Type.UploadRequest) {
