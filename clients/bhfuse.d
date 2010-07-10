@@ -419,7 +419,7 @@ static int bh_release(char *path, fuse_file_info *fi)
             client.assetMap[fi.fh] = null;
             asset.close();
         }
-    } catch {} // Whatever goes wring, Do Nothing
+    } catch {} // Whatever goes wrong, Do Nothing
 
     return 0;
 }
@@ -483,6 +483,8 @@ int main(char[][] args)
     auto addr = new LocalAddress(arguments.sockPath);
     client = new BHFuseClient(addr, "bhfuse");
 
+    if (arguments.do_debug)
+        Log.root.level = Level.Trace;
     Log.root.add(new AppendConsole(new LayoutDate));
 
     auto mountdir = FilePath(arguments.mountpoint).absolute("/");
