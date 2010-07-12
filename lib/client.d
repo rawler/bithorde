@@ -35,7 +35,7 @@ extern (C) void rt_attachDisposeEvent(Object h, DEvent e);
  * RemoteAsset is the basic BitHorde object for tracking a remotely open asset form the
  * client-side.
  ***************************************************************************************/
-class RemoteAsset : private message.OpenResponse, IAsset {
+class RemoteAsset : private IAsset {
     /************************************************************************************
      * Internal ReadRequest object, for tracking in-flight readrequests.
      ***********************************************************************************/
@@ -81,32 +81,31 @@ private:
     void clientGone(Object o) {
         this.client = null;
     }
-
-    message.OpenRequest _req;
-    final message.OpenRequest openRequest() {
-        if (!_req)
-            return _req = cast(message.OpenRequest)request;
-        else
-            return _req;
-    }
 protected:
     /************************************************************************************
      * RemoteAssets should only be created from the Client
      ***********************************************************************************/
-    this(Client c) {
+    this(Client c, message.OpenRequest req, message.OpenResponse resp) {
+        this(c, req.handle, resp);
+        this.requestIds = req.ids;
+    }
+    this(Client c, message.UploadRequest req, message.OpenResponse resp) {
+        this(c, req.handle, resp);
+    }
+    this(Client c, ushort handle, message.OpenResponse resp) {
         rt_attachDisposeEvent(c, &clientGone); // Add hook for invalidating client-reference
         this.client = c;
+        this.handle = handle;
+        this._size = resp.size;
     }
     ~this() {
         if (!closed)
             close();
     }
-
 public:
     ushort handle;
-    message.Identifier[] requestIds() {
-        return openRequest.ids;
-    }
+    ulong _size;
+    message.Identifier[] requestIds;
 
     /************************************************************************************
      * aSyncRead as of IAsset. With or without explicit retry-count
@@ -135,7 +134,7 @@ public:
     }
 
     final ulong size() {
-        return super.size;
+        return _size;
     }
 
     void close() {
@@ -164,11 +163,11 @@ public:
  * The Client is not thread-safe at this moment.
  ***************************************************************************************/
 class Client {
-private:
+protected:
     /************************************************************************************
      * Internal outgoing UploadRequest object
      ***********************************************************************************/
-    class UploadRequest : message.UploadRequest {
+    static class UploadRequest : message.UploadRequest {
         BHOpenCallback callback;
         this(BHOpenCallback cb) {
             this.callback = cb;
@@ -181,7 +180,7 @@ private:
     /************************************************************************************
      * Internal outgoing OpenRequest object
      ***********************************************************************************/
-    class OpenRequest : message.OpenRequest {
+    static class OpenRequest : message.OpenRequest {
         BHOpenCallback callback;
         this(BHOpenCallback cb) {
             this.callback = cb;
@@ -334,19 +333,20 @@ protected:
     }
 
     synchronized void processOpenResponse(Connection c, ubyte[] buf) {
-        auto resp = new RemoteAsset(this);
-        IAsset asset;
+        scope resp = new message.OpenResponse;
         resp.decode(buf);
         auto basereq = cast(message.OpenOrUploadRequest)c.releaseRequest(resp);
         if (basereq) {
-            if (basereq.handleIsSet) {
-                resp.handle = basereq.handle;
-                if (resp.status == message.Status.SUCCESS) {
-                    openAssets[resp.handle] = resp;
-                    asset = resp;
-                } else {
-                    freeAssetHandles.push(resp.handle);
+            RemoteAsset asset;
+            if (resp.status == message.Status.SUCCESS) {
+                if (basereq.typeId == message.Type.UploadRequest) {
+                    asset = new RemoteAsset(this, cast(UploadRequest)basereq, resp);
+                } else if (basereq.typeId == message.Type.OpenRequest) {
+                    asset = new RemoteAsset(this, cast(OpenRequest)basereq, resp);
                 }
+                openAssets[basereq.handle] = asset;
+            } else if (basereq.handleIsSet){
+                freeAssetHandles.push(basereq.handle);
             }
             if (basereq.typeId == message.Type.UploadRequest) {
                 auto req = cast(UploadRequest)basereq;
