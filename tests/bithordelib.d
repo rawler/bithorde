@@ -36,6 +36,7 @@ import daemon.config;
 import daemon.routing.friend;
 
 import lib.client;
+import lib.connection;
 import lib.message;
 
 /****************************************************************************************
@@ -68,7 +69,7 @@ class SteppingServer : Server {
         thread.start();
     }
 
-    bool _processMessageQueue(daemon.client.Client c) {
+    bool _processMessageQueue(Connection c) {
         Semaphore oldSem;
         do {
             oldSem = sem;

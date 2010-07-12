@@ -162,9 +162,10 @@ public:
         scope SelectionKey[] removeThese;
         auto nextDeadline = Time.max;
         foreach (key; selector) {
-            auto c = cast(Connection)key.attachment;
-            if (c && c.timeouts.size && (c.timeouts.peek.time < nextDeadline))
-                nextDeadline = c.timeouts.peek.time;
+            if (auto c = cast(Client)key.attachment) {
+                auto cnd = c.connection.nextDeadline;
+                if (cnd < nextDeadline) nextDeadline = cnd;
+            }
         }
         if (selector.select(nextDeadline - Clock.now) > 0) {
             foreach (SelectionKey event; selector.selectedSet()) {
@@ -173,8 +174,8 @@ public:
             }
         }
         foreach (key; selector) {
-            auto c = cast(Connection)key.attachment;
-            if (c) c.processTimeouts();
+            auto c = cast(Client)key.attachment;
+            if (c) c.connection.processTimeouts();
         }
         foreach (event; removeThese) {
             auto c = cast(Client)event.attachment;
@@ -192,7 +193,7 @@ public:
         cacheMgr.uploadAsset(req);
     }
 protected:
-    void onClientConnect(Client c)
+    void onClientConnect(Client c, Connection conn)
     {
         Friend f;
         auto peername = c.peername;
@@ -204,7 +205,7 @@ protected:
             router.registerFriend(f);
         }
 
-        log.info("{} {} connected: {}", f?"Friend":"Client", peername, c.remoteAddress);
+        log.info("{} {} connected: {}", f?"Friend":"Client", peername, conn.remoteAddress);
     }
 
     void onClientDisconnect(Client c)
@@ -217,7 +218,7 @@ protected:
         log.info("{} {} disconnected", f?"Friend":"Client", c.peername);
     }
 
-    protected bool _processMessageQueue(Client c) {
+    protected bool _processMessageQueue(Connection c) {
         try {
             while (c.processMessage()) {}
             return true;
@@ -244,12 +245,12 @@ protected:
             log.fatal("New connection triggered an unhandled exception; {}", excInfo);
             return abortSocket();
         }
-        onClientConnect(c);
+        onClientConnect(c, c.connection);
         selector.register(s, Event.Read, c);
 
         // ATM, there may be stale data in the buffers from the HandShake that needs processing
         // Perhaps try to rework internal API so that the HandShake is handled in normal run-loop?
-        if (!_processMessageQueue(c)) {
+        if (!_processMessageQueue(c.connection)) {
             onClientDisconnect(c);
             return abortSocket();
         }
@@ -272,8 +273,8 @@ protected:
                 return false;
             } else {
                 assert (event.isReadable);
-                if (c.readNewData())
-                    return _processMessageQueue(c);
+                if (c.connection.readNewData())
+                    return _processMessageQueue(c.connection);
                 else
                     return false;
             }

@@ -60,7 +60,7 @@ class RemoteAsset : private message.OpenResponse, IAsset {
         }
     }
     /************************************************************************************
-     * Internal MetaDataRequest object, for tracking in-flight readrequests.
+     * Internal MetaDataRequest object, for tracking in-flight MetaDataRequests.
      ***********************************************************************************/
     class MetaDataRequest : message.MetaDataRequest {
         BHMetaDataCallback _callback;
@@ -101,6 +101,7 @@ protected:
         if (!closed)
             close();
     }
+
 public:
     ushort handle;
     message.Identifier[] requestIds() {
@@ -162,7 +163,7 @@ public:
  *
  * The Client is not thread-safe at this moment.
  ***************************************************************************************/
-class Client : Connection {
+class Client {
 private:
     /************************************************************************************
      * Internal outgoing UploadRequest object
@@ -195,13 +196,14 @@ private:
     ushort nextNewHandle;
     protected Logger log;
 public:
+    Connection connection;
     /************************************************************************************
      * Create a BitHorde client by name and an IPv4Address, or a LocalAddress.
      ***********************************************************************************/
     this (Address addr, char[] name)
     {
         this.log = Log.lookup("lib.client");
-        super(name);
+        connection = new Connection(name, &process);
         connect(addr);
     }
 
@@ -210,8 +212,8 @@ public:
      ***********************************************************************************/
     this (Socket s, char[] name) {
         this.log = Log.lookup("lib.client");
-        super(name);
-        handshake(s);
+        connection = new Connection(name, &process);
+        connection.handshake(s);
     }
 
     /************************************************************************************
@@ -220,8 +222,12 @@ public:
     protected Socket connect(Address addr) {
         auto socket = new Socket(addr.addressFamily, SocketType.STREAM, ProtocolType.IP);
         socket.connect(addr);
-        handshake(socket);
+        connection.handshake(socket);
         return socket;
+    }
+
+    char[] peername() {
+        return connection.peername;
     }
 
     void close()
@@ -229,7 +235,7 @@ public:
         auto assets = openAssets.values;
         foreach (asset; assets)
             asset.close();
-        super.close();
+        connection.close();
     }
 
     /************************************************************************************
@@ -265,10 +271,32 @@ public:
         sendRequest(req);
     }
 protected:
-    void process(message.Type type, ubyte[] msg) {
+    synchronized void sendMessage(message.Message msg) {
+        connection.sendMessage(msg);
+    }
+    synchronized void sendRequest(message.RPCRequest req, TimeSpan timeout=TimeSpan.fromMillis(4000)) {
+        connection.sendRequest(req, timeout);
+    }
+    bool closed() {
+        return connection.closed;
+    }
+
+    void process(Connection c, message.Type type, ubyte[] msg) {
         try {
-            super.process(type, msg);
-        } catch (InvalidMessage exc) {
+            with (message) switch (type) {
+            case Type.HandShake: throw new Connection.InvalidMessage("Handshake not allowed after initialization");
+            case Type.OpenRequest: processOpenRequest(c, msg); break;
+            case Type.UploadRequest: processUploadRequest(c, msg); break;
+            case Type.OpenResponse: processOpenResponse(c, msg); break;
+            case Type.Close: processClose(c, msg); break;
+            case Type.ReadRequest: processReadRequest(c, msg); break;
+            case Type.ReadResponse: processReadResponse(c, msg); break;
+            case Type.DataSegment: processDataSegment(c, msg); break;
+            case Type.MetaDataRequest: processMetaDataRequest(c, msg); break;
+            case Type.MetaDataResponse: processMetaDataResponse(c, msg); break;
+            default: throw new Connection.InvalidMessage;
+            }
+        } catch (Connection.InvalidMessage exc) {
             log.warn("Exception in processing Message: {}", exc);
         }
     }
@@ -305,11 +333,11 @@ protected:
             return nextNewHandle++;
     }
 
-    synchronized void processOpenResponse(ubyte[] buf) {
+    synchronized void processOpenResponse(Connection c, ubyte[] buf) {
         auto resp = new RemoteAsset(this);
         IAsset asset;
         resp.decode(buf);
-        auto basereq = cast(message.OpenOrUploadRequest)releaseRequest(resp);
+        auto basereq = cast(message.OpenOrUploadRequest)c.releaseRequest(resp);
         if (basereq) {
             if (basereq.handleIsSet) {
                 resp.handle = basereq.handle;
@@ -331,36 +359,36 @@ protected:
             assert(basereq, "OpenResponse, but not OpenOrUploadRequest");
         }
     }
-    synchronized void processReadResponse(ubyte[] buf) {
+    synchronized void processReadResponse(Connection c, ubyte[] buf) {
         scope resp = new message.ReadResponse;
         resp.decode(buf);
-        auto req = cast(RemoteAsset.ReadRequest)releaseRequest(resp);
+        auto req = cast(RemoteAsset.ReadRequest)c.releaseRequest(resp);
         assert(req, "ReadResponse, but not ReadRequest");
         req.callback(resp.status, resp);
     }
-    synchronized void processMetaDataResponse(ubyte[] buf) {
+    synchronized void processMetaDataResponse(Connection c, ubyte[] buf) {
         scope resp = new message.MetaDataResponse;
         resp.decode(buf);
-        auto req = cast(RemoteAsset.MetaDataRequest)releaseRequest(resp);
+        auto req = cast(RemoteAsset.MetaDataRequest)c.releaseRequest(resp);
         assert(req, "MetaDataResponse, but not MetaDataRequest");
         req.callback(resp);
     }
-    void processOpenRequest(ubyte[] buf) {
+    void processOpenRequest(Connection c, ubyte[] buf) {
         throw new AssertException("Danger Danger! This client should not get requests!", __FILE__, __LINE__);
     }
-    void processClose(ubyte[] buf) {
+    void processClose(Connection c, ubyte[] buf) {
         throw new AssertException("Danger Danger! This client should not get requests!", __FILE__, __LINE__);
     }
-    void processReadRequest(ubyte[] buf) {
+    void processReadRequest(Connection c, ubyte[] buf) {
         throw new AssertException("Danger Danger! This client should not get requests!", __FILE__, __LINE__);
     }
-    void processUploadRequest(ubyte[] buf) {
+    void processUploadRequest(Connection c, ubyte[] buf) {
         throw new AssertException("Danger Danger! This client should not get requests!", __FILE__, __LINE__);
     }
-    void processDataSegment(ubyte[] buf) {
+    void processDataSegment(Connection c, ubyte[] buf) {
         throw new AssertException("Danger Danger! This client should not get segment data!", __FILE__, __LINE__);
     }
-    void processMetaDataRequest(ubyte[] buf) {
+    void processMetaDataRequest(Connection c, ubyte[] buf) {
         throw new AssertException("Danger Danger! This client should not get requests!", __FILE__, __LINE__);
     }
 }
@@ -408,13 +436,12 @@ public:
      * Run exactly one cycle of readNewData, processMessage*, processTimeouts
      ***********************************************************************************/
     synchronized void pump() {
-        if (selector.select(nextTimeOut) > 0) {
+        if (selector.select(connection.nextTimeOut) > 0) {
             foreach (key; selector.selectedSet()) {
-                assert(key.conduit is socket);
                 if (key.isReadable) {
-                    auto read = readNewData();
+                    auto read = connection.readNewData();
                     if (read)
-                        while (processMessage()) {}
+                        while (connection.processMessage()) {}
                     else
                         onDisconnected();
                 } else if (key.isError) {
@@ -422,7 +449,7 @@ public:
                 }
             }
         }
-        processTimeouts();
+        connection.processTimeouts();
     }
 
     /************************************************************************************

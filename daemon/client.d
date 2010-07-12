@@ -28,6 +28,7 @@ import daemon.cache.asset;
 import daemon.cache.manager;
 import lib.asset;
 import lib.client;
+import lib.connection;
 import message = lib.message;
 import lib.protobuf;
 
@@ -159,7 +160,7 @@ public:
     void open(message.Identifier[] ids, bool do_bind, BHOpenCallback openCallback, ulong uuid,
               TimeSpan timeout) { super.open(ids, do_bind, openCallback, uuid, timeout); }
 protected:
-    void processOpenRequest(ubyte[] buf)
+    void processOpenRequest(Connection c, ubyte[] buf)
     {
         auto req = new daemon.client.OpenRequest(this);
         req.decode(buf);
@@ -170,9 +171,9 @@ protected:
         server.findAsset(req);
     }
 
-    void processUploadRequest(ubyte[] buf)
+    void processUploadRequest(Connection c, ubyte[] buf)
     {
-        if (!isTrusted) {
+        if (!c.isTrusted) {
             log.warn("Got UploadRequest from unauthorized client {}", this);
             return;
         }
@@ -182,7 +183,7 @@ protected:
         server.uploadAsset(req);
     }
 
-    void processReadRequest(ubyte[] buf)
+    void processReadRequest(Connection c, ubyte[] buf)
     {
         auto req = new ReadRequest(this);
         req.decode(buf);
@@ -199,7 +200,7 @@ protected:
         asset.aSyncRead(req.offset, req.size, &req.callback);
     }
 
-    void processDataSegment(ubyte[] buf) {
+    void processDataSegment(Connection c, ubyte[] buf) {
         scope req = new message.DataSegment();
         req.decode(buf);
         try {
@@ -210,7 +211,7 @@ protected:
         }
     }
 
-    void processMetaDataRequest(ubyte[] buf) {
+    void processMetaDataRequest(Connection c, ubyte[] buf) {
         // Create anon class to satisfy abstract abort().
         // MetaData is always local and never async, so don't need full state
         scope req = new class message.MetaDataRequest {
@@ -237,7 +238,7 @@ protected:
         sendMessage(resp);
     }
 
-    void processClose(ubyte[] buf)
+    void processClose(Connection c, ubyte[] buf)
     {
         scope req = new message.Close;
         req.decode(buf);
