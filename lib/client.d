@@ -111,13 +111,14 @@ public:
      * aSyncRead as of IAsset. With or without explicit retry-count
      ***********************************************************************************/
     void aSyncRead(ulong offset, uint size, BHReadCallback readCallback) {
-        aSyncRead(offset, size, readCallback, 5);
+        this.aSyncRead(offset, size, readCallback, 5, TimeSpan.fromMillis(6000));
     }
-    void aSyncRead(ulong offset, uint size, BHReadCallback readCallback, ushort retries) { /// ditto
+    /// ditto
+    void aSyncRead(ulong offset, uint size, BHReadCallback readCallback, ushort retries, TimeSpan timeout) {
         auto req = new ReadRequest(readCallback, retries);
         req.offset = offset;
         req.size = size;
-        client.sendRequest(req);
+        client.sendRequest(req, timeout);
     }
 
     void requestMetaData(BHMetaDataCallback cb) {

@@ -227,7 +227,7 @@ void testAssetFetchWithTimeout(SteppingServer src, Identifier[] ids) {
         asset = cast(RemoteAsset)_asset;
         assert(asset && (status == Status.SUCCESS), "Failed opening");
 
-        asset.aSyncRead(pos, chunkSize, &gotResponse, 500);
+        asset.aSyncRead(pos, chunkSize, &gotResponse, 2, TimeSpan.fromMillis(500));
     });
     auto t = new Thread(delegate() { // After 1 second, let the server respond
         Thread.sleep(1);
@@ -261,7 +261,7 @@ void testRestartWithPartialAsset(SteppingServer src, Identifier[] ids) {
         asset = cast(RemoteAsset)_asset;
         assert(asset && (status == Status.SUCCESS), "Failed opening, status is " ~ statusToString(status));
 
-        asset.aSyncRead(0, chunkSize, &gotResponse1, 500);
+        asset.aSyncRead(0, chunkSize, &gotResponse1, 2, TimeSpan.fromMillis(500));
     });
     client.run();
     LOG.info("Shutting down server");
@@ -269,7 +269,7 @@ void testRestartWithPartialAsset(SteppingServer src, Identifier[] ids) {
     LOG.info("Restarting server");
     proxy = new SteppingServer("RestartProxy", 23416, [src]);
     proxy.reset(1000);
-    LOG.info("Reconnection client");
+    LOG.info("Reconnecting client");
     client = createClient(proxy);
 
     void gotResponse2(IAsset asset, Status status, ReadRequest req, ReadResponse resp) {
@@ -287,7 +287,7 @@ void testRestartWithPartialAsset(SteppingServer src, Identifier[] ids) {
         asset = cast(RemoteAsset)_asset;
         assert(asset && (status == Status.SUCCESS), "Failed opening");
 
-        asset.aSyncRead(pos, chunkSize, &gotResponse2, 500);
+        asset.aSyncRead(pos, chunkSize, &gotResponse2, 2, TimeSpan.fromMillis(500));
     });
     client.run();
 }
