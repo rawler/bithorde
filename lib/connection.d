@@ -24,18 +24,22 @@ private import tango.time.Clock;
 private import tango.util.container.more.Heap;
 private import tango.util.container.more.Stack;
 
-private import lib.protobuf;
 public import message = lib.message;
+private import lib.protobuf;
+private import lib.timeout;
 
 /****************************************************************************************
  * Structure describing a still-unanswered request from BitHorde. Wraps the actual
  * request up with a timeout-time.
  ***************************************************************************************/
 struct InFlightRequest {
-    Time time;
+    Connection c;
     message.RPCRequest req;
-    int opCmp(InFlightRequest other) {
-        return this.time.opCmp(other.time);
+    TimeoutQueue.EventId timeout;
+    void triggerTimeout(Time deadline, Time now) {
+        auto req = this.req;
+        c.lingerRequest(req); // LingerRequest destroys req, so must store local refs first.
+        req.abort(message.Status.TIMEOUT);
     }
 }
 
@@ -51,8 +55,6 @@ struct LingerId {
     }
 }
 
-/// Queue-types
-alias Heap!(InFlightRequest*, true) TimedRequestQueue;
 /// ditto
 alias Heap!(LingerId, true) LingerIdQueue;
 
@@ -80,8 +82,8 @@ protected:
 
     /// inFlightRequests contains actual requests, and is the allocation-heap for IFR:s
     InFlightRequest[] inFlightRequests;
-    /// timeouts contains references to inFlightRequests, sorted on timeout-time. Needs care and attention
-    public TimedRequestQueue timeouts;
+    /// TimeoutQueue for inFlightRequests
+    public TimeoutQueue timeouts;
     /// Free reusable request-ids
     Stack!(ushort,100) _freeIds;
     /// Ids that can't be re-used for a while, to avoid conflicting responses
@@ -100,19 +102,21 @@ protected:
         } else {
             target.rpcId = nextid++;
             if (inFlightRequests.length <= target.rpcId) {
+                // TODO: Why not .length = ???
                 auto newInFlightRequests = new InFlightRequest[inFlightRequests.length*2];
                 newInFlightRequests[0..inFlightRequests.length] = inFlightRequests;
                 delete inFlightRequests;
                 inFlightRequests = newInFlightRequests;
 
-                // Timeouts is now full of broken references, rebuild
+                // Timeouts is now full of broken callbacks, rebuild
                 timeouts.clear();
                 foreach (ref ifr; inFlightRequests[0..target.rpcId]) {
                     if (ifr.req)
-                        timeouts.push(&ifr);
+                        ifr.timeout = timeouts.registerAt(ifr.timeout.at, &ifr.triggerTimeout);
                 }
             }
         }
+        inFlightRequests[target.rpcId].c = this;
         return target.rpcId;
     }
 
@@ -127,7 +131,7 @@ protected:
         if (!req)
             throw new InvalidResponse;
         msg.request = req;
-        timeouts.remove(ifr);
+        timeouts.abort(ifr.timeout);
         inFlightRequests[msg.rpcId] = InFlightRequest.init;
         if (_freeIds.unused)
             _freeIds.push(msg.rpcId);
@@ -162,7 +166,7 @@ public:
      ***********************************************************************************/
     protected void reset() {
         this._freeIds = _freeIds.init;
-        this.timeouts = timeouts.init;
+        this.timeouts = new TimeoutQueue;
         this.lingerIds = lingerIds.init;
         this.nextid = nextid.init;
         this._peername = _peername.init;
@@ -252,25 +256,14 @@ public:
      * Process waiting timeouts expected to fire up until now.
      ***********************************************************************************/
     synchronized void processTimeouts() {
-        while (timeouts.size && (Clock.now > timeouts.peek.time)) {
-            auto req = timeouts.pop.req;
-            lingerRequest(req);
-            req.abort(message.Status.TIMEOUT);
-        }
-    }
-
-    /************************************************************************************
-     * Figure next TimeOut, which is either time to the first timeout, or TimeSpan.max
-     ***********************************************************************************/
-    TimeSpan nextTimeOut() {
-        return timeouts.size ? (timeouts.peek.time-Clock.now) : TimeSpan.max;
+        timeouts.emit();
     }
 
     /************************************************************************************
      * Figure next DeadLine, which is either time to the first timeout, or TimeSpan.max
      ***********************************************************************************/
     Time nextDeadline() {
-        return timeouts.size ? timeouts.peek.time : Time.max;
+        return timeouts.nextDeadline;
     }
 
     final char[] peername() { return _peername; }
@@ -350,10 +343,9 @@ package:
         auto rpcId = allocRequest(req);
         req.timeout = timeout.millis;
         sendMessage(req);
-        auto ifr = &inFlightRequests[rpcId];
+        InFlightRequest* ifr = &inFlightRequests[rpcId];
         ifr.req = req;
-        ifr.time = Clock.now + timeout;
-        timeouts.push(ifr);
+        ifr.timeout = timeouts.registerIn(timeout, &ifr.triggerTimeout);
     }
 protected:
     /************************************************************************************

@@ -20,6 +20,7 @@ private import tango.core.Exception;
 private import tango.io.selector.Selector;
 private import tango.math.random.Random;
 private import tango.net.device.Socket;
+private import tango.time.Clock;
 private import tango.time.Time;
 private import tango.util.container.more.Stack;
 private import tango.util.log.Log;
@@ -437,7 +438,8 @@ public:
      * Run exactly one cycle of readNewData, processMessage*, processTimeouts
      ***********************************************************************************/
     synchronized void pump() {
-        if (selector.select(connection.nextTimeOut) > 0) {
+        auto timeout = connection.nextDeadline - Clock.now;
+        if (selector.select(timeout) > 0) {
             foreach (key; selector.selectedSet()) {
                 if (key.isReadable) {
                     auto read = connection.readNewData();
