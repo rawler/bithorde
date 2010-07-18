@@ -124,7 +124,7 @@ void testLibTimeout(SteppingServer s) {
             LOG.info("SUCCESS: Timeout gotten");
             client.close();
         } else {
-            assert(false, "Expected Timeout but got other status " ~ toString(status));
+            assert(false, "Expected Timeout but got other status " ~ statusToString(status));
         }
         assert(req, "Invalid request");
         assert(!resp, "Got unexpected response");
@@ -151,7 +151,7 @@ void testServerTimeout(SteppingServer src, SteppingServer proxy) {
             gotTimeout = true;
             client.close();
         } else {
-            assert(false, "Expected NOTFOUND but got other status " ~ toString(status));
+            assert(false, "Expected NOTFOUND but got other status " ~ statusToString(status));
         }
         auto elapsed = Clock.now - sendTime;
         assert(elapsed.millis > 300, "Too little time has passed. Can't be result of Timeout.");
@@ -213,7 +213,7 @@ void testAssetFetchWithTimeout(SteppingServer src, Identifier[] ids) {
     RemoteAsset asset;
 
     void gotResponse(IAsset asset, Status status, ReadRequest req, ReadResponse resp) {
-        assert(status == Status.SUCCESS, "Read should have succeded, but got status " ~ toString(status));
+        assert(status == Status.SUCCESS, "Read should have succeded, but got status " ~ statusToString(status));
         pos += chunkSize;
         if (pos < asset.size)
             asset.aSyncRead(pos, chunkSize, &gotResponse);
@@ -254,7 +254,7 @@ void testRestartWithPartialAsset(SteppingServer src, Identifier[] ids) {
     RemoteAsset asset;
 
     void gotResponse1(IAsset asset, Status status, ReadRequest req, ReadResponse resp) {
-        assert(status == Status.SUCCESS, "First-Read should have succeded, but got status " ~ toString(status));
+        assert(status == Status.SUCCESS, "First-Read should have succeded, but got status " ~ statusToString(status));
         client.close();
     }
     client.open(ids, delegate(IAsset _asset, Status status, OpenOrUploadRequest req, OpenResponse resp) {
@@ -273,7 +273,7 @@ void testRestartWithPartialAsset(SteppingServer src, Identifier[] ids) {
     client = createClient(proxy);
 
     void gotResponse2(IAsset asset, Status status, ReadRequest req, ReadResponse resp) {
-        assert(status == Status.SUCCESS, "Read should have succeded, but got status " ~ toString(status));
+        assert(status == Status.SUCCESS, "Read should have succeded, but got status " ~ statusToString(status));
         pos += chunkSize;
         if (pos < asset.size)
             asset.aSyncRead(pos, chunkSize, &gotResponse2);
