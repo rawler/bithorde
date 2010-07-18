@@ -163,7 +163,7 @@ public:
         auto nextDeadline = Time.max;
         foreach (key; selector) {
             if (auto c = cast(Client)key.attachment) {
-                auto cnd = c.connection.nextDeadline;
+                auto cnd = c.nextDeadline;
                 if (cnd < nextDeadline) nextDeadline = cnd;
             }
         }
@@ -173,9 +173,10 @@ public:
                     removeThese ~= event;
             }
         }
+        auto now = Clock.now;
         foreach (key; selector) {
             auto c = cast(Client)key.attachment;
-            if (c) c.connection.processTimeouts();
+            if (c) c.processTimeouts(now);
         }
         foreach (event; removeThese) {
             auto c = cast(Client)event.attachment;
@@ -185,11 +186,11 @@ public:
         }
     }
 
-    void findAsset(OpenRequest req) {
+    void findAsset(BindRead req) {
         return cacheMgr.findAsset(req);
     }
 
-    void uploadAsset(UploadRequest req) {
+    void uploadAsset(BindWrite req) {
         cacheMgr.uploadAsset(req);
     }
 protected:

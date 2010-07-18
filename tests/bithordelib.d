@@ -86,7 +86,7 @@ class SteppingServer : Server {
     void reset(uint steps=0) {
         auto oldsem = sem;
         sem = new Semaphore(steps);
-        sem.notify;
+        oldsem.notify;
     }
 
     void shutdown() {
@@ -113,20 +113,19 @@ SimpleClient createClient(SteppingServer s, char[] name="libtest") {
  * Verifies that the bithorde lib times out stale requests correctly.
  ***************************************************************************************/
 void testLibTimeout(SteppingServer s) {
-    s.step();
+    s.reset();
     LOG.info("Client open, sending assetRequest");
     auto client = createClient(s);
     auto ids = [new Identifier(message.HashType.SHA1, cast(ubyte[])x"c1531277498f21cb9ded5741f7a0d66c66505bca")];
     bool gotTimeout = false;
-    client.open(ids, delegate(IAsset asset, Status status, OpenOrUploadRequest req, OpenResponse resp) {
-        assert(!asset, "Asset is not null");
+    client.open(ids, delegate(IAsset asset, Status status, AssetStatus resp) {
+        assert(asset, "Asset is null");
         if (status == Status.TIMEOUT) {
             LOG.info("SUCCESS: Timeout gotten");
             client.close();
         } else {
             assert(false, "Expected Timeout but got other status " ~ statusToString(status));
         }
-        assert(req, "Invalid request");
         assert(!resp, "Got unexpected response");
     }, TimeSpan.fromMillis(500));
     LOG.info("Request sent, expecting Timeout");
@@ -137,16 +136,16 @@ void testLibTimeout(SteppingServer s) {
  * Verifies that the bithorde server times out stale forwarded requests correctly.
  ***************************************************************************************/
 void testServerTimeout(SteppingServer src, SteppingServer proxy) {
-    src.step();
-    proxy.step(100);
-    Thread.sleep(0.1);
+    src.reset(1);
+    proxy.reset(100);
+    Thread.sleep(0.2);
     auto client = createClient(proxy);
     LOG.info("Client open, sending assetRequest");
     auto ids = [new Identifier(message.HashType.SHA1, cast(ubyte[])x"c1531277498f21cb9ded5741f7a0d66c66505bca")];
     bool gotTimeout = false;
     auto sendTime = Clock.now;
-    client.open(ids, delegate(IAsset asset, Status status, OpenOrUploadRequest req, OpenResponse resp) {
-        assert(!asset, "Asset is not null");
+    client.open(ids, delegate(IAsset asset, Status status, AssetStatus resp) {
+        assert(asset, "Asset is null");
         if (status == Status.NOTFOUND) {
             gotTimeout = true;
             client.close();
@@ -155,7 +154,6 @@ void testServerTimeout(SteppingServer src, SteppingServer proxy) {
         }
         auto elapsed = Clock.now - sendTime;
         assert(elapsed.millis > 300, "Too little time has passed. Can't be result of Timeout.");
-        assert(req, "Invalid request");
         assert(resp, "Did not get expected response");
     }, TimeSpan.fromMillis(500));
     LOG.info("Request sent, expecting Timeout");
@@ -178,7 +176,7 @@ Identifier[] testAssetUpload(SteppingServer dst) {
     Thread.sleep(0.1);
     auto client = createClient(dst);
     LOG.info("Client open, uploading asset");
-    client.beginUpload(testData.length*times, delegate(IAsset _asset, Status status, OpenOrUploadRequest req, OpenResponse resp) {
+    client.beginUpload(testData.length*times, delegate(IAsset _asset, Status status, AssetStatus resp) {
         auto asset = cast(RemoteAsset)_asset;
         assert(asset && (status == Status.SUCCESS), "Failed opening");
         for (int i = 0; i < times; i++)
@@ -223,7 +221,7 @@ void testAssetFetchWithTimeout(SteppingServer src, Identifier[] ids) {
         }
     }
 
-    client.open(ids, delegate(IAsset _asset, Status status, OpenOrUploadRequest req, OpenResponse resp) {
+    client.open(ids, delegate(IAsset _asset, Status status, AssetStatus resp) {
         asset = cast(RemoteAsset)_asset;
         assert(asset && (status == Status.SUCCESS), "Failed opening");
 
@@ -257,7 +255,7 @@ void testRestartWithPartialAsset(SteppingServer src, Identifier[] ids) {
         assert(status == Status.SUCCESS, "First-Read should have succeded, but got status " ~ statusToString(status));
         client.close();
     }
-    client.open(ids, delegate(IAsset _asset, Status status, OpenOrUploadRequest req, OpenResponse resp) {
+    client.open(ids, delegate(IAsset _asset, Status status, AssetStatus resp) {
         asset = cast(RemoteAsset)_asset;
         assert(asset && (status == Status.SUCCESS), "Failed opening, status is " ~ statusToString(status));
 
@@ -283,7 +281,7 @@ void testRestartWithPartialAsset(SteppingServer src, Identifier[] ids) {
         }
     }
     LOG.info("Retrying fetch");
-    client.open(ids, delegate(IAsset _asset, Status status, OpenOrUploadRequest req, OpenResponse resp) {
+    client.open(ids, delegate(IAsset _asset, Status status, AssetStatus resp) {
         asset = cast(RemoteAsset)_asset;
         assert(asset && (status == Status.SUCCESS), "Failed opening");
 

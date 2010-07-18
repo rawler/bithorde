@@ -17,6 +17,7 @@
 module daemon.routing.router;
 
 private import tango.time.Time;
+private import tango.util.log.Log;
 
 private import lib.message;
 
@@ -33,19 +34,21 @@ class Router : IAssetSource {
 private:
     ForwardedAsset[ulong] openRequests;
     Friend[Client] connectedFriends;
+    Logger log;
 public:
     this() {
+        log = Log.lookup("daemon.router.manager");
     }
 
     /************************************************************************************
      * Implements IAssetSource.find. Unless request is already under forwarding, forward
      * to all connected friends.
      ***********************************************************************************/
-    void findAsset(daemon.client.OpenRequest req) {
+    void findAsset(daemon.client.BindRead req) {
         if (req.uuid in openRequests)
             req.callback(null, Status.WOULD_LOOP);
         else
-            return forwardOpenRequest(req);
+            return forwardBindRead(req);
     }
 
     /************************************************************************************
@@ -71,7 +74,7 @@ private:
     /************************************************************************************
      * Remove request from list of in-flight-openRequests
      ***********************************************************************************/
-    void openRequestCompleted(daemon.client.OpenRequest req) {
+    void openRequestCompleted(daemon.client.BindRead req) {
         this.openRequests.remove(req.uuid);
     }
 
@@ -80,20 +83,19 @@ private:
      * requests.
      ***********************************************************************************/
     // TODO: Exception-handling; what if sending to friend fails?
-    void forwardOpenRequest(daemon.client.OpenRequest req) {
-        bool forwarded = false;
+    void forwardBindRead(daemon.client.BindRead req) {
+        log.trace("Forwarding request among {} friends", connectedFriends.length);
         auto asset = new ForwardedAsset(req, &openRequestCompleted);
         foreach (friend; connectedFriends) {
             auto client = friend.c;
             if (client != req.client) {
+                log.trace("Forwarding to {}", friend);
                 asset.waitingResponses += 1;
                 // TODO: Randomize timeouts
-                // TODO: Don't require bound handle if downstream doesn't need it.
-                client.open(req.ids, true, &asset.addBackingAsset, req.uuid, TimeSpan.fromMillis(req.timeout-50));
-                forwarded = true;
+                client.open(req.ids, &asset.addBackingAsset, req.uuid, TimeSpan.fromMillis(req.timeout-50));
             }
         }
-        if (!forwarded)
+        if (!asset.waitingResponses)
             asset.doCallback();
         else
             openRequests[req.uuid] = asset;

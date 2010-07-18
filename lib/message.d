@@ -29,12 +29,11 @@ private import lib.protobuf;
 enum Type
 {
     HandShake = 1,
-    OpenRequest = 2,
-    OpenResponse = 3,
-    Close = 4,
+    BindRead = 2,
+    AssetStatus = 3,
     ReadRequest = 5,
     ReadResponse = 6,
-    UploadRequest = 7,
+    BindWrite = 7,
     DataSegment = 8,
     MetaDataRequest = 9,
     MetaDataResponse = 10,
@@ -146,41 +145,41 @@ class HandShake : Message {
     Type typeId() { return Type.HandShake; }
 }
 
-package class OpenOrUploadRequest : RPCRequest {
+package class BindRequest : Message {
     mixin(PBField!(ushort, "handle"));     // Requested handle
+    mixin(PBField!(ushort, "timeout"));    // Timeout
 }
 
-class OpenRequest : OpenOrUploadRequest {
+class BindRead : BindRequest {
     mixin(PBField!(Identifier[], "ids"));  // Asset-Id:s to look for
     mixin(PBField!(ulong, "uuid"));        // UUID to avoid loops
 
-    mixin ProtoBufCodec!(PBMapping("rpcId",    1),
+    mixin ProtoBufCodec!(PBMapping("handle",   1),
                          PBMapping("ids",      2),
                          PBMapping("uuid",     3),
-                         PBMapping("timeout",  4),
-                         PBMapping("handle",   5));
+                         PBMapping("timeout",  4));
 
-    Type typeId() { return Type.OpenRequest; }
+    Type typeId() { return Type.BindRead; }
 }
 
-class UploadRequest : OpenOrUploadRequest {
+class BindWrite : BindRequest {
     mixin(PBField!(ulong, "size"));        // Size of opened asset
-    mixin ProtoBufCodec!(PBMapping("rpcId",    1),
+    mixin ProtoBufCodec!(PBMapping("handle",   1),
                          PBMapping("size",     2),
-                         PBMapping("timeout",  3),
-                         PBMapping("handle",   5));
+                         PBMapping("timeout",  3));
 
-    Type typeId() { return Type.UploadRequest; }
+    Type typeId() { return Type.BindWrite; }
 }
 
-class OpenResponse : RPCResponse {
+class AssetStatus : Message {
+    mixin(PBField!(ushort, "handle"));     // Requested handle
     mixin(PBField!(Status, "status"));     // Status of request
     mixin(PBField!(ulong, "size"));        // Size of opened asset
-    mixin ProtoBufCodec!(PBMapping("rpcId",     1),
+    mixin ProtoBufCodec!(PBMapping("handle",    1),
                          PBMapping("status",    2),
                          PBMapping("size",      4));
 
-    Type typeId() { return Type.OpenResponse; }
+    Type typeId() { return Type.AssetStatus; }
 }
 
 class ReadRequest : RPCRequest {
@@ -236,11 +235,4 @@ class MetaDataResponse : RPCResponse {
                          PBMapping("ids",       3));
 
     Type typeId() { return Type.MetaDataResponse; }
-}
-
-class Close : Message {
-    mixin(PBField!(ushort, "handle"));     // AssetHandle to release
-    mixin ProtoBufCodec!(PBMapping("handle",    1));
-
-    Type typeId() { return Type.Close; }
 }

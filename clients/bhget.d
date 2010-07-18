@@ -154,7 +154,7 @@ public:
         else
             output = new SortedOutput(new File(args.name, File.WriteCreate));
 
-        client.open(args.ids, &onOpen);
+        client.open(args.ids, &onStatusUpdate);
     }
     ~this(){
         if (asset)
@@ -201,7 +201,7 @@ private:
     /************************************************************************************
      * Callback for when asset-open response is recieved.
      ***********************************************************************************/
-    void onOpen(IAsset asset, Status status, OpenOrUploadRequest req, OpenResponse resp) {
+    void onStatusUpdate(IAsset asset, Status status, AssetStatus resp) {
         switch (status) {
         case Status.SUCCESS:
             if (args.verbose)

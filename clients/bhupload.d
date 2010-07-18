@@ -106,7 +106,7 @@ public:
 
         file = new File(args.file.toString);
 
-        client.beginUpload(file.length, &onOpen);
+        client.beginUpload(file.length, &onStatusUpdate);
     }
     ~this(){
         if (asset)
@@ -133,7 +133,7 @@ private:
     /************************************************************************************
      * Called-back from asset.beginUpload. If sucessful, start pushing the file
      ***********************************************************************************/
-    void onOpen(IAsset asset, Status status, OpenOrUploadRequest req, OpenResponse resp) {
+    void onStatusUpdate(IAsset asset, Status status, AssetStatus resp) {
         switch (status) {
         case Status.SUCCESS:
             if (args.verbose)

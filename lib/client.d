@@ -24,10 +24,12 @@ private import tango.time.Clock;
 private import tango.time.Time;
 private import tango.util.container.more.Stack;
 private import tango.util.log.Log;
+private import tango.util.MinMax;
 
 public import lib.asset;
 import lib.connection;
 import lib.protobuf;
+import lib.timeout;
 
 alias void delegate(Object) DEvent;
 extern (C) void rt_attachDisposeEvent(Object h, DEvent e);
@@ -86,22 +88,53 @@ protected:
     /************************************************************************************
      * RemoteAssets should only be created from the Client
      ***********************************************************************************/
-    this(Client c, message.OpenRequest req, message.OpenResponse resp) {
-        this(c, req.handle, resp);
+    this(Client c, message.BindRead req, BHAssetStatusCallback cb) {
+        this(c, cb);
         this.requestIds = req.ids;
     }
-    this(Client c, message.UploadRequest req, message.OpenResponse resp) {
-        this(c, req.handle, resp);
+    this(Client c, message.BindWrite req, BHAssetStatusCallback cb) {
+        this(c, cb);
+        this._size = req.size;
     }
-    this(Client c, ushort handle, message.OpenResponse resp) {
+    this(Client c, BHAssetStatusCallback cb) {
         rt_attachDisposeEvent(c, &clientGone); // Add hook for invalidating client-reference
         this.client = c;
-        this.handle = handle;
-        this._size = resp.size;
+        this.handle = c.allocateFreeHandle;
+        this._statusChangeHandler = cb;
     }
     ~this() {
         if (!closed)
             close();
+    }
+
+    BHAssetStatusCallback _statusChangeHandler;
+    TimeoutQueue.EventId statusTimeout;
+    void updateStatus(message.AssetStatus resp) {
+        if (statusTimeout.cb.ptr) {
+            client.timeouts.abort(statusTimeout);
+            statusTimeout = statusTimeout.init;
+        }
+        if (closed) {
+            confirmedClose();
+        } else {
+            if (resp.sizeIsSet)
+                this._size = resp.size;
+            if (this._statusChangeHandler)
+                this._statusChangeHandler(this, resp.status, resp);
+        }
+    }
+    void triggerTimeout(Time deadline, Time now) {
+        if (closed) {
+            confirmedClose();
+        } else {
+            statusTimeout = statusTimeout.init;
+            if (this._statusChangeHandler)
+                this._statusChangeHandler(this, message.Status.TIMEOUT, null);
+        }
+    }
+    void confirmedClose() {
+        if (client) client.onAssetClosed(this);
+        client = null;
     }
 public:
     ushort handle;
@@ -141,13 +174,11 @@ public:
 
     void close() {
         closed = true;
-        if (client) {
-            if (!client.closed) {
-                scope req = new message.Close;
-                req.handle = handle;
-                client.sendMessage(req);
-            }
-            client.onAssetClosed(this);
+        _statusChangeHandler = null;
+        if (client && !client.closed) {
+            // Sending null-bind closes the asset
+            scope req = new message.BindRead;
+            client.sendBindRequest(req, this, TimeSpan.fromSeconds(5));
         }
     }
 }
@@ -165,36 +196,11 @@ public:
  * The Client is not thread-safe at this moment.
  ***************************************************************************************/
 class Client {
-protected:
-    /************************************************************************************
-     * Internal outgoing UploadRequest object
-     ***********************************************************************************/
-    static class UploadRequest : message.UploadRequest {
-        BHOpenCallback callback;
-        this(BHOpenCallback cb) {
-            this.callback = cb;
-        }
-        void abort(message.Status s) {
-            callback(null, s, this, null);
-        }
-    }
-
-    /************************************************************************************
-     * Internal outgoing OpenRequest object
-     ***********************************************************************************/
-    static class OpenRequest : message.OpenRequest {
-        BHOpenCallback callback;
-        this(BHOpenCallback cb) {
-            this.callback = cb;
-        }
-        void abort(message.Status s) {
-            callback(null, s, this, null);
-        }
-    }
 private:
-    RemoteAsset[uint] openAssets;
+    RemoteAsset[] boundAssets;
     Stack!(ushort) freeAssetHandles;
     ushort nextNewHandle;
+    TimeoutQueue timeouts;
     protected Logger log;
 public:
     Connection connection;
@@ -203,8 +209,7 @@ public:
      ***********************************************************************************/
     this (Address addr, char[] name)
     {
-        this.log = Log.lookup("lib.client");
-        connection = new Connection(name, &process);
+        this(name);
         connect(addr);
     }
 
@@ -212,9 +217,18 @@ public:
      * Create BitHorde client on provided Socket
      ***********************************************************************************/
     this (Socket s, char[] name) {
+        this(name);
+        connection.handshake(s);
+    }
+
+    /************************************************************************************
+     * Private common-initialization ctor
+     ***********************************************************************************/
+    private this(char[] name) {
         this.log = Log.lookup("lib.client");
         connection = new Connection(name, &process);
-        connection.handshake(s);
+        timeouts = new TimeoutQueue;
+        boundAssets = new RemoteAsset[16];
     }
 
     /************************************************************************************
@@ -233,9 +247,10 @@ public:
 
     void close()
     {
-        auto assets = openAssets.values;
-        foreach (asset; assets)
+        auto assets = boundAssets;
+        foreach (asset; boundAssets) if (asset) {
             asset.close();
+        }
         connection.close();
     }
 
@@ -249,34 +264,55 @@ public:
      *     timeout       =  (optional) How long to wait before automatically failing the
      *                      request. Defaults to 500msec.
      ***********************************************************************************/
-    void open(message.Identifier[] ids,
-              BHOpenCallback openCallback, TimeSpan timeout = TimeSpan.fromMillis(3000)) {
-        open(ids, true, openCallback, rand.uniformR2!(ulong)(1,ulong.max), timeout);
-    }
-
-    /************************************************************************************
-     * Query about an asset without binding it to handle.
-     ***********************************************************************************/
-    void stat(message.Identifier[] ids, BHOpenCallback openCallback,
-        TimeSpan timeout = TimeSpan.fromMillis(3000)) {
-        open(ids, false, openCallback, rand.uniformR2!(ulong)(1,ulong.max), timeout);
+    void open(message.Identifier[] ids, BHAssetStatusCallback openCallback,
+              TimeSpan timeout = TimeSpan.fromMillis(3000)) {
+        open(ids, openCallback, rand.uniformR2!(ulong)(1,ulong.max), timeout);
     }
 
     /************************************************************************************
      * Create a new remote asset for uploading
      ***********************************************************************************/
-    void beginUpload(ulong size, BHOpenCallback cb) {
-        auto req = new UploadRequest(cb);
-        req.handle = this.allocateFreeHandle();
+    void beginUpload(ulong size, BHAssetStatusCallback cb) {
+        auto req = new message.BindWrite;
         req.size = size;
-        sendRequest(req);
+        auto asset = new RemoteAsset(this, req, cb);
+        sendBindRequest(req, asset);
+    }
+
+    /************************************************************************************
+     * Figure next timeout for this asset
+     ***********************************************************************************/
+    Time nextDeadline() {
+        return min!(Time)(timeouts.nextDeadline, connection.nextDeadline);
+    }
+
+    /************************************************************************************
+     * Process any passed timeouts
+     ***********************************************************************************/
+    void processTimeouts(Time now) {
+        timeouts.emit(now);
+        connection.processTimeouts(now);
     }
 protected:
     synchronized void sendMessage(message.Message msg) {
         connection.sendMessage(msg);
     }
-    synchronized void sendRequest(message.RPCRequest req, TimeSpan timeout=TimeSpan.fromMillis(4000)) {
+    synchronized void sendRequest(message.RPCRequest req,
+                                  TimeSpan timeout=TimeSpan.fromMillis(4000)) {
         connection.sendRequest(req, timeout);
+    }
+
+    /************************************************************************************
+     * Handles sending a bind-request for an asset, and setting up the asset for status-
+     * updates and timeouts.
+     ***********************************************************************************/
+    synchronized void sendBindRequest(message.BindRequest req, RemoteAsset asset,
+                                      TimeSpan timeout=TimeSpan.fromMillis(4000)) {
+        req.handle = asset.handle;
+        req.timeout = timeout.millis;
+        boundAssets[asset.handle] = asset;
+        sendMessage(req);
+        asset.statusTimeout = timeouts.registerIn(timeout, &asset.triggerTimeout);
     }
     bool closed() {
         return connection.closed;
@@ -285,11 +321,11 @@ protected:
     void process(Connection c, message.Type type, ubyte[] msg) {
         try {
             with (message) switch (type) {
-            case Type.HandShake: throw new Connection.InvalidMessage("Handshake not allowed after initialization");
-            case Type.OpenRequest: processOpenRequest(c, msg); break;
-            case Type.UploadRequest: processUploadRequest(c, msg); break;
-            case Type.OpenResponse: processOpenResponse(c, msg); break;
-            case Type.Close: processClose(c, msg); break;
+            case Type.HandShake:
+                throw new Connection.InvalidMessage("Handshake not allowed after initialization");
+            case Type.BindRead: processBindRead(c, msg); break;
+            case Type.BindWrite: processBindWrite(c, msg); break;
+            case Type.AssetStatus: processAssetStatus(c, msg); break;
             case Type.ReadRequest: processReadRequest(c, msg); break;
             case Type.ReadResponse: processReadResponse(c, msg); break;
             case Type.DataSegment: processDataSegment(c, msg); break;
@@ -305,21 +341,19 @@ protected:
     /************************************************************************************
      * Real open-function, but should only be used internally by bithorde.
      ***********************************************************************************/
-    void open(message.Identifier[] ids, bool do_bind, BHOpenCallback openCallback, ulong uuid,
+    void open(message.Identifier[] ids, BHAssetStatusCallback cb, ulong uuid,
               TimeSpan timeout) {
-        auto req = new OpenRequest(openCallback);
+        auto req = new message.BindRead;
         req.ids = ids;
         req.uuid = uuid;
-        if (do_bind)
-            req.handle = allocateFreeHandle;
-        sendRequest(req, timeout);
+        auto asset = new RemoteAsset(this, req, cb);
+        sendBindRequest(req, asset, timeout);
     }
 
     /************************************************************************************
      * Cleanup after a closed RemoteAsset
      ***********************************************************************************/
     protected void onAssetClosed(RemoteAsset asset) {
-        openAssets.remove(asset.handle);
         freeAssetHandles.push(asset.handle);
     }
 
@@ -328,38 +362,22 @@ protected:
      ***********************************************************************************/
     protected ushort allocateFreeHandle()
     {
-        if (freeAssetHandles.size > 0)
+        if (freeAssetHandles.size > 0) {
             return freeAssetHandles.pop();
-        else
+        } else {
+            if (nextNewHandle >= boundAssets.length)
+                boundAssets.length = boundAssets.length + 16;
             return nextNewHandle++;
+        }
     }
 
-    synchronized void processOpenResponse(Connection c, ubyte[] buf) {
-        scope resp = new message.OpenResponse;
+    synchronized void processAssetStatus(Connection c, ubyte[] buf) {
+        scope resp = new message.AssetStatus;
         resp.decode(buf);
-        auto basereq = cast(message.OpenOrUploadRequest)c.releaseRequest(resp);
-        if (basereq) {
-            RemoteAsset asset;
-            if (resp.status == message.Status.SUCCESS) {
-                if (basereq.typeId == message.Type.UploadRequest) {
-                    asset = new RemoteAsset(this, cast(UploadRequest)basereq, resp);
-                } else if (basereq.typeId == message.Type.OpenRequest) {
-                    asset = new RemoteAsset(this, cast(OpenRequest)basereq, resp);
-                }
-                openAssets[basereq.handle] = asset;
-            } else if (basereq.handleIsSet){
-                freeAssetHandles.push(basereq.handle);
-            }
-            if (basereq.typeId == message.Type.UploadRequest) {
-                auto req = cast(UploadRequest)basereq;
-                req.callback(asset, resp.status, req, resp);
-            } else if (basereq.typeId == message.Type.OpenRequest) {
-                auto req = cast(OpenRequest)basereq;
-                req.callback(asset, resp.status, req, resp);
-            }
-        } else {
-            assert(basereq, "OpenResponse, but not OpenOrUploadRequest");
-        }
+        log.trace("Recieved AssetStatus for handle {}", resp.handle);
+        auto asset = (boundAssets.length>resp.handle)?boundAssets[resp.handle]:null;
+        assert(asset, "Got AssetStatus for unknown handle");
+        asset.updateStatus(resp);
     }
     synchronized void processReadResponse(Connection c, ubyte[] buf) {
         scope resp = new message.ReadResponse;
@@ -375,16 +393,13 @@ protected:
         assert(req, "MetaDataResponse, but not MetaDataRequest");
         req.callback(resp);
     }
-    void processOpenRequest(Connection c, ubyte[] buf) {
-        throw new AssertException("Danger Danger! This client should not get requests!", __FILE__, __LINE__);
-    }
-    void processClose(Connection c, ubyte[] buf) {
+    void processBindRead(Connection c, ubyte[] buf) {
         throw new AssertException("Danger Danger! This client should not get requests!", __FILE__, __LINE__);
     }
     void processReadRequest(Connection c, ubyte[] buf) {
         throw new AssertException("Danger Danger! This client should not get requests!", __FILE__, __LINE__);
     }
-    void processUploadRequest(Connection c, ubyte[] buf) {
+    void processBindWrite(Connection c, ubyte[] buf) {
         throw new AssertException("Danger Danger! This client should not get requests!", __FILE__, __LINE__);
     }
     void processDataSegment(Connection c, ubyte[] buf) {
@@ -438,7 +453,7 @@ public:
      * Run exactly one cycle of readNewData, processMessage*, processTimeouts
      ***********************************************************************************/
     synchronized void pump() {
-        auto timeout = connection.nextDeadline - Clock.now;
+        auto timeout = nextDeadline - Clock.now;
         if (selector.select(timeout) > 0) {
             foreach (key; selector.selectedSet()) {
                 if (key.isReadable) {
@@ -452,7 +467,7 @@ public:
                 }
             }
         }
-        connection.processTimeouts();
+        processTimeouts(Clock.now);
     }
 
     /************************************************************************************

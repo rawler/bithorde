@@ -30,25 +30,22 @@ message HandShake { // Must be first message in stream
   required uint32 protoversion = 2 [default = 1];
 }
 
-message Open {
-  message Request {
-    required uint32 reqId = 1;
-    repeated Identifier ids = 2;
-    required uint64 uuid = 3;
-    required uint32 timeout = 4;
-    optional uint32 handle = 5;
-  }
-  message Upload {
-    required uint32 reqId = 1;
-    required uint64 size = 2;
-    required uint32 timeout = 3;
-    required uint32 handle = 5;
-  }
-  message Response {
-    required uint32 reqId = 1;
-    required Status status = 2;
-    optional uint32 size = 4;
-  }
+message BindRead { // Client->Server initate Read-Only binding
+  required uint32 handle = 1;
+  repeated Identifier ids = 2;
+  required uint64 uuid = 3;
+  required uint32 timeout = 4;
+}
+message BindWrite { // Client->Server initiate Read/Write Binding
+  required uint32 handle = 1;
+  required uint64 size = 2;
+  required uint32 timeout = 3;
+}
+
+message AssetStatus { // Server->Client, confirm bind-status (respond to Bind-Read/Write, notify changes in availability, and notify asset gone)
+  required uint32 handle = 1;
+  required Status status = 2;
+  optional uint32 size = 4;
 }
 
 message Read {
@@ -73,10 +70,6 @@ message DataSegment {
     required bytes content = 3;   // Content to write
 }
 
-message Close {
-  required uint32 handle = 1;     // Handle to asset, 0 means failure
-}
-
 message MetaDataRequest {
     required uint32 reqId = 1;
     required uint32 handle = 2;      // Asset handle for the data
@@ -89,16 +82,16 @@ message MetaDataResponse {
     repeated Identifier ids = 3;
 }
 
-// Dummy message to document the stream itself. Makes no sense as a message or object.
+// Dummy message to document the stream message-ids itself.
+// Makes no sense as a message or object.
 message Stream
 {
   required HandShake handshake          = 1;
-  repeated Open.Request openReq         = 2;
-  repeated Open.Response openRes        = 3;
-  repeated Close close                  = 4;
+  repeated BindRead bindRead            = 2;
+  repeated AssetStatus assetStatus      = 3;
   repeated Read.Request readReq         = 5;
   repeated Read.Response readRes        = 6;
-  repeated Open.Upload uploadReq        = 7;
+  repeated BindWrite bindWrite          = 7;
   repeated DataSegment dataSeg          = 8;
   repeated MetaDataRequest  metaDataReq = 9;
   repeated MetaDataResponse metaDataRes = 10;

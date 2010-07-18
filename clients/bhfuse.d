@@ -18,6 +18,7 @@ module clients.fuse;
 
 private import tango.core.Exception;
 private import tango.core.Thread;
+private import tango.core.tools.TraceExceptions;
 private import tango.io.FilePath;
 private import tango.io.selector.Selector;
 private import tango.io.Stdout;
@@ -229,7 +230,7 @@ extern (D) {
             RemoteAsset retval;
             for (auto retries = 2; retries > 0; retries--) try {
                 bool gotResponse = false;
-                open(objectids, delegate void(IAsset asset, Status status, OpenOrUploadRequest req, OpenResponse resp) {
+                open(objectids, delegate void(IAsset asset, Status status, AssetStatus resp) {
                     if (status == Status.SUCCESS) {
                         retval = cast(RemoteAsset)asset;
                     } else {
@@ -248,13 +249,14 @@ extern (D) {
         /********************************************************************************
          * Try to stat() asset, while driving client
          *******************************************************************************/
-        OpenResponse statAsset(Identifier[] objectids) {
-            OpenResponse retval;
+        ulong statAsset(Identifier[] objectids) {
+            ulong retval;
             for (auto retries = 2; retries > 0; retries--) try {
                 bool gotResponse = false;
-                stat(objectids, delegate void(IAsset asset, Status status, OpenOrUploadRequest req, OpenResponse resp) {
+                open(objectids, delegate void(IAsset asset, Status status, AssetStatus resp) {
+                    scope(exit) asset.close();
                     if (status == Status.SUCCESS) {
-                        retval = resp;
+                        retval = resp.size;
                     } else {
                         Stderr.format("Got non-success status from BitHorde.open: {}", statusToString(status)).newline;
                         throw new BitHordeException(status);
@@ -297,10 +299,10 @@ static int bh_getattr(char *path, stat_t *stbuf)
         if (!objectids.length)
             return -ENOENT;
 
-        if (auto asset = client.statAsset(objectids)) {
+        if (auto size = client.statAsset(objectids)) {
             stbuf.st_mode = S_IFREG | 0444;
             stbuf.st_nlink = 1;
-            stbuf.st_size = asset.size;
+            stbuf.st_size = size;
             return 0; // Success
         } else {
             return -ENOENT;
@@ -317,6 +319,13 @@ static int bh_getattr(char *path, stat_t *stbuf)
         return -ENOENT;
     } catch (BHFuseClient.DisconnectedException) {
         return -ENOTCONN;
+    } catch (Exception e) {
+        void write(char[] x) {
+            Stderr(x);
+        }
+        e.writeOut(&write);
+        Stderr.newline;
+        return -ENOENT;
     }
 }
 

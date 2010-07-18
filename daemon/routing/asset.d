@@ -22,7 +22,7 @@ private import lib.message;
 private import daemon.client;
 
 /// Used to notify router that request completed (regardless of success)
-alias void delegate(daemon.client.OpenRequest) RequestCompleted;
+alias void delegate(daemon.client.BindRead) RequestCompleted;
 
 /****************************************************************************************
  * A ForwardedAsset represents an asset currently being forwarded from "upstream" nodes.
@@ -30,7 +30,7 @@ alias void delegate(daemon.client.OpenRequest) RequestCompleted;
  ***************************************************************************************/
 private class ForwardedAsset : IServerAsset {
 private:
-    daemon.client.OpenRequest req;
+    daemon.client.BindRead req;
     IAsset[] backingAssets;
     BHServerOpenCallback openCallback;
     RequestCompleted notify;
@@ -41,7 +41,7 @@ public:
     /************************************************************************************
      * Create new ForwardedAsset from a request, and save callbacks
      ***********************************************************************************/
-    this (daemon.client.OpenRequest req, RequestCompleted notify)
+    this (daemon.client.BindRead req, RequestCompleted notify)
     {
         this.req = req;
         this.notify = notify;
@@ -60,7 +60,7 @@ public:
      * Implement IServerAsset.hashIds
      ***********************************************************************************/
     Identifier[] hashIds() {
-        // TODO: OpenResponse should also include hashIds, which should be preffered
+        // TODO: AssetStatus should also include hashIds, which should be preffered
         return req.ids;
     }
 
@@ -83,7 +83,7 @@ package:
     /************************************************************************************
      * Callback for hooking up new-found backing assets
      ***********************************************************************************/
-    void addBackingAsset(IAsset asset, Status status, lib.message.OpenOrUploadRequest req, OpenResponse resp) {
+    void addBackingAsset(IAsset asset, Status status, AssetStatus resp) {
         switch (status) {
         case Status.SUCCESS:
             assert(asset, "SUCCESS response, but no asset");

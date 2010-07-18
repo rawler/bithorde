@@ -36,7 +36,7 @@ import lib.protobuf;
  * Delegate-signature for request-notification-recievers. Reciever is responsible for
  * triggering a new req.callback, with appropriate responses.
  ***************************************************************************************/
-alias void delegate(OpenRequest req, IServerAsset, message.Status status) BHServerOpenCallback;
+alias void delegate(BindRead req, IServerAsset, message.Status status) BHServerOpenCallback;
 
 /****************************************************************************************
  * Interface for the various forms of server-assets. (BaseAsset, CachingAsset,
@@ -46,14 +46,14 @@ interface IServerAsset : IAsset {
     message.Identifier[] hashIds();
 }
 interface IAssetSource {
-    void findAsset(daemon.client.OpenRequest req);
+    void findAsset(daemon.client.BindRead req);
 }
 
 /****************************************************************************************
- * Structure for an incoming OpenRequest. Store the details of the request, should it
+ * Structure for an incoming BindRead. Store the details of the request, should it
  * need to be asynchronously forwarded before completion.
  ***************************************************************************************/
-class OpenRequest : message.OpenRequest {
+class BindRead : message.BindRead {
     Client client;
     BHServerOpenCallback[4] _callbacks;
     ushort _callbackCounter;
@@ -61,15 +61,14 @@ class OpenRequest : message.OpenRequest {
         client = c;
         pushCallback(&_callback);
     }
-    final void _callback(OpenRequest req, IServerAsset asset, message.Status status) {
+    final void _callback(BindRead req, IServerAsset asset, message.Status status) {
         assert(this is req);
         if (!client.closed) {
-            scope resp = new message.OpenResponse;
-            resp.rpcId = rpcId;
+            scope resp = new message.AssetStatus;
+            resp.handle = handle;
             resp.status = status;
             if (status == message.Status.SUCCESS) {
-                if (this.handleIsSet) // Add handle, to map
-                    client.openAssets[handle] = asset;
+                client.openAssets[handle] = asset;
                 resp.size = asset.size;
             }
             client.sendMessage(resp);
@@ -91,15 +90,15 @@ class OpenRequest : message.OpenRequest {
 /****************************************************************************************
  * Structure for an incoming UploadReuest.
  ***************************************************************************************/
-class UploadRequest : message.UploadRequest {
+class BindWrite : message.BindWrite {
     Client client;
     this(Client c) {
         client = c;
     }
     final void callback(IServerAsset asset, message.Status status) {
         if (!client.closed) {
-            scope resp = new message.OpenResponse;
-            resp.rpcId = rpcId;
+            scope resp = new message.AssetStatus;
+            resp.handle = handle;
             resp.status = status;
             if (status == message.Status.SUCCESS) {
                 // Allocate handle, and add to map
@@ -157,12 +156,12 @@ public:
     /************************************************************************************
      * Re-declared _open from lib.Client to make it publicly visible in the daemon.
      ***********************************************************************************/
-    void open(message.Identifier[] ids, bool do_bind, BHOpenCallback openCallback, ulong uuid,
-              TimeSpan timeout) { super.open(ids, do_bind, openCallback, uuid, timeout); }
+    void open(message.Identifier[] ids, BHAssetStatusCallback openCallback, ulong uuid,
+              TimeSpan timeout) { super.open(ids, openCallback, uuid, timeout); }
 protected:
-    void processOpenRequest(Connection c, ubyte[] buf)
+    void processBindRead(Connection c, ubyte[] buf)
     {
-        auto req = new daemon.client.OpenRequest(this);
+        auto req = new daemon.client.BindRead(this);
         req.decode(buf);
         log.trace("Got open request");
         ulong uuid = req.uuid;
@@ -171,15 +170,15 @@ protected:
         server.findAsset(req);
     }
 
-    void processUploadRequest(Connection c, ubyte[] buf)
+    void processBindWrite(Connection c, ubyte[] buf)
     {
         if (!c.isTrusted) {
-            log.warn("Got UploadRequest from unauthorized client {}", this);
+            log.warn("Got BindWrite from unauthorized client {}", this);
             return;
         }
-        auto req = new daemon.client.UploadRequest(this);
+        auto req = new daemon.client.BindWrite(this);
         req.decode(buf);
-        log.trace("Got UploadRequest from trusted client");
+        log.trace("Got BindWrite from trusted client");
         server.uploadAsset(req);
     }
 
@@ -236,19 +235,5 @@ protected:
             resp.status = message.Status.INVALID_HANDLE;
         }
         sendMessage(resp);
-    }
-
-    void processClose(Connection c, ubyte[] buf)
-    {
-        scope req = new message.Close;
-        req.decode(buf);
-        log.trace("closing handle {}", req.handle);
-        try {
-            IServerAsset asset = openAssets[req.handle];
-            openAssets.remove(req.handle);
-        } catch (ArrayBoundsException e) {
-            log.error("tried to Close invalid handle");
-            return;
-        }
     }
 }

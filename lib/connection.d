@@ -255,8 +255,8 @@ public:
     /************************************************************************************
      * Process waiting timeouts expected to fire up until now.
      ***********************************************************************************/
-    synchronized void processTimeouts() {
-        timeouts.emit();
+    synchronized void processTimeouts(Time now) {
+        timeouts.emit(now);
     }
 
     /************************************************************************************

@@ -220,7 +220,7 @@ public:
     /************************************************************************************
      * Recieves responses for forwarded requests, and decides on caching.
      ***********************************************************************************/
-    private void _forwardedCallback(OpenRequest req, IServerAsset asset, message.Status status) {
+    private void _forwardedCallback(BindRead req, IServerAsset asset, message.Status status) {
         if (status == message.Status.SUCCESS) {
             auto metaAsset = findMetaAsset(asset.hashIds);
             bool foundAsset = metaAsset !is null;
@@ -275,7 +275,7 @@ public:
     /************************************************************************************
      * Implements IAssetSource.findAsset. Tries to get a hold of a certain asset.
      ***********************************************************************************/
-    void findAsset(OpenRequest req) {
+    void findAsset(BindRead req) {
         void fromCache(MetaData meta, BaseAsset asset) {
             log.trace("serving {} from cache", hex.encode(meta.localId));
             req.callback(asset, message.Status.SUCCESS);
@@ -302,7 +302,7 @@ public:
     /************************************************************************************
      * Implement uploading new assets to this Cache.
      ***********************************************************************************/
-    void uploadAsset(UploadRequest req) {
+    void uploadAsset(BindWrite req) {
         try {
             if (_makeRoom(req.size)) {
                 MetaData meta = newMetaAsset();
