@@ -155,9 +155,9 @@ public:
         client.sendRequest(req, timeout);
     }
 
-    void requestMetaData(BHMetaDataCallback cb) {
+    void requestMetaData(BHMetaDataCallback cb, TimeSpan timeout=TimeSpan.fromSeconds(30)) {
         auto req = new MetaDataRequest(cb);
-        client.sendRequest(req);
+        client.sendRequest(req, timeout);
     }
 
     void sendDataSegment(ulong offset, ubyte[] data) {
