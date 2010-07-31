@@ -169,7 +169,8 @@ public:
         }
         if (selector.select(nextDeadline - Clock.now) > 0) {
             foreach (SelectionKey event; selector.selectedSet()) {
-                if (!processSelectEvent(event))
+                if (event.isError || event.isHangup || event.isInvalidHandle ||
+                        !processSelectEvent(event))
                     removeThese ~= event;
             }
         }
@@ -179,10 +180,11 @@ public:
             if (c) c.processTimeouts(now);
         }
         foreach (event; removeThese) {
-            auto c = cast(Client)event.attachment;
-            onClientDisconnect(c);
             selector.unregister(event.conduit);
-            c.close();
+            if (auto c = cast(Client)event.attachment) { // Connection has attached client
+                onClientDisconnect(c);
+                c.close();
+            }
         }
     }
 
@@ -259,26 +261,20 @@ protected:
     }
 
     bool processSelectEvent(SelectionKey event)
-    {
+    in { assert(event.isReadable); }
+    body {
         if (event.conduit is tcpServer) {
-            assert(event.isReadable);
             _handshakeAndSetup(tcpServer.accept());
         } else if (event.conduit is unixServer) {
-            assert(event.isReadable);
             _handshakeAndSetup(unixServer.accept());
         } else if (event.conduit is evfd) {
             evfd.clear();
         } else {
             auto c = cast(Client)event.attachment;
-            if (event.isError || event.isHangup || event.isInvalidHandle) {
+            if (c.connection.readNewData())
+                return _processMessageQueue(c.connection);
+            else
                 return false;
-            } else {
-                assert (event.isReadable);
-                if (c.connection.readNewData())
-                    return _processMessageQueue(c.connection);
-                else
-                    return false;
-            }
         }
         return true;
     }
