@@ -203,7 +203,6 @@ protected:
         }
     }
 
-    import tango.io.Stdout;
     /************************************************************************************
      * Post-finish hooks. Finalize the digests, add to assetMap, and remove the CacheMap
      ***********************************************************************************/
