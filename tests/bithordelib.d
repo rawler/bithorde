@@ -19,6 +19,7 @@ module tests.libbithorde;
 private import tango.core.Thread;
 private import tango.core.sync.Semaphore;
 private import tango.core.tools.TraceExceptions;
+private import tango.io.Console;
 private import tango.io.FilePath;
 private import tango.io.selector.model.ISelector;
 private import tango.io.Stdout;
@@ -300,22 +301,22 @@ void main() {
     Log.root.add(new AppendConsole(new LayoutDate));
     LOG = Log.lookup("libtest");
 
-    Stdout("\nTesting ClientTimeout\n=====================\n").newline;
+    synchronized (Cout.stream) { Stdout("\nTesting ClientTimeout\n=====================\n").newline; }
     auto src = new SteppingServer("Src", 23412);
     scope(exit) src.shutdown();
     testLibTimeout(src);
 
-    Stdout("\nTesting ServerTimeout\n=====================\n").newline;
+    synchronized (Cout.stream) { Stdout("\nTesting ServerTimeout\n=====================\n").newline; }
     auto proxy = new SteppingServer("Proxy", 23415, [src]);
     scope(exit) proxy.shutdown();
     testServerTimeout(src, proxy);
 
-    Stdout("\nTesting AssetUpload\n===================\n").newline;
+    synchronized (Cout.stream) { Stdout("\nTesting AssetUpload\n===================\n").newline; }
     auto ids = testAssetUpload(src);
 
-    Stdout("\nTesting Asset Fetching With Retry on Timeouts\n=============================================\n").newline;
+    synchronized (Cout.stream) { Stdout("\nTesting Asset Fetching With Retry on Timeouts\n=============================================\n").newline; }
     testAssetFetchWithTimeout(src, ids);
 
-    Stdout("\nTesting Restarting During Partial Asset\n=======================================\n").newline;
+    synchronized (Cout.stream) { Stdout("\nTesting Restarting During Partial Asset\n=======================================\n").newline; }
     testRestartWithPartialAsset(src, ids);
 }
