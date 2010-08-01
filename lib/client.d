@@ -265,7 +265,7 @@ public:
      *                      request. Defaults to 500msec.
      ***********************************************************************************/
     void open(message.Identifier[] ids, BHAssetStatusCallback openCallback,
-              TimeSpan timeout = TimeSpan.fromMillis(3000)) {
+              TimeSpan timeout = TimeSpan.fromMillis(10000)) {
         open(ids, openCallback, rand.uniformR2!(ulong)(1,ulong.max), timeout);
     }
 
