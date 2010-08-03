@@ -53,7 +53,7 @@ class RemoteAsset : private IAsset {
         void callback(message.Status s, message.ReadResponse resp) {
             if ((s == message.Status.TIMEOUT) && retries) {
                 retries -= 1;
-                client.sendRequest(this);
+                client.sendRPCRequest(this);
             } else {
                 _callback(this.outer, s, this, resp);
             }
@@ -152,12 +152,12 @@ public:
         auto req = new ReadRequest(readCallback, retries);
         req.offset = offset;
         req.size = size;
-        client.sendRequest(req, timeout);
+        client.sendRPCRequest(req, timeout);
     }
 
     void requestMetaData(BHMetaDataCallback cb, TimeSpan timeout=TimeSpan.fromSeconds(30)) {
         auto req = new MetaDataRequest(cb);
-        client.sendRequest(req, timeout);
+        client.sendRPCRequest(req, timeout);
     }
 
     void sendDataSegment(ulong offset, ubyte[] data) {
@@ -297,9 +297,9 @@ protected:
     synchronized void sendMessage(message.Message msg) {
         connection.sendMessage(msg);
     }
-    synchronized void sendRequest(message.RPCRequest req,
+    synchronized void sendRPCRequest(message.RPCRequest req,
                                   TimeSpan timeout=TimeSpan.fromMillis(4000)) {
-        connection.sendRequest(req, timeout);
+        connection.sendRPCRequest(req, timeout);
     }
 
     /************************************************************************************

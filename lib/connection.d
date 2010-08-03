@@ -339,7 +339,7 @@ package:
     /************************************************************************************
      * Send a request, with optional timeout, and register in corresponding idMaps.
      ***********************************************************************************/
-    synchronized void sendRequest(message.RPCRequest req, TimeSpan timeout) {
+    synchronized void sendRPCRequest(message.RPCRequest req, TimeSpan timeout) {
         auto rpcId = allocRequest(req);
         req.timeout = timeout.millis;
         sendMessage(req);
