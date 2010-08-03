@@ -29,6 +29,7 @@ import daemon.cache.manager;
 import lib.asset;
 import lib.client;
 import lib.connection;
+import lib.hashes;
 import message = lib.message;
 import lib.protobuf;
 
@@ -67,10 +68,10 @@ class BindRead : message.BindRead {
             scope resp = new message.AssetStatus;
             resp.handle = handle;
             resp.status = status;
-            if (status == message.Status.SUCCESS) {
-                client.openAssets[handle] = asset;
+            if (asset)
                 resp.size = asset.size;
-            }
+
+            client.openAssets[handle] = asset; // Assign to assetMap by Id
             client.sendMessage(resp);
         }
         delete this;
@@ -163,11 +164,14 @@ protected:
     {
         auto req = new daemon.client.BindRead(this);
         req.decode(buf);
-        log.trace("Got open request");
-        ulong uuid = req.uuid;
-        if (uuid == 0)
-            uuid = rand.uniformR2!(ulong)(1,ulong.max);
-        server.findAsset(req);
+        if (req.idsIsSet) {
+            log.trace("Got open request #{}, {}", req.uuid, formatMagnet(req.ids, 0));
+            if (!req.uuidIsSet)
+                req.uuid = rand.uniformR2!(ulong)(1,ulong.max);
+            server.findAsset(req);
+        } else {
+            req.abort(message.Status.NOTFOUND);
+        }
     }
 
     void processBindWrite(Connection c, ubyte[] buf)
