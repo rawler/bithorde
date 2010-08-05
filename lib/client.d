@@ -35,10 +35,12 @@ alias void delegate(Object) DEvent;
 extern (C) void rt_attachDisposeEvent(Object h, DEvent e);
 
 /****************************************************************************************
- * RemoteAsset is the basic BitHorde object for tracking a remotely open asset form the
+ * RemoteAsset is the basic BitHorde object for tracking a remotely open asset from the
  * client-side.
  ***************************************************************************************/
 class RemoteAsset : private IAsset {
+    mixin IAsset.StatusSignal;
+
     /************************************************************************************
      * Internal ReadRequest object, for tracking in-flight readrequests.
      ***********************************************************************************/

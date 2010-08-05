@@ -57,6 +57,7 @@ alias void delegate(Identifier[]) HashIdsListener;
  * Base for all kinds of cached assets. Provides basic reading functionality
  ***************************************************************************************/
 class BaseAsset : private File, public IServerAsset {
+    mixin IAsset.StatusSignal;
 protected:
     FilePath path;
     FilePath idxPath;

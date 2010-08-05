@@ -29,6 +29,7 @@ alias void delegate(daemon.client.BindRead) RequestCompleted;
  * A forwarded asset SHOULD have one or more BackingAssets.
  ***************************************************************************************/
 private class ForwardedAsset : IServerAsset {
+    mixin IAsset.StatusSignal;
 private:
     daemon.client.BindRead req;
     IAsset[] backingAssets;
