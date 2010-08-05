@@ -244,7 +244,7 @@ template ProtoBufCodec(fields...) {
                         case fields[i].id:
                             debug {
                                 if ((descriptor & 0b0111) != _WTypeForDType!(typeof(mixin("this._pb_"~fields[i].name))))
-                                    Log.lookup("bithorde").warn("Field with wrong WType parsed");
+                                    Log.lookup("protobuf").warn("Field with wrong WType parsed");
                             }
                             auto field = mixin("this._pb_"~fields[i].name); // Note, read-only. Since mixin will evalutate to variable declaration, cannot be written to
                             static if (is(typeof(field) : ProtoBufMessage))
