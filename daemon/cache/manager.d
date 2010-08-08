@@ -29,6 +29,7 @@ private import tango.text.Util;
 private import tango.time.Time;
 private import tango.util.log.Log;
 
+private import lib.asset;
 private import lib.hashes;
 private import lib.protobuf;
 
@@ -302,20 +303,21 @@ public:
     /************************************************************************************
      * Implement uploading new assets to this Cache.
      ***********************************************************************************/
-    void uploadAsset(BindWrite req) {
+    void uploadAsset(message.BindWrite req, BHAssetStatusCallback callback) {
         try {
             if (_makeRoom(req.size)) {
                 MetaData meta = newMetaAsset();
                 auto path = meta.assetPath;
                 assert(!path.exists());
                 auto asset = new WriteableAsset(path, meta, req.size, &meta.updateHashIds);
-                req.callback(asset, message.Status.SUCCESS);
+                asset.statusSignal.attach(callback);
+                callback(asset, message.Status.SUCCESS, null);
             } else {
-                req.callback(null, message.Status.NORESOURCES);
+                callback(null, message.Status.NORESOURCES, null);
             }
         } catch (IOException e) {
             log.error("While opening upload asset: {}", e);
-            req.callback(null, message.Status.NOTFOUND);
+            callback(null, message.Status.NOTFOUND, null);
         }
     }
 

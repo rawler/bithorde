@@ -30,6 +30,11 @@ message HandShake { // Must be first message in stream
   required uint32 protoversion = 2 [default = 1];
 }
 
+/****************************************************************************************
+ * Binds one set of Asset-identifiers to a specific handle
+ * Re-binding new assets to already used handles is allowed.
+ * Binding to a zero-length list of identifiers, is allowed, releasing the asset.
+ ***************************************************************************************/
 message BindRead { // Client->Server initate Read-Only binding
   required uint32 handle = 1;
   repeated Identifier ids = 2;
@@ -45,7 +50,8 @@ message BindWrite { // Client->Server initiate Read/Write Binding
 message AssetStatus { // Server->Client, confirm bind-status (respond to Bind-Read/Write, notify changes in availability, and notify asset gone)
   required uint32 handle = 1;
   required Status status = 2;
-  optional uint32 size = 4;
+  repeated Identifier ids = 3; // Used to notify client of new ids
+  optional uint32 size = 4;    // Notify Client of known size
 }
 
 message Read {
@@ -70,18 +76,6 @@ message DataSegment {
     required bytes content = 3;   // Content to write
 }
 
-message MetaDataRequest {
-    required uint32 reqId = 1;
-    required uint32 handle = 2;      // Asset handle for the data
-    required uint32 timeout = 3;
-}
-
-message MetaDataResponse {
-    required uint32 reqId = 1;
-    required Status status = 2;
-    repeated Identifier ids = 3;
-}
-
 // Dummy message to document the stream message-ids itself.
 // Makes no sense as a message or object.
 message Stream
@@ -93,6 +87,4 @@ message Stream
   repeated Read.Response readRes        = 6;
   repeated BindWrite bindWrite          = 7;
   repeated DataSegment dataSeg          = 8;
-  repeated MetaDataRequest  metaDataReq = 9;
-  repeated MetaDataResponse metaDataRes = 10;
 }

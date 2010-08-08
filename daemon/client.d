@@ -89,31 +89,6 @@ class BindRead : message.BindRead {
 }
 
 /****************************************************************************************
- * Structure for an incoming UploadReuest.
- ***************************************************************************************/
-class BindWrite : message.BindWrite {
-    Client client;
-    this(Client c) {
-        client = c;
-    }
-    final void callback(IServerAsset asset, message.Status status) {
-        if (!client.closed) {
-            scope resp = new message.AssetStatus;
-            resp.handle = handle;
-            resp.status = status;
-            if (status == message.Status.SUCCESS) {
-                // Allocate handle, and add to map
-                client.openAssets[handle] = asset;
-            }
-            client.sendMessage(resp);
-        }
-    }
-    void abort(message.Status s) {
-        callback(null, s);
-    }
-}
-
-/****************************************************************************************
  * Structure for an incoming ReadRequest
  ***************************************************************************************/
 class ReadRequest : message.ReadRequest {
@@ -139,6 +114,58 @@ public:
 }
 
 class Client : lib.client.Client {
+    /************************************************************************************
+     * Represents a ServerAsset bound to a client-handle
+     ***********************************************************************************/
+    class BoundAsset : IServerAsset {
+        uint handle;
+        IServerAsset assetSource;
+    protected:
+        /// Construct from BindRead request
+        this (BindRead req) {
+        }
+        this (message.BindWrite req) {
+            handle = req.handle;
+            openAssets[handle] = this;
+            server.uploadAsset(req, &onAssetStatus);
+        }
+    private:
+        void onAssetStatus(IAsset asset, message.Status sCode, message.AssetStatus s) {
+            assetSource = cast(IServerAsset)asset;
+            if (!closed) {
+                scope resp = new message.AssetStatus();
+                resp.handle = handle;
+                resp.status = sCode;
+                if (assetSource) {
+                    resp.size = size;
+                    resp.ids = hashIds;
+                }
+                openAssets[handle] = this; // Assign to assetMap by Id
+                sendMessage(resp);
+            }
+        }
+    public:
+        ulong size() {
+            return assetSource ? assetSource.size : 0;
+        }
+        void close() {
+            // TODO: Implement
+        }
+        Signal!(ParameterTupleOf!(BHAssetStatusCallback))* statusSignal() {
+            return null; // Doesn't make sense?
+        }
+        message.Identifier[] hashIds() {
+            return assetSource ? assetSource.hashIds : null;
+        }
+        void aSyncRead(ulong offset, uint length, BHReadCallback cb) {
+            assert(assetSource);
+            return assetSource.aSyncRead(offset, length, cb);
+        }
+        void addDataSegment(message.DataSegment req) {
+            auto asset = cast(WriteableAsset)assetSource;
+            asset.add(req.offset, req.content);
+        }
+    }
 private:
     Server server;
     CacheManager cacheMgr;
@@ -180,10 +207,10 @@ protected:
             log.warn("Got BindWrite from unauthorized client {}", this);
             return;
         }
-        auto req = new daemon.client.BindWrite(this);
+        auto req = new message.BindWrite;
         req.decode(buf);
         log.trace("Got BindWrite from trusted client");
-        server.uploadAsset(req);
+        auto asset = new BoundAsset(req);
     }
 
     void processReadRequest(Connection c, ubyte[] buf)
@@ -207,37 +234,10 @@ protected:
         scope req = new message.DataSegment();
         req.decode(buf);
         try {
-            auto asset = cast(BaseAsset)openAssets[req.handle];
-            asset.add(req.offset, req.content);
+            auto asset = cast(BoundAsset)openAssets[req.handle];
+            asset.addDataSegment(req);
         } catch (ArrayBoundsException e) {
             log.error("DataSegment to invalid handle");
         }
-    }
-
-    void processMetaDataRequest(Connection c, ubyte[] buf) {
-        // Create anon class to satisfy abstract abort().
-        // MetaData is always local and never async, so don't need full state
-        scope req = new class message.MetaDataRequest {
-            void abort(message.Status s) {}
-        };
-        req.decode(buf);
-        scope resp = new message.MetaDataResponse;
-        resp.rpcId = req.rpcId;
-        try {
-            auto asset = openAssets[req.handle];
-            if (asset) {
-                resp.ids = asset.hashIds;
-                if (resp.ids)
-                    resp.status = message.Status.SUCCESS;
-                else
-                    resp.status = message.Status.ERROR;
-            } else {
-                resp.status = message.Status.INVALID_HANDLE;
-            }
-        } catch (ArrayBoundsException e) {
-            log.error("MetaDataRequest on invalid handle");
-            resp.status = message.Status.INVALID_HANDLE;
-        }
-        sendMessage(resp);
     }
 }

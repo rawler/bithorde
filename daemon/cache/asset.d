@@ -228,6 +228,8 @@ protected:
 
         cacheMap.path.remove();
         delete cacheMap;
+
+        statusSignal.call(this, message.Status.SUCCESS, null);
     }
 }
 

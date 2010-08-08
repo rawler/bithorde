@@ -192,8 +192,8 @@ public:
         return cacheMgr.findAsset(req);
     }
 
-    void uploadAsset(BindWrite req) {
-        cacheMgr.uploadAsset(req);
+    void uploadAsset(message.BindWrite req, BHAssetStatusCallback cb) {
+        cacheMgr.uploadAsset(req, cb);
     }
 protected:
     void onClientConnect(Client c, Connection conn)

@@ -35,8 +35,6 @@ enum Type
     ReadResponse = 6,
     BindWrite = 7,
     DataSegment = 8,
-    MetaDataRequest = 9,
-    MetaDataResponse = 10,
 }
 
 public abstract class Message : ProtoBufMessage {
@@ -175,8 +173,10 @@ class AssetStatus : Message {
     mixin(PBField!(ushort, "handle"));     // Requested handle
     mixin(PBField!(Status, "status"));     // Status of request
     mixin(PBField!(ulong, "size"));        // Size of opened asset
+    mixin(PBField!(Identifier[], "ids"));  // Notification of new known ids
     mixin ProtoBufCodec!(PBMapping("handle",    1),
                          PBMapping("status",    2),
+                         PBMapping("ids",       3),
                          PBMapping("size",      4));
 
     Type typeId() { return Type.AssetStatus; }
@@ -216,23 +216,4 @@ class DataSegment : Message {
                          PBMapping("content",   3));
 
     Type typeId() { return Type.DataSegment; }
-}
-
-class MetaDataRequest : RPCRequest {
-    mixin(PBField!(ushort, "handle"));     // Asset handle for the data
-    mixin ProtoBufCodec!(PBMapping("rpcId",     1),
-                         PBMapping("handle",    2),
-                         PBMapping("timeout",   3));
-
-    Type typeId() { return Type.MetaDataRequest; }
-}
-
-class MetaDataResponse : RPCResponse {
-    mixin(PBField!(Status, "status"));
-    mixin(PBField!(Identifier[], "ids"));
-    mixin ProtoBufCodec!(PBMapping("rpcId",     1),
-                         PBMapping("status",    2),
-                         PBMapping("ids",       3));
-
-    Type typeId() { return Type.MetaDataResponse; }
 }

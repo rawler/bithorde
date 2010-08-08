@@ -177,19 +177,25 @@ Identifier[] testAssetUpload(SteppingServer dst) {
     Thread.sleep(0.1);
     auto client = createClient(dst);
     LOG.info("Client open, uploading asset");
-    client.beginUpload(testData.length*times, delegate(IAsset _asset, Status status, AssetStatus resp) {
+    auto expectedStatus = Status.SUCCESS;
+    void onAssetStatus(IAsset _asset, Status status, AssetStatus resp) {
         auto asset = cast(RemoteAsset)_asset;
-        assert(asset && (status == Status.SUCCESS), "Failed opening");
-        for (int i = 0; i < times; i++)
-            asset.sendDataSegment(i*testData.length,cast(ubyte[])testData);
+        LOG.trace("status: {}", message.statusToString(status));
+        assert(asset && (status == expectedStatus));
 
-        asset.requestMetaData(delegate (IAsset asset, Status status, MetaDataRequest req, MetaDataResponse resp) {
-            assert(asset && (status == Status.SUCCESS), "Failed digesting");
-            retVal = resp.ids;
-            LOG.info("SUCCESS! Digest is {}", retVal[0].id);
-            client.close();
-        });
-    });
+        if (resp && (status == Status.SUCCESS)) {
+            if (resp.idsIsSet) { // Upload Complete, got response
+                retVal = resp.ids;
+                LOG.info("SUCCESS! Digest is {}", retVal[0].id);
+                expectedStatus = Status.INVALID_HANDLE;
+                client.close();
+            } else { // Initial "ok to upload"-response
+                for (int i = 0; i < times; i++)
+                    asset.sendDataSegment(i*testData.length,cast(ubyte[])testData);
+            }
+        }
+    }
+    client.beginUpload(testData.length*times, &onAssetStatus);
     LOG.info("Request sent, expecting Timeout");
     client.run();
 

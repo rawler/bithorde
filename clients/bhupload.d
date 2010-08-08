@@ -126,6 +126,8 @@ private:
      * Finalize pushing, and exit with status
      ***********************************************************************************/
     void exit(int exitStatus) {
+        if (asset)
+            asset.statusSignal.detach(&onStatusUpdate);
         client.close();
         this.exitStatus = exitStatus;
     }
@@ -133,16 +135,17 @@ private:
     /************************************************************************************
      * Called-back from asset.beginUpload. If sucessful, start pushing the file
      ***********************************************************************************/
-    void onStatusUpdate(IAsset asset, Status status, AssetStatus resp) {
+    void onStatusUpdate(IAsset _asset, Status status, AssetStatus resp) {
         switch (status) {
         case Status.SUCCESS:
-            if (args.verbose)
-                Stderr.format("File upload begun.").newline;
-            if (args.progressBar)
-                pBar = new ProgressBar(file.length, args.file.name ~ " : ", "kB", 1024);
-            this.asset = cast(RemoteAsset)asset;
-            sendFile();
-            break;
+            asset = cast(RemoteAsset)_asset;
+            if (resp.idsIsSet) {
+                return onComplete(asset, status, resp.ids);
+            } else {
+                // Re-register this handle to recieve status updates
+                asset.statusSignal.attach(&onStatusUpdate);
+                return sendFile(asset);
+            }
         default:
             if (resp)
                 Stderr.format("Got unexpected status from BitHorde.open: {}", statusToString(status)).newline;
@@ -156,7 +159,12 @@ private:
      * Since BitHorde does not reply to file-pushing, the entire file can safely be
      * pushed in one go.
      ***********************************************************************************/
-    void sendFile() {
+    void sendFile(RemoteAsset asset) {
+        if (args.verbose)
+            Stderr.format("File upload begun.").newline;
+        if (args.progressBar)
+            pBar = new ProgressBar(file.length, args.file.name ~ " : ", "kB", 1024);
+
         pos = file.position;
         while (pos < file.length) {
             ubyte[CHUNK_SIZE] buf;
@@ -172,7 +180,6 @@ private:
                 exit(-1);
             }
         }
-        asset.requestMetaData(&onComplete);
         if (args.progressBar) {
             if (exitStatus == 0) // Successful finish
                 pBar.finish(pos);
@@ -185,10 +192,10 @@ private:
      * When the entire file is pushed, bithorde will reply with calculated checksums.
      * Print these, and exit
      ***********************************************************************************/
-    void onComplete(IAsset asset, Status status, MetaDataRequest req, MetaDataResponse resp) {
+    void onComplete(IAsset asset, Status status, Identifier[] ids) {
         if (status == Status.SUCCESS) {
-            Stdout(formatMagnet(resp.ids, pos, args.file.file)).newline;
-            Stdout(formatED2K(resp.ids, pos, args.file.file)).newline;
+            Stdout(formatMagnet(ids, pos, args.file.file)).newline;
+            Stdout(formatED2K(ids, pos, args.file.file)).newline;
             exit(0);
         } else {
             Stderr("Non-successful upload", statusToString(status)).newline;

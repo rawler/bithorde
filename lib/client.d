@@ -65,22 +65,6 @@ class RemoteAsset : private IAsset {
             callback(s, null);
         }
     }
-    /************************************************************************************
-     * Internal MetaDataRequest object, for tracking in-flight MetaDataRequests.
-     ***********************************************************************************/
-    class MetaDataRequest : message.MetaDataRequest {
-        BHMetaDataCallback _callback;
-        this(BHMetaDataCallback cb) {
-            this.handle = this.outer.handle;
-            _callback = cb;
-        }
-        void callback(message.MetaDataResponse resp) {
-            _callback(this.outer, resp.status, this, resp);
-        }
-        void abort(message.Status s) {
-            _callback(this.outer, s, this, null);
-        }
-    }
 private:
     Client client;
     bool closed;
@@ -162,11 +146,6 @@ public:
         client.sendRPCRequest(req, timeout);
     }
 
-    void requestMetaData(BHMetaDataCallback cb, TimeSpan timeout=TimeSpan.fromSeconds(30)) {
-        auto req = new MetaDataRequest(cb);
-        client.sendRPCRequest(req, timeout);
-    }
-
     void sendDataSegment(ulong offset, ubyte[] data) {
         auto msg = new message.DataSegment;
         msg.handle = handle;
@@ -181,8 +160,9 @@ public:
 
     void close() {
         closed = true;
-        statusSignal.call(this, message.Status.INVALID_HANDLE, null);
+        scope sig = _statusSignal;
         _statusSignal = _statusSignal.init;
+        sig.call(this, message.Status.INVALID_HANDLE, null);
         if (client && !client.closed) {
             // Sending null-bind closes the asset
             scope req = new message.BindRead;
@@ -284,10 +264,10 @@ public:
     /************************************************************************************
      * Create a new remote asset for uploading
      ***********************************************************************************/
-    void beginUpload(ulong size, BHAssetStatusCallback cb) {
+    void beginUpload(ulong size, BHAssetStatusCallback cb, bool singleShotStatus = false) {
         auto req = new message.BindWrite;
         req.size = size;
-        auto asset = new RemoteAsset(this, req, cb);
+        auto asset = new RemoteAsset(this, req, cb, singleShotStatus);
         sendBindRequest(req, asset);
     }
 
@@ -341,8 +321,6 @@ protected:
             case Type.ReadRequest: processReadRequest(c, msg); break;
             case Type.ReadResponse: processReadResponse(c, msg); break;
             case Type.DataSegment: processDataSegment(c, msg); break;
-            case Type.MetaDataRequest: processMetaDataRequest(c, msg); break;
-            case Type.MetaDataResponse: processMetaDataResponse(c, msg); break;
             default: throw new Connection.InvalidMessage;
             }
         } catch (Connection.InvalidMessage exc) {
@@ -398,13 +376,6 @@ protected:
         assert(req, "ReadResponse, but not ReadRequest");
         req.callback(resp.status, resp);
     }
-    synchronized void processMetaDataResponse(Connection c, ubyte[] buf) {
-        scope resp = new message.MetaDataResponse;
-        resp.decode(buf);
-        auto req = cast(RemoteAsset.MetaDataRequest)c.releaseRequest(resp);
-        assert(req, "MetaDataResponse, but not MetaDataRequest");
-        req.callback(resp);
-    }
     void processBindRead(Connection c, ubyte[] buf) {
         throw new AssertException("Danger Danger! This client should not get requests!", __FILE__, __LINE__);
     }
@@ -416,9 +387,6 @@ protected:
     }
     void processDataSegment(Connection c, ubyte[] buf) {
         throw new AssertException("Danger Danger! This client should not get segment data!", __FILE__, __LINE__);
-    }
-    void processMetaDataRequest(Connection c, ubyte[] buf) {
-        throw new AssertException("Danger Danger! This client should not get requests!", __FILE__, __LINE__);
     }
 }
 
