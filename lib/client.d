@@ -40,6 +40,7 @@ extern (C) void rt_attachDisposeEvent(Object h, DEvent e);
  ***************************************************************************************/
 class RemoteAsset : private IAsset {
     mixin IAsset.StatusSignal;
+    public bool singleShotStatus = true;
 
     /************************************************************************************
      * Internal ReadRequest object, for tracking in-flight readrequests.
@@ -90,26 +91,26 @@ protected:
     /************************************************************************************
      * RemoteAssets should only be created from the Client
      ***********************************************************************************/
-    this(Client c, message.BindRead req, BHAssetStatusCallback cb) {
-        this(c, cb);
+    this(Client c, message.BindRead req, BHAssetStatusCallback cb, bool singleShotStatus = true) {
+        this(c, cb, singleShotStatus);
         this.requestIds = req.ids;
     }
-    this(Client c, message.BindWrite req, BHAssetStatusCallback cb) {
-        this(c, cb);
+    this(Client c, message.BindWrite req, BHAssetStatusCallback cb, bool singleShotStatus = true) {
+        this(c, cb, singleShotStatus);
         this._size = req.size;
     }
-    this(Client c, BHAssetStatusCallback cb) {
+    this(Client c, BHAssetStatusCallback cb, bool singleShotStatus) {
         rt_attachDisposeEvent(c, &clientGone); // Add hook for invalidating client-reference
         this.client = c;
         this.handle = c.allocateFreeHandle;
-        this._statusChangeHandler = cb;
+        this.statusSignal.attach(cb);
+        this.singleShotStatus = singleShotStatus;
     }
     ~this() {
         if (!closed)
             close();
     }
 
-    BHAssetStatusCallback _statusChangeHandler;
     TimeoutQueue.EventId statusTimeout;
     void updateStatus(message.AssetStatus resp) {
         if (statusTimeout.cb.ptr) {
@@ -121,8 +122,10 @@ protected:
         } else {
             if (resp.sizeIsSet)
                 this._size = resp.size;
-            if (this._statusChangeHandler)
-                this._statusChangeHandler(this, resp.status, resp);
+            scope sig = _statusSignal; // Store away sig for call
+            if (singleShotStatus)
+                _statusSignal = _statusSignal.init;
+            sig.call(this, resp.status, resp);
         }
     }
     void triggerTimeout(Time deadline, Time now) {
@@ -130,8 +133,10 @@ protected:
             confirmedClose();
         } else {
             statusTimeout = statusTimeout.init;
-            if (this._statusChangeHandler)
-                this._statusChangeHandler(this, message.Status.TIMEOUT, null);
+            scope sig = _statusSignal; // Store away sig for call
+            if (singleShotStatus)
+                _statusSignal = _statusSignal.init;
+            sig.call(this, message.Status.TIMEOUT, null);
         }
     }
     void confirmedClose() {
@@ -176,7 +181,8 @@ public:
 
     void close() {
         closed = true;
-        _statusChangeHandler = null;
+        statusSignal.call(this, message.Status.INVALID_HANDLE, null);
+        _statusSignal = _statusSignal.init;
         if (client && !client.closed) {
             // Sending null-bind closes the asset
             scope req = new message.BindRead;
@@ -260,15 +266,19 @@ public:
      * Attempt to open an asset identified by any of a set of ids.
      *
      * Params:
-     *     ids           =  A list of ids to match. Priorities, and outcome of conflicts
-     *                      in ID:s are undefined
-     *     openCallback  =  A callback to be notified when the open request has completed
-     *     timeout       =  (optional) How long to wait before automatically failing the
-     *                      request. Defaults to 500msec.
+     *     ids              = A list of ids to match. Priorities, and outcome of
+     *                        conflicts in ID:s are undefined
+     *     openCallback     = A callback to be notified when the open request has
+     *                        completed
+     *     timeout          = (optional) How long to wait before automatically failing
+     *                        the request. Defaults to 500msec.
+     *     singleShotStatus = The BHAssetStatusCallback will only be called once on
+     *                        initial binding, and not for later status updates
      ***********************************************************************************/
-    void open(message.Identifier[] ids, BHAssetStatusCallback openCallback,
-              TimeSpan timeout = TimeSpan.fromMillis(10000)) {
-        open(ids, openCallback, rand.uniformR2!(ulong)(1,ulong.max), timeout);
+    void open(message.Identifier[] ids, BHAssetStatusCallback cb,
+        TimeSpan timeout = TimeSpan.fromMillis(10000), bool singleShotStatus = true) {
+        open(ids, cb, rand.uniformR2!(ulong)(1,ulong.max), timeout,
+             singleShotStatus);
     }
 
     /************************************************************************************
@@ -343,12 +353,12 @@ protected:
     /************************************************************************************
      * Real open-function, but should only be used internally by bithorde.
      ***********************************************************************************/
-    void open(message.Identifier[] ids, BHAssetStatusCallback cb, ulong uuid,
-              TimeSpan timeout) {
+    void open(message.Identifier[] ids, BHAssetStatusCallback cb,
+              ulong uuid, TimeSpan timeout, bool singleShotStatus) {
         auto req = new message.BindRead;
         req.ids = ids;
         req.uuid = uuid;
-        auto asset = new RemoteAsset(this, req, cb);
+        auto asset = new RemoteAsset(this, req, cb, singleShotStatus);
         sendBindRequest(req, asset, timeout);
     }
 

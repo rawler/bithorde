@@ -158,7 +158,7 @@ public:
      * Re-declared _open from lib.Client to make it publicly visible in the daemon.
      ***********************************************************************************/
     void open(message.Identifier[] ids, BHAssetStatusCallback openCallback, ulong uuid,
-              TimeSpan timeout) { super.open(ids, openCallback, uuid, timeout); }
+              TimeSpan timeout) { super.open(ids, openCallback, uuid, timeout, true); }
 protected:
     void processBindRead(Connection c, ubyte[] buf)
     {
