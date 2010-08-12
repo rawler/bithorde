@@ -18,6 +18,7 @@ module daemon.server;
 
 private import tango.core.Exception;
 private import tango.core.Thread;
+// private import tango.core.tools.TraceExceptions; // Disabled due to poor Tracing-performance.
 private import tango.io.FilePath;
 private import tango.io.selector.Selector;
 private import tango.net.device.Berkeley;
@@ -161,37 +162,41 @@ public:
         scope SelectionKey[] removeThese;
         auto nextDeadline = Time.max;
         foreach (key; selector) {
-            auto c = cast(Connection)key.attachment;
-            if (c && c.timeouts.size && (c.timeouts.peek.time < nextDeadline))
-                nextDeadline = c.timeouts.peek.time;
+            if (auto c = cast(Client)key.attachment) {
+                auto cnd = c.nextDeadline;
+                if (cnd < nextDeadline) nextDeadline = cnd;
+            }
         }
         if (selector.select(nextDeadline - Clock.now) > 0) {
             foreach (SelectionKey event; selector.selectedSet()) {
-                if (!processSelectEvent(event))
+                if (event.isError || event.isHangup || event.isInvalidHandle ||
+                        !processSelectEvent(event))
                     removeThese ~= event;
             }
         }
+        auto now = Clock.now;
         foreach (key; selector) {
-            auto c = cast(Connection)key.attachment;
-            if (c) c.processTimeouts();
+            auto c = cast(Client)key.attachment;
+            if (c) c.processTimeouts(now);
         }
         foreach (event; removeThese) {
-            auto c = cast(Client)event.attachment;
-            onClientDisconnect(c);
             selector.unregister(event.conduit);
-            c.close();
+            if (auto c = cast(Client)event.attachment) { // Connection has attached client
+                onClientDisconnect(c);
+                c.close();
+            }
         }
     }
 
-    void findAsset(OpenRequest req) {
+    void findAsset(BindRead req) {
         return cacheMgr.findAsset(req);
     }
 
-    void uploadAsset(UploadRequest req) {
-        cacheMgr.uploadAsset(req);
+    void uploadAsset(message.BindWrite req, BHAssetStatusCallback cb) {
+        cacheMgr.uploadAsset(req, cb);
     }
 protected:
-    void onClientConnect(Client c)
+    void onClientConnect(Client c, Connection conn)
     {
         Friend f;
         auto peername = c.peername;
@@ -203,7 +208,7 @@ protected:
             router.registerFriend(f);
         }
 
-        log.info("{} {} connected: {}", f?"Friend":"Client", peername, c.remoteAddress);
+        log.info("{} {} connected: {}", f?"Friend":"Client", peername, conn.remoteAddress);
     }
 
     void onClientDisconnect(Client c)
@@ -216,7 +221,7 @@ protected:
         log.info("{} {} disconnected", f?"Friend":"Client", c.peername);
     }
 
-    protected bool _processMessageQueue(Client c) {
+    protected bool _processMessageQueue(Connection c) {
         try {
             while (c.processMessage()) {}
             return true;
@@ -243,12 +248,12 @@ protected:
             log.fatal("New connection triggered an unhandled exception; {}", excInfo);
             return abortSocket();
         }
-        onClientConnect(c);
+        onClientConnect(c, c.connection);
         selector.register(s, Event.Read, c);
 
         // ATM, there may be stale data in the buffers from the HandShake that needs processing
         // Perhaps try to rework internal API so that the HandShake is handled in normal run-loop?
-        if (!_processMessageQueue(c)) {
+        if (!_processMessageQueue(c.connection)) {
             onClientDisconnect(c);
             return abortSocket();
         }
@@ -256,26 +261,20 @@ protected:
     }
 
     bool processSelectEvent(SelectionKey event)
-    {
+    in { assert(event.isReadable); }
+    body {
         if (event.conduit is tcpServer) {
-            assert(event.isReadable);
             _handshakeAndSetup(tcpServer.accept());
         } else if (event.conduit is unixServer) {
-            assert(event.isReadable);
             _handshakeAndSetup(unixServer.accept());
         } else if (event.conduit is evfd) {
             evfd.clear();
         } else {
             auto c = cast(Client)event.attachment;
-            if (event.isError || event.isHangup || event.isInvalidHandle) {
+            if (c.connection.readNewData())
+                return _processMessageQueue(c.connection);
+            else
                 return false;
-            } else {
-                assert (event.isReadable);
-                if (c.readNewData())
-                    return _processMessageQueue(c);
-                else
-                    return false;
-            }
         }
         return true;
     }

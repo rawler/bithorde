@@ -18,6 +18,8 @@ module clients.fuse;
 
 private import tango.core.Exception;
 private import tango.core.Thread;
+private import tango.core.tools.TraceExceptions;
+private import tango.io.FilePath;
 private import tango.io.selector.Selector;
 private import tango.io.Stdout;
 private import tango.net.device.Berkeley : Address;
@@ -164,6 +166,14 @@ extern (D) {
         }
     }
 
+    class BitHordeException : Exception {
+        Status status;
+        this(Status status) {
+            this.status = status;
+            super(statusToString(status));
+        }
+    }
+
     class BHFuseClient : SimpleClient {
         private Address _remoteAddr;
         AssetMap assetMap;
@@ -220,15 +230,36 @@ extern (D) {
             RemoteAsset retval;
             for (auto retries = 2; retries > 0; retries--) try {
                 bool gotResponse = false;
-                open(objectids, delegate void(IAsset asset, Status status, OpenOrUploadRequest req, OpenResponse resp) {
-                    switch (status) {
-                    case Status.SUCCESS:
+                open(objectids, delegate void(IAsset asset, Status status, AssetStatus resp) {
+                    if (status == Status.SUCCESS) {
                         retval = cast(RemoteAsset)asset;
-                        break;
-                    case Status.NOTFOUND:
-                        break;
-                    default:
-                        Stderr.format("Got unknown status from BitHorde.open: {}", status).newline;
+                    } else {
+                        Stderr.format("Got non-success status from BitHorde.open: {}", statusToString(status)).newline;
+                        throw new BitHordeException(status);
+                    }
+                    gotResponse = true;
+                });
+                driveUntil(gotResponse);
+                break;
+            } catch (ReconnectedException e) { continue; } // Retry
+
+            return retval;
+        }
+
+        /********************************************************************************
+         * Try to stat() asset, while driving client
+         *******************************************************************************/
+        ulong statAsset(Identifier[] objectids) {
+            ulong retval;
+            for (auto retries = 2; retries > 0; retries--) try {
+                bool gotResponse = false;
+                open(objectids, delegate void(IAsset asset, Status status, AssetStatus resp) {
+                    scope(exit) asset.close();
+                    if (status == Status.SUCCESS) {
+                        retval = resp.size;
+                    } else {
+                        Stderr.format("Got non-success status from BitHorde.open: {}", statusToString(status)).newline;
+                        throw new BitHordeException(status);
                     }
                     gotResponse = true;
                 });
@@ -255,34 +286,47 @@ extern (D) {
  ***************************************************************************************/
 static int bh_getattr(char *path, stat_t *stbuf)
 {
-    int res = 0;
     char[] dpath = path[0..strlen(path)];
 
     memset(stbuf, 0, stat_t.sizeof);
     if (dpath == "/") {
         stbuf.st_mode = S_IFDIR | 0755;
         stbuf.st_nlink = 2;
+        return 0;
     } else try {
         char[] name;
         auto objectids = parseUri(dpath[1..length], name);
         if (!objectids.length)
             return -ENOENT;
 
-        if (auto asset = client.openAsset(objectids)) {
+        if (auto size = client.statAsset(objectids)) {
             stbuf.st_mode = S_IFREG | 0444;
             stbuf.st_nlink = 1;
-            stbuf.st_size = asset.size;
-            asset.close();
+            stbuf.st_size = size;
+            return 0; // Success
         } else {
-            res = -ENOENT;
+            return -ENOENT;
+        }
+    } catch (BitHordeException e) {
+        switch (e.status) {
+            case Status.NORESOURCES:
+                return -ENOMEM;
+                break;
+            default:
+                return -ENOENT;
         }
     } catch (IllegalArgumentException) {
-        res = -ENOENT;
+        return -ENOENT;
     } catch (BHFuseClient.DisconnectedException) {
         return -ENOTCONN;
+    } catch (Exception e) {
+        void write(char[] x) {
+            Stderr(x);
+        }
+        e.writeOut(&write);
+        Stderr.newline;
+        return -ENOENT;
     }
-
-    return res;
 }
 
 /****************************************************************************************
@@ -307,6 +351,14 @@ static int bh_open(char *path, fuse_file_info *fi)
             return 0;
         } else {
             return -ENOENT;
+        }
+    } catch (BitHordeException e) {
+        switch (e.status) {
+            case Status.NORESOURCES:
+                return -ENOMEM;
+                break;
+            default:
+                return -ENOENT;
         }
     } catch (IllegalArgumentException) {
         return -ENOENT;
@@ -376,7 +428,7 @@ static int bh_release(char *path, fuse_file_info *fi)
             client.assetMap[fi.fh] = null;
             asset.close();
         }
-    } catch {} // Whatever goes wring, Do Nothing
+    } catch {} // Whatever goes wrong, Do Nothing
 
     return 0;
 }
@@ -440,8 +492,12 @@ int main(char[][] args)
     auto addr = new LocalAddress(arguments.sockPath);
     client = new BHFuseClient(addr, "bhfuse");
 
+    if (arguments.do_debug)
+        Log.root.level = Level.Trace;
     Log.root.add(new AppendConsole(new LayoutDate));
 
+    auto mountdir = FilePath(arguments.mountpoint).absolute("/");
+    mountdir.create();
     auto cmountpoint = arguments.mountpoint~'\0';
     auto cbinname = args[0] ~ '\0';
     auto argv = new char*[0];
@@ -451,6 +507,7 @@ int main(char[][] args)
     argv ~= cmountpoint.ptr;
     char* parsedmountpoint;
     int multithreaded;
+
     auto fusehandle = fuse_setup(argv.length, argv.ptr, &bh_oper, bh_oper.sizeof, &parsedmountpoint, &multithreaded, null);
     scope (exit) fuse_teardown(fusehandle, parsedmountpoint);
     if (fusehandle)

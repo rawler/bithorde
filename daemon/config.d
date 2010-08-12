@@ -66,8 +66,8 @@ class Config
      * Create Config object from file
      ***********************************************************************************/
     this (char[] configFileName) {
-        scope auto configFile = new File(configFileName, File.ReadExisting);
-        scope auto config = new MapInput!(char)(configFile);
+        scope configFile = new File(configFileName, File.ReadExisting);
+        scope config = new MapInput!(char)(configFile);
 
         foreach (name, value; config) {
             char[] option;

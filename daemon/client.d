@@ -21,7 +21,6 @@ private import tango.core.Memory;
 private import tango.math.random.Random;
 private import tango.net.device.Socket;
 private import tango.time.Time;
-private import tango.util.container.more.Stack;
 private import tango.util.log.Log;
 
 import daemon.server;
@@ -29,6 +28,8 @@ import daemon.cache.asset;
 import daemon.cache.manager;
 import lib.asset;
 import lib.client;
+import lib.connection;
+import lib.hashes;
 import message = lib.message;
 import lib.protobuf;
 
@@ -36,24 +37,24 @@ import lib.protobuf;
  * Delegate-signature for request-notification-recievers. Reciever is responsible for
  * triggering a new req.callback, with appropriate responses.
  ***************************************************************************************/
-alias void delegate(OpenRequest req, IServerAsset, message.Status status) BHServerOpenCallback;
+alias void delegate(BindRead req, IServerAsset, message.Status status) BHServerOpenCallback;
 
 /****************************************************************************************
- * Interface for the various forms of server-assets. (CachedAsset, CachingAsset,
+ * Interface for the various forms of server-assets. (BaseAsset, CachingAsset,
  * ForwardedAsset...)
  ***************************************************************************************/
 interface IServerAsset : IAsset {
     message.Identifier[] hashIds();
 }
 interface IAssetSource {
-    void findAsset(daemon.client.OpenRequest req);
+    void findAsset(daemon.client.BindRead req);
 }
 
 /****************************************************************************************
- * Structure for an incoming OpenRequest. Store the details of the request, should it
+ * Structure for an incoming BindRead. Store the details of the request, should it
  * need to be asynchronously forwarded before completion.
  ***************************************************************************************/
-class OpenRequest : message.OpenRequest {
+class BindRead : message.BindRead {
     Client client;
     BHServerOpenCallback[4] _callbacks;
     ushort _callbackCounter;
@@ -61,19 +62,16 @@ class OpenRequest : message.OpenRequest {
         client = c;
         pushCallback(&_callback);
     }
-    final void _callback(OpenRequest req, IServerAsset asset, message.Status status) {
+    final void _callback(BindRead req, IServerAsset asset, message.Status status) {
         assert(this is req);
         if (!client.closed) {
-            scope auto resp = new message.OpenResponse;
-            resp.rpcId = rpcId;
+            scope resp = new message.AssetStatus;
+            resp.handle = handle;
             resp.status = status;
-            if (status == message.Status.SUCCESS) {
-                // Allocate handle, and add to map
-                auto handle = client.allocateFreeHandle(this.handle);
-                client.openAssets[handle] = asset;
-                resp.handle = handle;
+            if (asset)
                 resp.size = asset.size;
-            }
+
+            client.openAssets[handle] = asset; // Assign to assetMap by Id
             client.sendMessage(resp);
         }
         delete this;
@@ -91,33 +89,6 @@ class OpenRequest : message.OpenRequest {
 }
 
 /****************************************************************************************
- * Structure for an incoming UploadReuest.
- ***************************************************************************************/
-class UploadRequest : message.UploadRequest {
-    Client client;
-    this(Client c) {
-        client = c;
-    }
-    final void callback(IServerAsset asset, message.Status status) {
-        if (!client.closed) {
-            scope auto resp = new message.OpenResponse;
-            resp.rpcId = rpcId;
-            resp.status = status;
-            if (status == message.Status.SUCCESS) {
-                // Allocate handle, and add to map
-                auto handle = client.allocateFreeHandle(this.handle);
-                client.openAssets[handle] = asset;
-                resp.handle = handle;
-            }
-            client.sendMessage(resp);
-        }
-    }
-    void abort(message.Status s) {
-        callback(null, s);
-    }
-}
-
-/****************************************************************************************
  * Structure for an incoming ReadRequest
  ***************************************************************************************/
 class ReadRequest : message.ReadRequest {
@@ -128,13 +99,14 @@ public:
     }
     final void callback(IAsset asset, message.Status status, message.ReadRequest remoteReq, message.ReadResponse remoteResp) {
         if (client) {
-            scope auto resp = new message.ReadResponse;
+            scope resp = new message.ReadResponse;
             resp.rpcId = rpcId;
             resp.offset = remoteResp.offset;
             resp.content = remoteResp.content;
             resp.status = status;
             client.sendMessage(resp);
         }
+        delete this;
     }
     void abort(message.Status s) {
         callback(null, s, null, null);
@@ -142,12 +114,62 @@ public:
 }
 
 class Client : lib.client.Client {
+    /************************************************************************************
+     * Represents a ServerAsset bound to a client-handle
+     ***********************************************************************************/
+    class BoundAsset : IServerAsset {
+        uint handle;
+        IServerAsset assetSource;
+    protected:
+        /// Construct from BindRead request
+        this (BindRead req) {
+        }
+        this (message.BindWrite req) {
+            handle = req.handle;
+            openAssets[handle] = this;
+            server.uploadAsset(req, &onAssetStatus);
+        }
+    private:
+        void onAssetStatus(IAsset asset, message.Status sCode, message.AssetStatus s) {
+            assetSource = cast(IServerAsset)asset;
+            if (!closed) {
+                scope resp = new message.AssetStatus();
+                resp.handle = handle;
+                resp.status = sCode;
+                if (assetSource) {
+                    resp.size = size;
+                    resp.ids = hashIds;
+                }
+                openAssets[handle] = this; // Assign to assetMap by Id
+                sendMessage(resp);
+            }
+        }
+    public:
+        ulong size() {
+            return assetSource ? assetSource.size : 0;
+        }
+        void close() {
+            // TODO: Implement
+        }
+        Signal!(ParameterTupleOf!(BHAssetStatusCallback))* statusSignal() {
+            return null; // Doesn't make sense?
+        }
+        message.Identifier[] hashIds() {
+            return assetSource ? assetSource.hashIds : null;
+        }
+        void aSyncRead(ulong offset, uint length, BHReadCallback cb) {
+            assert(assetSource);
+            return assetSource.aSyncRead(offset, length, cb);
+        }
+        void addDataSegment(message.DataSegment req) {
+            auto asset = cast(WriteableAsset)assetSource;
+            asset.add(req.offset, req.content);
+        }
+    }
 private:
     Server server;
     CacheManager cacheMgr;
     IServerAsset[uint] openAssets;
-    Stack!(ushort, 64) freeFileHandles;
-    ushort nextNewHandle;
     Logger log;
 public:
     this (Server server, Socket s)
@@ -162,33 +184,36 @@ public:
     /************************************************************************************
      * Re-declared _open from lib.Client to make it publicly visible in the daemon.
      ***********************************************************************************/
-    void open(message.Identifier[] ids, BHOpenCallback openCallback, ulong uuid,
-              TimeSpan timeout) { super.open(ids, openCallback, uuid, timeout); }
+    void open(message.Identifier[] ids, BHAssetStatusCallback openCallback, ulong uuid,
+              TimeSpan timeout) { super.open(ids, openCallback, uuid, timeout, true); }
 protected:
-    void processOpenRequest(ubyte[] buf)
+    void processBindRead(Connection c, ubyte[] buf)
     {
-        auto req = new daemon.client.OpenRequest(this);
+        auto req = new daemon.client.BindRead(this);
         req.decode(buf);
-        log.trace("Got open request");
-        ulong uuid = req.uuid;
-        if (uuid == 0)
-            uuid = rand.uniformR2!(ulong)(1,ulong.max);
-        server.findAsset(req);
+        if (req.idsIsSet) {
+            log.trace("Got open request #{}, {}", req.uuid, formatMagnet(req.ids, 0));
+            if (!req.uuidIsSet)
+                req.uuid = rand.uniformR2!(ulong)(1,ulong.max);
+            server.findAsset(req);
+        } else {
+            req.abort(message.Status.NOTFOUND);
+        }
     }
 
-    void processUploadRequest(ubyte[] buf)
+    void processBindWrite(Connection c, ubyte[] buf)
     {
-        if (!isTrusted) {
-            log.warn("Got UploadRequest from unauthorized client {}", this);
+        if (!c.isTrusted) {
+            log.warn("Got BindWrite from unauthorized client {}", this);
             return;
         }
-        auto req = new daemon.client.UploadRequest(this);
+        auto req = new message.BindWrite;
         req.decode(buf);
-        log.trace("Got UploadRequest from trusted client");
-        server.uploadAsset(req);
+        log.trace("Got BindWrite from trusted client");
+        auto asset = new BoundAsset(req);
     }
 
-    void processReadRequest(ubyte[] buf)
+    void processReadRequest(Connection c, ubyte[] buf)
     {
         auto req = new ReadRequest(this);
         req.decode(buf);
@@ -197,7 +222,7 @@ protected:
             asset = openAssets[req.handle];
         } catch (ArrayBoundsException e) {
             delete req;
-            scope auto resp = new message.ReadResponse;
+            scope resp = new message.ReadResponse;
             resp.rpcId = req.rpcId;
             resp.status = message.Status.INVALID_HANDLE;
             return sendMessage(resp);
@@ -205,65 +230,14 @@ protected:
         asset.aSyncRead(req.offset, req.size, &req.callback);
     }
 
-    void processDataSegment(ubyte[] buf) {
-        scope auto req = new message.DataSegment();
+    void processDataSegment(Connection c, ubyte[] buf) {
+        scope req = new message.DataSegment();
         req.decode(buf);
         try {
-            auto asset = cast(CachedAsset)openAssets[req.handle];
-            asset.add(req.offset, req.content);
+            auto asset = cast(BoundAsset)openAssets[req.handle];
+            asset.addDataSegment(req);
         } catch (ArrayBoundsException e) {
             log.error("DataSegment to invalid handle");
         }
-    }
-
-    void processMetaDataRequest(ubyte[] buf) {
-        // Create anon class to satisfy abstract abort().
-        // MetaData is always local and never async, so don't need full state
-        scope auto req = new class message.MetaDataRequest {
-            void abort(message.Status s) {}
-        };
-        req.decode(buf);
-        scope auto resp = new message.MetaDataResponse;
-        resp.rpcId = req.rpcId;
-        try {
-            auto asset = cast(CachedAsset)openAssets[req.handle];
-            if (asset && asset.metadata) {
-                resp.status = message.Status.SUCCESS;
-                resp.ids = asset.metadata.hashIds;
-            } else {
-                resp.status = message.Status.INVALID_HANDLE;
-            }
-        } catch (ArrayBoundsException e) {
-            log.error("MetaDataRequest on invalid handle");
-            resp.status = message.Status.INVALID_HANDLE;
-        }
-        sendMessage(resp);
-    }
-
-    void processClose(ubyte[] buf)
-    {
-        scope auto req = new message.Close;
-        req.decode(buf);
-        log.trace("closing handle {}", req.handle);
-        try {
-            IServerAsset asset = openAssets[req.handle];
-            openAssets.remove(req.handle);
-            freeFileHandles.push(req.handle);
-        } catch (ArrayBoundsException e) {
-            log.error("tried to Close invalid handle");
-            return;
-        }
-    }
-private:
-    /************************************************************************************
-     * Allocates an unused file handle for the transaction.
-     * requestedHandle - Just a suggestion, may not end up being what's allocated
-     ***********************************************************************************/
-    ushort allocateFreeHandle(uint requestedHandle)
-    {
-        if (freeFileHandles.size > 0)
-            return freeFileHandles.pop();
-        else
-            return nextNewHandle++;
     }
 }

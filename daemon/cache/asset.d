@@ -22,7 +22,7 @@ private import tango.core.Exception;
 private import tango.core.Thread;
 private import tango.io.device.File;
 private import tango.io.FilePath;
-private import tango.math.random.Random;
+version (Posix) private import tango.stdc.posix.unistd;
 private import ascii = tango.text.Ascii;
 private import tango.util.log.Log;
 
@@ -51,49 +51,36 @@ private static ubyte[] tlsBuffer(uint size) {
     return buf;
 }
 
-/****************************************************************************************
- * Assets throws this error when the requested segment is missing
- ***************************************************************************************/
-class MissingSegmentException : Exception {
-    this(char[] msg) { super(msg); }
-}
-
-enum AssetState { ALIVE, GOTIDS, DEAD }
-alias void delegate(CachedAsset, AssetState) AssetLifeCycleListener;
+alias void delegate(Identifier[]) HashIdsListener;
 
 /****************************************************************************************
  * Base for all kinds of cached assets. Provides basic reading functionality
  ***************************************************************************************/
-class CachedAsset : IServerAsset {
+class BaseAsset : private File, public IServerAsset {
+    mixin IAsset.StatusSignal;
 protected:
     FilePath path;
     FilePath idxPath;
-    ubyte[] _id;
-    File file;
     Logger log;
     AssetMetaData _metadata;
-    AssetLifeCycleListener notify;
+    HashIdsListener updateHashIds;
 public:
     /************************************************************************************
      * IncompleteAssetException is thrown if a not-fully-cached asset were to be Opened
-     * directly as a CachedAsset
+     * directly as a BaseAsset
      ***********************************************************************************/
-    this(FilePath assetDir, ubyte[] id, AssetLifeCycleListener listener) {
-        this._id = id.dup;
-        this.path = assetDir.dup.append(ascii.toLower(hex.encode(id)));
-        this.idxPath = path.dup.suffix(".idx");
-        this.notify = listener;
-        notify(this, AssetState.ALIVE);
-        log = Log.lookup("daemon.cache.cachedasset."~hex.encode(id[0..4]));
-        open();
-    }
-
-    /************************************************************************************
-     * Open actual underlying file
-     ***********************************************************************************/
-    protected void open() {
+    this(FilePath path, AssetMetaData metadata, HashIdsListener updateHashIds) {
+        this(path, metadata, File.ReadExisting, updateHashIds);
         assert(!idxPath.exists);
-        file = new File(path.toString, File.ReadExisting);
+    }
+    protected this(FilePath path, AssetMetaData metadata, File.Style style, HashIdsListener updateHashIds) {
+        this.path = path;
+        this.idxPath = path.dup.suffix(".idx");
+        this.updateHashIds = updateHashIds;
+        this._metadata = metadata;
+        log = Log.lookup("daemon.cache.baseasset."~path.name[0..8]);
+
+        super(path.toString, style);
     }
 
     /************************************************************************************
@@ -101,32 +88,33 @@ public:
      * awaiting garbage collection.
      ***********************************************************************************/
     void close() {
-        notify(this, AssetState.DEAD);
-        if (file) {
-            file.close();
-            file = null;
-        }
+        super.close();
     }
 
     /************************************************************************************
-     * TODO: Implement, _metadata can not currently be counted on
      * Implements IServerAsset.hashIds()
+     * TODO: IServerAsset perhaps should be migrated to MetaData?
      ***********************************************************************************/
     Identifier[] hashIds() {
-        assert(false, "Needs implementation");
-        return _metadata.hashIds;
+        if (_metadata)
+            return _metadata.hashIds;
+        else
+            return null;
     }
 
     /************************************************************************************
      * Read a single segment from the Asset
      ***********************************************************************************/
     synchronized void aSyncRead(ulong offset, uint length, BHReadCallback cb) {
-        assert(file);
         ubyte[] buf = tlsBuffer(length);
-        file.seek(offset);
-        int got = file.read(buf);
+        version (Posix) { // Posix has pread() for atomic seek+read
+            auto got = pread(fileHandle, buf.ptr, length, offset);
+        } else {
+            seek(offset);
+            auto got = read(buf);
+        }
         auto resp = new lib.message.ReadResponse;
-        if (got == file.Eof) {
+        if (got == Eof) {
             resp.status = message.Status.NOTFOUND;
         } else {
             resp.status = message.Status.SUCCESS;
@@ -137,7 +125,7 @@ public:
     }
 
     /************************************************************************************
-     * Adding segments is not supported for CachedAsset
+     * Adding segments is not supported for BaseAsset
      ***********************************************************************************/
     void add(ulong offset, ubyte[] data) {
         throw new IOException("Trying to write to a completed file");
@@ -147,47 +135,37 @@ public:
      * Find the size of the asset.
      ***********************************************************************************/
     final ulong size() {
-        assert(file);
-        return file.length;
+        return length;
     }
-
-    AssetMetaData metadata() {
-        return _metadata;
-    }
-    final ubyte[] id() { return _id; }
 }
 
 /****************************************************************************************
  * WriteableAsset implements uploading to Assets, and forms a base for CachingAsset
  ***************************************************************************************/
-class WriteableAsset : CachedAsset {
+class WriteableAsset : BaseAsset {
 protected:
     CacheMap cacheMap;
     Digest[HashType] hashes;
-    uint hashingptr;
+    ulong hashedPtr;
 public:
     /************************************************************************************
-     * Create WriteableAsset, id will be auto-random-generated if not specified.
+     * Create WriteableAsset by path and size
      ***********************************************************************************/
-    this(FilePath assetDir, ulong size, AssetLifeCycleListener _listener) {
-        auto id = new ubyte[LOCALID_LENGTH];
-        rand.randomizeUniform!(ubyte[],false)(id);
-        this(assetDir, id, _listener); // Super-class opens underlying file
-        file.truncate(size);           // We resize it to right size
-
+    this(FilePath path, AssetMetaData metadata, ulong size, HashIdsListener updateHashIds) {
+        this(path, metadata, File.Style(File.Access.ReadWrite, File.Open.Sedate), updateHashIds); // Super-class opens underlying file
+        truncate(size);           // We resize it to right size
     }
-    this(FilePath assetDir, ubyte[] id, AssetLifeCycleListener _listener) { /// ditto
+    protected this(FilePath path, AssetMetaData metadata, File.Style style, HashIdsListener updateHashIds) { /// ditto
         foreach (k,hash; HashMap)
             hashes[hash.pbType] = hash.factory();
-        super(assetDir, id, _listener);
-        log = Log.lookup("daemon.cache.writeasset."~hex.encode(id[0..4]));
+        super(path, metadata, style, updateHashIds);
+        cacheMap = new CacheMap(idxPath);
+        log = Log.lookup("daemon.cache.writeasset."~path.name[0..8]);
     }
 
     synchronized void aSyncRead(ulong offset, uint length, BHReadCallback cb) {
-        if (!cacheMap || cacheMap.has(offset, length))
-            super.aSyncRead(offset, length, cb);
-        else
-            throw new MissingSegmentException("Missing requested segment");
+        assert(!this.cacheMap || this.cacheMap.has(offset, length), "Checking cacheMap expected before aSyncRead");
+        super.aSyncRead(offset, length, cb);
     }
 
     /************************************************************************************
@@ -196,37 +174,33 @@ public:
     synchronized void add(ulong offset, ubyte[] data) {
         if (!cacheMap)
             throw new IOException("Trying to write to a completed file");
-        file.seek(offset);
-        file.write(data);
+        version (Posix) { // Posix has pwrite() for atomic write+seek
+            auto written = pwrite(fileHandle, data.ptr, data.length, offset);
+        } else {
+            seek(offset);
+            auto written = write(data);
+        }
         cacheMap.add(offset, data.length);
         updateHashes();
     }
 protected:
     /************************************************************************************
-     * Open existing for read/write
-     ***********************************************************************************/
-    void open() {
-        cacheMap = new CacheMap(idxPath);
-        file = new File(path.toString, File.Style(File.Access.ReadWrite, File.Open.Sedate));
-    }
-
-    /************************************************************************************
      * Check if more data is available for hashing
      ***********************************************************************************/
     void updateHashes() {
         auto zeroBlockSize = cacheMap.zeroBlockSize;
-        if (zeroBlockSize > hashingptr) {
-            scope auto newdata = new ubyte[zeroBlockSize - hashingptr];
-            file.seek(hashingptr);
-            auto read = file.read(newdata);
-            assert(read == newdata.length);
+        if (zeroBlockSize > hashedPtr) {
+            auto bufsize = zeroBlockSize - hashedPtr;
+            auto buf = tlsBuffer(bufsize);
+            auto got = pread(fileHandle, buf.ptr, bufsize, hashedPtr);
+            assert(got == bufsize);
             foreach (hash; hashes) {
-                hash.update(newdata);
+                hash.update(buf[0..bufsize]);
             }
-            if (zeroBlockSize == file.length)
+            if (zeroBlockSize == length)
                 finish();
             else
-                hashingptr = zeroBlockSize;
+                hashedPtr = zeroBlockSize;
         }
     }
 
@@ -234,24 +208,28 @@ protected:
      * Post-finish hooks. Finalize the digests, add to assetMap, and remove the CacheMap
      ***********************************************************************************/
     void finish() {
+        assert(updateHashIds);
+        assert(cacheMap);
         assert(cacheMap.segcount == 1);
-        assert(cacheMap.assetSize == file.length);
+        assert(cacheMap.assetSize == length);
         log.trace("Asset complete");
-        _metadata = new AssetMetaData;
-        _metadata.localId = _id.dup;
 
+        auto hashIds = new message.Identifier[hashes.length];
+        uint i;
         foreach (type, hash; hashes) {
             auto digest = hash.binaryDigest;
             auto hashId = new message.Identifier;
             hashId.type = type;
             hashId.id = digest.dup;
-            _metadata.hashIds ~= hashId;
+            hashIds[i++] = hashId;
         }
 
-        notify(this, AssetState.GOTIDS);
+        updateHashIds(hashIds);
 
         cacheMap.path.remove();
         delete cacheMap;
+
+        statusSignal.call(this, message.Status.SUCCESS, null);
     }
 }
 
@@ -261,22 +239,12 @@ protected:
  ***************************************************************************************/
 class CachingAsset : WriteableAsset {
     IServerAsset remoteAsset;
-    message.Identifier[] reqHashIds;
 public:
-    this (FilePath assetDir, message.Identifier[] reqHashIds, ubyte[] localId, IServerAsset remoteAsset, AssetLifeCycleListener _listener) {
-        this.reqHashIds = reqHashIds;
+    this (FilePath path, AssetMetaData metadata, IServerAsset remoteAsset, HashIdsListener updateHashIds) {
         this.remoteAsset = remoteAsset;
-        if (localId)
-            super(assetDir, localId, _listener);
-        else
-            super(assetDir, remoteAsset.size, _listener);
-        log = Log.lookup("daemon.cache.cachingasset."~hex.encode(id[0..4]));
-
+        super(path, metadata, remoteAsset.size, updateHashIds); // TODO: Verify remoteAsset.size against local file
+        log = Log.lookup("daemon.cache.cachingasset." ~ path.name[0..8]);
         log.trace("Caching remoteAsset of size {}", size);
-        _metadata = new AssetMetaData;
-        _metadata.localId = id;
-        _metadata.hashIds = reqHashIds;
-        notify(this, AssetState.GOTIDS);
     }
 
     synchronized void aSyncRead(ulong offset, uint length, BHReadCallback cb) {
@@ -290,7 +258,7 @@ protected:
     /************************************************************************************
      * Triggered when the underlying cache is complete.
      ***********************************************************************************/
-    void finish() {
+    void finish() body {
         // TODO: Validate hashId:s
         super.finish();
         remoteAsset = null;
@@ -312,11 +280,11 @@ private:
         // TODO: Limit re-tries
 
         void tryRead() {
-            try {
+            if (!cacheMap || cacheMap.has(offset, length)) {
                 realRead(offset, length, cb);
-            } catch (MissingSegmentException e) {
+                delete this;
+            } else
                 remoteAsset.aSyncRead(offset, length, &callback);
-            }
         }
         void callback(IAsset asset, message.Status status, message.ReadRequest req, message.ReadResponse resp) {
             if (status == message.Status.SUCCESS) {
@@ -329,6 +297,7 @@ private:
             } else {
                 // TODO: Report back error
             }
+            delete req;
         }
     }
 }

@@ -25,6 +25,7 @@ import tango.net.device.Berkeley;
 import tango.net.device.LocalSocket;
 import tango.net.device.Socket;
 import tango.text.convert.Format;
+import tango.text.Util;
 import tango.time.Clock;
 import tango.util.container.SortedMap;
 import tango.util.Convert;
@@ -37,7 +38,7 @@ import lib.arguments;
 
 import clients.lib.progressbar;
 
-const uint CHUNK_SIZE = 4096;     /// How large chunks to fetch
+const uint CHUNK_SIZE = 16384;    /// How large chunks to fetch
 const uint PARALLEL_REQUESTS = 5; /// How many requests to keep running in parallell.
 
 /****************************************************************************************
@@ -45,7 +46,7 @@ const uint PARALLEL_REQUESTS = 5; /// How many requests to keep running in paral
  ***************************************************************************************/
 class GetArguments : protected Arguments {
 private:
-    char[] sockPath;
+    char[] socketUri;
     Identifier[] ids;
     char[] name;
     bool verbose;
@@ -59,7 +60,7 @@ public:
         this["verbose"].aliased('v').smush;
         this["progressBar"].aliased('p').params(1).restrict(autoBool).smush.defaults("auto");
         this["stdout"].aliased('s').params(1).restrict(autoBool).smush.defaults("auto");
-        this["unixsocket"].aliased('u').params(1).smush.defaults("/tmp/bithorde");
+        this["sockuri"].aliased('u').params(1).smush.defaults("/tmp/bithorde");
         this[null].title("uri").required.params(1);
     }
 
@@ -81,7 +82,7 @@ public:
             return isatty(2) && (!isatty(1) || !stdout);
         });
         verbose = this["verbose"].set;
-        sockPath = this["unixsocket"].assigned[0];
+        socketUri = this["sockuri"].assigned[0];
 
         return true;
     }
@@ -138,7 +139,14 @@ public:
      ***********************************************************************************/
     this(GetArguments args) {
         this.args = args;
-        Address addr = new LocalAddress(args.sockPath);
+        Address addr;
+        if (args.socketUri[0] == '/') {
+            addr = new LocalAddress(args.socketUri);
+        } else {
+            auto addrSpec = split(args.socketUri, ":");
+            assert(addrSpec.length == 2);
+            addr = new InternetAddress(addrSpec[0], to!(int)(addrSpec[1]));
+        }
         client = new SimpleClient(addr, "bhget");
 
         if (args.stdout)
@@ -146,7 +154,7 @@ public:
         else
             output = new SortedOutput(new File(args.name, File.WriteCreate));
 
-        client.open(args.ids, &onOpen);
+        client.open(args.ids, &onStatusUpdate);
     }
     ~this(){
         if (asset)
@@ -193,7 +201,7 @@ private:
     /************************************************************************************
      * Callback for when asset-open response is recieved.
      ***********************************************************************************/
-    void onOpen(IAsset asset, Status status, OpenOrUploadRequest req, OpenResponse resp) {
+    void onStatusUpdate(IAsset asset, Status status, AssetStatus resp) {
         switch (status) {
         case Status.SUCCESS:
             if (args.verbose)

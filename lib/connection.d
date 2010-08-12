@@ -24,18 +24,22 @@ private import tango.time.Clock;
 private import tango.util.container.more.Heap;
 private import tango.util.container.more.Stack;
 
-private import lib.protobuf;
 public import message = lib.message;
+private import lib.protobuf;
+private import lib.timeout;
 
 /****************************************************************************************
  * Structure describing a still-unanswered request from BitHorde. Wraps the actual
  * request up with a timeout-time.
  ***************************************************************************************/
 struct InFlightRequest {
-    Time time;
+    Connection c;
     message.RPCRequest req;
-    int opCmp(InFlightRequest other) {
-        return this.time.opCmp(other.time);
+    TimeoutQueue.EventId timeout;
+    void triggerTimeout(Time deadline, Time now) {
+        auto req = this.req;
+        c.lingerRequest(req); // LingerRequest destroys req, so must store local refs first.
+        req.abort(message.Status.TIMEOUT);
     }
 }
 
@@ -51,8 +55,6 @@ struct LingerId {
     }
 }
 
-/// Queue-types
-alias Heap!(InFlightRequest*, true) TimedRequestQueue;
 /// ditto
 alias Heap!(LingerId, true) LingerIdQueue;
 
@@ -62,24 +64,26 @@ alias Heap!(LingerId, true) LingerIdQueue;
  ***************************************************************************************/
 class Connection
 {
+    alias void delegate(Connection c, message.Type t, ubyte[] msg) ProcessCallback;
+    static class InvalidMessage : Exception {
+        this (char[] msg="Invalid message recieved") { super(msg); }
+    }
+    static class InvalidResponse : InvalidMessage {
+        this () { super("Invalid response recieved"); }
+    }
 protected:
     Socket socket;
     ubyte[] frontbuf, backbuf, left;
     ByteBuffer msgbuf;
     char[] _myname, _peername;
-
+    ProcessCallback messageHandler;
+    ProcessCallback _processCallback;
 protected:
-    class InvalidMessage : Exception {
-        this (char[] msg="Invalid message recieved") { super(msg); }
-    }
-    class InvalidResponse : InvalidMessage {
-        this () { super("Invalid response recieved"); }
-    }
 
     /// inFlightRequests contains actual requests, and is the allocation-heap for IFR:s
     InFlightRequest[] inFlightRequests;
-    /// timeouts contains references to inFlightRequests, sorted on timeout-time. Needs care and attention
-    public TimedRequestQueue timeouts;
+    /// TimeoutQueue for inFlightRequests
+    public TimeoutQueue timeouts;
     /// Free reusable request-ids
     Stack!(ushort,100) _freeIds;
     /// Ids that can't be re-used for a while, to avoid conflicting responses
@@ -98,26 +102,28 @@ protected:
         } else {
             target.rpcId = nextid++;
             if (inFlightRequests.length <= target.rpcId) {
+                // TODO: Why not .length = ???
                 auto newInFlightRequests = new InFlightRequest[inFlightRequests.length*2];
                 newInFlightRequests[0..inFlightRequests.length] = inFlightRequests;
                 delete inFlightRequests;
                 inFlightRequests = newInFlightRequests;
 
-                // Timeouts is now full of broken references, rebuild
+                // Timeouts is now full of broken callbacks, rebuild
                 timeouts.clear();
                 foreach (ref ifr; inFlightRequests[0..target.rpcId]) {
                     if (ifr.req)
-                        timeouts.push(&ifr);
+                        ifr.timeout = timeouts.registerAt(ifr.timeout.at, &ifr.triggerTimeout);
                 }
             }
         }
+        inFlightRequests[target.rpcId].c = this;
         return target.rpcId;
     }
 
     /************************************************************************************
      * Release the requestId for given request, after completion. Throws
      ***********************************************************************************/
-    message.RPCRequest releaseRequest(message.RPCResponse msg) {
+    public message.RPCRequest releaseRequest(message.RPCResponse msg) {
         if (msg.rpcId >= inFlightRequests.length)
             throw new InvalidResponse;
         auto ifr = &inFlightRequests[msg.rpcId];
@@ -125,7 +131,7 @@ protected:
         if (!req)
             throw new InvalidResponse;
         msg.request = req;
-        timeouts.remove(ifr);
+        timeouts.abort(ifr.timeout);
         inFlightRequests[msg.rpcId] = InFlightRequest.init;
         if (_freeIds.unused)
             _freeIds.push(msg.rpcId);
@@ -146,13 +152,13 @@ public:
     /************************************************************************************
      * Create named connection, and perform HandShake
      ***********************************************************************************/
-    this(char[] myname)
+    this(char[] myname, ProcessCallback cb)
     {
         this._myname = myname;
+        this._processCallback = cb;
     }
 
     ~this() {
-        onClose();
     }
 
     /************************************************************************************
@@ -160,10 +166,11 @@ public:
      ***********************************************************************************/
     protected void reset() {
         this._freeIds = _freeIds.init;
-        this.timeouts = timeouts.init;
+        this.timeouts = new TimeoutQueue;
         this.lingerIds = lingerIds.init;
         this.nextid = nextid.init;
         this._peername = _peername.init;
+        this.messageHandler = &processHandShake;
 
         this.frontbuf = new ubyte[8192];
         this.backbuf = new ubyte[8192];
@@ -175,7 +182,7 @@ public:
     /************************************************************************************
      * Bind open Socket to this connection and performs handshake
      ***********************************************************************************/
-    protected void handshake(Socket s) {
+    public void handshake(Socket s) {
         reset();
 
         this.socket = s;
@@ -231,26 +238,32 @@ public:
     synchronized bool processMessage()
     {
         auto buf = left;
-        left = decodeMessage(buf);
-        return buf != left;
+        message.Type type;
+        size_t msglen;
+        if (decode_val!(message.Type)(buf, type) && decode_val!(size_t)(buf, msglen) && (buf.length >= msglen)) {
+            assert((type & 0b0000_0111) == 0b0010, "Expected message type, but got something else");
+            type >>= 3;
+
+            left = buf[msglen..length]; // Make sure to remove message from queue before processing
+            messageHandler(this, type, buf[0..msglen]);
+            return true;
+        } else {
+            return false;
+        }
     }
 
     /************************************************************************************
      * Process waiting timeouts expected to fire up until now.
      ***********************************************************************************/
-    synchronized void processTimeouts() {
-        while (timeouts.size && (Clock.now > timeouts.peek.time)) {
-            auto req = timeouts.pop.req;
-            lingerRequest(req);
-            req.abort(message.Status.TIMEOUT);
-        }
+    synchronized void processTimeouts(Time now) {
+        timeouts.emit(now);
     }
 
     /************************************************************************************
-     * Figure next TimeOut, which is either time to the first timeout, or TimeSpan.max
+     * Figure next DeadLine, which is either time to the first timeout, or TimeSpan.max
      ***********************************************************************************/
-    TimeSpan nextTimeOut() {
-        return timeouts.size ? (timeouts.peek.time-Clock.now) : TimeSpan.max;
+    Time nextDeadline() {
+        return timeouts.nextDeadline;
     }
 
     final char[] peername() { return _peername; }
@@ -273,25 +286,10 @@ public:
     /************************************************************************************
      * Process a single Message
      ***********************************************************************************/
-    void process(message.Type type, ubyte[] msg) {
-        with (message) switch (type) {
-        case Type.HandShake: processHandShake(msg); break;
-        case Type.OpenRequest: processOpenRequest(msg); break;
-        case Type.UploadRequest: processUploadRequest(msg); break;
-        case Type.OpenResponse: processOpenResponse(msg); break;
-        case Type.Close: processClose(msg); break;
-        case Type.ReadRequest: processReadRequest(msg); break;
-        case Type.ReadResponse: processReadResponse(msg); break;
-        case Type.DataSegment: processDataSegment(msg); break;
-        case Type.MetaDataRequest: processMetaDataRequest(msg); break;
-        case Type.MetaDataResponse: processMetaDataResponse(msg); break;
-        default: throw new InvalidMessage;
-        }
-    }
 private:
     /// Initiate HandShake
     void sayHello() {
-        scope auto handshake = new message.HandShake;
+        scope handshake = new message.HandShake;
         handshake.name = _myname;
         handshake.protoversion = 1;
         sendMessage(handshake);
@@ -322,80 +320,44 @@ private:
         backbuf = left;               // And new backbuf is our current frontbuf
         left = frontbuf[0..remainder];
     }
-
-    /************************************************************************************
-     * Attempt to decode and process a single message from a buffer
-     ***********************************************************************************/
-    ubyte[] decodeMessage(ubyte[] data)
-    {
-        auto buf = data;
-        auto type = decode_val!(message.Type)(buf);
-        if (buf == data) {
-            return data;
-        } else {
-            assert((type & 0b0000_0111) == 0b0010, "Expected message type, but got something else");
-            type >>= 3;
-        }
-        uint msglen = decode_val!(uint)(buf);
-        if (buf == data || buf.length < msglen) {
-            return data; // Not enough data in buffer
-        } else {
-            auto msg = buf[0..msglen];
-            process(type, msg);
-            return buf[msglen..length];
-        }
-    }
 package:
     /************************************************************************************
      * Send any kind of message, just serialize and push
      ***********************************************************************************/
-    synchronized void sendMessage(message.Message m) {
+    synchronized ubyte[] sendMessage(message.Message m) {
         if (closed)
             throw new IOException("Connection closed");
         msgbuf.reset();
         m.encode(msgbuf);
         encode_val!(uint)(msgbuf.length, msgbuf);
         encode_val!(ushort)((m.typeId << 3) | 0b0000_0010, msgbuf);
-        socket.write(msgbuf.data);
+        auto buf = msgbuf.data;
+        socket.write(buf);
+        return buf;
     }
 
     /************************************************************************************
      * Send a request, with optional timeout, and register in corresponding idMaps.
      ***********************************************************************************/
-    synchronized void sendRequest(message.RPCRequest req) {
-        // TODO: Randomize?
-        sendRequest(req, TimeSpan.fromMillis(4000));
-    }
-    /// ditto
-    synchronized void sendRequest(message.RPCRequest req, TimeSpan timeout) {
+    synchronized void sendRPCRequest(message.RPCRequest req, TimeSpan timeout) {
         auto rpcId = allocRequest(req);
         req.timeout = timeout.millis;
         sendMessage(req);
-        auto ifr = &inFlightRequests[rpcId];
+        InFlightRequest* ifr = &inFlightRequests[rpcId];
         ifr.req = req;
-        ifr.time = Clock.now + timeout;
-        timeouts.push(ifr);
+        ifr.timeout = timeouts.registerIn(timeout, &ifr.triggerTimeout);
     }
 protected:
     /************************************************************************************
      * HandShakes are the only thing Connection handles by itself. After initialization,
      * they are illegal.
      ***********************************************************************************/
-    void processHandShake(ubyte[] msg) {
-        if (_peername)
-            throw new AssertException("HandShake recieved after initialization", __FILE__, __LINE__);
-        scope auto handshake = new message.HandShake;
+    void processHandShake(Connection c, message.Type t, ubyte[] msg) {
+        assert(t == message.Type.HandShake);
+        scope handshake = new message.HandShake;
         handshake.decode(msg);
         _peername = handshake.name.dup;
+        messageHandler = _processCallback;
         assert(handshake.protoversion == 1);
     }
-    abstract void processOpenRequest(ubyte[]);
-    abstract void processUploadRequest(ubyte[]);
-    abstract void processOpenResponse(ubyte[]);
-    abstract void processClose(ubyte[]);
-    abstract void processReadRequest(ubyte[]);
-    abstract void processReadResponse(ubyte[]);
-    abstract void processDataSegment(ubyte[]);
-    abstract void processMetaDataRequest(ubyte[]);
-    abstract void processMetaDataResponse(ubyte[]);
 }

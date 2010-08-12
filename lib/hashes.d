@@ -84,7 +84,7 @@ char[] formatMagnet(Identifier[] ids, ulong length, char[] name = null)
 in {
     assert(ids.length > 0);
 } body {
-    scope auto array = new Array(64,64);
+    scope array = new Array(64,64);
     array.write("magnet:?");
     uint idx;
     void append(char[] fmt, ...) {

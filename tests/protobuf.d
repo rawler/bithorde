@@ -24,10 +24,10 @@ import lib.protobuf;
 
 class Person : ProtoBufMessage
 {
-    uint id;
-    char[] name;
-    mixin MessageMixin!(PBField!("id",   1)(),
-                        PBField!("name", 2)());
+    mixin(PBField!(uint,"id"));
+    mixin(PBField!(char[],"name"));
+    mixin ProtoBufCodec!(PBMapping("id",       1),
+                         PBMapping("name",     2));
 
     char[] toString() {
         return Format.convert("{} {{\n id: {}\n name: {}\n}}",this.classinfo.name, this.id, this.name);
@@ -41,12 +41,12 @@ class Person : ProtoBufMessage
 
 class Person2 : ProtoBufMessage
 {
-    uint id;
-    char[] name;
-    char[] addr;
-    mixin MessageMixin!(PBField!("id",   1)(),
-                        PBField!("name", 2)(),
-                        PBField!("addr", 3)());
+    mixin(PBField!(uint, "id"));
+    mixin(PBField!(char[], "name"));
+    mixin(PBField!(char[], "addr"));
+    mixin ProtoBufCodec!(PBMapping("id",   1),
+                         PBMapping("name", 2),
+                         PBMapping("addr", 3));
     bool opEquals(Person other) {
         return (this.id == other.id) &&
                (this.name == other.name);
@@ -55,8 +55,8 @@ class Person2 : ProtoBufMessage
 
 class Friends : ProtoBufMessage
 {
-    Person[] people;
-    mixin MessageMixin!(PBField!("people", 1)());
+    mixin(PBField!(Person[],"people"));
+    mixin ProtoBufCodec!(PBMapping("people", 1));
 
     char[] toString() {
         auto retval = this.classinfo.name ~ "{\n people: [\n";
@@ -84,8 +84,8 @@ bool test_varintenc() {
             auto middle = new ByteBuffer;
             encode_val(i, middle);
             auto data = middle.data;
-            uint roundtrip = decode_val!(uint)(data);
-            if (i == roundtrip) {
+            uint roundtrip;
+            if (decode_val!(uint)(data, roundtrip) && (i == roundtrip)) {
                 debug (protobuf) Stdout.format("{} == {} (middle: {})", i, roundtrip, middle).newline;
             } else {
                 debug (protobuf) Stdout.format("{} != {} (middle: {})", i, roundtrip, middle).newline;
@@ -107,8 +107,8 @@ bool test_wt_ld_enc() {
         auto middle = new ByteBuffer;
         encode_val(testdata, middle);
         auto data = middle.data;
-        ubyte[] roundtrip = decode_val!(ubyte[])(data);
-        if (testdata == roundtrip) {
+        ubyte[] roundtrip;
+        if (decode_val!(ubyte[])(data, roundtrip) && (testdata == roundtrip)) {
             debug (protobuf) Stdout.format("{} == {} (middle: {})", testdata, roundtrip, middle).newline;
         } else {
             debug (protobuf) Stdout.format("{} != {} (middle: {})", testdata, roundtrip, middle).newline;
@@ -152,9 +152,7 @@ bool test_repeated_enc()
     onlyFriend.name = "arne";
     onlyFriend.id = 5;
     Friends x = new Friends;
-    x.people ~= onlyFriend;
-    x.people ~= onlyFriend;
-    x.people ~= onlyFriend;
+    x.people = [onlyFriend, onlyFriend, onlyFriend];
     debug (protobuf) Stdout(x).newline();
     auto bb = new ByteBuffer;
     ubyte[] buf;
@@ -193,6 +191,32 @@ bool test_skip_unknown()
     }
 }
 
+bool test_unset()
+{
+    Stdout ("Testing IsSet-functionality...");
+    auto a = new Person;
+    a.name = "arne";
+    assert(!a.idIsSet, "Id should not be marked as set");
+    auto bb = new ByteBuffer;
+    auto buf = a.encode(bb);
+    debug (protobuf) Stdout(buf).newline();
+    Person b = new Person;
+    b.decode(buf);
+    assert(!b.idIsSet, "Id should still not be marked as set");
+    b.id = 5;
+    assert(b.idIsSet, "Id should now be marked as set");
+    buf = b.encode(bb);
+    a = new Person;
+    a.decode(buf);
+    if (a.idIsSet) {
+        Stdout("[PASS]").newline;
+        return true;
+    } else {
+        Stdout("[FAIL]").newline;
+        return false;
+    }
+}
+
 void main()
 {
     test_varintenc;
@@ -200,4 +224,5 @@ void main()
     test_object_enc;
     test_repeated_enc;
     test_skip_unknown;
+    test_unset;
 }

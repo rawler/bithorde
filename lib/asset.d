@@ -16,6 +16,9 @@
  ***************************************************************************************/
 module lib.asset;
 
+public import tango.core.Signal;
+public import tango.core.Traits;
+
 import lib.message;
 
 alias ushort  AssetHandle;
@@ -27,10 +30,17 @@ interface IAsset {
     void aSyncRead(ulong offset, uint length, BHReadCallback);
     ulong size();
     void close();
+    Signal!(ParameterTupleOf!(BHAssetStatusCallback))* statusSignal();
+    template StatusSignal() {
+        protected Signal!(ParameterTupleOf!(BHAssetStatusCallback)) _statusSignal;
+
+        public Signal!(ParameterTupleOf!(BHAssetStatusCallback))* statusSignal() {
+            return &_statusSignal;
+        }
+    }
 }
 
 /// Callbacks for requests
-alias void delegate(IAsset, Status status, OpenOrUploadRequest, OpenResponse) BHOpenCallback;
+alias void delegate(IAsset, Status status, AssetStatus) BHAssetStatusCallback;
 alias void delegate(IAsset, Status status, ReadRequest, ReadResponse) BHReadCallback;
-alias void delegate(IAsset, Status status, MetaDataRequest, MetaDataResponse) BHMetaDataCallback;
 
