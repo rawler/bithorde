@@ -147,6 +147,7 @@ void testServerTimeout(SteppingServer src, SteppingServer proxy) {
     auto sendTime = Clock.now;
     client.open(ids, delegate(IAsset asset, Status status, AssetStatus resp) {
         assert(asset, "Asset is null");
+        assert(resp !is null, "Did not get expected response");
         if (status == Status.NOTFOUND) {
             gotTimeout = true;
             client.close();
@@ -155,8 +156,7 @@ void testServerTimeout(SteppingServer src, SteppingServer proxy) {
         }
         auto elapsed = Clock.now - sendTime;
         assert(elapsed.millis > 300, "Too little time has passed. Can't be result of Timeout.");
-        assert(resp, "Did not get expected response");
-    }, TimeSpan.fromMillis(500));
+    }, TimeSpan.fromMillis(1000));
     LOG.info("Request sent, expecting Timeout");
     client.run();
     if (gotTimeout)
@@ -251,6 +251,7 @@ void testRestartWithPartialAsset(SteppingServer src, Identifier[] ids) {
     src.reset(1000);
 
     auto proxy = new SteppingServer("RestartProxy", 23416, [src]);
+    scope (exit) proxy.shutdown();
     proxy.reset(1000);
     auto client = createClient(proxy);
     LOG.info("Client open, trying to open asset");
@@ -297,6 +298,53 @@ void testRestartWithPartialAsset(SteppingServer src, Identifier[] ids) {
     client.run();
 }
 
+/****************************************************************************************
+ * Tests restarting a partial asset from a restarted server.
+ ***************************************************************************************/
+void testSourceGone(SteppingServer src, SteppingServer proxy, Identifier[] ids) {
+    const chunkSize = 5;
+    src.reset(1000);
+    proxy.reset(1000);
+
+    scope client = createClient(proxy);
+    LOG.info("Client open, trying to open asset");
+
+    uint pos;
+    RemoteAsset asset;
+    bool gotNewStatus;
+    uint origAvailable;
+
+    void readResponse(IAsset asset, Status status, ReadRequest req, ReadResponse resp) {
+        assert(status == Status.SUCCESS, "First-Read should have succeded, but got status " ~ statusToString(status));
+        if (src) {
+            LOG.info("Shutting down source");
+            src.shutdown();
+            src = null;
+        }
+    }
+    void updateStatus(IAsset _asset, Status status, AssetStatus resp) {
+        assert(_asset && (status == Status.SUCCESS), "Status update got non-SUCCESS: " ~ statusToString(status));
+        assert(resp.availabilityIsSet, "Availability wasn't set on statusUpdate");
+        LOG.trace("Avail: {} {}", resp.availability, origAvailable);
+        assert(resp.availability < origAvailable, "Availability wasn't decreased after src-shutdown.");
+        LOG.info("SUCCESS: Got status update after source-shutdown.");
+        gotNewStatus = true;
+        client.close();
+    }
+    client.open(ids, delegate(IAsset _asset, Status status, AssetStatus resp) {
+        asset = cast(RemoteAsset)_asset;
+        assert(asset && (status == Status.SUCCESS), "Failed opening, status is " ~ statusToString(status));
+        assert(resp.availabilityIsSet, "Availability wasn't set on open");
+        origAvailable = resp.availability;
+        asset.statusSignal.attach(&updateStatus);
+
+        asset.aSyncRead(0, chunkSize, &readResponse, 2, TimeSpan.fromMillis(500));
+    });
+    client.run();
+    assert(gotNewStatus, "Did not get status update");
+}
+
+
 /*----------------------- Actual tests begin here -------------------------------------*/
 
 /// Log for all the tests
@@ -325,4 +373,9 @@ void main() {
 
     synchronized (Cout.stream) { Stdout("\nTesting Restarting During Partial Asset\n=======================================\n").newline; }
     testRestartWithPartialAsset(src, ids);
+
+    synchronized (Cout.stream) { Stdout("\nTesting Dropping Source\n=======================================\n").newline; }
+    auto node3 = new SteppingServer("Node3", 23417, [src, proxy]);
+    scope(exit) node3.shutdown();
+    testSourceGone(src, node3, ids);
 }

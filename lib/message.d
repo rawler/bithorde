@@ -174,10 +174,12 @@ class AssetStatus : Message {
     mixin(PBField!(Status, "status"));     // Status of request
     mixin(PBField!(ulong, "size"));        // Size of opened asset
     mixin(PBField!(Identifier[], "ids"));  // Notification of new known ids
-    mixin ProtoBufCodec!(PBMapping("handle",    1),
-                         PBMapping("status",    2),
-                         PBMapping("ids",       3),
-                         PBMapping("size",      4));
+    mixin(PBField!(uint, "availability")); // Local-count of availability
+    mixin ProtoBufCodec!(PBMapping("handle",       1),
+                         PBMapping("status",       2),
+                         PBMapping("ids",          3),
+                         PBMapping("size",         4),
+                         PBMapping("availability", 5));
 
     Type typeId() { return Type.AssetStatus; }
 }

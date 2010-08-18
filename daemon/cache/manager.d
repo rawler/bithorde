@@ -221,36 +221,36 @@ public:
     /************************************************************************************
      * Recieves responses for forwarded requests, and decides on caching.
      ***********************************************************************************/
-    private void _forwardedCallback(BindRead req, IServerAsset asset, message.Status status) {
-        if (status == message.Status.SUCCESS) {
+    private void _forwardedCallback(BindRead req, IServerAsset asset, message.Status sCode, message.AssetStatus s) {
+        if (sCode == message.Status.SUCCESS) {
             auto metaAsset = findMetaAsset(asset.hashIds);
             bool foundAsset = metaAsset !is null;
             if (!metaAsset && req.handleIsSet) {
                 if (_makeRoom(asset.size))
                     metaAsset = newMetaAssetWithHashIds(asset.hashIds);
                 else
-                    return req.callback(null, message.Status.NORESOURCES);
+                    return req.callback(null, message.Status.NORESOURCES, null);
             }
             if (!metaAsset) {
-                req.callback(asset, status); // Just forward without caching
+                req.callback(asset, sCode, s); // Just forward without caching
             } else { // 
                 try {
                     auto path = metaAsset.assetPath;
                     assert(cast(bool)path.exists == foundAsset);
                     auto cachingAsset = new CachingAsset(path, metaAsset, asset, &metaAsset.updateHashIds);
                     metaAsset.setAsset(cachingAsset);
-                    log.trace("Responding with status {}", message.statusToString(status));
-                    req.callback(cachingAsset, status);
+                    log.trace("Responding with status {}", message.statusToString(sCode));
+                    req.callback(cachingAsset, sCode, s);
                 } catch (IOException e) {
                     log.error("While opening asset: {}", e);
                     if (metaAsset)
                         purgeAsset(metaAsset);
-                    req.callback(null, message.Status.ERROR);
+                    req.callback(null, message.Status.ERROR, null);
                 }
             }
         } else {
-            log.info("Forward search failed with error-code {}", message.statusToString(status));
-            req.callback(null, status);
+            log.info("Forward search failed with error-code {}", message.statusToString(sCode));
+            req.callback(null, sCode, null);
         }
     }
 
@@ -279,7 +279,7 @@ public:
     void findAsset(BindRead req) {
         void fromCache(MetaData meta, BaseAsset asset) {
             log.trace("serving {} from cache", hex.encode(meta.localId));
-            req.callback(asset, message.Status.SUCCESS);
+            req.callback(asset, message.Status.SUCCESS, null);
         }
         void forwardRequest() {
             req.pushCallback(&_forwardedCallback);

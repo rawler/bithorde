@@ -242,6 +242,7 @@ class CachingAsset : WriteableAsset {
 public:
     this (FilePath path, AssetMetaData metadata, IServerAsset remoteAsset, HashIdsListener updateHashIds) {
         this.remoteAsset = remoteAsset;
+        remoteAsset.statusSignal.attach(&onBackingUpdate);
         super(path, metadata, remoteAsset.size, updateHashIds); // TODO: Verify remoteAsset.size against local file
         log = Log.lookup("daemon.cache.cachingasset." ~ path.name[0..8]);
         log.trace("Caching remoteAsset of size {}", size);
@@ -266,6 +267,11 @@ protected:
 private:
     void realRead(ulong offset, uint length, BHReadCallback cb) {
         super.aSyncRead(offset, length, cb);
+    }
+
+    void onBackingUpdate(IAsset backing, message.Status sCode, message.AssetStatus s) {
+        // TODO: We should probably also react on changes
+        statusSignal.call(this, sCode, s);
     }
 
     /************************************************************************************

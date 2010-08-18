@@ -144,16 +144,15 @@ public:
      ***********************************************************************************/
     synchronized void shutdown() {
         running = false;
-        if (tcpServer) {
-            tcpServer.shutdown();
-            tcpServer.detach();
-            tcpServer = null;
+        foreach (sk; selector) {
+            auto sock = cast(Socket)(sk.conduit);
+            if (sock) {
+                sock.shutdown();
+                sock.detach();
+            }
         }
-        if (unixServer) {
-            unixServer.shutdown();
-            unixServer.detach();
-            unixServer = null;
-        }
+        tcpServer = null;
+        unixServer = null;
         evfd.signal();
     }
 

@@ -235,7 +235,7 @@ public:
 
     void close()
     {
-        auto assets = boundAssets;
+        log.trace("Closing...");
         foreach (asset; boundAssets) if (asset) {
             asset.close();
         }
@@ -438,11 +438,12 @@ public:
             foreach (key; selector.selectedSet()) {
                 if (key.isReadable) {
                     auto read = connection.readNewData();
-                    if (read)
+                    if (read) {
                         while (connection.processMessage()) {}
-                    else
+                    } else {
                         onDisconnected();
-                } else if (key.isError) {
+                    }
+                } else if (key.isError || key.isHangup) {
                     onDisconnected();
                 }
             }

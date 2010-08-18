@@ -16,6 +16,8 @@
  ***************************************************************************************/
 module daemon.routing.asset;
 
+private import tango.util.log.Log;
+
 private import lib.client;
 private import lib.message;
 
@@ -33,9 +35,9 @@ private class ForwardedAsset : IServerAsset {
 private:
     daemon.client.BindRead req;
     IAsset[] backingAssets;
-    BHServerOpenCallback openCallback;
     RequestCompleted notify;
     uint reqnum;
+    Logger log;
 package:
     uint waitingResponses;
 public:
@@ -46,6 +48,7 @@ public:
     {
         this.req = req;
         this.notify = notify;
+        this.log = Log.lookup("router.asset");
     }
     ~this() {
         close();
@@ -80,6 +83,27 @@ public:
         return backingAssets[0].size;
     }
 
+private:
+    void onUpdatedStatus(IAsset asset, Status status, AssetStatus resp) {
+        log.trace("Got updated backingAsset status {}", statusToString(status));
+        if (status != Status.SUCCESS) {
+            // Remove backingAsset
+            auto newBackingAssets = new IAsset[0];
+            foreach (a; backingAssets) {
+                if (a != asset)
+                    newBackingAssets ~= a;
+            }
+            auto oldBackingAssets = backingAssets;
+            backingAssets = newBackingAssets;
+            delete oldBackingAssets;
+
+            scope fwd = new AssetStatus;
+            fwd.status = (backingAssets.length > 0) ? Status.SUCCESS : Status.NOTFOUND;
+            fwd.availability = backingAssets.length*5;
+            statusSignal.call(this, fwd.status, fwd);
+        }
+    }
+
 package:
     /************************************************************************************
      * Callback for hooking up new-found backing assets
@@ -89,6 +113,7 @@ package:
         case Status.SUCCESS:
             assert(asset, "SUCCESS response, but no asset");
             assert(asset.size > 0, "Empty asset");
+            asset.statusSignal.attach(&onUpdatedStatus);
             backingAssets ~= asset;
             break;
         default:
@@ -104,7 +129,10 @@ package:
      ***********************************************************************************/
     void doCallback() {
         notify(req);
-        req.callback(this, (backingAssets.length > 0) ? Status.SUCCESS : Status.NOTFOUND);
+        scope s = new message.AssetStatus;
+        s.status = (backingAssets.length > 0) ? Status.SUCCESS : Status.NOTFOUND;
+        s.availability = backingAssets.length*5;
+        req.callback(this, s.status, s);
     }
 }
 

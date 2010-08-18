@@ -34,12 +34,6 @@ import message = lib.message;
 import lib.protobuf;
 
 /****************************************************************************************
- * Delegate-signature for request-notification-recievers. Reciever is responsible for
- * triggering a new req.callback, with appropriate responses.
- ***************************************************************************************/
-alias void delegate(BindRead req, IServerAsset, message.Status status) BHServerOpenCallback;
-
-/****************************************************************************************
  * Interface for the various forms of server-assets. (BaseAsset, CachingAsset,
  * ForwardedAsset...)
  ***************************************************************************************/
@@ -55,36 +49,23 @@ interface IAssetSource {
  * need to be asynchronously forwarded before completion.
  ***************************************************************************************/
 class BindRead : message.BindRead {
+    alias void delegate(BindRead req, IServerAsset asset, message.Status sCode, message.AssetStatus s) CallBack;
+
     Client client;
-    BHServerOpenCallback[4] _callbacks;
+    CallBack[4] _callbacks;
     ushort _callbackCounter;
     this(Client c) {
         client = c;
-        pushCallback(&_callback);
     }
-    final void _callback(BindRead req, IServerAsset asset, message.Status status) {
-        assert(this is req);
-        if (!client.closed) {
-            scope resp = new message.AssetStatus;
-            resp.handle = handle;
-            resp.status = status;
-            if (asset)
-                resp.size = asset.size;
-
-            client.openAssets[handle] = asset; // Assign to assetMap by Id
-            client.sendMessage(resp);
-        }
-        delete this;
+    final void callback(IServerAsset asset, message.Status sCode, message.AssetStatus status) {
+        _callbacks[--_callbackCounter](this, asset, sCode, status);
     }
-    final void callback(IServerAsset asset, message.Status status) {
-        _callbacks[--_callbackCounter](this, asset, status);
-    }
-    final void pushCallback(BHServerOpenCallback cb) {
+    final void pushCallback(CallBack cb) {
         assert(_callbackCounter < _callbacks.length);
         _callbacks[_callbackCounter++] = cb;
     }
     void abort(message.Status s) {
-        callback(null, s);
+        callback(null, s, null);
     }
 }
 
@@ -123,6 +104,10 @@ class Client : lib.client.Client {
     protected:
         /// Construct from BindRead request
         this (BindRead req) {
+            handle = req.handle;
+            openAssets[handle] = this;
+            req.pushCallback(&onBindReadReply);
+            server.findAsset(req);
         }
         this (message.BindWrite req) {
             handle = req.handle;
@@ -130,17 +115,27 @@ class Client : lib.client.Client {
             server.uploadAsset(req, &onAssetStatus);
         }
     private:
+        void onBindReadReply(BindRead _, IServerAsset asset, message.Status sCode, message.AssetStatus s) {
+            if (asset) {
+                log.trace("Registered for statusUpdates on handle {}", handle);
+                asset.statusSignal.attach(&onAssetStatus);
+            }
+            return onAssetStatus(asset, sCode, s);
+        }
         void onAssetStatus(IAsset asset, message.Status sCode, message.AssetStatus s) {
+            log.trace("Informing client on status {} on handle {}", message.statusToString(sCode), handle);
             assetSource = cast(IServerAsset)asset;
             if (!closed) {
-                scope resp = new message.AssetStatus();
+                scope resp = new message.AssetStatus;
                 resp.handle = handle;
                 resp.status = sCode;
                 if (assetSource) {
                     resp.size = size;
                     resp.ids = hashIds;
                 }
-                openAssets[handle] = this; // Assign to assetMap by Id
+                if (s) {
+                    resp.availability = s.availability;
+                }
                 sendMessage(resp);
             }
         }
@@ -195,9 +190,12 @@ protected:
             log.trace("Got open request #{}, {}", req.uuid, formatMagnet(req.ids, 0));
             if (!req.uuidIsSet)
                 req.uuid = rand.uniformR2!(ulong)(1,ulong.max);
-            server.findAsset(req);
+            openAssets[req.handle] = new BoundAsset(req);
         } else {
-            req.abort(message.Status.NOTFOUND);
+            scope resp = new message.AssetStatus();
+            resp.handle = req.handle;
+            resp.status = message.Status.NOTFOUND;
+            sendMessage(resp);
         }
     }
 

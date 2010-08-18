@@ -46,7 +46,7 @@ public:
      ***********************************************************************************/
     void findAsset(daemon.client.BindRead req) {
         if (req.uuid in openRequests)
-            req.callback(null, Status.WOULD_LOOP);
+            req.callback(null, Status.WOULD_LOOP, null);
         else
             return forwardBindRead(req);
     }
@@ -92,7 +92,7 @@ private:
                 log.trace("Forwarding to {}", friend);
                 asset.waitingResponses += 1;
                 // TODO: Randomize timeouts
-                client.open(req.ids, &asset.addBackingAsset, req.uuid, TimeSpan.fromMillis(req.timeout-50));
+                client.open(req.ids, &asset.addBackingAsset, req.uuid, TimeSpan.fromMillis(req.timeout-100));
             }
         }
         if (!asset.waitingResponses)
