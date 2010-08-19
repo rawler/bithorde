@@ -169,7 +169,7 @@ public {
     }
     bool read(T:ProtoBufMessage)(ref T[] members, T allocated, ref ubyte[] buf) {
         uint msglen;
-        if (decode_val!(size_t)(buf, msglen) && (buf.length >= msglen)) {
+        if (decode_val!(uint)(buf, msglen) && (buf.length >= msglen)) {
             allocated.decode(buf[0..msglen]);
             members ~= allocated;
             buf = buf[msglen..length];
