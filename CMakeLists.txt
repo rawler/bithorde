@@ -15,6 +15,22 @@ add_d_program(bhget clients/bhget.d)
 add_d_program(bhupload clients/bhupload.d)
 add_d_program(bhfuse clients/bhfuse.d LIBS fuse)
 
+# Install specifications
+INSTALL(FILES
+  ${CMAKE_CURRENT_BINARY_DIR}/bin/bithorded
+  ${CMAKE_CURRENT_BINARY_DIR}/bin/bhget
+  ${CMAKE_CURRENT_BINARY_DIR}/bin/bhupload
+  ${CMAKE_CURRENT_BINARY_DIR}/bin/bhfuse
+  DESTINATION bin
+)
+
+set(CONF_INSTALL_DIR /etc CACHE PATH "Where should config-template be installed?")
+
+INSTALL(FILES template.config
+  DESTINATION ${CONF_INSTALL_DIR}
+  RENAME bithorde.conf
+)
+
 # Tests
 add_d_program(bithordelib tests/bithordelib.d OUTPUT_PATH ${CMAKE_CURRENT_BINARY_DIR}/tests)
 add_d_program(protobuf tests/protobuf.d OUTPUT_PATH ${CMAKE_CURRENT_BINARY_DIR}/tests)
