@@ -37,4 +37,6 @@ add_d_program(protobuf tests/protobuf.d OUTPUT_PATH ${CMAKE_CURRENT_BINARY_DIR}/
 
 ENABLE_TESTING()
 ADD_TEST(RoundtripTest ${CMAKE_SOURCE_DIR}/tests/roundtrip/test_roundtrip.sh)
+SET_TESTS_PROPERTIES(RoundtripTest PROPERTIES ENVIRONMENT "BH_BINDIR=${CMAKE_CURRENT_BINARY_DIR}/bin")
+
 ADD_TEST(BithordeLibTest ${CMAKE_CURRENT_BINARY_DIR}/tests/bithordelib)
