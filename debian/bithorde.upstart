@@ -1,0 +1,10 @@
+
+
+start on net-device-up
+
+
+exec /usr/bin/bithorded /etc/bithorde.conf
+
+expect fork
+
+

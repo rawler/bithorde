@@ -2,7 +2,7 @@ Source: bithorde
 Section: net
 Priority: extra
 Maintainer: Ulrik Mikaelsson <ulrik.mikaelsson@gmail.com>
-Build-Depends: debhelper (>= 7), cmake, libtango-ldc-dev 
+Build-Depends: debhelper (>= 7), cmake, libtango-ldc-dev, ldc, libfuse-dev
 Standards-Version: 3.8.3
 Homepage: http://www.bithorde.org/
 
