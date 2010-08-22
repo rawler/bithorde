@@ -2,13 +2,6 @@
 *.o
 *.pyc
 
-# CMake and Make-files
-CMakeFiles/*
-CMakeCache.txt
-cmake_install.cmake
-Makefile
-*.*.deps
-
 # Built executables
 /bin
 /tests/protobuf
