@@ -25,6 +25,7 @@ private import tango.net.device.Berkeley;
 private import tango.net.device.LocalSocket;
 private import tango.net.device.Socket;
 private import tango.net.InternetAddress;
+private import tango.stdc.posix.sys.stat;
 private import tango.stdc.signal;
 private import unistd = tango.stdc.posix.unistd;
 private import Text = tango.text.Util;
@@ -107,6 +108,8 @@ public:
         selector.register(tcpServer, Event.Read);
         if (config.unixSocket) {
             auto sockF = new FilePath(config.unixSocket);
+            auto old_mask = umask(0); // Temporarily clear umask so socket is mode 777
+            scope(exit) umask(old_mask);
             if (sockF.exists())
                 sockF.remove();
             log.info("Listening to unix-socket {}", config.unixSocket);
