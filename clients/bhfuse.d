@@ -497,11 +497,14 @@ int main(char[][] args)
     Log.root.add(new AppendConsole(new LayoutDate));
 
     auto mountdir = FilePath(arguments.mountpoint).absolute("/");
+    auto oldmask = umask(0022);
     mountdir.create();
+    umask(oldmask);
     auto cmountpoint = arguments.mountpoint~'\0';
     auto cbinname = args[0] ~ '\0';
     auto argv = new char*[0];
     argv ~= cbinname.ptr;
+    argv ~= "-oallow_other\0".ptr;
     if (arguments.do_debug)
         argv ~= "-d\0".ptr;
     argv ~= cmountpoint.ptr;
