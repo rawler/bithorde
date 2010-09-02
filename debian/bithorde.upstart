@@ -2,8 +2,8 @@
 
 start on net-device-up
 
-
 exec /usr/bin/bithorded /etc/bithorde.conf
+respawn
 
 expect fork
 
