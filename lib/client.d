@@ -110,6 +110,8 @@ protected:
             if (singleShotStatus)
                 _statusSignal = _statusSignal.init;
             sig.call(this, resp.status, resp);
+            if (resp.status != message.Status.SUCCESS)
+                close();
         }
     }
     void triggerTimeout(Time deadline, Time now) {
