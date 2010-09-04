@@ -65,9 +65,9 @@ class RemoteAsset : private IAsset {
             callback(s, null);
         }
     }
+    bool closed;
 private:
     Client client;
-    bool closed;
     void clientGone(Object o) {
         this.client = null;
     }
