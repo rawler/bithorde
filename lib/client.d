@@ -438,19 +438,25 @@ public:
         auto timeout = nextDeadline - Clock.now;
         if (selector.select(timeout) > 0) {
             foreach (key; selector.selectedSet()) {
-                if (key.isReadable) {
-                    auto read = connection.readNewData();
-                    if (read) {
-                        while (connection.processMessage()) {}
-                    } else {
-                        onDisconnected();
-                    }
-                } else if (key.isError || key.isHangup) {
-                    onDisconnected();
-                }
             }
         }
         processTimeouts(Clock.now);
+    }
+
+    /************************************************************************************
+     * Process a single SelectionKey event
+     ***********************************************************************************/
+    void process(ref SelectionKey key) {
+        if (key.isReadable) {
+            auto read = connection.readNewData();
+            if (read) {
+                while (connection.processMessage()) {}
+            } else {
+                onDisconnected();
+            }
+        } else if (key.isError || key.isHangup) {
+            onDisconnected();
+        }
     }
 
     /************************************************************************************

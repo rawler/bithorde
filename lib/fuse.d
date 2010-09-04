@@ -22,6 +22,9 @@
 import tango.io.model.IConduit;
 import tango.stdc.posix.sys.stat;
 import tango.sys.consts.errno;
+import tango.time.Time;
+
+import lib.pumping;
 
 pragma(lib, "fuse");
 
@@ -119,7 +122,7 @@ extern(C) {
     void         fuse_unmount(char* mountpoint, fuse_chan ch);
 }
 
-abstract class Filesystem : ISelectable {
+abstract class Filesystem : ISelectable, IProcessor {
 private:
     char[] mountpoint;
     fuse_session s;
@@ -217,6 +220,20 @@ protected:
     abstract void open(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi);
     abstract void release(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi);
     abstract void read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, fuse_file_info *fi);
+
+public: // IProcessor implementation
+    ISelectable[] conduits() {
+        return [this];
+    }
+    void process(ref SelectionKey key) {
+        if (exited) {
+            // TODO: Trigger termination somehow?
+        } else {
+            dispatch_waiting();
+        }
+    }
+    Time nextDeadline() { return Time.max; }
+    void processTimeouts(Time now) { }
 }
 
 debug (FUSETest) {

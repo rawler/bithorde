@@ -42,6 +42,7 @@ private import lib.client;
 private import lib.fuse;
 private import lib.hashes;
 private import lib.message;
+private import lib.pumping;
 
 /*-------------- Main program below ---------------*/
 static BHFuseClient client;
@@ -82,7 +83,7 @@ class BitHordeException : Exception {
     }
 }
 
-class BHFuseClient : SimpleClient {
+class BHFuseClient : SimpleClient, IProcessor {
     private Address _remoteAddr;
     AssetMap assetMap;
 
@@ -135,6 +136,13 @@ class BHFuseClient : SimpleClient {
         newConnection(currentConnection);
         return currentConnection;
     }
+public: // IProcessor interface-implementation
+    ISelectable[] conduits() {
+        return [currentConnection];
+    }
+    void process(ref SelectionKey key) { super.process(key); }
+    Time nextDeadline() { return super.nextDeadline; }
+    void processTimeouts(Time now) { super.processTimeouts(now); }
 }
 
 class BitHordeFilesystem : Filesystem {
@@ -387,31 +395,6 @@ int main(char[][] args)
     umask(oldmask);
     scope BitHordeFilesystem fs = new BitHordeFilesystem(mountdir, client, arguments);
 
-    auto selector = new Selector();
-    selector.open(2,2);
-    selector.register(fs, Event.Read, null);
-    selector.register(client.currentConnection, Event.Read, null);
-    int events;
-    while ((events = selector.select())>0) {
-        foreach (SelectionKey key; selector.selectedSet())
-        {
-            if (key.isReadable()) {
-                if (key.conduit is fs) {
-                    if (fs.exited) {
-                        return -1;
-                    } else {
-                        fs.dispatch_waiting();
-                    }
-                } else if (key.conduit is client.currentConnection) {
-                    client.pump();
-                } else {
-                    Stderr("Unknown SelectionKey", __FILE__, __LINE__).newline;
-                }
-            }
-
-            if (key.isError() || key.isHangup() || key.isInvalidHandle()) {
-                return -1;
-            }
-        }
-    }
+    auto pump = new Pump([cast(IProcessor)fs, client]);
+    pump.run();
 }
