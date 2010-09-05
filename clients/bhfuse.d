@@ -410,4 +410,5 @@ int main(char[][] args)
 
     auto pump = new Pump([cast(IProcessor)fs, client]);
     pump.run();
+    return 0;
 }

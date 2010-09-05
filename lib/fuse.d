@@ -209,10 +209,10 @@ protected:
         buf = new ubyte[fuse_chan_bufsize(chan)];
     }
     ~this() {
-        if (s)
-            fuse_session_destroy(s);
         if (chan)
             fuse_unmount((mountpoint~'\0').ptr, chan);
+        if (s)
+            fuse_session_destroy(s);
     }
     abstract void lookup(fuse_req_t req, fuse_ino_t parent, char *name);
     abstract void forget(fuse_ino_t ino, uint nlookup);
