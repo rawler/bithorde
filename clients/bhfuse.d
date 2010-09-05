@@ -164,7 +164,7 @@ class BitHordeFilesystem : Filesystem {
             inodeNameMap[pathName] = this;
         }
 
-        stat_t stat(fuse_ino_t ino) {
+        stat_t create_stat_t(fuse_ino_t ino) {
             stat_t r;
             r.st_ino = ino;
             r.st_mode = S_IFREG | 0555;
@@ -174,31 +174,44 @@ class BitHordeFilesystem : Filesystem {
         }
 
         /********************************************************************************
-         * Make a FUSE-entry-reply for this INode
+         * Make a FUSE-entry-reply for this INode and reply
          *******************************************************************************/
-        void fuse_lookup(fuse_req_t req) {
+        void lookup(fuse_req_t req) {
             refCount += 1;
             fuse_entry_param reply;
             reply.ino = ino;
             reply.generation = 0;
-            reply.attr = stat(reply.ino);
+            reply.attr = create_stat_t(reply.ino);
             reply.attr_timeout = double.max;
-            reply.entry_timeout = 0.1;
+            reply.entry_timeout = 1;
             auto res = fuse_reply_entry(req, &reply);
             assert(res == 0);
         }
 
         /********************************************************************************
-         * Handle a FUSE-open request for this INode
+         * Handle a FUSE-open request for this INode and trigger reply
          *******************************************************************************/
-        void fuse_open(OpenRequest r) {
+        void open(OpenRequest r) {
             if (asset) {
-                r.onOpenResponse(asset, Status.SUCCESS, null);
+                r.onBindResponse(asset, Status.SUCCESS, null);
             } else {
-                client.open(ids, &r.onOpenResponse);
+                client.open(ids, &r.onBindResponse);
             }
         }
 
+        /********************************************************************************
+         * Release resources held by an open INode.
+         *******************************************************************************/
+        void release() {
+            if (asset) {
+                asset.close;
+                asset = null;
+            }
+        }
+
+        /********************************************************************************
+         * Handle a FUSE-read request for this INode and trigger reply
+         *******************************************************************************/
         void read(ReadRequest r) {
             if (asset && !asset.closed) {
                 asset.aSyncRead(r.offset, r.size, &r.onReadResponse);
@@ -237,7 +250,7 @@ class BitHordeFilesystem : Filesystem {
             auto asset = cast(RemoteAsset)_asset;
             if (asset && (sCode == Status.SUCCESS)) {
                 auto inode = new INode(pathName, asset);
-                inode.fuse_lookup(req);
+                inode.lookup(req);
             } else {
                 fuse_reply_err(req, ENOENT);
             }
@@ -256,14 +269,16 @@ class BitHordeFilesystem : Filesystem {
             this.fi = fi;
             this.inode = inode;
         }
-        void onOpenResponse(IAsset asset, Status sCode, AssetStatus status) {
+        void onBindResponse(IAsset asset, Status sCode, AssetStatus status) {
             if (sCode == Status.SUCCESS) {
+                inode.asset = cast(RemoteAsset)asset;
                 fuse_reply_open(req, fi);
             } else {
                 fuse_reply_err(req, ENOENT);
             }
         }
     }
+
     class ReadRequest {
         fuse_req_t req;
         fuse_file_info *fi;
@@ -285,7 +300,7 @@ class BitHordeFilesystem : Filesystem {
                 auto end = start+size;
                 fuse_reply_buf(req, cast(void*)(data[start..end].ptr), size);
             } else {
-                fuse_reply_err(req, ENOBUFS);
+                fuse_reply_err(req, EBADF);
             }
         }
     }
@@ -305,7 +320,10 @@ private:
 public:
     this(FilePath mountpoint, BHFuseClient client, FUSEArguments args) {
         // TODO: deal with arguments
-        super(mountpoint.toString, ["-oallow_other"]);
+        char[][] fuse_args = ["-oallow_other"];
+        if (args.do_debug)
+            fuse_args ~= "-d";
+        super(mountpoint.toString, fuse_args);
         this.client = client;
     }
 protected:
@@ -313,7 +331,7 @@ protected:
         auto name = _name[0..strlen(_name)];
         if (name in inodeNameMap) {
             auto inode = inodeNameMap[name];
-            inode.fuse_lookup(req);
+            inode.lookup(req);
         } else if ((parent == ROOT_INODE) && (name in HashNameMap)) {
             fuse_entry_param reply;
             reply.ino = (HashNameMap[name].pbType << 1) | 0b1;
@@ -356,7 +374,7 @@ protected:
                 fuse_reply_err(req, ENOENT);
             }
         } else if (auto asset = inoToAsset(ino)) {
-            auto res = fuse_reply_attr(req, &asset.stat(ino), 60);
+            auto res = fuse_reply_attr(req, &asset.create_stat_t(ino), 60);
             assert(res == 0);
         } else {
             fuse_reply_err(req, ENOENT);
@@ -365,21 +383,22 @@ protected:
     void open(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi) {
         if (auto inode = inoToAsset(ino)) {
             fi.keep_cache = true;
-            inode.fuse_open(new OpenRequest(req, fi, inode));
+            inode.open(new OpenRequest(req, fi, inode));
         } else {
             fuse_reply_err(req, ENOENT);
         }
     }
     void release(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi) {
-        Stdout("Releasing", ino).newline;
-        if (inoToAsset(ino))
-            fuse_reply_none(req);
-        else
+        if (auto inode = inoToAsset(ino)) {
+            inode.release();
+            fuse_reply_err(req, 0);
+        } else {
             fuse_reply_err(req, EBADF);
+        }
     }
     void read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, fuse_file_info *fi) {
-        if (auto asset = inoToAsset(ino)) {
-            asset.read(new ReadRequest(req, fi, off, size));
+        if (auto inode = inoToAsset(ino)) {
+            inode.read(new ReadRequest(req, fi, off, size));
         } else {
             fuse_reply_err(req, EBADF);
         }
