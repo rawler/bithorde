@@ -161,6 +161,8 @@ public:
     }
 
     void close() {
+        if (closed)
+            return;
         closed = true;
         scope sig = _statusSignal;
         _statusSignal = _statusSignal.init;
