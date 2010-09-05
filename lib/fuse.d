@@ -1,4 +1,4 @@
-/*
+/****************************************************************************************
  * FUSE: Filesystem in Userspace
  *  is Copyright (C) 2001-2007  Miklos Szeredi <miklos@szeredi.hu>
  *
@@ -17,8 +17,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
-
-*/
+ ****************************************************************************************/
 import tango.io.model.IConduit;
 import tango.stdc.posix.sys.stat;
 import tango.sys.consts.errno;
@@ -187,7 +186,6 @@ public:
         if (res>0) {
             fuse_session_process(s, buf.ptr, res, tmpch);
         } else if ( exited ) {
-
             throw new Exception("We're done here");
         }
     }
