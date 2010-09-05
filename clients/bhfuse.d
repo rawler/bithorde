@@ -146,15 +146,19 @@ public: // IProcessor interface-implementation
 }
 
 class BitHordeFilesystem : Filesystem {
-    class Asset {
-        fuse_req_t req;
+    class INode {
         RemoteAsset asset;
         char[] pathName;
+        ulong size;
         ino_t ino;
         uint refCount;
-        this (fuse_req_t req, char[] pathName) {
-            this.req = req;
+
+        this (char[] pathName, RemoteAsset asset) {
             this.pathName = pathName;
+            size = asset.size;
+            ino = allocateIno;
+            inodes[ino] = this;
+            inodeNameMap[pathName] = this;
         }
 
         stat_t stat(fuse_ino_t ino) {
@@ -162,22 +166,8 @@ class BitHordeFilesystem : Filesystem {
             r.st_ino = ino;
             r.st_mode = S_IFREG | 0555;
             r.st_nlink = 1;
-            r.st_size = asset.size;
+            r.st_size = size;
             return r;
-        }
-
-        /********************************************************************************
-         * Recieve bindResponse from bithorde, and answer to fuse.
-         *******************************************************************************/
-        void onBindResponse(IAsset _asset, Status sCode, AssetStatus s) {
-            asset = cast(RemoteAsset)_asset;
-            if (asset && (sCode == Status.SUCCESS)) {
-                assets[asset.handle] = this;
-                assetNameMap[pathName] = this;
-                fuse_success(req);
-            } else {
-                fuse_reply_err(req, ENOENT);
-            }
         }
 
         /********************************************************************************
@@ -186,7 +176,7 @@ class BitHordeFilesystem : Filesystem {
         void fuse_success(fuse_req_t req) {
             refCount += 1;
             fuse_entry_param reply;
-            reply.ino = ino = (asset.handle+1) << 1;
+            reply.ino = ino;
             reply.generation = 0;
             reply.attr = stat(reply.ino);
             reply.attr_timeout = double.max;
@@ -207,9 +197,33 @@ class BitHordeFilesystem : Filesystem {
             refCount -= nlookup;
             Stdout("Forgot to", refCount).newline;
             if (!refCount) {
-                assets.remove(asset.handle);
-                assetNameMap.remove(pathName);
+                inodes.remove(asset.handle);
+                inodeNameMap.remove(pathName);
                 asset.close();
+            }
+        }
+    }
+    /************************************************************************************
+     * Try to lookup an INode from BitHorde
+     ***********************************************************************************/
+    class LookupRequest {
+        fuse_req_t req;
+        char[] pathName;
+        this(fuse_req_t req, char[] pathName) {
+            this.req = req;
+            this.pathName = pathName;
+        }
+
+        /********************************************************************************
+         * Recieve bindResponse from bithorde, and answer to fuse.
+         *******************************************************************************/
+        void onBindResponse(IAsset _asset, Status sCode, AssetStatus s) {
+            auto asset = cast(RemoteAsset)_asset;
+            if (asset && (sCode == Status.SUCCESS)) {
+                auto inode = new INode(pathName, asset);
+                inode.fuse_success(req);
+            } else {
+                fuse_reply_err(req, ENOENT);
             }
         }
     }
@@ -240,13 +254,12 @@ class BitHordeFilesystem : Filesystem {
     }
 private:
     BHFuseClient client;
-    Asset[uint] assets;
-    Asset[char[]] assetNameMap;
-    Asset inoToAsset(fuse_ino_t ino) {
-        if ((ino & 0b1) != 0) // Not an Asset-inode
-            return null;
-        ino = (ino >> 1) - 1;
-        auto ptr = ino in assets;
+    INode[uint] inodes;
+    INode[char[]] inodeNameMap;
+    fuse_ino_t ino = 2;
+    fuse_ino_t allocateIno() {return ino++;}
+    INode inoToAsset(fuse_ino_t ino) {
+        auto ptr = ino in inodes;
         if (ptr)
             return *ptr;
         else
@@ -261,9 +274,9 @@ public:
 protected:
     void lookup(fuse_req_t req, fuse_ino_t parent, char *_name) {
         auto name = _name[0..strlen(_name)];
-        if (name in assetNameMap) {
-            auto asset = assetNameMap[name];
-            asset.fuse_success(req);
+        if (name in inodeNameMap) {
+            auto inode = inodeNameMap[name];
+            inode.fuse_success(req);
         } else if ((parent == ROOT_INODE) && (name in HashNameMap)) {
             fuse_entry_param reply;
             reply.ino = (HashNameMap[name].pbType << 1) | 0b1;
@@ -279,8 +292,8 @@ protected:
             char[] _;
             auto objectids = parseUri(name, _);
             if (objectids.length) {
-                auto asset = new Asset(req, name.dup);
-                client.open(objectids, &asset.onBindResponse);
+                auto ctx = new LookupRequest(req, name.dup);
+                client.open(objectids, &ctx.onBindResponse);
             } else {
                 fuse_reply_err(req, ENOENT);
             }
