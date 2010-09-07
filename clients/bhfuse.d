@@ -428,13 +428,14 @@ protected:
                 s.st_ino = ino;
                 s.st_mode = S_IFDIR | 0555;
                 s.st_nlink = 2;
-                auto res = fuse_reply_attr(req, &s, 60);
+                auto res = fuse_reply_attr(req, &s, double.max);
                 assert(res == 0);
             } else {
                 fuse_reply_err(req, ENOENT);
             }
-        } else if (auto asset = inoToAsset(ino)) {
-            auto res = fuse_reply_attr(req, &asset.create_stat_t(ino), 60);
+        } else if (auto inode = inoToAsset(ino)) {
+            auto s = inode.create_stat_t(ino);
+            auto res = fuse_reply_attr(req, &s, double.max);
             assert(res == 0);
         } else {
             fuse_reply_err(req, ENOENT);
