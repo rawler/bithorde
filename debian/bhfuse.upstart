@@ -1,0 +1,14 @@
+
+
+start on started bithorde
+stop on stopped bithorde
+
+exec /usr/bin/bhfuse -d /tmp/bhfuse
+respawn
+
+post-stop script
+ (mount | grep -c /tmp/bhfuse) && /bin/fusermount -u /tmp/bhfuse
+ sleep 1
+end script
+
+
