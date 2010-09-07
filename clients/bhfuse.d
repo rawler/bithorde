@@ -257,7 +257,9 @@ class BitHordeFilesystem : Filesystem {
          * Handle a FUSE-read request for this INode and trigger reply
          *******************************************************************************/
         void read(ReadRequest r) {
-            if (asset && !asset.closed) {
+            if (r.size == 0) {
+                r.onReadResponse(null, Status.SUCCESS, null, null);
+            } else if (asset && !asset.closed) {
                 asset.aSyncRead(r.offset, r.size, &r.onReadResponse);
             } else {
                 r.onReadResponse(null, Status.INVALID_HANDLE, null, null);
@@ -339,8 +341,10 @@ class BitHordeFilesystem : Filesystem {
             this.size = size;
         }
 
-        void onReadResponse(IAsset asset, Status sCode, lib.message.ReadRequest _, ReadResponse resp) {
-            if ((sCode == Status.SUCCESS) &&
+        void onReadResponse(IAsset _asset, Status sCode, lib.message.ReadRequest _, ReadResponse resp) {
+            if (size == 0) { // EOF, we have not requested anything
+                fuse_reply_buf(req, null, size);
+            } else if ((sCode == Status.SUCCESS) &&
                 (resp.offset <= offset) &&
                 ((resp.offset+resp.content.length) >= (offset+size))) {
                 auto data = resp.content;
@@ -459,6 +463,9 @@ protected:
     }
     void read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, fuse_file_info *fi) {
         if (auto inode = inoToAsset(ino)) {
+            assert(off <= inode.size, "FUSE sent offset after Eof");
+            if ((off+size) > inode.size) // Limit to Eof
+                size = inode.size - off;
             inode.read(new ReadRequest(req, fi, off, size));
         } else {
             fuse_reply_err(req, EBADF);
