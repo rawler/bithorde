@@ -33,6 +33,8 @@ private import tango.stdc.posix.sys.stat;
 private import tango.stdc.posix.sys.statvfs;
 private import tango.stdc.posix.utime;
 private import tango.stdc.string;
+private import tango.time.Clock;
+private import tango.util.container.more.Heap;
 private import tango.util.log.AppendConsole;
 private import tango.util.log.LayoutDate;
 private import tango.util.log.Log;
@@ -43,6 +45,9 @@ private import lib.fuse;
 private import lib.hashes;
 private import lib.message;
 private import lib.pumping;
+
+const HandleTimeoutTime = TimeSpan.fromMillis(100);
+const HandleTimeoutLimit = 10;
 
 /*-------------- Main program below ---------------*/
 static BHFuseClient client;
@@ -147,7 +152,19 @@ public: // IProcessor interface-implementation
 
 class BitHordeFilesystem : Filesystem {
     class INode {
+        struct TimeoutHandle {
+            Time deadline;
+            void delegate() callback;
+            int opCmp(TimeoutHandle other) {
+                return this.deadline.opCmp(other.deadline);
+            }
+            bool opEquals(typeof(callback) cb) {
+                return this.callback == cb;
+            }
+        }
+
         RemoteAsset asset;
+        TimeoutHandle handleTimeout;
         char[] pathName;
         Identifier[] ids;
         ulong size;
@@ -160,10 +177,35 @@ class BitHordeFilesystem : Filesystem {
             this.ids = asset.requestIds;
             this.size = asset.size;
             this.ino = allocateIno;
+            setHandleTimeout();
             inodes[ino] = this;
             inodeNameMap[pathName] = this;
         }
 
+        /********************************************************************************
+         * Register a pending handleTimeout.
+         *******************************************************************************/
+        void setHandleTimeout() {
+            handleTimeout.deadline = Clock.now + HandleTimeoutTime;
+            handleTimeout.callback = &this.release;
+            handleTimeouts.push(&handleTimeout);
+            if (handleTimeouts.size > HandleTimeoutLimit) // Keep a ceiling on number of handles
+                handleTimeouts.peek().callback();
+        }
+
+        /********************************************************************************
+         * If there is a handleTimeout pending for this INode, release it.
+         *******************************************************************************/
+        void clearHandleTimeout() {
+            if (handleTimeout.callback) {
+                handleTimeouts.remove(&handleTimeout);
+                handleTimeout = handleTimeout.init;
+            }
+        }
+
+        /********************************************************************************
+         * Fill in stat_t structure for lookup or stat
+         *******************************************************************************/
         stat_t create_stat_t(fuse_ino_t ino) {
             stat_t r;
             r.st_ino = ino;
@@ -193,6 +235,7 @@ class BitHordeFilesystem : Filesystem {
          *******************************************************************************/
         void open(OpenRequest r) {
             if (asset) {
+                clearHandleTimeout();
                 r.onBindResponse(asset, Status.SUCCESS, null);
             } else {
                 client.open(ids, &r.onBindResponse);
@@ -207,6 +250,7 @@ class BitHordeFilesystem : Filesystem {
                 asset.close;
                 asset = null;
             }
+            clearHandleTimeout();
         }
 
         /********************************************************************************
@@ -226,6 +270,10 @@ class BitHordeFilesystem : Filesystem {
             if (!refCount) {
                 inodes.remove(asset.handle);
                 inodeNameMap.remove(pathName);
+                if (handleTimeout.callback) {
+                    handleTimeouts.remove(&handleTimeout);
+                    handleTimeout = handleTimeout.init;
+                }
                 asset.close();
             }
         }
@@ -310,6 +358,7 @@ private:
     INode[char[]] inodeNameMap;
     fuse_ino_t ino = 2;
     fuse_ino_t allocateIno() {return ino++;}
+    Heap!(INode.TimeoutHandle*, true) handleTimeouts;
     INode inoToAsset(fuse_ino_t ino) {
         auto ptr = ino in inodes;
         if (ptr)
@@ -325,6 +374,17 @@ public:
             fuse_args ~= "-d";
         super(mountpoint.toString, fuse_args);
         this.client = client;
+    }
+
+    // Implement timeouts
+    Time nextDeadline() {
+        return handleTimeouts.size? handleTimeouts.peek.deadline : Time.max;
+    }
+    void processTimeouts(Time now) {
+        while (handleTimeouts.size &&
+            (handleTimeouts.peek.deadline <= now)) {
+            handleTimeouts.peek.callback();
+        }
     }
 protected:
     void lookup(fuse_req_t req, fuse_ino_t parent, char *_name) {
