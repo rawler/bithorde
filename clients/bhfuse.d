@@ -369,7 +369,7 @@ private:
 public:
     this(FilePath mountpoint, BHFuseClient client, FUSEArguments args) {
         // TODO: deal with arguments
-        char[][] fuse_args = ["-oallow_other"];
+        char[][] fuse_args = ["bhfuse", "-ofsname=bhfuse", "-oallow_other"];
         if (args.do_debug)
             fuse_args ~= "-d";
         super(mountpoint.toString, fuse_args);
