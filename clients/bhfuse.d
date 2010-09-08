@@ -40,6 +40,7 @@ private import tango.util.log.LayoutDate;
 private import tango.util.log.Log;
 
 private import lib.arguments;
+private import lib.cachedalloc;
 private import lib.client;
 private import lib.fuse;
 private import lib.hashes;
@@ -233,7 +234,7 @@ class BitHordeFilesystem : Filesystem {
         /********************************************************************************
          * Handle a FUSE-open request for this INode and trigger reply
          *******************************************************************************/
-        void open(OpenRequest r) {
+        void open(OpenRequest* r) {
             if (asset) {
                 clearHandleTimeout();
                 r.onBindResponse(asset, Status.SUCCESS, null);
@@ -256,7 +257,7 @@ class BitHordeFilesystem : Filesystem {
         /********************************************************************************
          * Handle a FUSE-read request for this INode and trigger reply
          *******************************************************************************/
-        void read(ReadRequest r) {
+        void read(ReadRequest* r) {
             if (r.size == 0) {
                 r.onReadResponse(null, Status.SUCCESS, null, null);
             } else if (asset && !asset.closed) {
@@ -285,13 +286,11 @@ class BitHordeFilesystem : Filesystem {
      * Hold details of a FUSE lookup-request, so we can store it over async call-
      * responses
      ***********************************************************************************/
-    class LookupRequest {
+    struct LookupRequest {
+        mixin CachedAllocation!(16, size_t.sizeof*4);
         fuse_req_t req;
         char[] pathName;
-        this(fuse_req_t req, char[] pathName) {
-            this.req = req;
-            this.pathName = pathName;
-        }
+        BitHordeFilesystem fs;
 
         /********************************************************************************
          * Recieve bindResponse from bithorde, and answer to fuse.
@@ -299,26 +298,23 @@ class BitHordeFilesystem : Filesystem {
         void onBindResponse(IAsset _asset, Status sCode, AssetStatus s) {
             auto asset = cast(RemoteAsset)_asset;
             if (asset && (sCode == Status.SUCCESS)) {
-                auto inode = new INode(pathName, asset);
+                auto inode = fs.new INode(pathName, asset);
                 inode.lookup(req);
             } else {
                 fuse_reply_err(req, ENOENT);
             }
+            delete this;
         }
     }
 
     /************************************************************************************
      * Hold details of a FUSE open-request, so we can store it over async call-responses
      ***********************************************************************************/
-    class OpenRequest {
+    struct OpenRequest {
+        mixin CachedAllocation!(16, size_t.sizeof*3);
         fuse_req_t req;
         fuse_file_info *fi;
         INode inode; // Need INode since we're attaching opened assets to it.
-        this (fuse_req_t req, fuse_file_info *fi, INode inode) {
-            this.req = req;
-            this.fi = fi;
-            this.inode = inode;
-        }
         void onBindResponse(IAsset asset, Status sCode, AssetStatus status) {
             if (sCode == Status.SUCCESS) {
                 inode.asset = cast(RemoteAsset)asset;
@@ -326,20 +322,16 @@ class BitHordeFilesystem : Filesystem {
             } else {
                 fuse_reply_err(req, ENOENT);
             }
+            delete this;
         }
     }
 
-    class ReadRequest {
+    struct ReadRequest {
+        mixin CachedAllocation!(16, 8+size_t.sizeof*3);
         fuse_req_t req;
         fuse_file_info *fi;
         off_t offset;
         size_t size;
-        this (fuse_req_t req, fuse_file_info *fi, off_t offset, size_t size) {
-            this.req = req;
-            this.fi = fi;
-            this.offset = offset;
-            this.size = size;
-        }
 
         void onReadResponse(IAsset _asset, Status sCode, lib.message.ReadRequest _, ReadResponse resp) {
             if (size == 0) { // EOF, we have not requested anything
@@ -354,6 +346,7 @@ class BitHordeFilesystem : Filesystem {
             } else {
                 fuse_reply_err(req, EBADF);
             }
+            delete this;
         }
     }
 private:
@@ -411,7 +404,10 @@ protected:
             char[] _;
             auto objectids = parseUri(name, _);
             if (objectids.length) {
-                auto ctx = new LookupRequest(req, name.dup);
+                auto ctx = new LookupRequest;
+                ctx.req = req;
+                ctx.pathName = name;
+                ctx.fs = this;
                 client.open(objectids, &ctx.onBindResponse);
             } else {
                 fuse_reply_err(req, ENOENT);
@@ -448,7 +444,11 @@ protected:
     void open(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi) {
         if (auto inode = inoToAsset(ino)) {
             fi.keep_cache = true;
-            inode.open(new OpenRequest(req, fi, inode));
+            auto ctx = new OpenRequest;
+            ctx.req = req;
+            ctx.fi = fi;
+            ctx.inode = inode;
+            inode.open(ctx);
         } else {
             fuse_reply_err(req, ENOENT);
         }
@@ -466,7 +466,12 @@ protected:
             assert(off <= inode.size, "FUSE sent offset after Eof");
             if ((off+size) > inode.size) // Limit to Eof
                 size = inode.size - off;
-            inode.read(new ReadRequest(req, fi, off, size));
+            auto ctx = new ReadRequest;
+            ctx.req = req;
+            ctx.fi = fi;
+            ctx.offset = off;
+            ctx.size = size;
+            inode.read(ctx);
         } else {
             fuse_reply_err(req, EBADF);
         }
