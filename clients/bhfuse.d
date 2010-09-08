@@ -170,11 +170,12 @@ class BitHordeFilesystem : Filesystem {
         Identifier[] ids;
         ulong size;
         ino_t ino;
-        uint refCount;
+        uint openCount;
 
         this (char[] pathName, RemoteAsset asset) {
             this.pathName = pathName;
             this.asset = asset;
+            this.openCount = 1;
             this.ids = asset.requestIds;
             this.size = asset.size;
             this.ino = allocateIno;
@@ -207,24 +208,21 @@ class BitHordeFilesystem : Filesystem {
         /********************************************************************************
          * Fill in stat_t structure for lookup or stat
          *******************************************************************************/
-        stat_t create_stat_t(fuse_ino_t ino) {
-            stat_t r;
+        void fill_stat_t(out stat_t r) {
             r.st_ino = ino;
             r.st_mode = S_IFREG | 0555;
             r.st_nlink = 1;
             r.st_size = size;
-            return r;
         }
 
         /********************************************************************************
          * Make a FUSE-entry-reply for this INode and reply
          *******************************************************************************/
         void lookup(fuse_req_t req) {
-            refCount += 1;
             fuse_entry_param reply;
             reply.ino = ino;
             reply.generation = 0;
-            reply.attr = create_stat_t(reply.ino);
+            fill_stat_t(reply.attr);
             reply.attr_timeout = double.max;
             reply.entry_timeout = 1;
             auto res = fuse_reply_entry(req, &reply);
@@ -237,6 +235,7 @@ class BitHordeFilesystem : Filesystem {
         void open(OpenRequest* r) {
             if (asset) {
                 clearHandleTimeout();
+                openCount += 1;
                 r.onBindResponse(asset, Status.SUCCESS, null);
             } else {
                 client.open(ids, &r.onBindResponse);
@@ -244,10 +243,10 @@ class BitHordeFilesystem : Filesystem {
         }
 
         /********************************************************************************
-         * Release resources held by an open INode.
+         * Decrement openCounter. If zero, release resources held by an open INode.
          *******************************************************************************/
         void release() {
-            if (asset) {
+            if (asset && (--openCount == 0) ) {
                 asset.close;
                 asset = null;
             }
@@ -264,20 +263,6 @@ class BitHordeFilesystem : Filesystem {
                 asset.aSyncRead(r.offset, r.size, &r.onReadResponse);
             } else {
                 r.onReadResponse(null, Status.INVALID_HANDLE, null, null);
-            }
-        }
-
-        void forget(uint nlookup) {
-            refCount -= nlookup;
-            Stdout("Forgot to", refCount).newline;
-            if (!refCount) {
-                inodes.remove(asset.handle);
-                inodeNameMap.remove(pathName);
-                if (handleTimeout.callback) {
-                    handleTimeouts.remove(&handleTimeout);
-                    handleTimeout = handleTimeout.init;
-                }
-                asset.close();
             }
         }
     }
@@ -317,6 +302,7 @@ class BitHordeFilesystem : Filesystem {
         INode inode; // Need INode since we're attaching opened assets to it.
         void onBindResponse(IAsset asset, Status sCode, AssetStatus status) {
             if (sCode == Status.SUCCESS) {
+                inode.openCount += 1;
                 inode.asset = cast(RemoteAsset)asset;
                 fuse_reply_open(req, fi);
             } else {
@@ -415,26 +401,19 @@ protected:
         }
     }
     void forget(fuse_ino_t ino, uint nlookup) {
-        Stdout("Forgetting", ino).newline;
-        if (auto asset = inoToAsset(ino))
-            asset.forget(nlookup);
     }
     void getattr(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi) {
         Stdout("Stat:ing", ino).newline;
-        if (ino & 0b01) { // Is directory?
-            ino >>= 1; // Right-shift 1
-            if (ino == 0 || ((cast(HashType)ino) in HashMap)) {
-                stat_t s;
-                s.st_ino = ino;
-                s.st_mode = S_IFDIR | 0555;
-                s.st_nlink = 2;
-                auto res = fuse_reply_attr(req, &s, double.max);
-                assert(res == 0);
-            } else {
-                fuse_reply_err(req, ENOENT);
-            }
+        if (ino == ROOT_INODE) { // Is root?
+            stat_t s;
+            s.st_ino = ino;
+            s.st_mode = S_IFDIR | 0555;
+            s.st_nlink = 2;
+            auto res = fuse_reply_attr(req, &s, double.max);
+            assert(res == 0);
         } else if (auto inode = inoToAsset(ino)) {
-            auto s = inode.create_stat_t(ino);
+            stat_t s;
+            inode.fill_stat_t(s);
             auto res = fuse_reply_attr(req, &s, double.max);
             assert(res == 0);
         } else {
