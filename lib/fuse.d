@@ -25,8 +25,11 @@ import tango.time.Time;
 
 import lib.pumping;
 
+// Advise compiler/linker we need to be linked with libfuse
 pragma(lib, "fuse");
 
+// Needed C-declarations for libfuse.
+// See http://fuse.sourceforge.net/doxygen/fuse__lowlevel_8h.html for explanations.
 extern(C) {
     const ROOT_INODE = 1;
     alias void* fuse_session;
@@ -121,6 +124,10 @@ extern(C) {
     void         fuse_unmount(char* mountpoint, fuse_chan ch);
 }
 
+/****************************************************************************************
+ * Abstrace D-class used to implement real FileSystems. All filesystems should extend
+ * this class, with real implementations of each abstracted method.
+ ***************************************************************************************/
 abstract class Filesystem : ISelectable, IProcessor {
 private:
     char[] mountpoint;
@@ -129,6 +136,8 @@ private:
     ubyte[] buf;
 
 extern(C) static {
+    // D-wrappers to map fuse_userdata to a specific FileSystem. Also ensures fuse gets
+    // an error if an Exception aborts control.
     void _op_lookup(fuse_req_t req, fuse_ino_t parent, char *name) {
         scope(failure) fuse_reply_err(req, EIO);
         (cast(Filesystem)fuse_req_userdata(req)).lookup(req, parent, name);
@@ -154,6 +163,9 @@ extern(C) static {
         (cast(Filesystem)fuse_req_userdata(req)).read(req, ino, size, off, fi);
     }
 
+    /************************************************************************************
+     * FUSE_lowlevel_ops struct, pointing to the D-class-wrappers.
+     ***********************************************************************************/
     fuse_lowlevel_ops ops = {
         lookup:  &_op_lookup,
         forget:  &_op_forget,
@@ -170,6 +182,10 @@ public:
     Handle fileHandle() {
         return cast(Handle)fuse_chan_fd(chan);
     }
+
+    /************************************************************************************
+     * Have the FileSystem been shut down?
+     ***********************************************************************************/
     bool exited() {
         return fuse_session_exited(s) != 0;
     }
@@ -212,14 +228,38 @@ protected:
         if (s)
             fuse_session_destroy(s);
     }
+    /************************************************************************************
+     * FUSE-hook for mapping a name in a directory to an inode.
+     ***********************************************************************************/
     abstract void lookup(fuse_req_t req, fuse_ino_t parent, char *name);
+
+    /************************************************************************************
+     * FUSE-hook informing that an INode may be forgotten
+     * TODO: potentially unsafe needs investigation
+     ***********************************************************************************/
     abstract void forget(fuse_ino_t ino, uint nlookup);
+
+    /************************************************************************************
+     * FUSE-hook for fetching attributes of an INode
+     ***********************************************************************************/
     abstract void getattr(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi);
+
+    /************************************************************************************
+     * FUSE-hook for open()ing an INode
+     ***********************************************************************************/
     abstract void open(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi);
+
+    /************************************************************************************
+     * FUSE-hook for close()ing an INode
+     ***********************************************************************************/
     abstract void release(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi);
+
+    /************************************************************************************
+     * FUSE-hook for read()ing from an open INode
+     ***********************************************************************************/
     abstract void read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, fuse_file_info *fi);
 
-public: // IProcessor implementation
+public: /// IProcessor implementation
     ISelectable[] conduits() {
         return [this];
     }
@@ -257,6 +297,7 @@ debug (FUSETest) {
             }
         }
     }
+
     int main() {
         scope(failure) return -1;
         auto fs = new TestFS("/tmp/tst");

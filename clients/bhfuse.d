@@ -312,6 +312,10 @@ class BitHordeFilesystem : Filesystem {
         }
     }
 
+    /************************************************************************************
+     * Async store details regarding a single-read-request, in order to feed back
+     * result to Fuse.
+     ***********************************************************************************/
     struct ReadRequest {
         mixin CachedAllocation!(16, 8+size_t.sizeof*3);
         fuse_req_t req;
@@ -359,17 +363,27 @@ public:
         this.client = client;
     }
 
-    // Implement timeouts
+    /************************************************************************************
+     * When do we need to process our next timeout?
+     ***********************************************************************************/
     Time nextDeadline() {
         return handleTimeouts.size? handleTimeouts.peek.deadline : Time.max;
     }
+
+    /************************************************************************************
+     * Process all timeouts up until (now)
+     ***********************************************************************************/
     void processTimeouts(Time now) {
         while (handleTimeouts.size &&
             (handleTimeouts.peek.deadline <= now)) {
             handleTimeouts.peek.callback();
         }
     }
+
 protected:
+    /************************************************************************************
+     * FUSE-hook for mapping a name in a directory to an inode.
+     ***********************************************************************************/
     void lookup(fuse_req_t req, fuse_ino_t parent, char *_name) {
         auto name = _name[0..strlen(_name)];
         if (name in inodeNameMap) {
@@ -400,8 +414,17 @@ protected:
             }
         }
     }
+
+    /************************************************************************************
+     * FUSE-hook informing that an INode may be forgotten
+     * TODO: potentially unsafe needs investigation
+     ***********************************************************************************/
     void forget(fuse_ino_t ino, uint nlookup) {
     }
+
+    /************************************************************************************
+     * FUSE-hook for fetching attributes of an INode
+     ***********************************************************************************/
     void getattr(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi) {
         if (ino == ROOT_INODE) { // Is root?
             stat_t s;
@@ -419,6 +442,10 @@ protected:
             fuse_reply_err(req, ENOENT);
         }
     }
+
+    /************************************************************************************
+     * FUSE-hook for open()ing an INode
+     ***********************************************************************************/
     void open(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi) {
         if (auto inode = inoToAsset(ino)) {
             fi.keep_cache = true;
@@ -431,6 +458,10 @@ protected:
             fuse_reply_err(req, ENOENT);
         }
     }
+
+    /************************************************************************************
+     * FUSE-hook for close()ing an INode
+     ***********************************************************************************/
     void release(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi) {
         if (auto inode = inoToAsset(ino)) {
             inode.release();
@@ -439,6 +470,10 @@ protected:
             fuse_reply_err(req, EBADF);
         }
     }
+
+    /************************************************************************************
+     * FUSE-hook for read()ing from an open INode
+     ***********************************************************************************/
     void read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, fuse_file_info *fi) {
         if (auto inode = inoToAsset(ino)) {
             assert(off <= inode.size, "FUSE sent offset after Eof");
@@ -490,6 +525,9 @@ public:
     }
 }
 
+/****************************************************************************************
+ * BHFuse main routine. Parse arguments, connect to BitHorde, and mount Filesystem.
+ ***************************************************************************************/
 int main(char[][] args)
 {
     auto arguments = new FUSEArguments;
