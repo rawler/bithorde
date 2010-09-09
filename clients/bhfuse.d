@@ -403,7 +403,6 @@ protected:
     void forget(fuse_ino_t ino, uint nlookup) {
     }
     void getattr(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi) {
-        Stdout("Stat:ing", ino).newline;
         if (ino == ROOT_INODE) { // Is root?
             stat_t s;
             s.st_ino = ino;
@@ -503,12 +502,14 @@ int main(char[][] args)
         return -1;
     }
 
-    auto addr = new LocalAddress(arguments.sockPath);
-    client = new BHFuseClient(addr, "bhfuse");
-
     if (arguments.do_debug)
         Log.root.level = Level.Trace;
+    else
+        Log.root.level = Level.Info;
     Log.root.add(new AppendConsole(new LayoutDate));
+
+    auto addr = new LocalAddress(arguments.sockPath);
+    client = new BHFuseClient(addr, "bhfuse");
 
     auto mountdir = FilePath(arguments.mountpoint).absolute("/");
     auto oldmask = umask(0022);
