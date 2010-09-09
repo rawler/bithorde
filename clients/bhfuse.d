@@ -53,34 +53,6 @@ const HandleTimeoutLimit = 10;
 /*-------------- Main program below ---------------*/
 static BHFuseClient client;
 
-struct AssetMap { // TODO: Is _probably_ not desired anymore.
-    RemoteAsset[] _assetMap;
-
-    /********************************************************************************
-     * Read out an asset by index
-     *******************************************************************************/
-    RemoteAsset opIndex(uint idx) {
-        return _assetMap[idx];
-    }
-    /********************************************************************************
-     * Assign an asset to index
-     *******************************************************************************/
-    RemoteAsset opIndexAssign(RemoteAsset asset, uint idx) in {
-        assert(idx < 32768, "Not sensible with thousands of open assets");
-    } body {
-        if (idx >= _assetMap.length)
-            _assetMap.length = (_assetMap.length*2) + 2; // Grow
-        return _assetMap[idx] = asset;
-    }
-
-    void recycleThrough(RemoteAsset delegate(Identifier[] objectids) openMethod) {
-        foreach (ref asset; _assetMap) {
-            if (asset)
-                asset = openMethod(asset.requestIds);
-        }
-    }
-}
-
 class BitHordeException : Exception {
     Status status;
     this(Status status) {
@@ -91,7 +63,6 @@ class BitHordeException : Exception {
 
 class BHFuseClient : SimpleClient, IProcessor {
     private Address _remoteAddr;
-    AssetMap assetMap;
 
     this(Address addr, char[] myname) {
         _remoteAddr = addr;
@@ -122,16 +93,7 @@ class BHFuseClient : SimpleClient, IProcessor {
     void onDisconnected() {
         super.onDisconnected();
 
-        // TODO: Implement again
-/+        bool tryReconnect() {
-            try connect(_remoteAddr);
-            catch (Exception e) return false;
-
-            assetMap.recycleThrough(&openAsset);
-            throw new ReconnectedException; // Success! Inform callers
-        }
-        for (uint reconnectAttempts = 3; (reconnectAttempts > 0) && !tryReconnect(); reconnectAttempts--)
-            Thread.sleep(3);+/
+        // TODO: Implement reconnection again
     }
 
     protected Socket currentConnection;
