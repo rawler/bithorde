@@ -56,7 +56,7 @@ version (linux) {
         }
         void signal() {
             static ulong add = 1;
-            unistd.write(_handle, &add, add.sizeof);
+            auto written = unistd.write(_handle, &add, add.sizeof);
         }
         void clear() {
             static ulong res;
@@ -74,6 +74,7 @@ package:
     CacheManager cacheMgr;
     Router router;
     Friend[char[]] offlineFriends;
+    Thread serverThread;
     Thread reconnectThread;
     ServerSocket tcpServer;
     LocalServerSocket unixServer;
@@ -133,8 +134,9 @@ public:
     }
 
     void run() {
+        serverThread = Thread.getThis;
         reconnectThread = new Thread(&reconnectLoop);
-        scope(exit) { shutdown(); } // Make sure to clean up
+        scope(exit) { cleanup(); } // Make sure to clean up
         reconnectThread.isDaemon = true;
         reconnectThread.start();
 
@@ -143,10 +145,9 @@ public:
     }
 
     /************************************************************************************
-     * Prepares for shutdown. Closes sockets, open files and connections
+     * Cleans up after server ending. Closes connections and shuts down server.
      ***********************************************************************************/
-    synchronized void shutdown() {
-        running = false;
+    private void cleanup() {
         foreach (sk; selector) {
             auto sock = cast(Socket)(sk.conduit);
             if (sock) {
@@ -156,7 +157,18 @@ public:
         }
         tcpServer = null;
         unixServer = null;
+        serverThread = null;
+    }
+
+    /************************************************************************************
+     * Runs shutdown. Set running to false and signal evfd.
+     ***********************************************************************************/
+    synchronized void shutdown() {
+        running = false;
         evfd.signal();
+        // Wait for cleanup, unless we're the thread supposed to do the cleanup.
+        while (serverThread && (serverThread !is Thread.getThis))
+            Thread.sleep(0.1);
     }
 
     protected void pump()
