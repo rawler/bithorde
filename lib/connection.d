@@ -296,9 +296,7 @@ private:
     }
     /// Complete HandShake
     void expectHello() {
-        while (!processMessage()) {
-            readNewData();
-        }
+        while (!processMessage() && readNewData()) {}
         if (!_peername)
             throw new AssertException("Other side did not greet with handshake", __FILE__, __LINE__);
     }
