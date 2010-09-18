@@ -272,7 +272,7 @@ public:
         auto req = new message.BindWrite;
         req.size = size;
         auto asset = new RemoteAsset(this, req, cb, singleShotStatus);
-        sendBindRequest(req, asset);
+        sendBindRequest(req, asset, TimeSpan.fromMillis(10000));
     }
 
     /************************************************************************************
