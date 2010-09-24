@@ -310,7 +310,7 @@ public:
                 auto path = meta.assetPath;
                 assert(!path.exists());
                 auto asset = new WriteableAsset(path, meta, req.size, &meta.updateHashIds);
-                asset.statusSignal.attach(callback);
+                asset.attachWatcher(callback);
                 callback(asset, message.Status.SUCCESS, null);
             } else {
                 callback(null, message.Status.NORESOURCES, null);

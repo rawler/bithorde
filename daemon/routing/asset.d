@@ -100,7 +100,7 @@ private:
             scope fwd = new AssetStatus;
             fwd.status = (backingAssets.length > 0) ? Status.SUCCESS : Status.NOTFOUND;
             fwd.availability = backingAssets.length*5;
-            statusSignal.call(this, fwd.status, fwd);
+            _statusSignal.call(this, fwd.status, fwd);
         }
     }
 
@@ -113,7 +113,7 @@ package:
         case Status.SUCCESS:
             assert(asset, "SUCCESS response, but no asset");
             assert(asset.size > 0, "Empty asset");
-            asset.statusSignal.attach(&onUpdatedStatus);
+            asset.attachWatcher(&onUpdatedStatus);
             backingAssets ~= asset;
             break;
         default:

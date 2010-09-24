@@ -127,7 +127,7 @@ private:
      ***********************************************************************************/
     void exit(int exitStatus) {
         if (asset)
-            asset.statusSignal.detach(&onStatusUpdate);
+            asset.detachWatcher(&onStatusUpdate);
         client.close();
         this.exitStatus = exitStatus;
     }
@@ -143,7 +143,7 @@ private:
                 return onComplete(asset, status, resp.ids);
             } else {
                 // Re-register this handle to recieve status updates
-                asset.statusSignal.attach(&onStatusUpdate);
+                asset.attachWatcher(&onStatusUpdate);
                 return sendFile(asset);
             }
         default:

@@ -336,7 +336,7 @@ void testSourceGone(SteppingServer src, SteppingServer proxy, Identifier[] ids) 
         assert(asset && (status == Status.SUCCESS), "Failed opening, status is " ~ statusToString(status));
         assert(resp.availabilityIsSet, "Availability wasn't set on open");
         origAvailable = resp.availability;
-        asset.statusSignal.attach(&updateStatus);
+        asset.attachWatcher(&updateStatus);
 
         asset.aSyncRead(0, chunkSize, &readResponse, 2, TimeSpan.fromMillis(500));
     });

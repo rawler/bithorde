@@ -87,7 +87,7 @@ protected:
         rt_attachDisposeEvent(c, &clientGone); // Add hook for invalidating client-reference
         this.client = c;
         this.handle = c.allocateFreeHandle;
-        this.statusSignal.attach(cb);
+        this.attachWatcher(cb);
         this.singleShotStatus = singleShotStatus;
     }
     ~this() {

@@ -118,7 +118,7 @@ class Client : lib.client.Client {
         void onBindReadReply(BindRead _, IServerAsset asset, message.Status sCode, message.AssetStatus s) {
             if (asset) {
                 log.trace("Registered for statusUpdates on handle {}", handle);
-                asset.statusSignal.attach(&onAssetStatus);
+                asset.attachWatcher(&onAssetStatus);
             }
             return onAssetStatus(asset, sCode, s);
         }
@@ -146,9 +146,8 @@ class Client : lib.client.Client {
         void close() {
             // TODO: Implement
         }
-        Signal!(ParameterTupleOf!(BHAssetStatusCallback))* statusSignal() {
-            return null; // Doesn't make sense?
-        }
+        void attachWatcher(BHAssetStatusCallback) {} // Doesn't make sense?
+        void detachWatcher(BHAssetStatusCallback) {} // Doesn't make sense?
         message.Identifier[] hashIds() {
             return assetSource ? assetSource.hashIds : null;
         }

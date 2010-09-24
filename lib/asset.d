@@ -30,12 +30,16 @@ interface IAsset {
     void aSyncRead(ulong offset, uint length, BHReadCallback);
     ulong size();
     void close();
-    Signal!(ParameterTupleOf!(BHAssetStatusCallback))* statusSignal();
+    void attachWatcher(BHAssetStatusCallback watcher);
+    void detachWatcher(BHAssetStatusCallback watcher);
     template StatusSignal() {
         protected Signal!(ParameterTupleOf!(BHAssetStatusCallback)) _statusSignal;
 
-        public Signal!(ParameterTupleOf!(BHAssetStatusCallback))* statusSignal() {
-            return &_statusSignal;
+        public void attachWatcher(BHAssetStatusCallback watcher) {
+            _statusSignal.attach(watcher);
+        }
+        public void detachWatcher(BHAssetStatusCallback watcher) {
+            _statusSignal.detach(watcher);
         }
     }
 }
