@@ -148,16 +148,22 @@ public:
      * Cleans up after server ending. Closes connections and shuts down server.
      ***********************************************************************************/
     private void cleanup() {
-        foreach (sk; selector) {
-            auto sock = cast(Socket)(sk.conduit);
-            if (sock) {
-                sock.shutdown();
-                sock.detach();
+        running = false;
+        try {
+            foreach (sk; selector) {
+                auto sock = cast(Socket)(sk.conduit);
+                if (sock) {
+                    sock.shutdown();
+                    sock.detach();
+                }
             }
+            tcpServer = null;
+            unixServer = null;
+        } catch (Exception e) {
+            log.error("Error in cleanup {}", e);
+        } finally {
+            serverThread = null;
         }
-        tcpServer = null;
-        unixServer = null;
-        serverThread = null;
     }
 
     /************************************************************************************
