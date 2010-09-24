@@ -43,7 +43,7 @@ interface IProcessor {
     Time nextDeadline();
 
     /************************************************************************************
-     * Let the processor process all it's timeouts.
+     * Let the processor process all it's timeouts expected to happen until now.
      ***********************************************************************************/
     void processTimeouts(Time now);
 }
