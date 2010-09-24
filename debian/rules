@@ -15,3 +15,6 @@
 override_dh_installinit:
 	dh_installinit --name=bhfuse
 	dh_installinit --name=bithorde
+
+override_dh_auto_test:
+	dh_auto_test -- 'ARGS=-V'

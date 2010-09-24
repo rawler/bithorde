@@ -1,3 +1,24 @@
+bithorde (0.0.9+0.1beta1-3.1) lucid; urgency=low
+
+  * Build with verbose tests to troubleshoot launchpad-problem.
+
+ -- Ulrik Mikaelsson <ulrik.mikaelsson@gmail.com>  Fri, 24 Sep 2010 23:21:52 +0200
+
+bithorde (0.0.9+0.1beta1-2) lucid; urgency=low
+
+  * Fix race-condition triggering shutdown-bugs on amd64.
+
+ -- Ulrik Mikaelsson <ulrik.mikaelsson@gmail.com>  Sun, 12 Sep 2010 17:48:29 +0200
+
+bithorde (0.0.9+0.1beta1-1) lucid; urgency=low
+
+  * First beta.
+    - Rewritten FUSE-implementation. Better parallell performance, better troubleshooting at errors.
+    - Add bhfuse upstart-job.
+    - Minor bugfixes.
+
+ -- Ulrik Mikaelsson <ulrik.mikaelsson@gmail.com>  Sun, 12 Sep 2010 15:05:30 +0200
+
 bithorde (0.1-alpha3-2) lucid; urgency=low
 
   * Fix umask-problem of server 
