@@ -82,25 +82,27 @@ public int main(char[][] args)
         if (fork() != 0) exit(0);
     }
 
-    // If root, drop privileges.
-    if (geteuid() == 0) {
-        auto log = Log.lookup("main");
-        Log.lookup("main").info("Detected running as root. Dropping privileges to nobody");
+    auto log = Log.lookup("main");
 
-        if (auto nogroup = getgrnam("nogroup")) {
-            if (setegid(nogroup.gr_gid))
-                log.error("Failed dropping group-privileges. Running with root privileges!");
+    if (config.setgid) {
+        if (auto group = getgrnam((config.setgid~'\0').ptr)) {
+            if (setgid(group.gr_gid))
+                log.error("Failed dropping group-privileges. Running with unmodified privileges!");
         } else {
-            log.error("Did not find user 'group'. Running with root privileges!");
-        }
-
-        if (auto nobody = getpwnam("nobody")) {
-            if (seteuid(nobody.pw_uid))
-                log.error("Failed dropping user-privileges. Running with root privileges!");
-        } else {
-            log.error("Did not find user 'nobody'. Running with root privileges!");
+            log.error("Did not find user '{}'. Running with unmodified privileges!", config.setgid);
         }
     }
+
+    if (config.setuid) {
+        if (auto user = getpwnam((config.setuid~'\0').ptr)) {
+            if (setuid(user.pw_uid))
+                log.error("Failed dropping user-privileges. Running with unmodified privileges!");
+        } else {
+            log.error("Did not find user '{}'. Running with unmodified privileges!", config.setuid);
+        }
+    }
+
+    log.info("Setup done, starting server");
 
     s.run();
 

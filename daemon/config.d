@@ -56,6 +56,7 @@ class Config
     char[] name;
     ushort port = 1337;
     char[] unixSocket = "/tmp/bithorde";
+    char[] setuid, setgid;
     FilePath cachedir;
     ulong cacheMaxSize;                        /// Maximum cacheSize, in MB
     FilePath logfile;
@@ -129,6 +130,12 @@ private:
             break;
         case "logfile":
             this.logfile = new FilePath(value);
+            break;
+        case "setuid":
+            this.setuid = value.dup;
+            break;
+        case "setgid":
+            this.setgid = value.dup;
             break;
         case "debug":
             this.doDebug = parseBool(value);
