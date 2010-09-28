@@ -1,0 +1,12 @@
+#!/bin/bash
+
+# Add bithorde account to system
+useradd -r -M -d /var/cache/bithorde -g nogroup bithorde 2>/dev/null
+
+# Change bithorde-conf to setuid to the new user
+sed -r -i 's/^(server.setuid\s*=\s*)nobody/\1bithorde/' /etc/bithorde.conf
+
+# Chown cache-dir using dpkg-statoverride
+dpkg-statoverride --update --add bithorde nogroup 0700 /var/cache/bithorde 2>/dev/null
+
+exit 0

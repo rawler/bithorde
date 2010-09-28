@@ -1,0 +1,6 @@
+#!/bin/bash
+
+dpkg-statoverride --remove /var/cache/bithorde 2>/dev/null
+userdel bithorde 2>/dev/null
+
+exit 0

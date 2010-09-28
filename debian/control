@@ -8,7 +8,7 @@ Homepage: http://www.bithorde.org/
 
 Package: bithorde
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}
+Depends: debconf, ${shlibs:Depends}, ${misc:Depends}
 Description: A fast and light caching-graph content distribution system.
  A fast and light content distribution system, aimed for high-performance de-centralized
  content distribution. Key design goals is; caching graph, low footprint, direct access 

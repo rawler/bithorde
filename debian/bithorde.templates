@@ -1,0 +1,24 @@
+Template: bithorde/nodename
+Type: string
+Default: 
+Description: What do you want to call this node?
+ Each node in BitHorde is identified by a name. The name should preferably be
+ unique, such that two of your friend nodes does not share name.
+
+Template: bithorde/cachesize
+Type: string
+Default: 16
+Description: Please specify cache-size.
+ BitHorde will cache popular content on your harddrive. Please specify how many
+ gigabytes BitHorde may occupy. Large caches means assets will be more
+ available, improving performance throughout the network.
+ .
+ 0 means unlimited cache. NOT recommended.
+
+Template: bithorde/done
+Type: text
+Description: Congratulations, you now have a basic config for bithorde.
+ Your config has been written to /etc/bithorde.conf. Please feel free to
+ review, and modify it there.
+ .
+ Good luck with bithorde.

@@ -1,3 +1,11 @@
+bithorde (0.0.9+0.1beta1-4) lucid; urgency=low
+
+  * bithorded: Implemented setuid/setgid.
+  * debian: added debconf-script
+  * debian: added postinst-script to create bithorde system account, and fix permissions
+
+ -- Ulrik Mikaelsson <ulrik.mikaelsson@gmail.com>  Tue, 28 Sep 2010 22:25:51 +0200
+
 bithorde (0.0.9+0.1beta1-3.1) lucid; urgency=low
 
   * Build with verbose tests to troubleshoot launchpad-problem.
