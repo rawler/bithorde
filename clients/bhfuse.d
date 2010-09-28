@@ -28,9 +28,12 @@ private import tango.net.device.LocalSocket;
 private import tango.net.device.Socket : Socket;
 private import tango.stdc.errno;
 private import tango.stdc.posix.fcntl;
+private import tango.stdc.posix.grp;
+private import tango.stdc.posix.pwd;
 private import tango.stdc.posix.signal;
 private import tango.stdc.posix.sys.stat;
 private import tango.stdc.posix.sys.statvfs;
+private import tango.stdc.posix.unistd;
 private import tango.stdc.posix.utime;
 private import tango.stdc.string;
 private import tango.time.Clock;
@@ -506,6 +509,24 @@ int main(char[][] args)
     mountdir.create();
     umask(oldmask);
     scope BitHordeFilesystem fs = new BitHordeFilesystem(mountdir, client, arguments);
+
+    if (geteuid() == 0) {
+        auto log = Log.lookup("main");
+        Log.lookup("main").info("Detected running as root. Dropping privileges to nobody");
+        if (auto nogroup = getgrnam("nogroup")) {
+            if (setegid(nogroup.gr_gid))
+                log.error("Failed dropping group-privileges. Running with root privileges!");
+        } else {
+            log.error("Did not find user 'group'. Running with root privileges!");
+        }
+
+        if (auto nobody = getpwnam("nobody")) {
+            if (seteuid(nobody.pw_uid))
+                log.error("Failed dropping user-privileges. Running with root privileges!");
+        } else {
+            log.error("Did not find user 'nobody'. Running with root privileges!");
+        }
+    }
 
     auto pump = new Pump([cast(IProcessor)fs, client]);
     pump.run();

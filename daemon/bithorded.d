@@ -21,6 +21,8 @@ private import tango.core.Thread;
 private import tango.core.Runtime;
 private import tango.io.Console;
 private import tango.io.Stdout;
+private import tango.stdc.posix.grp;
+private import tango.stdc.posix.pwd;
 private import tango.stdc.posix.signal;
 private import tango.stdc.posix.unistd;
 private import tango.stdc.stdlib;
@@ -78,6 +80,26 @@ public int main(char[][] args)
         Cout.output.close();
         Cerr.output.close();
         if (fork() != 0) exit(0);
+    }
+
+    // If root, drop privileges.
+    if (geteuid() == 0) {
+        auto log = Log.lookup("main");
+        Log.lookup("main").info("Detected running as root. Dropping privileges to nobody");
+
+        if (auto nogroup = getgrnam("nogroup")) {
+            if (setegid(nogroup.gr_gid))
+                log.error("Failed dropping group-privileges. Running with root privileges!");
+        } else {
+            log.error("Did not find user 'group'. Running with root privileges!");
+        }
+
+        if (auto nobody = getpwnam("nobody")) {
+            if (seteuid(nobody.pw_uid))
+                log.error("Failed dropping user-privileges. Running with root privileges!");
+        } else {
+            log.error("Did not find user 'nobody'. Running with root privileges!");
+        }
     }
 
     s.run();
