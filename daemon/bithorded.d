@@ -24,6 +24,7 @@ private import tango.io.Stdout;
 private import tango.stdc.posix.grp;
 private import tango.stdc.posix.pwd;
 private import tango.stdc.posix.signal;
+private import tango.stdc.posix.sys.stat;
 private import tango.stdc.posix.unistd;
 private import tango.stdc.stdlib;
 private import tango.util.log.AppendConsole;
@@ -101,6 +102,9 @@ public int main(char[][] args)
             log.error("Did not find user '{}'. Running with unmodified privileges!", config.setuid);
         }
     }
+
+    // We always want only the file-owner to be able to read files created.
+    umask(07077);
 
     log.info("Setup done, starting server");
 
