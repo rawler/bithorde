@@ -51,16 +51,6 @@ const HandleTimeoutTime = TimeSpan.fromMillis(100);
 const HandleTimeoutLimit = 10;
 
 /*-------------- Main program below ---------------*/
-static BHFuseClient client;
-
-class BitHordeException : Exception {
-    Status status;
-    this(Status status) {
-        this.status = status;
-        super(statusToString(status));
-    }
-}
-
 class BHFuseClient : SimpleClient, IProcessor {
     private Address _remoteAddr;
 
@@ -509,7 +499,7 @@ int main(char[][] args)
     Log.root.add(new AppendConsole(new LayoutDate));
 
     auto addr = new LocalAddress(arguments.sockPath);
-    client = new BHFuseClient(addr, "bhfuse");
+    auto client = new BHFuseClient(addr, "bhfuse");
 
     auto mountdir = FilePath(arguments.mountpoint).absolute("/");
     auto oldmask = umask(0022);
