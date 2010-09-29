@@ -3,10 +3,22 @@
 # Add bithorde account to system
 useradd -r -M -d /var/cache/bithorde -g nogroup bithorde 2>/dev/null
 
-# Change bithorde-conf to setuid to the new user
-sed -r -i 's/^(server.setuid\s*=\s*)nobody/\1bithorde/' /etc/bithorde.conf
-
 # Chown cache-dir using dpkg-statoverride
 dpkg-statoverride --update --add bithorde nogroup 0700 /var/cache/bithorde 2>/dev/null
+
+## Use debconf to preconfigure the package
+set -e
+. /usr/share/debconf/confmodule
+
+# Read variables
+db_get "bithorde/nodename"
+NODENAME="$RET"
+db_get "bithorde/cachesize"
+CACHESIZE="$RET"
+
+# Update base-settings in config
+sed -r -i.bak -e "s/^(server.name\\s*=).*/\\1 $NODENAME/" -e "s/(server.cachesize\\s*=).*/\\1 $CACHESIZE"000"/" /etc/bithorde.conf
+
+start bithorde || :
 
 exit 0

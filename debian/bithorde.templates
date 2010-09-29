@@ -16,9 +16,13 @@ Description: Please specify cache-size.
  0 means unlimited cache. NOT recommended.
 
 Template: bithorde/done
-Type: text
-Description: Congratulations, you now have a basic config for bithorde.
- Your config has been written to /etc/bithorde.conf. Please feel free to
- review, and modify it there.
+Type: note
+Description: ATTENTION, you now have a BASIC config for bithorde.
+ Your config template has been written to /etc/bithorde.conf, but you are 
+ probably not done just yet. You will probably want to review it and add some
+ friend nodes, at the bottom.
  .
- Good luck with bithorde.
+ When done, restart bithorde as:
+  $ sudo restart bithorde
+ .
+ Good luck and don't forget to give feedback!

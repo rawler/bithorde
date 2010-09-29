@@ -1,3 +1,10 @@
+bithorde (0.0.9+0.1beta1-5) lucid; urgency=low
+
+  * debian: adjusted debconf-handling
+  * debian: start bithorde by default after install
+
+ -- Ulrik Mikaelsson <ulrik.mikaelsson@gmail.com>  Wed, 29 Sep 2010 22:26:47 +0200
+
 bithorde (0.0.9+0.1beta1-4) lucid; urgency=low
 
   * bithorded: Implemented setuid/setgid.
