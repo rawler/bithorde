@@ -5,24 +5,17 @@ useradd -r -M -d /var/cache/bithorde -g nogroup bithorde 2>/dev/null
 
 # Chown cache-dir using dpkg-statoverride
 dpkg-statoverride --update --add bithorde nogroup 0700 /var/cache/bithorde 2>/dev/null
+chown -R bithorde:users /var/cache/bithorde 2>/dev/null
+chmod -R 0700 /var/cache/bithorde 2>/dev/null
 
-## Use debconf to preconfigure the package
-set -e
-. /usr/share/debconf/confmodule
-
-CONFIGFILE="/etc/bithorde.conf"
-SERVICEFILE="/etc/init/bithorde.conf"
-if [ -e "$CONFIGFILE" ]; then
-    # Read variables
-    db_get "bithorde/nodename" || true; NODENAME="$RET"
-    db_get "bithorde/cachesize" || true; CACHESIZE="$RET"
-
-    # Update base-settings in config
-    sed -r -i.bak -e "s/^(server.name\\s*=).*/\\1 $NODENAME/" -e "s/(server.cachesize\\s*=).*/\\1 $CACHESIZE"000"/" "$CONFIGFILE" || true
-
-    if [ -e "$SERVICEFILE" ]; then
-        start bithorde || true
-    fi
+if [ "$1" == configure ]; then
+  echo "***** Congratulations, and welcome to BitHorde! *****"
+  echo "You should start by configuring /etc/bithorde.conf. Especially you should:"
+  echo "  * Set your nodename to something unique among your friends."
+  echo "  * Add some friend-nodes, at the bottom of the conf."
+  echo "When done, please start bithorde using;"
+  echo "  $ sudo start bithorde"
+  echo "Good luck, and don't forget to tell us and your friends about your experience!"
 fi
 
 exit 0

@@ -1,3 +1,9 @@
+bithorde (0.0.9+0.1beta1-7) lucid; urgency=low
+
+  * debian: Drop friggin debconf. The piece of sh-t is just messing with me. 
+
+ -- Ulrik Mikaelsson <ulrik.mikaelsson@gmail.com>  Thu, 30 Sep 2010 21:31:23 +0200
+
 bithorde (0.0.9+0.1beta1-6) lucid; urgency=low
 
   * debian/postinst: don't update config if it doesn't exist.

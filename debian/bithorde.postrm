@@ -3,7 +3,4 @@
 dpkg-statoverride --remove /var/cache/bithorde 2>/dev/null
 userdel bithorde 2>/dev/null
 
-. /usr/share/debconf/confmodule
-db_purge
-
 exit 0
