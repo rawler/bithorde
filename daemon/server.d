@@ -173,7 +173,7 @@ public:
         running = false;
         evfd.signal();
         // Wait for cleanup, unless we're the thread supposed to do the cleanup.
-        while (serverThread && (serverThread !is Thread.getThis))
+        while (serverThread && (serverThread != Thread.getThis))
             Thread.sleep(0.1);
     }
 
