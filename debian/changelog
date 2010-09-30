@@ -1,3 +1,9 @@
+bithorde (0.0.9+0.1beta1-6) lucid; urgency=low
+
+  * debian/postinst: don't update config if it doesn't exist.
+
+ -- Ulrik Mikaelsson <ulrik.mikaelsson@gmail.com>  Thu, 30 Sep 2010 18:57:08 +0200
+
 bithorde (0.0.9+0.1beta1-5) lucid; urgency=low
 
   * debian: adjusted debconf-handling

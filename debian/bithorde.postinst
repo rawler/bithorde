@@ -10,15 +10,19 @@ dpkg-statoverride --update --add bithorde nogroup 0700 /var/cache/bithorde 2>/de
 set -e
 . /usr/share/debconf/confmodule
 
-# Read variables
-db_get "bithorde/nodename"
-NODENAME="$RET"
-db_get "bithorde/cachesize"
-CACHESIZE="$RET"
+CONFIGFILE="/etc/bithorde.conf"
+SERVICEFILE="/etc/init/bithorde.conf"
+if [ -e "$CONFIGFILE" ]; then
+    # Read variables
+    db_get "bithorde/nodename" || true; NODENAME="$RET"
+    db_get "bithorde/cachesize" || true; CACHESIZE="$RET"
 
-# Update base-settings in config
-sed -r -i.bak -e "s/^(server.name\\s*=).*/\\1 $NODENAME/" -e "s/(server.cachesize\\s*=).*/\\1 $CACHESIZE"000"/" /etc/bithorde.conf
+    # Update base-settings in config
+    sed -r -i.bak -e "s/^(server.name\\s*=).*/\\1 $NODENAME/" -e "s/(server.cachesize\\s*=).*/\\1 $CACHESIZE"000"/" "$CONFIGFILE" || true
 
-start bithorde || :
+    if [ -e "$SERVICEFILE" ]; then
+        start bithorde || true
+    fi
+fi
 
 exit 0
