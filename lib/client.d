@@ -240,10 +240,10 @@ public:
     void close()
     {
         log.trace("Closing...");
+        connection.close();
         foreach (asset; boundAssets) if (asset) {
             asset.close();
         }
-        connection.close();
     }
 
     /************************************************************************************
