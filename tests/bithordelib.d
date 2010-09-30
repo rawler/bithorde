@@ -91,8 +91,7 @@ class SteppingServer : Server {
     }
 
     void shutdown() {
-        running = false;
-        step(1000);
+        reset(1000);
         super.shutdown();
     }
 }
@@ -251,7 +250,10 @@ void testRestartWithPartialAsset(SteppingServer src, Identifier[] ids) {
     src.reset(1000);
 
     auto proxy = new SteppingServer("RestartProxy", 23416, [src]);
-    scope (exit) proxy.shutdown();
+    scope (exit) {
+        proxy.reset(1000);
+        proxy.shutdown();
+    }
     proxy.reset(1000);
     auto client = createClient(proxy);
     LOG.info("Client open, trying to open asset");
@@ -342,6 +344,7 @@ void testSourceGone(SteppingServer src, SteppingServer proxy, Identifier[] ids) 
     });
     client.run();
     assert(gotNewStatus, "Did not get status update");
+    LOG.info("testSourceGone successful");
 }
 
 
@@ -378,4 +381,9 @@ void main() {
     auto node3 = new SteppingServer("Node3", 23417, [src, proxy]);
     scope(exit) node3.shutdown();
     testSourceGone(src, node3, ids);
+
+    src.reset(1000);
+    proxy.reset(1000);
+    node3.reset(1000);
+    LOG.info("SUCCESS: All tests done");
 }
