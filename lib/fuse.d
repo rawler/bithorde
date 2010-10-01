@@ -19,6 +19,7 @@
  * limitations under the License.
  ****************************************************************************************/
 import tango.io.model.IConduit;
+public import tango.stdc.config;
 import tango.stdc.posix.sys.stat;
 import tango.sys.consts.errno;
 import tango.time.Time;
@@ -50,19 +51,19 @@ extern(C) {
         }
     }
     alias void* fuse_req_t;
-    alias uint fuse_ino_t;
+    alias c_ulong fuse_ino_t;
     alias void* fuse_conn_info;
 
     struct fuse_entry_param {
         fuse_ino_t ino;
-        uint       generation;
+        c_ulong    generation;
         stat_t     attr;
         double     attr_timeout;
         double     entry_timeout;
     }
     struct fuse_file_info {
         int flags;
-        ulong fh_old;
+        c_ulong fh_old;
         int writepage;
         uint options; // The C struct uses a bitfield here. We use an int with accessors below
         ulong fh;
@@ -85,7 +86,7 @@ extern(C) {
         void function(void *userdata, fuse_conn_info conn) init;
         void function(void *userdata) destroy;
         void function(fuse_req_t req, fuse_ino_t parent, char *name) lookup;
-        void function(fuse_req_t req, fuse_ino_t ino, uint nlookup) forget;
+        void function(fuse_req_t req, fuse_ino_t ino, c_ulong nlookup) forget;
         void function(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi) getattr;
         void function(fuse_req_t req, fuse_ino_t ino, stat_t *attr, int to_set, fuse_file_info *fi) setattr;
         void function(fuse_req_t req, fuse_ino_t ino) readlink;
@@ -142,7 +143,7 @@ extern(C) static {
         scope(failure) fuse_reply_err(req, EIO);
         (cast(Filesystem)fuse_req_userdata(req)).lookup(req, parent, name);
     }
-    void _op_forget(fuse_req_t req, fuse_ino_t ino, uint nlookup) {
+    void _op_forget(fuse_req_t req, fuse_ino_t ino, c_ulong nlookup) {
         scope(exit) fuse_reply_none(req);
         (cast(Filesystem)fuse_req_userdata(req)).forget(ino, nlookup);
     }
@@ -237,7 +238,7 @@ protected:
      * FUSE-hook informing that an INode may be forgotten
      * TODO: potentially unsafe needs investigation
      ***********************************************************************************/
-    abstract void forget(fuse_ino_t ino, uint nlookup);
+    abstract void forget(fuse_ino_t ino, c_ulong nlookup);
 
     /************************************************************************************
      * FUSE-hook for fetching attributes of an INode

@@ -374,7 +374,7 @@ protected:
      * FUSE-hook informing that an INode may be forgotten
      * TODO: potentially unsafe needs investigation
      ***********************************************************************************/
-    void forget(fuse_ino_t ino, uint nlookup) {
+    void forget(fuse_ino_t ino, c_ulong nlookup) {
     }
 
     /************************************************************************************
