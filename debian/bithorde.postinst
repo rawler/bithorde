@@ -8,14 +8,18 @@ dpkg-statoverride --update --add bithorde nogroup 0700 /var/cache/bithorde 2>/de
 chown -R bithorde:users /var/cache/bithorde 2>/dev/null
 chmod -R 0700 /var/cache/bithorde 2>/dev/null
 
-if [ "$1" == configure ]; then
-  echo "***** Congratulations, and welcome to BitHorde! *****"
-  echo "You should start by configuring /etc/bithorde.conf. Especially you should:"
-  echo "  * Set your nodename to something unique among your friends."
-  echo "  * Add some friend-nodes, at the bottom of the conf."
-  echo "When done, please start bithorde using;"
-  echo "  $ sudo start bithorde"
-  echo "Good luck, and don't forget to tell us and your friends about your experience!"
+if [ -z "$2" ]; then
+  if [ "$1" == configure ]; then
+    echo "***** Congratulations, and welcome to BitHorde! *****"
+    echo "You should start by configuring /etc/bithorde.conf. Especially you should:"
+    echo "  * Set your nodename to something unique among your friends."
+    echo "  * Add some friend-nodes, at the bottom of the conf."
+    echo "When done, please start bithorde using;"
+    echo "  $ sudo start bithorde"
+    echo "Good luck, and don't forget to tell us and your friends about your experience!"
+  fi
+else
+  start bithorde
 fi
 
 exit 0
