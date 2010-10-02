@@ -135,8 +135,8 @@ public:
 
     void run() {
         serverThread = Thread.getThis;
-        reconnectThread = new Thread(&reconnectLoop);
         scope(exit) { cleanup(); } // Make sure to clean up
+        reconnectThread = new Thread(&reconnectLoop);
         reconnectThread.isDaemon = true;
         reconnectThread.start();
 
@@ -187,7 +187,10 @@ public:
                 if (cnd < nextDeadline) nextDeadline = cnd;
             }
         }
-        if (selector.select(nextDeadline - Clock.now) > 0) {
+        auto triggers = selector.select(nextDeadline - Clock.now);
+        if (!running) // Shutdown started
+            return;
+        if (triggers > 0) {
             foreach (SelectionKey event; selector.selectedSet()) {
                 if (event.isError || event.isHangup || event.isInvalidHandle ||
                         !processSelectEvent(event))
