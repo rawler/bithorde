@@ -1,3 +1,11 @@
+bithorde (0.0.9+0.1beta1-8) lucid; urgency=low
+
+  * x86_64: fix c-int-types for bhfuse
+  * debian: only print install-help on new installs, otherwise start server after shutdown.
+  * server: fast-track server shutdown. May help build-test-problems at LP.
+
+ -- Ulrik Mikaelsson <ulrik.mikaelsson@gmail.com>  Sat, 02 Oct 2010 16:45:01 +0200
+
 bithorde (0.0.9+0.1beta1-7) lucid; urgency=low
 
   * debian: Drop friggin debconf. The piece of sh-t is just messing with me. 
