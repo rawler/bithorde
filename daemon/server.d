@@ -159,6 +159,7 @@ public:
             }
             tcpServer = null;
             unixServer = null;
+            cacheMgr.shutdown();
         } catch (Exception e) {
             log.error("Error in cleanup {}", e);
         } finally {

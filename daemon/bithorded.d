@@ -63,6 +63,7 @@ public int main(char[][] args)
 
     // Exit_handler
     signal(SIGTERM, &exit_handler);
+    signal(SIGINT, &exit_handler);
 
     // Parse config
     auto config = new Config(args[1]);

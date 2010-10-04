@@ -53,11 +53,11 @@ class CacheManager : IAssetSource {
         this() {
             _openAsset = new AssetRef(null);
         }
-        BaseAsset setAsset(BaseAsset asset) {
+        synchronized BaseAsset setAsset(BaseAsset asset) {
             _openAsset.set(asset);
             return asset;
         }
-        BaseAsset getAsset() {
+        synchronized BaseAsset openAsset() {
             if (auto retval = cast(BaseAsset)_openAsset()) {
                 return retval;
             } else if (idxPath.exists) {
@@ -70,6 +70,13 @@ class CacheManager : IAssetSource {
                     purgeAsset(this);
                     return null;
                 }
+            }
+        }
+        synchronized BaseAsset asset() {
+            if (auto retval = cast(BaseAsset)_openAsset()) {
+                return retval;
+            } else {
+                return null;
             }
         }
         FilePath assetPath() {
@@ -173,6 +180,13 @@ public:
             }
         }
         return retval;
+    }
+
+    /************************************************************************************
+     * Clean shutdown
+     ***********************************************************************************/
+    void shutdown() {
+        saveIdMap();
     }
 
     /************************************************************************************
@@ -292,7 +306,7 @@ public:
         if (!metaAsset) {
             log.trace("Unknown asset, forwarding {}", req);
             forwardRequest();
-        } else if (auto asset = metaAsset.getAsset()) {
+        } else if (auto asset = metaAsset.openAsset()) {
             fromCache(metaAsset, asset);
         } else {
             log.trace("Incomplete asset, forwarding {}", req);
@@ -381,7 +395,12 @@ private:
      ************************************************************************/
     void saveIdMap() {
         scope map = new IdMap;
-        map.assets = localIdMap.values;
+        synchronized (this) map.assets = localIdMap.values;
+        foreach (meta; map.assets) {
+            auto asset = cast(WriteableAsset)meta.asset;
+            if (asset)
+                asset.sync();
+        }
         File.set(idMapPath.toString, map.encode());
     }
 

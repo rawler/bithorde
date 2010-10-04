@@ -18,8 +18,12 @@
 module daemon.cache.map;
 
 private import tango.io.device.File;
-private import tango.io.device.FileMap;
 private import tango.io.FilePath;
+version (Posix) private import tango.stdc.posix.unistd;
+static if ( !is(typeof(fdatasync) == function ) ) // Not in Tango ATM.
+    extern (C) int fdatasync(int);
+
+private import lib.protobuf;
 
 /****************************************************************************************
  * CacheMap is the core datastructure for tracking which segments of an asset is
@@ -66,12 +70,6 @@ private:
     }
 
     Segment[] segments;
-    uint _segcount;
-    MappedFile file;
-    void ensureIdxAvail(uint length) {
-        if (length > segments.length)
-            segments = cast(Segment[])file.resize(Segment.sizeof * length);
-    }
 public:
     FilePath path;
 
@@ -80,18 +78,16 @@ public:
      ***********************************************************************************/
     this(FilePath path) {
         this.path = path;
-        file = new MappedFile(path.toString, File.ReadWriteOpen);
-        if (file.length)
-            segments = cast(Segment[])file.map();
+        if (path.exists)
+            load();
         else
-            segments = cast(Segment[])file.resize(Segment.sizeof * 16);
-        for (; !segments[_segcount].isEmpty; _segcount++) {}
+            path.createFile();
     }
 
     /***********************************************************************************
      * Count of cached segments of the asset
      **********************************************************************************/
-    uint segcount() { return _segcount; }
+    final uint segcount() { return segments.length; }
 
     /***********************************************************************************
      * Amount of cached content in the asset
@@ -103,11 +99,27 @@ public:
         return retval;
     }
 
-    void close() {
-        if (file) {
-            file.close();
-            file = null;
+    /************************************************************************************
+     * Load from underlying file
+     ***********************************************************************************/
+    private void load() {
+        try {
+            segments = cast(Segment[])File.get(path.toString, cast(void[])segments);
+        } catch (Exception e) {
+            segments.length = 0;
         }
+    }
+
+    /************************************************************************************
+     * Ensure underlying file is up-to-date
+     ***********************************************************************************/
+    package void sync() {
+        auto tmpPath = path.dup.cat(".new");
+        scope file = new File(tmpPath.toString, File.WriteCreate);
+        file.write(segments);
+        fdatasync(file.fileHandle);
+        file.close();
+        tmpPath.rename(path);
     }
 
     /************************************************************************************
@@ -116,8 +128,8 @@ public:
     bool has(ulong start, uint length) {
         auto end = start+length;
         uint i;
-        for (; (i < _segcount) && (segments[i].end < start); i++) {}
-        if (i==_segcount)
+        for (; (i < segcount) && (segments[i].end < start); i++) {}
+        if (i==segcount)
             return false;
         else
             return (start>=segments[i].start) && (end<=segments[i].end);
@@ -135,50 +147,42 @@ public:
 
         uint i;
         // Find insertion-point
-        for (; (i < _segcount) && (segments[i].end <= anew.start); i++) {}
-        assert(i <= _segcount);
+        for (; (i < segments.length) && (segments[i].end <= anew.start); i++) {}
+        assert(i <= segments.length);
 
         // Append, Update or Insert ?
-        if (i == _segcount) {
+        if (i == segments.length) {
             // Append
-            if ((++_segcount) > segments.length)
-                ensureIdxAvail(segments.length*2);
+            segments.length = segments.length + 1;
             segments[i] = onew;
         } else if (segments[i].start <= anew.end) {
             // Update
             segments[i] |= onew;
         } else {
             // Insert, need to ensure we have space, and shift trailing segments up a position
-            if ((++_segcount) > segments.length)
-                ensureIdxAvail(segments.length*2);
-            for (auto j=_segcount-1;j>i;j--)
+            segments.length = segments.length + 1;
+            for (auto j=segments.length-1;j>i;j--)
                 segments[j] = segments[j-1];
             segments[i] = onew;
         }
 
         // Squash possible trails (merge any intersecting or adjacent segments)
         uint j = i+1;
-        for (;(j < _segcount) && (segments[j].start <= (segments[i].end+1)); j++)
+        for (;(j < segments.length) && (segments[j].start <= (segments[i].end+1)); j++)
             segments[i] |= segments[j];
 
         // Right-shift the rest
         uint shift = j-i-1;
         if (shift) {
-            _segcount -= shift; // New _segcount
+            auto newlen = segments.length - shift; // New segments.length
             // Shift down valid segments
-            for (i+=1; i < _segcount; i++)
+            for (i+=1; i < newlen; i++)
                 segments[i] = segments[i+shift];
             // Zero-fill superfluous segments
             for (;shift; shift--)
                 segments[i++] = Segment.init;
+            segments.length = newlen;
         }
-    }
-
-    /************************************************************************************
-     * Ensure underlying file is up-to-date
-     ***********************************************************************************/
-    void flush() {
-        file.flush();
     }
 
     /************************************************************************************
@@ -209,18 +213,15 @@ public:
         map.add(30,15);
         assert(map.segments[1].start == 30);
         assert(map.segments[1].end == 45);
-        assert(map.segments[2].start == 0);
-        assert(map.segments[2].end == 0);
+        assert(map.segments.length == 2);
         map.add(45,5);
         assert(map.segments[1].start == 30);
         assert(map.segments[1].end == 50);
-        assert(map.segments[2].start == 0);
-        assert(map.segments[2].end == 0);
+        assert(map.segments.length == 2);
         map.add(25,5);
         assert(map.segments[1].start == 25);
         assert(map.segments[1].end == 50);
-        assert(map.segments[2].start == 0);
-        assert(map.segments[2].end == 0);
+        assert(map.segments.length == 2);
 
         map.add(18,2);
         assert(map.segments[0].start == 0);
@@ -235,8 +236,7 @@ public:
         assert(map.segments[0].end == 20);
         assert(map.segments[1].start == 25);
         assert(map.segments[1].end == 50);
-        assert(map.segments[2].start == 0);
-        assert(map.segments[2].end == 0);
+        assert(map.segments.length == 2);
 
         assert(map.has(0,10) == true);
         assert(map.has(1,15) == true);

@@ -34,6 +34,9 @@ private import daemon.cache.metadata;
 private import daemon.cache.map;
 private import daemon.client;
 
+static if ( !is(typeof(fdatasync) == function ) )
+    extern (C) int fdatasync(int);
+
 const LOCALID_LENGTH = 32;
 
 private static ThreadLocal!(ubyte[]) tls_buf;
@@ -183,6 +186,18 @@ public:
         cacheMap.add(offset, data.length);
         updateHashes();
     }
+
+    /************************************************************************************
+     * Make sure to synchronize file data, and flush cachemap to disk.
+     ***********************************************************************************/
+    synchronized void sync() {
+        version (Posix)
+            fdatasync(fileHandle);
+        else
+            static assert(false, "Needs Non-POSIX implementation");
+        if (cacheMap)
+            cacheMap.sync();
+    }
 protected:
     /************************************************************************************
      * Check if more data is available for hashing
@@ -207,7 +222,7 @@ protected:
     /************************************************************************************
      * Post-finish hooks. Finalize the digests, add to assetMap, and remove the CacheMap
      ***********************************************************************************/
-    void finish() {
+    synchronized void finish() {
         assert(updateHashIds);
         assert(cacheMap);
         assert(cacheMap.segcount == 1);
@@ -226,8 +241,11 @@ protected:
 
         updateHashIds(hashIds);
 
-        cacheMap.path.remove();
-        delete cacheMap;
+        auto oldCache = cacheMap;
+        cacheMap = null;
+        sync();
+        oldCache.path.remove();
+        delete oldCache;
 
         _statusSignal.call(this, message.Status.SUCCESS, null);
     }
