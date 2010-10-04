@@ -251,7 +251,7 @@ protected:
         } catch (Exception e) {
             char[] excInfo = "";
             e.writeOut(delegate(char[] msg){excInfo ~= msg;});
-            log.fatal("Connection {} recieved triggered an unhandled exception; {}", c.peername, excInfo);
+            log.fatal("Connection {} triggered an unhandled exception; {}", c.peername, excInfo);
             return false;
         }
     }
