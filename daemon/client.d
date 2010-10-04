@@ -79,13 +79,13 @@ public:
         client = c;
     }
     final void callback(IAsset asset, message.Status status, message.ReadRequest remoteReq, message.ReadResponse remoteResp) {
-        if (client) {
+        if (client && !client.closed) {
             scope resp = new message.ReadResponse;
             resp.rpcId = rpcId;
             resp.offset = remoteResp.offset;
             resp.content = remoteResp.content;
             resp.status = status;
-            client.sendMessage(resp);
+            client.sendNotification(resp);
         }
         delete this;
     }
@@ -136,7 +136,7 @@ class Client : lib.client.Client {
                 if (s) {
                     resp.availability = s.availability;
                 }
-                sendMessage(resp);
+                sendNotification(resp);
             }
         }
     public:
@@ -194,7 +194,7 @@ protected:
             scope resp = new message.AssetStatus();
             resp.handle = req.handle;
             resp.status = message.Status.NOTFOUND;
-            sendMessage(resp);
+            sendNotification(resp);
         }
     }
 
@@ -222,7 +222,7 @@ protected:
             scope resp = new message.ReadResponse;
             resp.rpcId = req.rpcId;
             resp.status = message.Status.INVALID_HANDLE;
-            return sendMessage(resp);
+            return sendNotification(resp);
         }
         asset.aSyncRead(req.offset, req.size, &req.callback);
     }

@@ -153,7 +153,7 @@ public:
         msg.handle = handle;
         msg.offset = offset;
         msg.content = data;
-        client.sendMessage(msg);
+        client.sendNotification(msg);
     }
 
     final ulong size() {
@@ -239,11 +239,11 @@ public:
 
     void close()
     {
-        log.trace("Closing...");
         connection.close();
         foreach (asset; boundAssets) if (asset) {
             asset.close();
         }
+        log.trace("Closed...");
     }
 
     /************************************************************************************
@@ -292,6 +292,18 @@ public:
 protected:
     synchronized void sendMessage(message.Message msg) {
         connection.sendMessage(msg);
+    }
+
+    /************************************************************************************
+     * Send message, but don't care about delivery. IE, catch IOExceptions and just
+     * ignore them.
+     ***********************************************************************************/
+    void sendNotification(message.Message msg) {
+        try {
+            sendMessage(msg);
+        } catch (IOException e) {
+            log.trace("Ignored exception: {}", e);
+        }
     }
     synchronized void sendRPCRequest(message.RPCRequest req,
                                   TimeSpan timeout=TimeSpan.fromMillis(4000)) {
