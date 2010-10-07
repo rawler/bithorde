@@ -117,7 +117,7 @@ public:
             auto got = read(buf);
         }
         auto resp = new lib.message.ReadResponse;
-        if (got == Eof) {
+        if (got == 0 || got == Eof) {
             resp.status = message.Status.NOTFOUND;
         } else {
             resp.status = message.Status.SUCCESS;
@@ -183,7 +183,8 @@ public:
             seek(offset);
             auto written = write(data);
         }
-        cacheMap.add(offset, data.length);
+        assert(written == data.length);
+        cacheMap.add(offset, written);
         updateHashes();
     }
 
@@ -311,7 +312,7 @@ private:
                 remoteAsset.aSyncRead(offset, length, &callback);
         }
         void callback(IAsset asset, message.Status status, message.ReadRequest req, message.ReadResponse resp) {
-            if (status == message.Status.SUCCESS) {
+            if (status == message.Status.SUCCESS && resp && resp.content.length) {
                 if (cacheMap) // May no longer be open for writing, due to stale requests
                     add(resp.offset, resp.content);
                 tryRead();
@@ -319,6 +320,7 @@ private:
                 lastStatus = status;
                 tryRead();
             } else {
+                log.warn("Failed forwarded read, with error {}", status);
                 // TODO: Report back error
             }
             delete req;
