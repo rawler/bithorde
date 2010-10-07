@@ -145,16 +145,19 @@ public:
         // Original new segment
         auto news = Segment(start, start + length);
 
+        // Expanded segment to cover neighbors.
+        auto anew = news.expanded;
+
         uint i;
         // Find insertion-point
-        for (; (i < segments.length) && (segments[i].end < news.start); i++) {}
+        for (; (i < segments.length) && (segments[i].end < anew.start); i++) {}
         assert(i <= segments.length);
 
         // Append, Update or Insert ?
         if (i == segments.length) {
             // Append
             segments ~= news;
-        } else if (segments[i].start < news.end) {
+        } else if (segments[i].start < anew.end) {
             // Update
             segments[i] |= news;
         } else {
@@ -256,6 +259,10 @@ public:
         assert(map.segments[0].start == 0);
         assert(map.segments[0].end == 10);
         map.add(10, 5);
+        assert(map.segments.length == 1);
+        map.add(20, 5);
+        assert(map.segments.length == 2);
+        map.add(16,3);
         assert(map.segments.length == 1);
 
         // Now test inserting many segments, to verify it expands correctly
