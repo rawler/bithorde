@@ -139,31 +139,30 @@ public:
      * Add a segment into the cachemap
      ***********************************************************************************/
     void add(ulong start, uint length) {
-        // Original new segment
-        auto onew = Segment(start, start + length);
+        // Just skip 0-length segments
+        if (!length) return;
 
-        // Expand start and end with 1, to cover adjacency
-        auto anew = onew.expanded(1);
+        // Original new segment
+        auto news = Segment(start, start + length);
 
         uint i;
         // Find insertion-point
-        for (; (i < segments.length) && (segments[i].end <= anew.start); i++) {}
+        for (; (i < segments.length) && (segments[i].end < news.start); i++) {}
         assert(i <= segments.length);
 
         // Append, Update or Insert ?
         if (i == segments.length) {
             // Append
-            segments.length = segments.length + 1;
-            segments[i] = onew;
-        } else if (segments[i].start <= anew.end) {
+            segments ~= news;
+        } else if (segments[i].start < news.end) {
             // Update
-            segments[i] |= onew;
+            segments[i] |= news;
         } else {
             // Insert, need to ensure we have space, and shift trailing segments up a position
             segments.length = segments.length + 1;
             for (auto j=segments.length-1;j>i;j--)
                 segments[j] = segments[j-1];
-            segments[i] = onew;
+            segments[i] = news;
         }
 
         // Squash possible trails (merge any intersecting or adjacent segments)
@@ -246,6 +245,18 @@ public:
         assert(map.has(35,5) == true);
         assert(map.has(45,5) == true);
         assert(map.has(46,5) == false);
+
+        cleanup();
+        map = new CacheMap(path);
+        map.add(0,0);
+        assert(map.segments.length == 0);
+        map.segments = [Segment(0,0)];
+        map.add(0, 10);
+        assert(map.segments.length == 1);
+        assert(map.segments[0].start == 0);
+        assert(map.segments[0].end == 10);
+        map.add(10, 5);
+        assert(map.segments.length == 1);
 
         // Now test inserting many segments, to verify it expands correctly
         map.add(1000, 5);
