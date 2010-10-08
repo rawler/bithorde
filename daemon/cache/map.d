@@ -105,6 +105,19 @@ public:
     private void load() {
         try {
             segments = cast(Segment[])File.get(path.toString, cast(void[])segments);
+
+            // Now squash useless 0-size segments. Artefact from beta1, probably won't be needed later.
+            auto len = segments.length;
+            foreach (i, ref x; segments) {
+                if (x.end == x.start) {
+                    len -= 1;
+                    for (auto j=i; j < len; j++)
+                        segments[j] = segments[j+1];
+                } else if (x.end < x.start) {
+                    throw new Exception("Serious corruption, discarding");
+                }
+            }
+            segments.length = len;
         } catch (Exception e) {
             segments.length = 0;
         }
@@ -157,7 +170,7 @@ public:
         if (i == segments.length) {
             // Append
             segments ~= news;
-        } else if (segments[i].start < anew.end) {
+        } else if (segments[i].start <= anew.end) {
             // Update
             segments[i] |= news;
         } else {
@@ -180,9 +193,6 @@ public:
             // Shift down valid segments
             for (i+=1; i < newlen; i++)
                 segments[i] = segments[i+shift];
-            // Zero-fill superfluous segments
-            for (;shift; shift--)
-                segments[i++] = Segment.init;
             segments.length = newlen;
         }
     }
