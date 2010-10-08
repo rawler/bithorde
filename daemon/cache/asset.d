@@ -124,7 +124,7 @@ public:
             resp.offset = offset;
             resp.content = buf[0..got];
         }
-        cb(this, message.Status.SUCCESS, null, resp); // TODO: should really hold reference to req
+        cb(this, resp.status, null, resp); // TODO: should really hold reference to req
     }
 
     /************************************************************************************
@@ -302,14 +302,22 @@ private:
         uint length;
         BHReadCallback cb;
         message.Status lastStatus;
-        // TODO: Limit re-tries
+        uint tries;
 
         void tryRead() {
             if (!cacheMap || cacheMap.has(offset, length)) {
                 realRead(offset, length, cb);
                 delete this;
-            } else
+            } else if (tries++ < 4) {
                 remoteAsset.aSyncRead(offset, length, &callback);
+            } else {
+                fail();
+            }
+        }
+        void fail() {
+            auto resp = new lib.message.ReadResponse;
+            resp.status = message.Status.NOTFOUND;
+            cb(this.outer, resp.status, null, resp);
         }
         void callback(IAsset asset, message.Status status, message.ReadRequest req, message.ReadResponse resp) {
             if (status == message.Status.SUCCESS && resp && resp.content.length) {
@@ -321,7 +329,7 @@ private:
                 tryRead();
             } else {
                 log.warn("Failed forwarded read, with error {}", status);
-                // TODO: Report back error
+                fail();
             }
             delete req;
         }
