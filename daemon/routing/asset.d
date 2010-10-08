@@ -34,7 +34,7 @@ private class ForwardedAsset : IServerAsset {
     mixin IAsset.StatusSignal;
 private:
     daemon.client.BindRead req;
-    IAsset[] backingAssets;
+    RemoteAsset[] backingAssets;
     RequestCompleted notify;
     uint reqnum;
     Logger log;
@@ -72,8 +72,22 @@ public:
      * Implements IServerAsset.size - size of the asset
      ***********************************************************************************/
     void aSyncRead(ulong offset, uint length, BHReadCallback cb) {
-        auto forwardIdx = (reqnum++) % backingAssets.length; // Round-robin over available backingAssets
-        backingAssets[forwardIdx].aSyncRead(offset, length, cb);
+        auto score = uint.max;
+        RemoteAsset target;
+        foreach (asset; backingAssets) { // Find client with least load
+            auto currentScore = asset.client.getLoad();
+            if (currentScore < score) {
+                score = currentScore;
+                target = asset;
+            }
+        }
+        if (target) {
+            target.aSyncRead(offset, length, cb);
+        } else {
+            auto resp = new ReadResponse;
+            resp.status = Status.NOTFOUND;
+            cb(this, Status.NOTFOUND, null, resp);
+        }
     }
 
     /************************************************************************************
@@ -84,13 +98,15 @@ public:
     }
 
 private:
-    void onUpdatedStatus(IAsset asset, Status status, AssetStatus resp) {
+    void onUpdatedStatus(IAsset asset_, Status status, AssetStatus resp) {
         log.trace("Got updated backingAsset status {}", statusToString(status));
+        auto asset = cast(RemoteAsset)asset_;
+        assert(asset);
         if (status != Status.SUCCESS) {
             // Remove backingAsset
-            auto newBackingAssets = new IAsset[0];
+            auto newBackingAssets = new RemoteAsset[0];
             foreach (a; backingAssets) {
-                if (a != asset)
+                if (asset != a)
                     newBackingAssets ~= a;
             }
             auto oldBackingAssets = backingAssets;
@@ -108,7 +124,9 @@ package:
     /************************************************************************************
      * Callback for hooking up new-found backing assets
      ***********************************************************************************/
-    void addBackingAsset(IAsset asset, Status status, AssetStatus resp) {
+    void addBackingAsset(IAsset asset_, Status status, AssetStatus resp) {
+        auto asset = cast(RemoteAsset)asset_;
+        assert(asset);
         switch (status) {
         case Status.SUCCESS:
             assert(asset, "SUCCESS response, but no asset");

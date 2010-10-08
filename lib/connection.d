@@ -82,6 +82,8 @@ protected:
 
     /// inFlightRequests contains actual requests, and is the allocation-heap for IFR:s
     InFlightRequest[] inFlightRequests;
+    /// Load is the number of requests currently in flight.
+    uint load;
     /// TimeoutQueue for inFlightRequests
     public TimeoutQueue timeouts;
     /// Free reusable request-ids
@@ -117,6 +119,7 @@ protected:
             }
         }
         inFlightRequests[target.rpcId].c = this;
+        load += 1;
         return target.rpcId;
     }
 
@@ -133,6 +136,7 @@ protected:
         msg.request = req;
         timeouts.abort(ifr.timeout);
         inFlightRequests[msg.rpcId] = InFlightRequest.init;
+        load -= 1;
         if (_freeIds.unused)
             _freeIds.push(msg.rpcId);
         return req;
@@ -264,6 +268,14 @@ public:
      ***********************************************************************************/
     Time nextDeadline() {
         return timeouts.nextDeadline;
+    }
+
+
+    /************************************************************************************
+     * Measure how loaded this connection is
+     ***********************************************************************************/
+    uint getLoad() {
+        return inFlightRequests.length;
     }
 
     final char[] peername() { return _peername; }

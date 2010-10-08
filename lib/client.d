@@ -66,8 +66,8 @@ class RemoteAsset : private IAsset {
         }
     }
     bool closed;
-private:
     Client client;
+private:
     void clientGone(Object o) {
         this.client = null;
     }
@@ -273,6 +273,13 @@ public:
         req.size = size;
         auto asset = new RemoteAsset(this, req, cb, singleShotStatus);
         sendBindRequest(req, asset, TimeSpan.fromMillis(10000));
+    }
+
+    /************************************************************************************
+     * Measure how loaded this client currently is
+     ***********************************************************************************/
+    uint getLoad() {
+        return connection.getLoad();
     }
 
     /************************************************************************************
