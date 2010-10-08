@@ -1,3 +1,13 @@
+bithorde (0.0.9+0.1beta3-1) lucid; urgency=low
+
+  * daemon: Apply limit to how many retries will be done in routing.
+  * daemon: Implement load-based load-balancing such that slower friend will be used, but
+            less than faster friends with the same content.
+  * daemon: Fix broken migration between existing indexes from beta1 and beta2.
+  * packaging: Don't strip binaries, to produce sensible debug-data.
+
+ -- Ulrik Mikaelsson <ulrik.mikaelsson@gmail.com>  Fri, 08 Oct 2010 22:45:06 +0200
+
 bithorde (0.0.9+0.1beta2-1) lucid; urgency=low
 
   * daemon: Manually control fsyncdata() to avoid cache-corruption
