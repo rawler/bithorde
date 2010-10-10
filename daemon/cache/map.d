@@ -138,7 +138,9 @@ public:
     /************************************************************************************
      * Check if a segment is completely in the cache.
      ***********************************************************************************/
-    bool has(ulong start, uint length) {
+    bool has(ulong start, uint length) in {
+        assert(length > 0, "CacheMap.has() is undefined for 0-length.");
+    } body {
         auto end = start+length;
         uint i;
         for (; (i < segcount) && (segments[i].end < start); i++) {}
@@ -274,6 +276,21 @@ public:
         assert(map.segments.length == 2);
         map.add(16,3);
         assert(map.segments.length == 1);
+
+        cleanup();
+        map = new CacheMap(path);
+        map.add(10,5);
+        map.add(0,5);
+        assert(map.segments.length == 2);
+        assert(map.segments[0].start == 0);
+        assert(map.segments[0].end == 5);
+        assert(map.segments[1].start == 10);
+        assert(map.segments[1].end == 15);
+        assert(map.has(4,1));
+        assert(!map.has(5,1));
+        assert(!map.has(8,2));
+        assert(map.has(10,5));
+        assert(!map.has(10,6));
 
         // Now test inserting many segments, to verify it expands correctly
         map.add(1000, 5);
