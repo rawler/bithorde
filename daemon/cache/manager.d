@@ -21,6 +21,7 @@ private import tango.core.Exception;
 private import tango.core.WeakRef;
 private import tango.io.device.File;
 private import tango.io.FilePath;
+private import tango.io.FileSystem;
 private import tango.math.random.Random;
 version (Posix) import tango.stdc.posix.sys.stat;
 private import tango.text.Ascii;
@@ -40,6 +41,8 @@ private import daemon.config;
 private import daemon.routing.router;
 
 alias WeakReference!(File) AssetRef;
+const FS_MINFREE = 0.1; // Amount of filesystem that should always be kept unused.
+const M = 1024*1024;
 
 /****************************************************************************************
  * Overseeing Cache-manager, keeping state of all cache-assets, and mapping from id:s to
@@ -141,6 +144,7 @@ public:
         if (idMapPath.exists) {
             loadIdMap();
             garbageCollect();
+            _makeRoom(0); // Make sure the cache is in good order.
         } else {
             hashIdMap[message.HashType.SHA1] = null;
             hashIdMap[message.HashType.SHA256] = null;
@@ -194,6 +198,9 @@ public:
      * returns false.
      ***********************************************************************************/
     private bool _makeRoom(ulong size) {
+        /********************************************************************************
+         * Find least important asset in cache.
+         *******************************************************************************/
         MetaData pickLoser() {
             MetaData loser;
             Time loserMtime = Time.max;
@@ -214,16 +221,35 @@ public:
             }
             return loser;
         }
-        log.trace("Making room for new asset of {}MB. MaxSize is {}MB", size/(1024*1024), this.maxSize);
-        if (this.maxSize == 0)
-            return true;
-        auto maxSize = this.maxSize * 1024 * 1024;
+        /********************************************************************************
+         * Calculate how large the Cache can be according to FS-limits.
+         *******************************************************************************/
+        ulong constrainToFs(ulong wanted, ulong cacheSize) {
+            auto dir = assetDir.toString;
+            auto fsBufferSpace = cast(long)(FileSystem.totalSpace(dir) * FS_MINFREE);
+            auto fsFreeSpace = cast(long)FileSystem.freeSpace(dir) - fsBufferSpace;
+            auto fsAllowed = cast(long)(this.size)+fsFreeSpace;
+            if (wanted > fsAllowed) {
+                if (this.maxSize != 0) // Don't warn when user have specified unlimited cache
+                    log.warn("FileSystem-space smaller than specified cache maxSize. Constraining cache to {}% of FileSystem.", cast(uint)((1.0-FS_MINFREE)*100));
+                return fsAllowed;
+            } else {
+                return wanted;
+            }
+        }
+        log.trace("Making room for new asset of {}MB. MaxSize is {}MB", size/M, this.maxSize);
+        auto maxSize = this.maxSize * M;
+        if (maxSize == 0)
+            maxSize = maxSize.max;
+        auto cacheSize = this.size;
+        maxSize = constrainToFs(maxSize, cacheSize);
+
         if (size > (maxSize / 2))
             return false; // Will not cache individual assets larger than half the cacheSize
         auto targetSize = maxSize - size;
-        log.trace("This cache is {}MB, roof is {}MB for upload", this.size/(1024*1024), targetSize / (1024*1024));
+        log.trace("This cache is {}MB, roof is {}MB for upload", this.size/M, targetSize / M);
         garbageCollect();
-        while (this.size > targetSize) {
+        while (cacheSize > targetSize) {
             auto loser = pickLoser;
             if (!loser)
                 return false;
