@@ -183,9 +183,12 @@ public:
             seek(offset);
             auto written = write(data);
         }
-        assert(written == data.length);
-        cacheMap.add(offset, written);
-        updateHashes();
+        if (written == data.length) {
+            cacheMap.add(offset, written);
+            updateHashes();
+        } else {
+            throw new IOException("Failed to write received segment. Disk full?");
+        }
     }
 
     /************************************************************************************
