@@ -82,9 +82,11 @@ public:
         if (client && !client.closed) {
             scope resp = new message.ReadResponse;
             resp.rpcId = rpcId;
-            resp.offset = remoteResp.offset;
-            resp.content = remoteResp.content;
             resp.status = status;
+            if (status == message.Status.SUCCESS) {
+                resp.offset = remoteResp.offset;
+                resp.content = remoteResp.content;
+            }
             client.sendNotification(resp);
         }
         delete this;
