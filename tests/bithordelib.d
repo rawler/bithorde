@@ -358,32 +358,29 @@ void main() {
     Log.root.add(new AppendConsole(new LayoutDate));
     LOG = Log.lookup("libtest");
 
-    synchronized (Cout.stream) { Stdout("\nTesting ClientTimeout\n=====================\n").newline; }
+    synchronized (Cerr.stream) { Stderr("\nTesting ClientTimeout\n=====================\n").newline; }
     auto src = new SteppingServer("Src", 23412);
     scope(exit) src.shutdown();
     testLibTimeout(src);
 
-    synchronized (Cout.stream) { Stdout("\nTesting ServerTimeout\n=====================\n").newline; }
+    synchronized (Cerr.stream) { Stderr("\nTesting ServerTimeout\n=====================\n").newline; }
     auto proxy = new SteppingServer("Proxy", 23415, [src]);
     scope(exit) proxy.shutdown();
     testServerTimeout(src, proxy);
 
-    synchronized (Cout.stream) { Stdout("\nTesting AssetUpload\n===================\n").newline; }
+    synchronized (Cerr.stream) { Stderr("\nTesting AssetUpload\n===================\n").newline; }
     auto ids = testAssetUpload(src);
 
-    synchronized (Cout.stream) { Stdout("\nTesting Asset Fetching With Retry on Timeouts\n=============================================\n").newline; }
+    synchronized (Cerr.stream) { Stderr("\nTesting Asset Fetching With Retry on Timeouts\n=============================================\n").newline; }
     testAssetFetchWithTimeout(src, ids);
 
-    synchronized (Cout.stream) { Stdout("\nTesting Restarting During Partial Asset\n=======================================\n").newline; }
+    synchronized (Cerr.stream) { Stderr("\nTesting Restarting During Partial Asset\n=======================================\n").newline; }
     testRestartWithPartialAsset(src, ids);
 
-    synchronized (Cout.stream) { Stdout("\nTesting Dropping Source\n=======================================\n").newline; }
+    synchronized (Cerr.stream) { Stderr("\nTesting Dropping Source\n=======================================\n").newline; }
     auto node3 = new SteppingServer("Node3", 23417, [src, proxy]);
     scope(exit) node3.shutdown();
     testSourceGone(src, node3, ids);
 
-    src.reset(1000);
-    proxy.reset(1000);
-    node3.reset(1000);
     LOG.info("SUCCESS: All tests done");
 }
