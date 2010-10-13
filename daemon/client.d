@@ -159,7 +159,10 @@ class Client : lib.client.Client {
         }
         void addDataSegment(message.DataSegment req) {
             auto asset = cast(WriteableAsset)assetSource;
-            asset.add(req.offset, req.content);
+            if (asset)
+                asset.add(req.offset, req.content);
+            else
+                log.warn("Client trying to write to non-writeable asset!");
         }
     }
 private:
