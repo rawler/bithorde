@@ -73,17 +73,21 @@ public:
      * directly as a BaseAsset
      ***********************************************************************************/
     this(FilePath path, AssetMetaData metadata, HashIdsListener updateHashIds) {
-        this(path, metadata, File.ReadExisting, updateHashIds);
-        assert(!idxPath.exists);
-    }
-    protected this(FilePath path, AssetMetaData metadata, File.Style style, HashIdsListener updateHashIds) {
         this.path = path;
         this.idxPath = path.dup.suffix(".idx");
         this.updateHashIds = updateHashIds;
         this._metadata = metadata;
         log = Log.lookup("daemon.cache.baseasset."~path.name[0..8]);
 
-        super(path.toString, style);
+        super();
+        assetOpen(path);
+    }
+
+    /************************************************************************************
+     * assetOpen - Overridable function to really open or create the asset.
+     ***********************************************************************************/
+    void assetOpen(FilePath path) {
+        File.open(path.toString);
     }
 
     /************************************************************************************
@@ -155,20 +159,33 @@ public:
      * Create WriteableAsset by path and size
      ***********************************************************************************/
     this(FilePath path, AssetMetaData metadata, ulong size, HashIdsListener updateHashIds) {
-        this(path, metadata, File.Style(File.Access.ReadWrite, File.Open.Sedate), updateHashIds); // Super-class opens underlying file
-        truncate(size);           // We resize it to right size
-    }
-    protected this(FilePath path, AssetMetaData metadata, File.Style style, HashIdsListener updateHashIds) { /// ditto
         foreach (k,hash; HashMap)
             hashes[hash.pbType] = hash.factory();
-        super(path, metadata, style, updateHashIds);
-        cacheMap = new CacheMap(idxPath);
+        super(path, metadata, updateHashIds); // Parent calls open()
+        truncate(size);           // We resize it to right size
         log = Log.lookup("daemon.cache.writeasset."~path.name[0..8]);
     }
 
+    /************************************************************************************
+     * Create and open a WriteableAsset. Make sure to create cacheMap first, create the
+     * file, and then truncate it to the right size.
+     ***********************************************************************************/
+    void assetOpen(FilePath path) {
+        this.cacheMap = new CacheMap(idxPath);
+        File.open(path.toString, File.Style(File.Access.ReadWrite, File.Open.Sedate));
+    }
+
+    /************************************************************************************
+     * Asynchronous read, first checking the cacheMap has the block we're looking for.
+     ***********************************************************************************/
     synchronized void aSyncRead(ulong offset, uint length, BHReadCallback cb) {
-        assert(!this.cacheMap || this.cacheMap.has(offset, length), "Checking cacheMap expected before aSyncRead");
-        super.aSyncRead(offset, length, cb);
+        if (length == 0) {
+            cb(this, message.Status.SUCCESS, null, null);
+        } else if (this.cacheMap && !this.cacheMap.has(offset, length)) {
+            cb(this, message.Status.NOTFOUND, null, null);
+        } else {
+            super.aSyncRead(offset, length, cb);
+        }
     }
 
     /************************************************************************************
