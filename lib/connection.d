@@ -21,7 +21,9 @@ private import tango.core.Signal;
 private import tango.io.model.IConduit;
 private import tango.net.device.Berkeley;
 private import tango.net.device.Socket;
+private import tango.text.convert.Format;
 private import tango.time.Clock;
+private import tango.util.MinMax;
 private import tango.util.container.more.Heap;
 private import tango.util.container.more.Stack;
 
@@ -58,6 +60,71 @@ struct LingerId {
 
 /// ditto
 alias Heap!(LingerId, true) LingerIdQueue;
+
+/****************************************************************************************
+ * Small counter-helper to keep track of flow of bytes and packets.
+ ***************************************************************************************/
+struct Counters {
+    /// Stats for one direction
+    struct Stats {
+        ulong packets, bytes;
+        void addPacket(uint length) {
+            packets += 1;
+            bytes += length;
+        }
+    }
+    Time lastSwitch;
+    Stats currentIn, currentOut;
+    TimeSpan prevInterval;
+    Stats prevIn, prevOut;
+
+    /************************************************************************************
+     * add a sent packet for the current period. Won't be visible in accounting until
+     * after next switch.
+     ***********************************************************************************/
+    void addSentPacket(uint length) {
+        currentOut.addPacket(length);
+    }
+
+    /************************************************************************************
+     * add a recieved packet for the current period. Won't be visible in accounting
+     * until after next switch.
+     ***********************************************************************************/
+    void addRecvPacket(uint length) {
+        currentIn.addPacket(length);
+    }
+
+    /************************************************************************************
+     * Perform a switch, committing the current period
+     ***********************************************************************************/
+    void doSwitch(Time now) {
+        prevInterval = now - lastSwitch;
+        prevIn = currentIn;
+        prevOut = currentOut;
+        currentIn = currentOut = Stats.init;
+        lastSwitch = now;
+    }
+
+    /************************************************************************************
+     * Render string of back-stats.
+     ***********************************************************************************/
+    char[] toString() {
+        auto msec = max!(long)(prevInterval.millis, 1);
+        return Format.convert("Recv: {{{}pkts/sec, {}KB/sec} Sent: {{{}pkts/sec, {}KB/sec}",
+            (cast(double)(prevIn.packets) * 1000)/msec, cast(double)(prevIn.bytes/msec),
+            (cast(double)(prevOut.packets) * 1000)/msec, cast(double)(prevOut.bytes/msec));
+    }
+
+    /************************************************************************************
+     * Check if anything hit the counters last period.
+     ***********************************************************************************/
+    bool empty() {
+        if (prevIn.packets || prevOut.packets)
+            return false;
+        else
+            return true;
+    }
+}
 
 /****************************************************************************************
  * All underlying BitHorde connections run through this class. Deals with low-level
@@ -154,6 +221,8 @@ protected:
         inFlightRequests[req.rpcId] = InFlightRequest.init;
     }
 public:
+    /// Public statistics-module
+    Counters counters;
     /// Signal indicating handshake is done
     Signal!(char[]) onHandshakeDone;
 
@@ -164,6 +233,7 @@ public:
     {
         this._myname = myname;
         this._processCallback = cb;
+        counters.lastSwitch = Clock.now;
     }
 
     ~this() {
@@ -251,6 +321,9 @@ public:
         if (decode_val!(message.Type)(buf, type) && decode_val!(size_t)(buf, msglen) && (buf.length >= msglen)) {
             assert((type & 0b0000_0111) == 0b0010, "Expected message type, but got something else");
             type >>= 3;
+
+            auto totallength = (buf.ptr - left.ptr) /*length of type and length*/ + msglen;
+            counters.addRecvPacket(totallength);
 
             left = buf[msglen..length]; // Make sure to remove message from queue before processing
             messageHandler(this, type, buf[0..msglen]);
@@ -346,6 +419,7 @@ package:
         encode_val!(uint)(msgbuf.length, msgbuf);
         encode_val!(ushort)((m.typeId << 3) | 0b0000_0010, msgbuf);
         auto buf = msgbuf.data;
+        counters.addSentPacket(buf.length);
         socket.write(buf);
         return buf;
     }

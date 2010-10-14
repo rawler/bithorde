@@ -20,6 +20,7 @@ private import tango.core.Exception;
 private import tango.io.selector.Selector;
 private import tango.math.random.Random;
 private import tango.net.device.Socket;
+private import tango.text.convert.Format;
 private import tango.time.Clock;
 private import tango.time.Time;
 private import tango.util.container.more.Stack;
@@ -33,6 +34,8 @@ import lib.timeout;
 
 alias void delegate(Object) DEvent;
 extern (C) void rt_attachDisposeEvent(Object h, DEvent e);
+
+const StatInterval = TimeSpan.fromSeconds(60);
 
 /****************************************************************************************
  * RemoteAsset is the basic BitHorde object for tracking a remotely open asset from the
@@ -193,6 +196,7 @@ private:
     Stack!(ushort) freeAssetHandles;
     ushort nextNewHandle;
     TimeoutQueue timeouts;
+    Time nextStatPrint;
     protected Logger log;
 public:
     Connection connection;
@@ -222,6 +226,7 @@ public:
         connection.onHandshakeDone.attach = &onConnectionHandshakeDone;
         timeouts = new TimeoutQueue;
         boundAssets = new RemoteAsset[16];
+        nextStatPrint = Clock.now + StatInterval;
     }
 
     /************************************************************************************
@@ -294,7 +299,9 @@ public:
      * Figure next timeout for this asset
      ***********************************************************************************/
     Time nextDeadline() {
-        return min!(Time)(timeouts.nextDeadline, connection.nextDeadline);
+        auto result = min!(Time)(timeouts.nextDeadline, connection.nextDeadline);
+        result = min!(Time)(result, nextStatPrint);
+        return result;
     }
 
     /************************************************************************************
@@ -303,6 +310,12 @@ public:
     void processTimeouts(Time now) {
         timeouts.emit(now);
         connection.processTimeouts(now);
+        if (now >= nextStatPrint) {
+            connection.counters.doSwitch(now);
+            if (!connection.counters.empty)
+                log.trace("Stats: {}", connection.counters);
+            nextStatPrint = now + StatInterval;
+        }
     }
 protected:
     synchronized void sendMessage(message.Message msg) {
