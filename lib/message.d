@@ -23,6 +23,7 @@ private import tango.core.Exception;
 private import tango.core.Memory;
 private import tango.core.sync.Mutex;
 private import tango.util.container.more.Stack;
+private import tango.text.convert.Format;
 
 private import lib.protobuf;
 
@@ -112,6 +113,9 @@ abstract class RPCRequest : RPCMessage {
 
 abstract class RPCResponse : RPCMessage {
     RPCRequest request;
+    char[] toString() {
+        return Format.convert("RPCResponse {{rpcId={}}}", rpcId);
+    }
 }
 
 private import lib.asset;
@@ -207,6 +211,11 @@ class ReadResponse : RPCResponse {
                          PBMapping("content",   4));
 
     Type typeId() { return Type.ReadResponse; }
+
+    char[] toString() {
+        return Format.convert("ReadResponse {{rpcId={},status={}, offset={}, length={}}}",
+                    rpcId, statusToString(status), offset, content.length);
+    }
 }
 
 class DataSegment : Message {

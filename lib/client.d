@@ -395,9 +395,13 @@ protected:
     synchronized void processReadResponse(Connection c, ubyte[] buf) {
         scope resp = new message.ReadResponse;
         resp.decode(buf);
-        auto req = cast(RemoteAsset.ReadRequest)c.releaseRequest(resp);
-        assert(req, "ReadResponse, but not ReadRequest");
-        req.callback(resp.status, resp);
+        try {
+            auto req = cast(RemoteAsset.ReadRequest)c.releaseRequest(resp);
+            assert(req, "ReadResponse, but not ReadRequest");
+            req.callback(resp.status, resp);
+        } catch (Connection.InvalidResponse exc) {
+            log.warn("Recieved invalid response; {}", resp);
+        }
     }
     void processBindRead(Connection c, ubyte[] buf) {
         throw new AssertException("Danger Danger! This client should not get requests!", __FILE__, __LINE__);
