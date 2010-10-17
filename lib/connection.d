@@ -17,6 +17,7 @@
 module lib.connection;
 
 private import tango.core.Exception;
+private import tango.core.Signal;
 private import tango.io.model.IConduit;
 private import tango.net.device.Berkeley;
 private import tango.net.device.Socket;
@@ -153,6 +154,9 @@ protected:
         inFlightRequests[req.rpcId] = InFlightRequest.init;
     }
 public:
+    /// Signal indicating handshake is done
+    Signal!(char[]) onHandshakeDone;
+
     /************************************************************************************
      * Create named connection, and perform HandShake
      ***********************************************************************************/
@@ -369,5 +373,6 @@ protected:
         _peername = handshake.name.dup;
         messageHandler = _processCallback;
         assert(handshake.protoversion == 1);
+        onHandshakeDone(_peername);
     }
 }

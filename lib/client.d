@@ -219,6 +219,7 @@ public:
     private this(char[] name) {
         this.log = Log.lookup("lib.client");
         connection = new Connection(name, &process);
+        connection.onHandshakeDone.attach = &onConnectionHandshakeDone;
         timeouts = new TimeoutQueue;
         boundAssets = new RemoteAsset[16];
     }
@@ -231,6 +232,13 @@ public:
         socket.connect(addr);
         connection.handshake(socket);
         return socket;
+    }
+
+    /************************************************************************************
+     * As soon as we've got a remote name, let the logger reflect it.
+     ***********************************************************************************/
+    private void onConnectionHandshakeDone(char[] peername) {
+        this.log = Log.lookup("lib.client."~peername);
     }
 
     char[] peername() {
