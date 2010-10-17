@@ -118,10 +118,10 @@ protected:
         }
     }
     void triggerTimeout(Time deadline, Time now) {
+        statusTimeout = statusTimeout.init;
         if (closed) {
             confirmedClose();
         } else {
-            statusTimeout = statusTimeout.init;
             scope sig = _statusSignal; // Store away sig for call
             if (singleShotStatus)
                 _statusSignal = _statusSignal.init;
