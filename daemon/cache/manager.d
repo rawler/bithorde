@@ -30,6 +30,9 @@ private import tango.text.Util;
 private import tango.time.Time;
 private import tango.util.log.Log;
 
+static if ( !is(typeof(fdatasync) == function ) )
+    extern (C) int fdatasync(int);
+
 private import lib.asset;
 private import lib.hashes;
 private import lib.protobuf;
@@ -427,7 +430,15 @@ private:
             if (asset)
                 asset.sync();
         }
-        File.set(idMapPath.toString, map.encode());
+        scope tmpFile = idMapPath.dup.cat(".tmp");
+        scope file = new File (tmpFile.toString, File.ReadWriteCreate);
+        file.write (map.encode());
+        version (Posix)
+            fdatasync(file.fileHandle);
+        else
+            static assert(false, "Needs Non-POSIX implementation");
+        file.close();
+        tmpFile.rename(idMapPath);
     }
 
     /*************************************************************************
