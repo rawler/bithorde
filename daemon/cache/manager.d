@@ -260,15 +260,14 @@ public:
         auto maxSize = this.maxSize * M;
         if (maxSize == 0)
             maxSize = maxSize.max;
-        auto cacheSize = this.size;
-        maxSize = constrainToFs(maxSize, cacheSize);
+        maxSize = constrainToFs(maxSize, this.size);
 
         if (size > (maxSize / 2))
             return false; // Will not cache individual assets larger than half the cacheSize
         auto targetSize = maxSize - size;
         log.trace("This cache is {}MB, roof is {}MB for upload", this.size/M, targetSize / M);
         garbageCollect();
-        while (cacheSize > targetSize) {
+        while (this.size > targetSize) {
             auto loser = pickLoser;
             if (!loser)
                 return false;
