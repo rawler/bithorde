@@ -19,6 +19,7 @@ module daemon.cache.manager;
 
 private import tango.core.Exception;
 private import tango.core.WeakRef;
+private import tango.core.Thread;
 private import tango.io.device.File;
 private import tango.io.FilePath;
 private import tango.io.FileSystem;
@@ -46,6 +47,8 @@ private import daemon.routing.router;
 alias WeakReference!(File) AssetRef;
 const FS_MINFREE = 0.1; // Amount of filesystem that should always be kept unused.
 const M = 1024*1024;
+
+const FLUSH_INTERVAL_SEC = 30;
 
 /****************************************************************************************
  * Overseeing Cache-manager, keeping state of all cache-assets, and mapping from id:s to
@@ -105,6 +108,7 @@ class CacheManager : IAssetSource {
         auto localId = new ubyte[LOCALID_LENGTH];
         rand.randomizeUniform!(ubyte[],false)(localId);
         newMeta.localId = localId;
+        addToIdMap(newMeta);
         return newMeta;
     }
 
@@ -127,6 +131,8 @@ protected:
     ulong maxSize;            /// Maximum allowed storage-capacity of this cache, in MB. 0=unlimited
     Router router;
     MetaData localIdMap[ubyte[]];
+    bool idMapDirty;
+    Thread idMapFlusher;
 
     static Logger log;
     static this() {
@@ -190,9 +196,19 @@ public:
     }
 
     /************************************************************************************
+     * Final startup preparation
+     ***********************************************************************************/
+    void start() {
+        idMapFlusher = new Thread(&IdMapFlusher);
+        idMapFlusher.isDaemon = true;
+        idMapFlusher.start;
+    }
+
+    /************************************************************************************
      * Clean shutdown
      ***********************************************************************************/
     void shutdown() {
+        idMapFlusher = null;
         saveIdMap();
     }
 
@@ -200,7 +216,7 @@ public:
      * Makes room in cache for new asset of given size. May fail, in which case it
      * returns false.
      ***********************************************************************************/
-    private bool _makeRoom(ulong size) {
+    private synchronized bool _makeRoom(ulong size) {
         /********************************************************************************
          * Find least important asset in cache.
          *******************************************************************************/
@@ -301,7 +317,7 @@ public:
      * Remove an asset from cache.
      * TODO: Fail if asset is being locked by someone using it.
      ***********************************************************************************/
-    bool purgeAsset(MetaData asset) {
+    synchronized bool purgeAsset(MetaData asset) {
         log.info("Purging {}", formatMagnet(asset.hashIds, 0, null));
         if (asset.localId in localIdMap)
             localIdMap.remove(asset.localId);
@@ -377,7 +393,7 @@ private:
     /*************************************************************************
      * Load id-mappings through IdMap
      ************************************************************************/
-    void loadIdMap() {
+    synchronized void loadIdMap() {
         log.info("Loading fresh Id-Maps");
         scope mapsrc = new IdMap();
         scope fileContent = cast(ubyte[])File.get(idMapPath.toString);
@@ -387,20 +403,14 @@ private:
             foreach (id; asset.hashIds)
                 hashIdMap[id.type][id.id] = asset;
         }
+        idMapDirty = false;
     }
 
     /*************************************************************************
      * Walks through assets in dir, purging those not referenced by the idmap
      ************************************************************************/
-    void garbageCollect() {
+    synchronized void garbageCollect() {
         log.info("Beginning garbage collection");
-        localIdMap = localIdMap.init;
-        foreach (typeMap; hashIdMap) {
-            foreach (asset; typeMap) {
-                localIdMap[asset.localId] = asset;
-            }
-        }
-        saveIdMap();
         ubyte[LOCALID_LENGTH] idbuf;
         auto path = assetDir.dup.append("dummy");
         ulong cleaned;
@@ -422,7 +432,7 @@ private:
     /*************************************************************************
      * Save id-mappings with IdMap
      ************************************************************************/
-    void saveIdMap() {
+    synchronized void saveIdMap() {
         scope map = new IdMap;
         synchronized (this) map.assets = localIdMap.values;
         foreach (meta; map.assets) {
@@ -439,16 +449,31 @@ private:
             static assert(false, "Needs Non-POSIX implementation");
         file.close();
         tmpFile.rename(idMapPath);
+        idMapDirty = false;
     }
 
     /*************************************************************************
      * Add an asset to the id-maps
      ************************************************************************/
-    void addToIdMap(MetaData asset) {
+    synchronized void addToIdMap(MetaData asset) {
         localIdMap[asset.localId] = asset;
         foreach (id; asset.hashIds) {
             hashIdMap[id.type][id.id] = asset;
         }
-        saveIdMap();
+        idMapDirty = true;
+    }
+
+    /************************************************************************************
+     * Daemon-thread loop, flushing idMap periodically to disk.
+     ***********************************************************************************/
+    void IdMapFlusher() {
+        while (idMapFlusher) {
+            if (idMapDirty) {
+                garbageCollect();
+                saveIdMap();
+            }
+            for (int i = 0; (i < FLUSH_INTERVAL_SEC) && idMapFlusher; i++)
+                Thread.sleep(1);
+        }
     }
 }

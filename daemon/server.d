@@ -134,6 +134,7 @@ public:
     }
 
     void run() {
+        cacheMgr.start();
         serverThread = Thread.getThis;
         scope(exit) { cleanup(); } // Make sure to clean up
         reconnectThread = new Thread(&reconnectLoop);
