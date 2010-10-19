@@ -1,3 +1,18 @@
+bithorde (0.0.9+0.1beta4-1) lucid; urgency=low
+
+  * New beta-release
+  * Limit cachesize to 90% of disk, to avoid thrashing the filesystem.
+  * Improve cache-consistency
+    - Write asset-map before content. The opposite could lead to the file belived to be complete if disk-full at the wrong time.
+    - Atomically write cache-Index
+  * Add client-stats to log. (Show activity on connections.)
+  * Bugfix: always reset timeout after it being triggered to avoid crash on subsequent reply.
+  * Asynchronously flush asset-maps and idx-cache to improve performance and latency.
+  * BHFuse: Add lookuptimeout-parameter, and by default tune it down from 10s to 1s for bhfuse.
+    - Gives better response-times from bhfuse, at cost of limiting search-size in bigger networks.
+
+ -- Ulrik Mikaelsson <ulrik.mikaelsson@gmail.com>  Tue, 19 Oct 2010 20:29:26 +0200
+
 bithorde (0.0.9+0.1beta3-1) lucid; urgency=low
 
   * daemon: Apply limit to how many retries will be done in routing.
