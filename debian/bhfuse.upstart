@@ -1,9 +1,9 @@
-
+description "BitHorde FUSE proxy"
 
 start on started bithorde
 stop on stopped bithorde
 
-exec /usr/bin/bhfuse -d /tmp/bhfuse
+exec /usr/bin/bhfuse --lookuptimeout=1000 -d /tmp/bhfuse
 respawn
 
 post-stop script

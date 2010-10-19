@@ -37,6 +37,7 @@ private import tango.stdc.posix.unistd;
 private import tango.stdc.posix.utime;
 private import tango.stdc.string;
 private import tango.time.Clock;
+private import tango.util.Convert;
 private import tango.util.container.more.Heap;
 private import tango.util.log.AppendConsole;
 private import tango.util.log.LayoutDate;
@@ -372,7 +373,7 @@ protected:
 
     /************************************************************************************
      * FUSE-hook informing that an INode may be forgotten
-     * TODO: potentially unsafe needs investigation
+     * TODO: unclear semantics needs investigation
      ***********************************************************************************/
     void forget(fuse_ino_t ino, c_ulong nlookup) {
     }
@@ -454,6 +455,7 @@ class FUSEArguments : protected Arguments {
 private:
     char[] sockPath;
     char[] mountpoint;
+    uint lookupTimeout;
     bool do_debug;
 public:
     /************************************************************************************
@@ -462,6 +464,7 @@ public:
     this() {
         this["debug"].aliased('d').smush;
         this["unixsocket"].aliased('u').params(1).smush.defaults("/tmp/bithorde");
+        this["lookuptimeout"].aliased('t').params(1).smush.defaults("10000");
         this[null].title("mountpoint").required.params(1);
     }
 
@@ -474,6 +477,7 @@ public:
 
         do_debug = this["debug"].set;
         sockPath = this["unixsocket"].assigned[0];
+        lookupTimeout = to!(typeof(lookupTimeout))(this["lookuptimeout"].assigned[0]);
         mountpoint = this[null].assigned[0];
 
         return true;
@@ -491,7 +495,7 @@ int main(char[][] args)
     } catch (IllegalArgumentException e) {
         if (e.msg)
             Stderr(e.msg).newline;
-        Stderr.format("Usage: {} [--debug|-d] [--unixsocket|u=/tmp/bithorde] <mount-point>", args[0]).newline;
+        Stderr.format("Usage: {} [--debug|-d] [--unixsocket|u=/tmp/bithorde] [--lookuptimeout|-t=<msec>] <mount-point>", args[0]).newline;
         return -1;
     }
 
