@@ -83,7 +83,7 @@ public:
             scope resp = new message.ReadResponse;
             resp.rpcId = rpcId;
             resp.status = status;
-            if (status == message.Status.SUCCESS) {
+            if (remoteResp && (status == message.Status.SUCCESS)) {
                 resp.offset = remoteResp.offset;
                 resp.content = remoteResp.content;
             }
