@@ -46,6 +46,7 @@ if (DC)
     else (dmd_version)
 	string(REGEX MATCH "LLVM-based D Compiler" is_ldc "${d_output}")   
 	if (is_ldc)
+        set(LDC_CPU ${CMAKE_SYSTEM_PROCESSOR} CACHE STRING "Set the CPU for LLVM to generate for")
 	    exec_program(${DC} ARGS "--version" OUTPUT_VARIABLE d_output)
 	    string(REGEX MATCH "based on DMD v[0-9]\\.[0-9]+" ldc_version "${d_output}")
 	    set(D_IS_LLVM true)
@@ -116,6 +117,11 @@ if(CMAKE_HOST_WIN32)
     set(D_RELEASE_FLAGS ${D_RELEASE_FLAGS} -L/subsystem:windows)
 endif(CMAKE_HOST_WIN32)   
 set(D_DEBUG_FLAGS ${D_DEBUG_FLAGS} ${D_DEBUG_FLAG})
+
+# Architecture-specific
+if(LDC_CPU)
+    set(D_FLAGS ${D_FLAGS} -mcpu=${LDC_CPU})
+endif(LDC_CPU)
 
 # Unittest flags.
 option(UNITTEST "Includes unittests" "OFF")
