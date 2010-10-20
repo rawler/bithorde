@@ -296,6 +296,7 @@ class BitHordeFilesystem : Filesystem {
         }
     }
 private:
+    FUSEArguments args;
     BHFuseClient client;
     INode[uint] inodes;
     INode[char[]] inodeNameMap;
@@ -311,7 +312,7 @@ private:
     }
 public:
     this(FilePath mountpoint, BHFuseClient client, FUSEArguments args) {
-        // TODO: deal with arguments
+        this.args = args;
         char[][] fuse_args = ["bhfuse", "-ofsname=bhfuse", "-oallow_other"];
         if (args.do_debug)
             fuse_args ~= "-d";
@@ -364,7 +365,7 @@ protected:
                 ctx.req = req;
                 ctx.pathName = name;
                 ctx.fs = this;
-                client.open(objectids, &ctx.onBindResponse);
+                client.open(objectids, &ctx.onBindResponse, args.lookupTimeout);
             } else {
                 fuse_reply_err(req, ENOENT);
             }
@@ -455,7 +456,7 @@ class FUSEArguments : protected Arguments {
 private:
     char[] sockPath;
     char[] mountpoint;
-    uint lookupTimeout;
+    TimeSpan lookupTimeout;
     bool do_debug;
 public:
     /************************************************************************************
@@ -477,7 +478,7 @@ public:
 
         do_debug = this["debug"].set;
         sockPath = this["unixsocket"].assigned[0];
-        lookupTimeout = to!(typeof(lookupTimeout))(this["lookuptimeout"].assigned[0]);
+        lookupTimeout = TimeSpan.fromMillis(to!(uint)(this["lookuptimeout"].assigned[0]));
         mountpoint = this[null].assigned[0];
 
         return true;
