@@ -189,14 +189,17 @@ public:
                 if (cnd < nextDeadline) nextDeadline = cnd;
             }
         }
-        auto triggers = selector.select(nextDeadline - Clock.now);
-        if (!running) // Shutdown started
-            return;
-        if (triggers > 0) {
-            foreach (SelectionKey event; selector.selectedSet()) {
-                if (event.isError || event.isHangup || event.isInvalidHandle ||
-                        !processSelectEvent(event))
-                    removeThese ~= event;
+        auto timeout = nextDeadline - Clock.now;
+        if (timeout > TimeSpan.zero) {
+            auto triggers = selector.select(timeout);
+            if (!running) // Shutdown started
+                return;
+            if (triggers > 0) {
+                foreach (SelectionKey event; selector.selectedSet()) {
+                    if (event.isError || event.isHangup || event.isInvalidHandle ||
+                            !processSelectEvent(event))
+                        removeThese ~= event;
+                }
             }
         }
         auto now = Clock.now;

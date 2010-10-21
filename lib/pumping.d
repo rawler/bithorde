@@ -123,7 +123,8 @@ public:
                     nextDeadline = t;
             }
             ISelectable[] toRemove;
-            if (selector.select(nextDeadline-Clock.now)>0) {
+            auto timeout = nextDeadline-Clock.now;
+            if ((timeout > TimeSpan.zero) && (selector.select(timeout)>0)) {
                 foreach (SelectionKey key; selector.selectedSet())
                 {
                     auto processor = cast(IProcessor)key.attachment;

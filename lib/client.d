@@ -482,7 +482,7 @@ public:
      ***********************************************************************************/
     synchronized void pump() {
         auto timeout = nextDeadline - Clock.now;
-        if (selector.select(timeout) > 0) {
+        if ((timeout > TimeSpan.zero) && (selector.select(timeout) > 0)) {
             foreach (key; selector.selectedSet())
                 process(key);
         }
