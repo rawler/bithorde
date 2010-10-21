@@ -84,7 +84,7 @@ public:
     }
     /// ditto
     void emit(Time now) {
-        while (_queue.size && (now > _queue.peek.at)) {
+        while (_queue.size && (now >= _queue.peek.at)) {
             auto event = _queue.pop;
             event.cb(event.at, now);
         }
