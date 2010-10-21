@@ -41,7 +41,7 @@ struct InFlightRequest {
     TimeoutQueue.EventId timeout;
     void triggerTimeout(Time deadline, Time now) {
         auto req = this.req;
-        c.lingerRequest(req); // LingerRequest destroys req, so must store local refs first.
+        c.lingerRequest(req, now); // LingerRequest destroys req, so must store local refs first.
         req.abort(message.Status.TIMEOUT);
     }
 }
@@ -78,6 +78,10 @@ struct Counters {
     TimeSpan prevInterval;
     Stats prevIn, prevOut;
 
+    TimeSpan currentRequestWait, prevRequestWait;
+    TimeSpan currentWorstWait = TimeSpan.zero, prevWorstWait;
+    uint currentRequestCount, prevRequestCount;
+
     /************************************************************************************
      * add a sent packet for the current period. Won't be visible in accounting until
      * after next switch.
@@ -95,6 +99,16 @@ struct Counters {
     }
 
     /************************************************************************************
+     * submit the response-time stats for a recieved packet
+     ***********************************************************************************/
+    void submitRequest(TimeSpan responseTime) {
+        if (responseTime > currentWorstWait)
+            currentWorstWait = responseTime;
+        currentRequestWait += responseTime;
+        currentRequestCount += 1;
+    }
+
+    /************************************************************************************
      * Perform a switch, committing the current period
      ***********************************************************************************/
     void doSwitch(Time now) {
@@ -102,6 +116,15 @@ struct Counters {
         prevIn = currentIn;
         prevOut = currentOut;
         currentIn = currentOut = Stats.init;
+
+        prevRequestCount = currentRequestCount;
+        prevRequestWait = currentRequestWait;
+        prevWorstWait = currentWorstWait;
+
+        currentRequestCount = 0;
+        currentRequestWait = TimeSpan.zero;
+        currentWorstWait = TimeSpan.zero;
+
         lastSwitch = now;
     }
 
@@ -110,9 +133,11 @@ struct Counters {
      ***********************************************************************************/
     char[] toString() {
         auto msec = max!(long)(prevInterval.millis, 1);
-        return Format.convert("Recv: {{{}pkts/sec, {}KB/sec} Sent: {{{}pkts/sec, {}KB/sec}",
+        return Format.convert("Recv/sec: {{{}pkts, {}KB} Sent/sec: {{{}pkts, {}KB} Requests: {{{} processed, avg. {}ms, worst {}ms}",
             (cast(double)(prevIn.packets) * 1000)/msec, cast(double)(prevIn.bytes/msec),
-            (cast(double)(prevOut.packets) * 1000)/msec, cast(double)(prevOut.bytes/msec));
+            (cast(double)(prevOut.packets) * 1000)/msec, cast(double)(prevOut.bytes/msec),
+            prevRequestCount, (prevRequestCount>0)?prevRequestWait.millis/prevRequestCount:0,
+            prevWorstWait.millis);
     }
 
     /************************************************************************************
@@ -201,6 +226,7 @@ protected:
         auto req = ifr.req;
         if (!req)
             throw new InvalidResponse;
+        counters.submitRequest(Clock.now - req.sendTime);
         msg.request = req;
         timeouts.abort(ifr.timeout);
         inFlightRequests[msg.rpcId] = InFlightRequest.init;
@@ -213,10 +239,11 @@ protected:
     /************************************************************************************
      * Force-release the requestId for given request, and put it in the linger-queue;
      ***********************************************************************************/
-    void lingerRequest(message.RPCRequest req) {
+    void lingerRequest(message.RPCRequest req, Time now) {
+        counters.submitRequest(now - req.sendTime);
         LingerId li;
         li.rpcId = req.rpcId;
-        li.time = Clock.now+TimeSpan.fromMillis(65536);
+        li.time = now+TimeSpan.fromMillis(65536);
         lingerIds.push(li);
         inFlightRequests[req.rpcId] = InFlightRequest.init;
     }
@@ -430,6 +457,7 @@ package:
     synchronized void sendRPCRequest(message.RPCRequest req, TimeSpan timeout) {
         auto rpcId = allocRequest(req);
         req.timeout = timeout.millis;
+        req.sendTime = Clock.now;
         sendMessage(req);
         InFlightRequest* ifr = &inFlightRequests[rpcId];
         ifr.req = req;

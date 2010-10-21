@@ -24,6 +24,7 @@ private import tango.core.Memory;
 private import tango.core.sync.Mutex;
 private import tango.util.container.more.Stack;
 private import tango.text.convert.Format;
+private import tango.time.Time;
 
 private import lib.protobuf;
 
@@ -109,6 +110,8 @@ abstract class RPCMessage : Message {
 abstract class RPCRequest : RPCMessage {
     mixin(PBField!(ushort, "timeout"));
     abstract void abort(Status s);
+
+    Time sendTime;
 }
 
 abstract class RPCResponse : RPCMessage {

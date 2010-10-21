@@ -75,6 +75,7 @@ private:
         this.client = null;
     }
 protected:
+    Time openedTime;
     /************************************************************************************
      * RemoteAssets should only be created from the Client
      ***********************************************************************************/
@@ -98,11 +99,18 @@ protected:
             close();
     }
 
+    private void logRequestResponse(TimeSpan responseTime) {
+        if (client && client.connection) {
+            client.connection.counters.submitRequest(responseTime);
+        }
+    }
+
     TimeoutQueue.EventId statusTimeout;
     void updateStatus(message.AssetStatus resp) {
         if (statusTimeout.cb.ptr) {
             client.timeouts.abort(statusTimeout);
             statusTimeout = statusTimeout.init;
+            logRequestResponse(Clock.now - openedTime);
         }
         if (closed) {
             confirmedClose();
@@ -119,6 +127,7 @@ protected:
     }
     void triggerTimeout(Time deadline, Time now) {
         statusTimeout = statusTimeout.init;
+        logRequestResponse(now-openedTime);
         if (closed) {
             confirmedClose();
         } else {
@@ -347,6 +356,7 @@ protected:
         req.handle = asset.handle;
         req.timeout = timeout.millis;
         boundAssets[asset.handle] = asset;
+        asset.openedTime = Clock.now;
         sendMessage(req);
         asset.statusTimeout = timeouts.registerIn(timeout, &asset.triggerTimeout);
     }
