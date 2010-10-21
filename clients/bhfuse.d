@@ -51,8 +51,8 @@ private import lib.hashes;
 private import lib.message;
 private import lib.pumping;
 
-const HandleTimeoutTime = TimeSpan.fromMillis(100);
-const HandleTimeoutLimit = 10;
+const HandleTimeoutTime = TimeSpan.fromMillis(500);
+const HandleTimeoutLimit = 16;
 
 /*-------------- Main program below ---------------*/
 class BHFuseClient : SimpleClient, IProcessor {
@@ -194,7 +194,7 @@ class BitHordeFilesystem : Filesystem {
                 openCount += 1;
                 r.onBindResponse(asset, Status.SUCCESS, null);
             } else {
-                client.open(ids, &r.onBindResponse);
+                client.open(ids, &r.onBindResponse, args.lookupTimeout);
             }
         }
 
@@ -312,12 +312,12 @@ private:
     }
 public:
     this(FilePath mountpoint, BHFuseClient client, FUSEArguments args) {
-        this.args = args;
         char[][] fuse_args = ["bhfuse", "-ofsname=bhfuse", "-oallow_other"];
         if (args.do_debug)
             fuse_args ~= "-d";
         super(mountpoint.toString, fuse_args);
         this.client = client;
+        this.args = args;
     }
 
     /************************************************************************************

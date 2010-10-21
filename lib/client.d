@@ -343,7 +343,7 @@ protected:
      * updates and timeouts.
      ***********************************************************************************/
     synchronized void sendBindRequest(message.BindRequest req, RemoteAsset asset,
-                                      TimeSpan timeout=TimeSpan.fromMillis(4000)) {
+                                      TimeSpan timeout) {
         req.handle = asset.handle;
         req.timeout = timeout.millis;
         boundAssets[asset.handle] = asset;
