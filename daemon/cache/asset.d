@@ -211,13 +211,18 @@ public:
     /************************************************************************************
      * Make sure to synchronize file data, and flush cachemap to disk.
      ***********************************************************************************/
-    synchronized void sync() {
+    void sync() {
+        scope CacheMap cmapToWrite;
+        synchronized (this) {
+            if (!cacheMap)
+                return;
+            cmapToWrite = new CacheMap(cacheMap);
+        }
         version (Posix)
             fdatasync(fileHandle);
         else
             static assert(false, "Needs Non-POSIX implementation");
-        if (cacheMap)
-            cacheMap.sync();
+        cmapToWrite.sync();
     }
 protected:
     /************************************************************************************
