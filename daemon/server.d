@@ -210,8 +210,12 @@ public:
         foreach (event; removeThese) {
             selector.unregister(event.conduit);
             if (auto c = cast(Client)event.attachment) { // Connection has attached client
-                onClientDisconnect(c);
-                c.close();
+                try {
+                    onClientDisconnect(c);
+                    c.close();
+                } catch (Exception e) {
+                    log.error("Exception when closing client {}", e);
+                }
             }
         }
     }
