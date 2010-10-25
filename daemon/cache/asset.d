@@ -314,7 +314,6 @@ private:
     }
 
     void onBackingUpdate(IAsset backing, message.Status sCode, message.AssetStatus s) {
-        // TODO: We should probably also react on changes
         _statusSignal.call(this, sCode, s);
     }
 

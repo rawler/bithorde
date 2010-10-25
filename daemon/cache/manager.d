@@ -62,8 +62,16 @@ class CacheManager : IAssetSource {
         this() {
             _openAsset = new AssetRef(null);
         }
+        void onStatusUpdate(IAsset asset, message.Status sCode, message.AssetStatus s) {
+            if (sCode != sCode.SUCCESS)
+                setAsset(null);
+        }
         synchronized BaseAsset setAsset(BaseAsset asset) {
+            if (this.asset)
+                this.asset.detachWatcher(&onStatusUpdate);
             _openAsset.set(asset);
+            if (asset)
+                asset.attachWatcher(&onStatusUpdate);
             return asset;
         }
         synchronized BaseAsset openAsset() {
