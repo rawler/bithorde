@@ -59,6 +59,14 @@ function exit_success() {
     exit 0
 }
 
+function wait_until_found() {
+    file="$1"
+    pattern="$2"
+    while [ $(grep -c "$pattern" "$file") -eq 0 ]; do
+      sleep 0.1
+    done
+}
+
 function daemons_start() {
     clean && setup || exit_error "Failed setup"
     trap daemons_stop EXIT
@@ -68,7 +76,8 @@ function daemons_start() {
     "$SERVER" b.config &> b.log &
     DAEMON2=$!
     echo Daemon B is $DAEMON2
-    sleep 0.3
+    wait_until_found "a.log" "Started"
+    wait_until_found "b.log" "Started"
 }
 
 function quiet_stop() {
@@ -94,7 +103,7 @@ verify_done cacheb/?????????????????????* || exit_error "Uploaded file still has
 
 echo "Getting (2 in parallel) from B..."
 "$BHGET" -u/tmp/bithorde-rtb -sy "$MAGNETURL" | verify_equal || exit_error "Downloaded file did not match upload source" &
-sleep 0.1
+wait_until_found "a.log" 'serving [0-9A-Fa-f]* from cache'
 "$BHGET" -u/tmp/bithorde-rtb -sy "$MAGNETURL" | verify_equal || exit_error "Downloaded file did not match upload source"
 wait $!
 verify_done cacheb/?????????????????????* || exit_error "Cached asset still has an index, indicating not done"
