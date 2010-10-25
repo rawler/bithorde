@@ -154,6 +154,8 @@ public:
     }
     /// ditto
     void aSyncRead(ulong offset, uint size, BHReadCallback readCallback, ushort retries, TimeSpan timeout) {
+        if (closed || (!client) || client.closed)
+            readCallback(this, message.Status.DISCONNECTED, null, null);
         auto req = new ReadRequest(readCallback, retries);
         req.offset = offset;
         req.size = size;
@@ -261,10 +263,11 @@ public:
 
     void close()
     {
-        connection.close();
-        foreach (asset; boundAssets) if (asset) {
+        connection.shutdown();
+        foreach (asset; boundAssets) if (asset)
             asset.close();
-        }
+        connection.close();
+
         log.trace("Closed...");
     }
 
@@ -360,6 +363,7 @@ protected:
         sendMessage(req);
         asset.statusTimeout = timeouts.registerIn(timeout, &asset.triggerTimeout);
     }
+
     bool closed() {
         return connection.closed;
     }

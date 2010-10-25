@@ -301,21 +301,20 @@ public:
     final bool closed() { return (socket is null); }
 
     /************************************************************************************
-     * Trigger closing of the connection
+     * Begin closing of the connection
      ***********************************************************************************/
-    void close() {
+    void shutdown() {
         if (closed)
             return;
         socket.shutdown();
         socket.close();
-        onClose();
+        socket = null;
     }
 
     /************************************************************************************
-     * Send DISCONNECTED notifications to all waiting callbacks.
+     * Finish closing by sending DISCONNECTED notifications to all waiting callbacks.
      ***********************************************************************************/
-    protected void onClose() {
-        socket = null;
+    void close() {
         foreach (ifr; inFlightRequests) {
             if (ifr.req)
                 ifr.req.abort(message.Status.DISCONNECTED);
