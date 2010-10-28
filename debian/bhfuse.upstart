@@ -7,7 +7,7 @@ exec /usr/bin/bhfuse --lookuptimeout=1000 -d /tmp/bhfuse
 respawn
 
 post-stop script
- (mount | grep -c /tmp/bhfuse) && /bin/fusermount -u /tmp/bhfuse
+ (mount | grep -c /tmp/bhfuse) && /bin/umount -lf /tmp/bhfuse
  sleep 1
 end script
 
