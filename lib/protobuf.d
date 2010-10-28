@@ -99,7 +99,8 @@ bool decode_val(T : ubyte[])(ref ubyte[] buf, out T result) {
     }
 }
 
-void encode_val(T : long)(T i, ByteBuffer buffer) {
+void encode_val(T : ulong)(T _i, ByteBuffer buffer) {
+    ulong i = _i;
     auto maxbits = 0;
     auto x = i;
     while (x) {
@@ -116,15 +117,15 @@ void encode_val(T : long)(T i, ByteBuffer buffer) {
     buffer.charge(encbytes);
 }
 
-bool decode_val(T : long)(ref ubyte[] buf, out T result) {
-    T retval = cast(T)0;
+bool decode_val(T : ulong)(ref ubyte[] buf, out T result) {
+    ulong retval = 0;
     uint idx = 0;
     foreach (b; buf) {
-        retval ^= cast(T)(b & 0b01111111) << (idx++*7);
+        retval ^= cast(ulong)(b & 0b01111111) << (idx++*7);
         if (!(b & 0b10000000))
         {
             buf = buf[idx .. length];
-            result = retval;
+            result = cast(T)retval;
             return true;
         }
     }

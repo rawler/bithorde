@@ -78,9 +78,9 @@ class Friends : ProtoBufMessage
 
 bool test_varintenc() {
     Stdout("Testing varint_enc... ");
-    uint i;
+    int i;
     try {
-        for (i=0; i < 500000; i+=17) {
+        for (i=-100; i < 500000; i+=17) {
             auto middle = new ByteBuffer;
             encode_val(i, middle);
             auto data = middle.data;
