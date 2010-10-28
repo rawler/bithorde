@@ -66,13 +66,17 @@ class CacheManager : IAssetSource {
             if (sCode != sCode.SUCCESS)
                 setAsset(null);
         }
-        synchronized BaseAsset setAsset(BaseAsset asset) {
-            if (this.asset)
-                this.asset.detachWatcher(&onStatusUpdate);
-            _openAsset.set(asset);
-            if (asset)
-                asset.attachWatcher(&onStatusUpdate);
-            return asset;
+        synchronized BaseAsset setAsset(BaseAsset newAsset) {
+            if (auto oldAsset = this.asset) {
+                oldAsset.detachWatcher(&onStatusUpdate);
+                oldAsset.interestSignal.detach(&noteInterest);
+            }
+            _openAsset.set(newAsset);
+            if (newAsset) {
+                newAsset.attachWatcher(&onStatusUpdate);
+                newAsset.interestSignal.attach(&noteInterest);
+            }
+            return newAsset;
         }
         synchronized BaseAsset openAsset() {
             if (auto retval = cast(BaseAsset)_openAsset()) {
@@ -230,21 +234,13 @@ public:
          *******************************************************************************/
         MetaData pickLoser() {
             MetaData loser;
-            Time loserMtime = Time.max;
-            scope MetaData[] toPurge;
+            auto loserRating = long.max;
             foreach (asset; this.localIdMap) {
-                try {
-                    auto mtime = asset.assetPath.modified;
-                    if (mtime < loserMtime) {
-                        loser = asset;
-                        loserMtime = mtime;
-                    }
-                } catch (IOException e) {
-                    toPurge ~= asset;
+                auto rating = asset.rating;
+                if (rating < loserRating) {
+                    loser = asset;
+                    loserRating = rating;
                 }
-            }
-            foreach (staleAsset; toPurge) {
-                purgeAsset(staleAsset);
             }
             return loser;
         }

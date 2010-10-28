@@ -20,11 +20,14 @@ module daemon.cache.asset;
 
 private import tango.core.Exception;
 private import tango.core.Thread;
+private import tango.core.Signal;
 private import tango.io.device.File;
 private import tango.io.FilePath;
 version (Posix) private import tango.stdc.posix.unistd;
 private import ascii = tango.text.Ascii;
 private import tango.util.log.Log;
+private import tango.time.Clock;
+private import tango.time.Time;
 
 private import lib.client;
 private import lib.hashes;
@@ -61,6 +64,7 @@ alias void delegate(Identifier[]) HashIdsListener;
  ***************************************************************************************/
 class BaseAsset : private File, public IServerAsset {
     mixin IAsset.StatusSignal;
+    Signal!(Time, float) interestSignal;
 protected:
     FilePath path;
     FilePath idxPath;
@@ -124,6 +128,7 @@ public:
         if (got == 0 || got == Eof) {
             resp.status = message.Status.NOTFOUND;
         } else {
+            interestSignal(Clock.now, (cast(float)got)/cast(float)size);
             resp.status = message.Status.SUCCESS;
             resp.offset = offset;
             resp.content = buf[0..got];

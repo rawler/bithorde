@@ -18,6 +18,9 @@
  ***************************************************************************************/
 module daemon.cache.metadata;
 
+private import tango.time.Time;
+private import tango.util.Convert;
+
 import lib.hashes;
 import hex = lib.hex;
 private import lib.message;
@@ -29,13 +32,26 @@ private import lib.protobuf;
 class AssetMetaData : ProtoBufMessage {
     mixin(PBField!(ubyte[], "localId"));        /// Local assetId
     mixin(PBField!(Identifier[], "hashIds"));   /// HashIds
+    mixin(PBField!(long, "rating"));            /// Rating-system for determining which content to keep in cache.
 
     mixin ProtoBufCodec!(PBMapping("localId",   1),
-                         PBMapping("hashIds",   2));
+                         PBMapping("hashIds",   2),
+                         PBMapping("rating",    3));
+
+    /************************************************************************************
+     * Increase the rating by noting interest in this asset.
+     ***********************************************************************************/
+    void noteInterest(Time clock, float weight) in {
+        assert(clock >= Time.epoch1970);
+        assert(weight > 0);
+    } body {
+        rating = rating + cast(long)((clock.ticks - rating) / weight);
+    }
 
     char[] toString() {
         char[] retval = "AssetMetaData {\n";
         retval ~= "     localId: " ~ hex.encode(localId) ~ "\n";
+        retval ~= "     rating: " ~ to!(char[])(rating) ~ "\n";
         foreach (hash; hashIds) {
             retval ~= "     " ~ HashMap[hash.type].name ~ ": " ~ hex.encode(hash.id) ~ "\n";
         }
