@@ -29,6 +29,7 @@ private import tango.text.Ascii;
 private import tango.text.convert.Format;
 private import tango.text.Util;
 private import tango.time.Time;
+private import tango.time.Clock;
 private import tango.util.log.Log;
 
 static if ( !is(typeof(fdatasync) == function ) )
@@ -372,6 +373,7 @@ public:
                 auto path = meta.assetPath;
                 assert(!path.exists());
                 auto asset = new WriteableAsset(path, meta, req.size, &meta.updateHashIds);
+                meta.setMaxRating(Clock.now); // So it won't be immediately purged again.
                 asset.attachWatcher(callback);
                 callback(asset, message.Status.SUCCESS, null);
             } else {

@@ -48,6 +48,12 @@ class AssetMetaData : ProtoBufMessage {
         rating = rating + cast(ulong)((clock.unix.millis - rating) / weight);
     }
 
+    void setMaxRating(Time clock) in {
+        assert(clock >= Time.epoch1970);
+    } body {
+        rating = clock.unix.millis;
+    }
+
     char[] toString() {
         char[] retval = "AssetMetaData {\n";
         retval ~= "     localId: " ~ hex.encode(localId) ~ "\n";
