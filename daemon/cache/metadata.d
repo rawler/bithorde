@@ -32,7 +32,7 @@ private import lib.protobuf;
 class AssetMetaData : ProtoBufMessage {
     mixin(PBField!(ubyte[], "localId"));        /// Local assetId
     mixin(PBField!(Identifier[], "hashIds"));   /// HashIds
-    mixin(PBField!(long, "rating"));            /// Rating-system for determining which content to keep in cache.
+    mixin(PBField!(ulong, "rating"));           /// Rating-system for determining which content to keep in cache.
 
     mixin ProtoBufCodec!(PBMapping("localId",   1),
                          PBMapping("hashIds",   2),
@@ -45,7 +45,7 @@ class AssetMetaData : ProtoBufMessage {
         assert(clock >= Time.epoch1970);
         assert(weight > 0);
     } body {
-        rating = rating + cast(long)((clock.ticks - rating) / weight);
+        rating = rating + cast(ulong)((clock.unix.millis - rating) / weight);
     }
 
     char[] toString() {
