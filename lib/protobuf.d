@@ -100,7 +100,15 @@ bool decode_val(T : ubyte[])(ref ubyte[] buf, out T result) {
 }
 
 void encode_val(T : ulong)(T _i, ByteBuffer buffer) {
-    ulong i = _i;
+    static if (isSignedIntegerType!(T)) {
+        static if (T.sizeof > 4)
+            ulong i = (_i << 1) ^ (_i >> 63);
+        else
+            uint i = (_i << 1) ^ (_i >> 31);
+    } else {
+        alias _i i;
+    }
+
     auto maxbits = 0;
     auto x = i;
     while (x) {
@@ -118,14 +126,23 @@ void encode_val(T : ulong)(T _i, ByteBuffer buffer) {
 }
 
 bool decode_val(T : ulong)(ref ubyte[] buf, out T result) {
-    ulong retval = 0;
+    static if (isSignedIntegerType!(T)) {
+        static if (T.sizeof > 4)
+            ulong retval;
+        else
+            uint retval;
+    } else {
+        alias result retval;
+    }
+    retval = cast(typeof(retval))0; // Important to init retval, or it will break on I.E. enums
     uint idx = 0;
     foreach (b; buf) {
-        retval ^= cast(ulong)(b & 0b01111111) << (idx++*7);
+        retval ^= cast(typeof(retval))(b & 0b01111111) << (idx++*7);
         if (!(b & 0b10000000))
         {
             buf = buf[idx .. length];
-            result = cast(T)retval;
+            static if (isSignedIntegerType!(T))
+                result = (retval >> 1) ^ (-(retval & 1));
             return true;
         }
     }

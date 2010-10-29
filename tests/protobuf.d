@@ -76,28 +76,79 @@ class Friends : ProtoBufMessage
     }
 }
 
-bool test_varintenc() {
-    Stdout("Testing varint_enc... ");
-    int i;
-    try {
-        for (i=-100; i < 500000; i+=17) {
-            auto middle = new ByteBuffer;
-            encode_val(i, middle);
-            auto data = middle.data;
-            uint roundtrip;
-            if (decode_val!(uint)(data, roundtrip) && (i == roundtrip)) {
-                debug (protobuf) Stdout.format("{} == {} (middle: {})", i, roundtrip, middle).newline;
-            } else {
-                debug (protobuf) Stdout.format("{} != {} (middle: {})", i, roundtrip, middle).newline;
-                throw new AssertException("Varint_test failed", __LINE__);
-            }
+void runtestlist(TYPE)(ubyte[][TYPE] list) {
+    foreach (orig,v; list) {
+        auto middle = new ByteBuffer;
+        encode_val(orig, middle);
+        auto data = middle.data;
+        if (data != v)
+            throw new AssertException(TYPE.stringof ~ "test failed", __LINE__);
+        TYPE roundtrip;
+        if (decode_val(data, roundtrip) && (orig == roundtrip)) {
+            debug (protobuf) Stdout.format("{} == {} (middle: {})", orig, roundtrip, middle).newline;
+        } else {
+            debug (protobuf) Stdout.format("{} != {} (middle: {})", orig, roundtrip, middle).newline;
+            throw new AssertException(TYPE.stringof ~ "test failed", __LINE__);
         }
-        Stdout("[PASS]").newline;
-        return true;
-    } catch (Exception e) {
-        Stdout.format("[FAIL] (on {})", i).newline;
-        throw e;
     }
+}
+
+bool test_varintenc() {
+    Stdout("Testing varint encoding... ");
+
+    ubyte[][uint] uintlist;
+    uintlist[0] =   cast(ubyte[])[0];
+    uintlist[1] =   cast(ubyte[])[1];
+    uintlist[127] = cast(ubyte[])[127];
+    uintlist[300] = cast(ubyte[])[172, 2];
+    uintlist[128] = cast(ubyte[])[128, 1];
+    uintlist[4294967280] = cast(ubyte[])[240, 255, 255, 255, 15];
+    runtestlist(uintlist);
+
+    ubyte[][ulong] ulonglist;
+    ulonglist[0] =   cast(ubyte[])[0];
+    ulonglist[1] =   cast(ubyte[])[1];
+    ulonglist[127] = cast(ubyte[])[127];
+    ulonglist[300] = cast(ubyte[])[172, 2];
+    ulonglist[128] = cast(ubyte[])[128, 1];
+    ulonglist[4294967280] = cast(ubyte[])[240, 255, 255, 255, 15];
+    ulonglist[8589934560] = cast(ubyte[])[224, 255, 255, 255, 31];
+    runtestlist(ulonglist);
+
+    ubyte[][int] intlist;
+    intlist[-2147483640] = cast(ubyte[])[239, 255, 255, 255, 15];
+    intlist[-150] = cast(ubyte[])[171, 2];
+    intlist[-64] =  cast(ubyte[])[127];
+    intlist[-3] =   cast(ubyte[])[5];
+    intlist[-2] =   cast(ubyte[])[3];
+    intlist[-1] =   cast(ubyte[])[1];
+    intlist[0] =    cast(ubyte[])[0];
+    intlist[1] =    cast(ubyte[])[2];
+    intlist[2] =    cast(ubyte[])[4];
+    intlist[3] =    cast(ubyte[])[6];
+    intlist[64] =   cast(ubyte[])[128,1];
+    intlist[150] =  cast(ubyte[])[172, 2];
+    intlist[2147483640] = cast(ubyte[])[240, 255, 255, 255, 15];
+    runtestlist(intlist);
+
+    ubyte[][long] longlist;
+    longlist[-4294967280] = cast(ubyte[])[223, 255, 255, 255, 31];
+    longlist[-2147483640] = cast(ubyte[])[239, 255, 255, 255, 15];
+    longlist[-150] = cast(ubyte[])[171, 2];
+    longlist[-64] = cast(ubyte[])[127];
+    longlist[-2] =  cast(ubyte[])[3];
+    longlist[-1] =  cast(ubyte[])[1];
+    longlist[0] =   cast(ubyte[])[0];
+    longlist[1] =   cast(ubyte[])[2];
+    longlist[2] =   cast(ubyte[])[4];
+    longlist[64] =  cast(ubyte[])[128,1];
+    longlist[150] =  cast(ubyte[])[172, 2];
+    longlist[2147483640] = cast(ubyte[])[240, 255, 255, 255, 15];
+    longlist[4294967280] = cast(ubyte[])[224, 255, 255, 255, 31];
+    runtestlist(longlist);
+
+    Stdout("[PASS]").newline;
+    return true;
 }
 
 bool test_wt_ld_enc() {

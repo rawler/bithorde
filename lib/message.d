@@ -28,7 +28,7 @@ private import tango.time.Time;
 
 private import lib.protobuf;
 
-enum Type
+enum Type : uint
 {
     HandShake = 1,
     BindRead = 2,
@@ -66,7 +66,7 @@ public:
     abstract Type typeId();
 }
 
-enum HashType
+enum HashType : uint
 {
     SHA1 = 1,
     SHA256 = 2,
@@ -74,7 +74,7 @@ enum HashType
     ED2K = 4,
 }
 
-enum Status {
+enum Status : uint {
     NONE = 0,
     SUCCESS = 1,
     NOTFOUND = 2,
