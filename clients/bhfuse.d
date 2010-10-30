@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  ***************************************************************************************/
-module clients.fuse;
+module clients.bhfuse;
 
 private import tango.core.Exception;
 private import tango.core.Thread;

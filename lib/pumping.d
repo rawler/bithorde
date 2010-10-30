@@ -16,6 +16,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  ****************************************************************************************/
+module lib.pumping;
 
 public import tango.io.model.IConduit;
 public import tango.io.selector.model.ISelector;

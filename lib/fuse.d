@@ -18,6 +18,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  ****************************************************************************************/
+module lib.fuse;
+
 import tango.io.model.IConduit;
 public import tango.stdc.config;
 import tango.stdc.posix.sys.stat;
