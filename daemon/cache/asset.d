@@ -21,6 +21,7 @@ module daemon.cache.asset;
 private import tango.core.Exception;
 private import tango.core.Thread;
 private import tango.core.Signal;
+private import tango.core.WeakRef;
 private import tango.io.device.File;
 private import tango.io.FilePath;
 version (Posix) private import tango.stdc.posix.unistd;
@@ -287,10 +288,28 @@ protected:
  ***************************************************************************************/
 class CachingAsset : WriteableAsset {
     IServerAsset remoteAsset;
+
+    /************************************************************************************
+     * Structure holding WeakReference to this, so we can attach it to events without
+     * preventing GC of this.
+     ***********************************************************************************/
+    struct RemoteWatcher {
+        WeakReference!(CachingAsset) assetRef;
+        void setAsset(CachingAsset asset) {
+            assetRef = new typeof(assetRef)(asset);
+        }
+        void onBackingUpdate(IAsset backing, message.Status sCode, message.AssetStatus s) {
+            auto asset = assetRef();
+            if (asset)
+                asset._statusSignal.call(asset, sCode, s);
+        }
+    }
 public:
     this (FilePath path, AssetMetaData metadata, IServerAsset remoteAsset, HashIdsListener updateHashIds) {
         this.remoteAsset = remoteAsset;
-        remoteAsset.attachWatcher(&onBackingUpdate);
+        auto watcher = new RemoteWatcher();
+        watcher.setAsset(this);
+        remoteAsset.attachWatcher(&watcher.onBackingUpdate);
         super(path, metadata, remoteAsset.size, updateHashIds); // TODO: Verify remoteAsset.size against local file
         log = Log.lookup("daemon.cache.cachingasset." ~ path.name[0..8]);
         log.trace("Caching remoteAsset of size {}", size);
@@ -315,10 +334,6 @@ protected:
 private:
     void realRead(ulong offset, uint length, BHReadCallback cb) {
         super.aSyncRead(offset, length, cb);
-    }
-
-    void onBackingUpdate(IAsset backing, message.Status sCode, message.AssetStatus s) {
-        _statusSignal.call(this, sCode, s);
     }
 
     /************************************************************************************
