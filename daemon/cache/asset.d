@@ -64,7 +64,6 @@ alias void delegate(Identifier[]) HashIdsListener;
  ***************************************************************************************/
 class BaseAsset : private File, public IServerAsset {
     mixin IAsset.StatusSignal;
-    Signal!(Time, float) interestSignal;
 protected:
     FilePath path;
     FilePath idxPath;
@@ -128,7 +127,7 @@ public:
         if (got == 0 || got == Eof) {
             resp.status = message.Status.NOTFOUND;
         } else {
-            interestSignal(Clock.now, (cast(float)got)/cast(float)size);
+            _metadata.noteInterest(Clock.now, (cast(float)got)/cast(float)size);
             resp.status = message.Status.SUCCESS;
             resp.offset = offset;
             resp.content = buf[0..got];

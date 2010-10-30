@@ -68,15 +68,11 @@ class CacheManager : IAssetSource {
                 setAsset(null);
         }
         synchronized BaseAsset setAsset(BaseAsset newAsset) {
-            if (auto oldAsset = this.asset) {
+            if (auto oldAsset = this.asset)
                 oldAsset.detachWatcher(&onStatusUpdate);
-                oldAsset.interestSignal.detach(&noteInterest);
-            }
             _openAsset.set(newAsset);
-            if (newAsset) {
+            if (newAsset)
                 newAsset.attachWatcher(&onStatusUpdate);
-                newAsset.interestSignal.attach(&noteInterest);
-            }
             return newAsset;
         }
         synchronized BaseAsset openAsset() {
