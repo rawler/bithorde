@@ -146,7 +146,8 @@ class Client : lib.client.Client {
             return assetSource ? assetSource.size : 0;
         }
         void close() {
-            // TODO: Implement
+            log.trace("Closed asset {}", handle);
+            assetSource = null;
         }
         void attachWatcher(BHAssetStatusCallback) {} // Doesn't make sense?
         void detachWatcher(BHAssetStatusCallback) {} // Doesn't make sense?
@@ -196,6 +197,12 @@ protected:
                 req.uuid = rand.uniformR2!(ulong)(1,ulong.max);
             openAssets[req.handle] = new BoundAsset(req);
         } else {
+            auto openAsset = req.handle in openAssets;
+            if (openAsset) {
+                openAsset.close();
+                openAssets[req.handle] = null;
+            }
+
             scope resp = new message.AssetStatus();
             resp.handle = req.handle;
             resp.status = message.Status.NOTFOUND;
