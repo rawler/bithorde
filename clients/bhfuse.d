@@ -189,9 +189,8 @@ class BitHordeFilesystem : Filesystem {
          * Handle a FUSE-open request for this INode and trigger reply
          *******************************************************************************/
         void open(OpenRequest* r) {
-            if (asset) {
+            if (asset && !asset.closed) {
                 clearHandleTimeout();
-                openCount += 1;
                 r.onBindResponse(asset, Status.SUCCESS, null);
             } else {
                 client.open(ids, &r.onBindResponse, args.lookupTimeout);
