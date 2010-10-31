@@ -257,6 +257,12 @@ public:
                 return wanted;
             }
         }
+
+        debug (Performance) {
+            Time started = Clock.now;
+            scope(exit) { log.trace("MakeRoom took {}ms",(Clock.now-started).millis); }
+        }
+
         log.trace("Making room for new asset of {}MB. MaxSize is {}MB", size/M, this.maxSize);
         auto maxSize = this.maxSize * M;
         if (maxSize == 0)
@@ -411,6 +417,11 @@ private:
      * Walks through assets in dir, purging those not referenced by the idmap
      ************************************************************************/
     synchronized void garbageCollect() {
+        debug (Performance) {
+            Time started = Clock.now;
+            scope(exit) { log.trace("Asset-GC took {}ms",(Clock.now-started).millis); }
+        }
+
         log.info("Beginning garbage collection");
         ubyte[LOCALID_LENGTH] idbuf;
         auto path = assetDir.dup.append("dummy");

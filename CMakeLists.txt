@@ -7,6 +7,9 @@ project (BitHorde)
 set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 FIND_PACKAGE(D REQUIRED)
 
+set(D_DEBUG_KEYS "" CACHE STRING "Special debug-keywords to build with.")
+add_d_debugs(${D_DEBUG_KEYS})
+
 # The Bithorde daemon itself
 add_d_program(bithorded daemon/bithorded.d)
 
