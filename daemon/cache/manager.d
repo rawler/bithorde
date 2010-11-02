@@ -75,19 +75,17 @@ class CacheManager : IAssetSource {
                 newAsset.attachWatcher(&onStatusUpdate);
             return newAsset;
         }
+
+        /********************************************************************************
+         * Throws: IOException if asset is not found
+         *******************************************************************************/
         synchronized BaseAsset openAsset() {
             if (auto retval = cast(BaseAsset)_openAsset()) {
                 return retval;
             } else if (idxPath.exists) {
                 return null;
             } else {
-                try {
-                    return setAsset(new BaseAsset(assetPath, this, &updateHashIds));
-                } catch (IOException e) {
-                    log.error("While opening asset: {}", e);
-                    purgeAsset(this);
-                    return null;
-                }
+                return setAsset(new BaseAsset(assetPath, this, &updateHashIds));
             }
         }
         synchronized BaseAsset asset() {
@@ -350,6 +348,15 @@ public:
             req.pushCallback(&_forwardedCallback);
             router.findAsset(req);
         }
+        BaseAsset tryOpen(MetaData meta) {
+            try { // Needs to handle IOErrors here, to not lock meta while purging.
+                return meta.openAsset();
+            } catch (IOException e) {
+                log.error("While opening asset: {}", e);
+                purgeAsset(meta);
+                return null;
+            }
+        }
 
         log.trace("Looking up hashIds");
         auto metaAsset = findMetaAsset(req.ids);
@@ -357,7 +364,7 @@ public:
         if (!metaAsset) {
             log.trace("Unknown asset, forwarding {}", req);
             forwardRequest();
-        } else if (auto asset = metaAsset.openAsset()) {
+        } else if (auto asset = tryOpen(metaAsset)) {
             fromCache(metaAsset, asset);
         } else {
             log.trace("Incomplete asset, forwarding {}", req);
