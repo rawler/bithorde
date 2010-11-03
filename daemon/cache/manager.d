@@ -312,7 +312,6 @@ public:
                 }
             }
         } else {
-            log.info("Forward search failed with error-code {}", message.statusToString(sCode));
             req.callback(null, sCode, null);
         }
     }
@@ -358,11 +357,9 @@ public:
             }
         }
 
-        log.trace("Looking up hashIds");
         auto metaAsset = findMetaAsset(req.ids);
 
         if (!metaAsset) {
-            log.trace("Unknown asset, forwarding {}", req);
             forwardRequest();
         } else if (auto asset = tryOpen(metaAsset)) {
             fromCache(metaAsset, asset);
