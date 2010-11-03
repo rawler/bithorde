@@ -70,16 +70,14 @@ protected:
     FilePath idxPath;
     Logger log;
     AssetMetaData _metadata;
-    HashIdsListener updateHashIds;
 public:
     /************************************************************************************
      * IncompleteAssetException is thrown if a not-fully-cached asset were to be Opened
      * directly as a BaseAsset
      ***********************************************************************************/
-    this(FilePath path, AssetMetaData metadata, HashIdsListener updateHashIds) {
+    this(FilePath path, AssetMetaData metadata) {
         this.path = path;
         this.idxPath = path.dup.suffix(".idx");
-        this.updateHashIds = updateHashIds;
         this._metadata = metadata;
         log = Log.lookup("daemon.cache.baseasset."~path.name[0..8]);
 
@@ -159,6 +157,7 @@ protected:
     CacheMap cacheMap;
     Digest[HashType] hashes;
     ulong hashedPtr;
+    HashIdsListener updateHashIds;
 public:
     /************************************************************************************
      * Create WriteableAsset by path and size
@@ -166,7 +165,8 @@ public:
     this(FilePath path, AssetMetaData metadata, ulong size, HashIdsListener updateHashIds) {
         foreach (k,hash; HashMap)
             hashes[hash.pbType] = hash.factory();
-        super(path, metadata, updateHashIds); // Parent calls open()
+        this.updateHashIds = updateHashIds;
+        super(path, metadata); // Parent calls open()
         truncate(size);           // We resize it to right size
         log = Log.lookup("daemon.cache.writeasset."~path.name[0..8]);
     }
@@ -276,7 +276,6 @@ protected:
         cacheMap = null;
         sync();
         oldCache.path.remove();
-        delete oldCache;
 
         _statusSignal.call(this, message.Status.SUCCESS, null);
     }

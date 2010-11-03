@@ -85,7 +85,7 @@ class CacheManager : IAssetSource {
             } else if (idxPath.exists) {
                 return null;
             } else {
-                return setAsset(new BaseAsset(assetPath, this, &updateHashIds));
+                return setAsset(new BaseAsset(assetPath, this));
             }
         }
         synchronized BaseAsset asset() {
