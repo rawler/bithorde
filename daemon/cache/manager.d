@@ -409,7 +409,14 @@ private:
         scope mapsrc = new IdMap();
         scope fileContent = cast(ubyte[])File.get(idMapPath.toString);
         mapsrc.decode(fileContent);
+        auto now = Clock.now;
+        auto currentMaxRating = now.unix.millis;
         foreach (asset; mapsrc.assets) {
+            if (asset.rating > currentMaxRating) {
+                log.warn("Implausibly high asset-rating {} on {}. Have the system clock been reset? Adjusting...",
+                            asset.rating, ascii.toLower(hex.encode(asset.localId)));
+                asset.setMaxRating(now);
+            }
             localIdMap[asset.localId] = asset;
             foreach (id; asset.hashIds)
                 hashIdMap[id.type][id.id] = asset;
