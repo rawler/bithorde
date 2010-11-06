@@ -28,6 +28,8 @@
 ## Variables.
 ##--------------------------------------------
 
+set(D_LIBS "dl") # Default D-libraries needed
+
 ## Find D compiler and parse its version.
 find_program(DC NAMES dmd ldc)
 if (DC)   
