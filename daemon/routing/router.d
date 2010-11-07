@@ -89,7 +89,7 @@ private:
         foreach (friend; connectedFriends) {
             auto client = friend.c;
             if (client != req.client) {
-                log.trace("Forwarding to {}", friend);
+                log.trace("Forwarding to {}", friend.name);
                 asset.waitingResponses += 1;
                 // TODO: Randomize timeouts
                 client.open(req.ids, &asset.addBackingAsset, req.uuid, TimeSpan.fromMillis(req.timeout-100));
