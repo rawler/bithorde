@@ -491,9 +491,11 @@ private:
      ***********************************************************************************/
     void IdMapFlusher() {
         while (idMapFlusher) {
-            if (idMapDirty) {
+            try if (idMapDirty) {
                 garbageCollect();
                 saveIdMap();
+            } catch (Exception e) {
+                log.error("Failed flushing IdMap with {}", e);
             }
             for (int i = 0; (i < FLUSH_INTERVAL_SEC) && idMapFlusher; i++)
                 Thread.sleep(1);
