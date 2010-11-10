@@ -321,7 +321,12 @@ public:
      * TODO: Fail if asset is being locked by someone using it.
      ***********************************************************************************/
     synchronized bool purgeAsset(MetaData asset) {
-        log.info("Purging {}", formatMagnet(asset.hashIds, 0, null));
+        if (asset.hashIds.length) {
+            log.info("Purging {}", formatMagnet(asset.hashIds, 0, null));
+        } else {
+            log.info("Purging <unknown asset>");
+        }
+
         if (asset.localId in localIdMap)
             localIdMap.remove(asset.localId);
         foreach (hashId; asset.hashIds) {
