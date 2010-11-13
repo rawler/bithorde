@@ -148,6 +148,7 @@ class Client : lib.client.Client {
         void close() {
             log.trace("Closed asset {}", handle);
             assetSource = null;
+            openAssets.remove(handle);
         }
         void attachWatcher(BHAssetStatusCallback) {} // Doesn't make sense?
         void detachWatcher(BHAssetStatusCallback) {} // Doesn't make sense?
@@ -169,7 +170,7 @@ class Client : lib.client.Client {
 private:
     Server server;
     CacheManager cacheMgr;
-    IServerAsset[uint] openAssets;
+    BoundAsset[uint] openAssets;
     Logger log;
 public:
     this (Server server, Socket s)
@@ -186,6 +187,14 @@ public:
      ***********************************************************************************/
     void open(message.Identifier[] ids, BHAssetStatusCallback openCallback, ulong uuid,
               TimeSpan timeout) { super.open(ids, openCallback, uuid, timeout, true); }
+
+    /************************************************************************************
+     * Cleanup when client closes
+     ***********************************************************************************/
+    void close() {
+        super.close();
+        openAssets = null;
+    }
 protected:
     void processBindRead(Connection c, ubyte[] buf)
     {
