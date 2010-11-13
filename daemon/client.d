@@ -195,6 +195,11 @@ public:
         super.close();
         openAssets = null;
     }
+
+    void dumpStats(Time now) {
+        log.trace("Serving {} Assets", openAssets.length);
+        super.dumpStats(now);
+    }
 protected:
     void processBindRead(Connection c, ubyte[] buf)
     {

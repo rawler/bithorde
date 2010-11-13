@@ -323,11 +323,15 @@ public:
         timeouts.emit(now);
         connection.processTimeouts(now);
         if (now >= nextStatPrint) {
-            connection.counters.doSwitch(now);
-            if (!connection.counters.empty)
-                log.trace("Stats: {}", connection.counters);
+            dumpStats(now);
             nextStatPrint = now + StatInterval;
         }
+    }
+
+    void dumpStats(Time now) {
+        connection.counters.doSwitch(now);
+        if (!connection.counters.empty)
+            log.trace("Stats: {}", connection.counters);
     }
 protected:
     synchronized void sendMessage(message.Message msg) {
