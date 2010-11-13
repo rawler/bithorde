@@ -230,10 +230,12 @@ public:
         MetaData pickLoser() {
             MetaData loser;
             auto loserRating = long.max;
-            foreach (asset; this.localIdMap) {
-                auto rating = asset.rating;
+            foreach (meta; this.localIdMap) {
+                if (meta.asset) // Is Open
+                    continue;
+                auto rating = meta.rating;
                 if (rating < loserRating) {
-                    loser = asset;
+                    loser = meta;
                     loserRating = rating;
                 }
             }
@@ -318,7 +320,6 @@ public:
 
     /************************************************************************************
      * Remove an asset from cache.
-     * TODO: Fail if asset is being locked by someone using it.
      ***********************************************************************************/
     synchronized bool purgeAsset(MetaData asset) {
         if (asset.hashIds.length) {
@@ -383,8 +384,7 @@ public:
                 MetaData meta = newMetaAsset();
                 auto path = meta.assetPath;
                 assert(!path.exists());
-                auto asset = new WriteableAsset(path, meta, req.size, &meta.updateHashIds);
-                meta.setMaxRating(Clock.now); // So it won't be immediately purged again.
+                auto asset = new UploadAsset(path, meta, req.size, &meta.updateHashIds);
                 asset.attachWatcher(callback);
                 callback(asset, message.Status.SUCCESS, null);
             } else {

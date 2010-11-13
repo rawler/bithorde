@@ -150,7 +150,8 @@ public:
 }
 
 /****************************************************************************************
- * WriteableAsset implements uploading to Assets, and forms a base for CachingAsset
+ * WriteableAsset implements uploading to Assets, and forms a base for CachingAsset and
+ * UploadAsset
  ***************************************************************************************/
 class WriteableAsset : BaseAsset {
 protected:
@@ -278,6 +279,24 @@ protected:
         oldCache.path.remove();
 
         _statusSignal.call(this, message.Status.SUCCESS, null);
+    }
+}
+
+/****************************************************************************************
+ * Assets in the "upload"-phase.
+ ***************************************************************************************/
+class UploadAsset : WriteableAsset {
+    this(FilePath path, AssetMetaData metadata, ulong size, HashIdsListener updateHashIds) {
+        super(path, metadata, size, updateHashIds);
+    }
+
+    /************************************************************************************
+     * UploadAssets will have zero-rating until they are complete. When complete, set
+     * to max.
+     ***********************************************************************************/
+    void finish() {
+        _metadata.setMaxRating(Clock.now);
+        super.finish();
     }
 }
 
