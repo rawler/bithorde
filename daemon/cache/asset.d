@@ -126,7 +126,7 @@ public:
         if (got == 0 || got == Eof) {
             resp.status = message.Status.NOTFOUND;
         } else {
-            _metadata.noteInterest(Clock.now, (cast(float)got)/cast(float)size);
+            _metadata.noteInterest(Clock.now, (cast(double)got)/cast(double)size);
             resp.status = message.Status.SUCCESS;
             resp.offset = offset;
             resp.content = buf[0..got];

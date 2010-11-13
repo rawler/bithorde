@@ -41,11 +41,11 @@ class AssetMetaData : ProtoBufMessage {
     /************************************************************************************
      * Increase the rating by noting interest in this asset.
      ***********************************************************************************/
-    void noteInterest(Time clock, float weight) in {
+    void noteInterest(Time clock, double weight) in {
         assert(clock >= Time.epoch1970);
         assert(weight > 0);
     } body {
-        rating = rating + cast(ulong)((clock.unix.millis - rating) / weight);
+        rating = rating + cast(ulong)((clock.unix.millis - rating) * weight);
     }
 
     void setMaxRating(Time clock) in {
