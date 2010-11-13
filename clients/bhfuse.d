@@ -131,7 +131,7 @@ class BitHordeFilesystem : Filesystem {
         this (char[] pathName, RemoteAsset asset) {
             this.pathName = pathName;
             this.asset = asset;
-            this.openCount = 1;
+            this.openCount = 0;
             this.ids = asset.requestIds;
             this.size = asset.size;
             this.ino = allocateIno;
@@ -142,22 +142,32 @@ class BitHordeFilesystem : Filesystem {
 
         /********************************************************************************
          * Register a pending handleTimeout.
+         *
+         * For <Timeout>, we keep an extra openRef on the asset. If noone else have
+         * taken a ref on the asset by then, it is closed.
          *******************************************************************************/
         void setHandleTimeout() {
+
+            if (!handleTimeout.callback) { // No previous timeout set
+                this.openCount += 1;
+            }
             handleTimeout.deadline = Clock.now + HandleTimeoutTime;
-            handleTimeout.callback = &this.release;
+            handleTimeout.callback = &this.clearHandleTimeout;
             handleTimeouts.push(&handleTimeout);
-            if (handleTimeouts.size > HandleTimeoutLimit) // Keep a ceiling on number of handles
+            // Keep a ceiling on number of handles held by Timeouts
+            if (handleTimeouts.size > HandleTimeoutLimit)
                 handleTimeouts.peek().callback();
         }
 
         /********************************************************************************
-         * If there is a handleTimeout pending for this INode, release it.
+         * If there is a handleTimeout pending for this INode, release it, and decrement
+         * the openCount
          *******************************************************************************/
         void clearHandleTimeout() {
             if (handleTimeout.callback) {
                 handleTimeouts.remove(&handleTimeout);
                 handleTimeout = handleTimeout.init;
+                release();
             }
         }
 
@@ -190,8 +200,8 @@ class BitHordeFilesystem : Filesystem {
          *******************************************************************************/
         void open(OpenRequest* r) {
             if (asset && !asset.closed) {
-                clearHandleTimeout();
                 r.onBindResponse(asset, Status.SUCCESS, null);
+                clearHandleTimeout();
             } else {
                 client.open(ids, &r.onBindResponse, args.lookupTimeout);
             }
