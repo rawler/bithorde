@@ -308,7 +308,7 @@ public:
     }
 
     /************************************************************************************
-     * Figure next timeout for this asset
+     * Figure next timeout for this client
      ***********************************************************************************/
     Time nextDeadline() {
         auto result = min!(Time)(timeouts.nextDeadline, connection.nextDeadline);

@@ -192,7 +192,7 @@ public:
                 stat_t s;
                 char[256] filepath = void;
                 auto statres = stat(Format.sprint(filepath, "{}/{}\0", fileInfo.path, fileInfo.name).ptr, &s);
-                assert(statres == 0);
+                assert(statres == 0); // TODO: Should always check return value
                 version (linux) retval += s.st_blocks * 512;
                 else static assert(0, "Needs to port block-size for non-Linux POSIX.");
             } else {
