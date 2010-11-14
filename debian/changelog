@@ -1,3 +1,16 @@
+bithorde (0.0.9+0.1beta6) maverick; urgency=low
+
+  * Some feature-improvements;
+    - Asynchronous disk-flushes, improving latency.
+    - Print response-times and open assets per friend-connection.
+    - Better asset-rating system for maintaining cache.
+    - Improved resource-tracking
+  * Built with newer LDC and libtango for better performance and stability.
+  * Numerous bug and stability-fixes.
+  * Other various fixes and tweaks.
+
+ -- Ulrik Mikaelsson <ulrik.mikaelsson@gmail.com>  Sun, 14 Nov 2010 14:58:15 +0100
+
 bithorde (0.0.9+0.1beta5) lucid; urgency=low
 
   * Change build to forced i686. Previous versions adapted the build to the build-host, causing SIGILL on older CPU:s.
