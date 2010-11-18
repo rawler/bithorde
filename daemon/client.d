@@ -149,6 +149,7 @@ class Client : lib.client.Client {
             log.trace("Closed asset {}", handle);
             assetSource = null;
             openAssets.remove(handle);
+            GC.collect();
         }
         void attachWatcher(BHAssetStatusCallback) {} // Doesn't make sense?
         void detachWatcher(BHAssetStatusCallback) {} // Doesn't make sense?
@@ -194,6 +195,7 @@ public:
     void close() {
         super.close();
         openAssets = null;
+        GC.collect();
     }
 
     void dumpStats(Time now) {
