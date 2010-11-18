@@ -45,6 +45,8 @@ SET_TESTS_PROPERTIES(RoundtripTest PROPERTIES TIMEOUT 60 ENVIRONMENT "BH_BINDIR=
 ADD_TEST(BithordeLibTest ${CMAKE_CURRENT_BINARY_DIR}/tests/bithordelib)
 SET_TESTS_PROPERTIES(BithordeLibTest PROPERTIES TIMEOUT 60)
 
+ADD_TEST(ProtoBuf ${CMAKE_CURRENT_BINARY_DIR}/tests/protobuf)
+
 # CPack packaging
 INCLUDE(InstallRequiredSystemLibraries)
 SET(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Caching friend2friend oriented content-distribution.")
