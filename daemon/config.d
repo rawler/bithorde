@@ -62,6 +62,7 @@ class Config
     FilePath logfile;
     Friend[char[]] friends;
     bool doDebug = false;
+    bool usefsync = true;
 
     /************************************************************************************
      * Create Config object from file
@@ -139,6 +140,9 @@ private:
             break;
         case "debug":
             this.doDebug = parseBool(value);
+            break;
+        case "usefsync":
+            this.usefsync = parseBool(value);
             break;
         default:
             throw new ConfigException("Unknown server option "~value~"ASA");

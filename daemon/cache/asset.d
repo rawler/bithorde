@@ -159,14 +159,17 @@ protected:
     Digest[HashType] hashes;
     ulong hashedPtr;
     HashIdsListener updateHashIds;
+    bool usefsync;
 public:
     /************************************************************************************
      * Create WriteableAsset by path and size
      ***********************************************************************************/
-    this(FilePath path, AssetMetaData metadata, ulong size, HashIdsListener updateHashIds) {
+    this(FilePath path, AssetMetaData metadata, ulong size,
+         HashIdsListener updateHashIds, bool usefsync) {
         foreach (k,hash; HashMap)
             hashes[hash.pbType] = hash.factory();
         this.updateHashIds = updateHashIds;
+        this.usefsync = usefsync;
         super(path, metadata); // Parent calls open()
         truncate(size);           // We resize it to right size
         log = Log.lookup("daemon.cache.writeasset."~path.name[0..8]);
@@ -215,7 +218,10 @@ public:
     }
 
     /************************************************************************************
-     * Make sure to synchronize file data, and flush cachemap to disk.
+     * Make sure to synchronize asset data, and flush cachemap to disk.
+     * Params:
+     *   usefsync = control whether fsync is used, or simply flushing to filesystem is
+     *              enough
      ***********************************************************************************/
     void sync() {
         scope CacheMap cmapToWrite;
@@ -224,11 +230,13 @@ public:
                 return;
             cmapToWrite = new CacheMap(cacheMap);
         }
-        version (Posix)
-            fdatasync(fileHandle);
-        else
-            static assert(false, "Needs Non-POSIX implementation");
-        cmapToWrite.sync();
+        if (usefsync) {
+            version (Posix)
+                fdatasync(fileHandle);
+            else
+                static assert(false, "Needs Non-POSIX implementation");
+        }
+        cmapToWrite.sync(usefsync);
     }
 protected:
     /************************************************************************************
@@ -286,8 +294,9 @@ protected:
  * Assets in the "upload"-phase.
  ***************************************************************************************/
 class UploadAsset : WriteableAsset {
-    this(FilePath path, AssetMetaData metadata, ulong size, HashIdsListener updateHashIds) {
-        super(path, metadata, size, updateHashIds);
+    this(FilePath path, AssetMetaData metadata, ulong size,
+         HashIdsListener updateHashIds, bool usefsync) {
+        super(path, metadata, size, updateHashIds, usefsync);
     }
 
     /************************************************************************************
@@ -323,12 +332,13 @@ class CachingAsset : WriteableAsset {
         }
     }
 public:
-    this (FilePath path, AssetMetaData metadata, IServerAsset remoteAsset, HashIdsListener updateHashIds) {
+    this (FilePath path, AssetMetaData metadata, IServerAsset remoteAsset,
+          HashIdsListener updateHashIds, bool usefsync) {
         this.remoteAsset = remoteAsset;
         auto watcher = new RemoteWatcher();
         watcher.setAsset(this);
         remoteAsset.attachWatcher(&watcher.onBackingUpdate);
-        super(path, metadata, remoteAsset.size, updateHashIds); // TODO: Verify remoteAsset.size against local file
+        super(path, metadata, remoteAsset.size, updateHashIds, usefsync); // TODO: Verify remoteAsset.size against local file
         log = Log.lookup("daemon.cache.cachingasset." ~ path.name[0..8]);
         log.trace("Caching remoteAsset of size {}", size);
     }

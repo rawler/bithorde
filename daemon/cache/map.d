@@ -134,11 +134,16 @@ public:
     /************************************************************************************
      * Ensure underlying file is up-to-date
      ***********************************************************************************/
-    package void sync() {
+    package void sync(bool usefsync) {
         auto tmpPath = path.dup.cat(".new");
         scope file = new File(tmpPath.toString, File.WriteCreate);
         file.write(segments);
-        fdatasync(file.fileHandle);
+        if (usefsync) {
+            version (Posix)
+                fdatasync(file.fileHandle);
+            else
+                static assert(false, "Needs Non-POSIX implementation");
+        }
         file.close();
         tmpPath.rename(path);
     }

@@ -140,6 +140,7 @@ protected:
     MetaData localIdMap[ubyte[]];
     bool idMapDirty;
     Thread idMapFlusher;
+    bool usefsync;
 
     static Logger log;
     static this() {
@@ -149,11 +150,12 @@ public:
     /************************************************************************************
      * Create a CacheManager with a given asset-directory and underlying Router-instance
      ***********************************************************************************/
-    this(FilePath assetDir, ulong maxSize, Router router) {
+    this(FilePath assetDir, ulong maxSize, bool usefsync, Router router) {
         if (!(assetDir.exists && assetDir.isFolder && assetDir.isWritable))
             throw new ConfigException(assetDir.toString ~ " must be an existing writable directory");
         this.assetDir = assetDir;
         this.maxSize = maxSize;
+        this.usefsync = usefsync;
         this.router = router;
 
         idMapPath = this.assetDir.dup.append("index.protobuf");
@@ -302,7 +304,8 @@ public:
                 try {
                     auto path = metaAsset.assetPath;
                     assert(cast(bool)path.exists == foundAsset);
-                    auto cachingAsset = new CachingAsset(path, metaAsset, asset, &metaAsset.updateHashIds);
+                    auto cachingAsset = new CachingAsset(path, metaAsset, asset,
+                            &metaAsset.updateHashIds, usefsync);
                     metaAsset.setAsset(cachingAsset);
                     log.trace("Responding with status {}", message.statusToString(sCode));
                     req.callback(cachingAsset, sCode, s);
@@ -384,7 +387,7 @@ public:
                 MetaData meta = newMetaAsset();
                 auto path = meta.assetPath;
                 assert(!path.exists());
-                auto asset = new UploadAsset(path, meta, req.size, &meta.updateHashIds);
+                auto asset = new UploadAsset(path, meta, req.size, &meta.updateHashIds, usefsync);
                 asset.attachWatcher(callback);
                 callback(asset, message.Status.SUCCESS, null);
             } else {
@@ -471,10 +474,12 @@ private:
         scope tmpFile = idMapPath.dup.cat(".tmp");
         scope file = new File (tmpFile.toString, File.ReadWriteCreate);
         file.write (map.encode());
-        version (Posix)
-            fdatasync(file.fileHandle);
-        else
-            static assert(false, "Needs Non-POSIX implementation");
+        if (usefsync) {
+            version (Posix)
+                fdatasync(file.fileHandle);
+            else
+                static assert(false, "Needs Non-POSIX implementation");
+        }
         file.close();
         tmpFile.rename(idMapPath);
         idMapDirty = false;
