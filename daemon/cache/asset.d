@@ -24,7 +24,6 @@ private import tango.core.Signal;
 private import tango.core.WeakRef;
 private import tango.io.device.File;
 private import tango.io.FilePath;
-version (Posix) private import tango.stdc.posix.unistd;
 private import ascii = tango.text.Ascii;
 private import tango.util.log.Log;
 private import tango.time.Clock;
@@ -38,8 +37,13 @@ private import daemon.cache.metadata;
 private import daemon.cache.map;
 private import daemon.client;
 
-static if ( !is(typeof(fdatasync) == function ) )
-    extern (C) int fdatasync(int);
+version (Posix) {
+    private import tango.stdc.posix.unistd;
+    static if ( !is(typeof(fdatasync) == function ) )
+        extern (C) int fdatasync(int);
+} else {
+    static assert(false, "fdatasync Needs Non-POSIX implementation");
+}
 
 const LOCALID_LENGTH = 32;
 
@@ -180,7 +184,9 @@ public:
      * file, and then truncate it to the right size.
      ***********************************************************************************/
     void assetOpen(FilePath path) {
-        this.cacheMap = new CacheMap(idxPath);
+        scope idxFile = new File(idxPath.toString, File.Style(File.Access.Read, File.Open.Create));
+        cacheMap = new CacheMap();
+        cacheMap.load(idxFile);
         File.open(path.toString, File.Style(File.Access.ReadWrite, File.Open.Sedate));
     }
 
@@ -226,17 +232,22 @@ public:
     void sync() {
         scope CacheMap cmapToWrite;
         synchronized (this) {
-            if (!cacheMap)
-                return;
-            cmapToWrite = new CacheMap(cacheMap);
+            if (cacheMap)
+                cmapToWrite = new CacheMap(cacheMap);
         }
-        if (usefsync) {
-            version (Posix)
-                fdatasync(fileHandle);
-            else
-                static assert(false, "Needs Non-POSIX implementation");
+        if (usefsync)
+            fdatasync(fileHandle);
+
+        if (cmapToWrite) {
+            auto tmpPath = idxPath.dup.cat(".new");
+            scope idxFile = new File(tmpPath.toString, File.WriteCreate);
+            cmapToWrite.write(idxFile);
+            if (usefsync)
+                fdatasync(idxFile.fileHandle);
+
+            idxFile.close();
+            tmpPath.rename(idxPath);
         }
-        cmapToWrite.sync(usefsync);
     }
 protected:
     /************************************************************************************
@@ -281,10 +292,9 @@ protected:
 
         updateHashIds(hashIds);
 
-        auto oldCache = cacheMap;
         cacheMap = null;
         sync();
-        oldCache.path.remove();
+        idxPath.remove();
 
         _statusSignal.call(this, message.Status.SUCCESS, null);
     }

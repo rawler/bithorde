@@ -17,11 +17,7 @@
 
 module daemon.cache.map;
 
-private import tango.io.device.File;
-private import tango.io.FilePath;
-version (Posix) private import tango.stdc.posix.unistd;
-static if ( !is(typeof(fdatasync) == function ) ) // Not in Tango ATM.
-    extern (C) int fdatasync(int);
+private import tango.io.model.IConduit;
 
 private import lib.protobuf;
 
@@ -71,24 +67,15 @@ private:
 
     Segment[] segments;
 public:
-    FilePath path;
-
     /************************************************************************************
-     * Initialize and open a CacheMap backed by a given File
+     * Empty constructor
      ***********************************************************************************/
-    this(FilePath path) {
-        this.path = path;
-        if (path.exists)
-            load();
-        else
-            path.createFile();
-    }
+    this() {}
 
     /************************************************************************************
      * Create clone of other CacheMap
      ***********************************************************************************/
     this(CacheMap other) {
-        this.path = other.path.dup;
         this.segments = other.segments.dup;
     }
 
@@ -108,13 +95,13 @@ public:
     }
 
     /************************************************************************************
-     * Load from underlying file
+     * Load from provided InputStream
      ***********************************************************************************/
-    private void load() {
+    CacheMap load(InputStream stream) {
         try {
-            segments = cast(Segment[])File.get(path.toString, cast(void[])segments);
+            segments = cast(Segment[])stream.load();
 
-            // Now squash useless 0-size segments. Artefact from beta1, probably won't be needed later.
+            // Now squash useless 0-size segments. Artifact from beta1, probably won't be needed later.
             auto len = segments.length;
             foreach (i, ref x; segments) {
                 if (x.end == x.start) {
@@ -129,23 +116,14 @@ public:
         } catch (Exception e) {
             segments.length = 0;
         }
+        return this;
     }
 
     /************************************************************************************
-     * Ensure underlying file is up-to-date
+     * Write to provided OutputStream
      ***********************************************************************************/
-    package void sync(bool usefsync) {
-        auto tmpPath = path.dup.cat(".new");
-        scope file = new File(tmpPath.toString, File.WriteCreate);
-        file.write(segments);
-        if (usefsync) {
-            version (Posix)
-                fdatasync(file.fileHandle);
-            else
-                static assert(false, "Needs Non-POSIX implementation");
-        }
-        file.close();
-        tmpPath.rename(path);
+    package void write(OutputStream stream) {
+        stream.write(segments);
     }
 
     /************************************************************************************
@@ -225,15 +203,7 @@ public:
     }
 
     unittest {
-        auto path = new FilePath("/tmp/bh-unittest-testmap");
-        void cleanup() {
-            if (path.exists)
-                path.remove();
-        }
-        cleanup();
-        scope(exit) cleanup();
-
-        auto map = new CacheMap(path);
+        auto map = new CacheMap();
         map.add(0,15);
         assert(map.segments[0].start == 0);
         assert(map.segments[0].end == 15);
@@ -274,8 +244,7 @@ public:
         assert(map.has(45,5) == true);
         assert(map.has(46,5) == false);
 
-        cleanup();
-        map = new CacheMap(path);
+        map = new CacheMap();
         map.add(0,0);
         assert(map.segments.length == 0);
         map.segments = [Segment(0,0)];
@@ -290,8 +259,7 @@ public:
         map.add(16,3);
         assert(map.segments.length == 1);
 
-        cleanup();
-        map = new CacheMap(path);
+        map = new CacheMap();
         map.add(10,5);
         map.add(0,5);
         assert(map.segments.length == 2);
