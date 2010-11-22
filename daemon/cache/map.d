@@ -122,7 +122,7 @@ public:
     /************************************************************************************
      * Write to provided OutputStream
      ***********************************************************************************/
-    package void write(OutputStream stream) {
+    void write(OutputStream stream) {
         stream.write(segments);
     }
 

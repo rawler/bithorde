@@ -37,6 +37,7 @@ INSTALL(FILES template.config
 # Tests
 add_d_program(bithordelib tests/bithordelib.d OUTPUT_PATH ${CMAKE_CURRENT_BINARY_DIR}/tests)
 add_d_program(protobuf tests/protobuf.d OUTPUT_PATH ${CMAKE_CURRENT_BINARY_DIR}/tests)
+add_d_program(cachemap tests/cachemap.d OUTPUT_PATH ${CMAKE_CURRENT_BINARY_DIR}/tests)
 
 ENABLE_TESTING()
 ADD_TEST(RoundtripTest ${CMAKE_SOURCE_DIR}/tests/roundtrip/test_roundtrip.sh)
@@ -46,6 +47,7 @@ ADD_TEST(BithordeLibTest ${CMAKE_CURRENT_BINARY_DIR}/tests/bithordelib)
 SET_TESTS_PROPERTIES(BithordeLibTest PROPERTIES TIMEOUT 60)
 
 ADD_TEST(ProtoBuf ${CMAKE_CURRENT_BINARY_DIR}/tests/protobuf)
+ADD_TEST(CacheMap ${CMAKE_CURRENT_BINARY_DIR}/tests/cachemap)
 
 # CPack packaging
 INCLUDE(InstallRequiredSystemLibraries)
