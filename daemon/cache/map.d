@@ -17,9 +17,12 @@
 
 module daemon.cache.map;
 
+private import tango.io.device.Array;
 private import tango.io.model.IConduit;
+private import tango.io.stream.Data;
 
-private import lib.protobuf;
+private import lib.message;
+private import lib.networkendian;
 
 /****************************************************************************************
  * CacheMap is the core datastructure for tracking which segments of an asset is
@@ -29,7 +32,16 @@ private import lib.protobuf;
  * Note: Doesn't deal with 0-length files
  ***************************************************************************************/
 final class CacheMap {
-private:
+    class LoadException : Exception {
+        this(char[] msg = "Failed loading map") { super(msg); }
+    }
+
+    struct Header {
+        ubyte ver = 2;            /// Version of the current map
+        ulong hashed_amount;      /// Amount of bytes hashed starting from pos0
+        ubyte[][HashType] hashes; /// Hash-states from pos0->hashed_amount
+    }
+
     /************************************************************************************
      * Structure for defining the individual segments of the file
      ***********************************************************************************/
@@ -66,6 +78,7 @@ private:
     }
 
     Segment[] segments;
+    Header header;
 public:
     /************************************************************************************
      * Empty constructor
@@ -95,35 +108,123 @@ public:
     }
 
     /************************************************************************************
-     * Load from provided InputStream
+     * squash useless 0-size segments. Artifact from beta1, won't be needed later.
+     ***********************************************************************************/
+    void store_hashes(ulong hashed_amount, ubyte[][HashType] hashes) {
+        header.hashed_amount = hashed_amount;
+        header.hashes = null;
+        foreach (k,v; hashes) {
+            header.hashes[k] = v.dup;
+        }
+    }
+
+    /************************************************************************************
+     * squash useless 0-size segments. Artifact from beta1, won't be needed later.
+     ***********************************************************************************/
+    private void squashEmpty() {
+        auto len = segments.length;
+        foreach (i, ref x; segments) {
+            if (x.end == x.start) {
+                len -= 1;
+                for (auto j=i; j < len; j++)
+                    segments[j] = segments[j+1];
+            } else if (x.end < x.start) {
+                throw new LoadException("Serious corruption, discarding");
+            }
+        }
+        segments.length = len;
+    }
+
+    /************************************************************************************
+     * Load from the legacy V1-format.
+     ***********************************************************************************/
+    private void load_v1(ubyte[] data) {
+        header = header.init;
+        segments = cast(Segment[])data.dup;
+    }
+
+    /************************************************************************************
+     * Load from the current V2-format.
+     ***********************************************************************************/
+    private void load_v2(ubyte[] data) {
+        // Setup input stream
+        auto buf = new Array(data);
+        auto stream = new DataInput(buf);
+        stream.endian(stream.Network);
+
+        // Read header
+        header.ver = stream.getByte;
+        header.hashed_amount = stream.getLong;
+
+        // Read hashes
+        header.hashes = null;
+        auto hashCount = stream.getShort;
+        for (auto i = hashCount; hashCount > 0; hashCount--) {
+            HashType type = cast(HashType)stream.getByte;
+            ubyte[] hash = cast(ubyte[])stream.array;
+            header.hashes[type] = hash;
+        }
+
+        // Read segments
+        auto segcount = stream.getInt;
+        segments.length = segcount;
+        for (auto i = 0; i<segcount; i++) {
+            ulong start = stream.getLong;
+            ulong end = stream.getLong;
+
+            segments[i].start = start;
+            segments[i].end = end;
+        }
+    }
+
+    /************************************************************************************
+     * Load from provided InputStream, auto-detecting format.
      ***********************************************************************************/
     CacheMap load(InputStream stream) {
+        scope data = cast(ubyte[])stream.load;
         try {
-            segments = cast(Segment[])stream.load();
-
-            // Now squash useless 0-size segments. Artifact from beta1, probably won't be needed later.
-            auto len = segments.length;
-            foreach (i, ref x; segments) {
-                if (x.end == x.start) {
-                    len -= 1;
-                    for (auto j=i; j < len; j++)
-                        segments[j] = segments[j+1];
-                } else if (x.end < x.start) {
-                    throw new Exception("Serious corruption, discarding");
-                }
-            }
-            segments.length = len;
+            if ((data.length%8)==0)
+                load_v1(data);
+            else if (data[0] == 2)
+                load_v2(data);
+            else
+                throw new LoadException("Unsupported Format");
+            squashEmpty();
         } catch (Exception e) {
             segments.length = 0;
+            header.ver = 1;
+            header.hashed_amount = 0;
+            header.hashes = null;
         }
         return this;
     }
 
     /************************************************************************************
-     * Write to provided OutputStream
+     * Write V2-format to provided OutputStream
      ***********************************************************************************/
     void write(OutputStream stream) {
-        stream.write(segments);
+        // Setup input stream
+        scope ds = new DataOutput(stream);
+        ds.endian(ds.Network);
+
+        // Write header
+        ds.putByte(header.ver);
+        ds.putLong(header.hashed_amount);
+
+        // Write hashes
+        ds.putShort(header.hashes.length);
+        foreach (type, hash; header.hashes) {
+            ds.putByte(type);
+            ds.array(hash);
+        }
+
+        // Write segments
+        ds.putInt(segments.length);
+        foreach(seg; segments) {
+            ds.putLong(seg.start);
+            ds.putLong(seg.end);
+        }
+        ds.flush();
     }
 
     /************************************************************************************
