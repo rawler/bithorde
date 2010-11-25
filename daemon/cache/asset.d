@@ -46,6 +46,7 @@ version (Posix) {
 }
 
 const LOCALID_LENGTH = 32;
+const Hashers = [HashType.TREE_TIGER];
 
 private static ThreadLocal!(ubyte[]) tls_buf;
 private static this() {
@@ -170,8 +171,8 @@ public:
      ***********************************************************************************/
     this(FilePath path, AssetMetaData metadata, ulong size,
          HashIdsListener updateHashIds, bool usefsync) {
-        foreach (k,hash; HashMap)
-            hashes[hash.pbType] = hash.factory();
+        foreach (type; Hashers)
+            hashes[type] = HashMap[type].factory();
         this.updateHashIds = updateHashIds;
         this.usefsync = usefsync;
         super(path, metadata); // Parent calls open()
