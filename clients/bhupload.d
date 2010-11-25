@@ -195,7 +195,9 @@ private:
     void onComplete(IAsset asset, Status status, Identifier[] ids) {
         if (status == Status.SUCCESS) {
             Stdout(formatMagnet(ids, pos, args.file.file)).newline;
-            Stdout(formatED2K(ids, pos, args.file.file)).newline;
+            foreach (id; ids) if (id.type == HashType.ED2K) {
+                Stdout(formatED2K(ids, pos, args.file.file)).newline;
+            }
             exit(0);
         } else {
             Stderr("Non-successful upload", statusToString(status)).newline;
