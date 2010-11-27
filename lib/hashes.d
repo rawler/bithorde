@@ -26,11 +26,11 @@ private import tango.text.Util;
 public import tango.util.digest.Digest;
 private import tango.util.digest.Sha1;
 private import tango.util.digest.Sha256;
-private import tango.util.digest.Tiger;
 
 private static import base32 = lib.base32;
 private static import hex = lib.hex;
 private import lib.digest.ED2K;
+private import lib.digest.Tiger;
 private import lib.digest.HashTree;
 private import lib.message;
 
