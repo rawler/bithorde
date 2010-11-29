@@ -62,7 +62,7 @@ class Config
     FilePath logfile;
     Friend[char[]] friends;
     bool doDebug = false;
-    bool usefsync = true;
+    bool usefsync = false;
 
     /************************************************************************************
      * Create Config object from file
