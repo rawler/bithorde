@@ -31,6 +31,7 @@ private import tango.time.Time;
 
 private import lib.client;
 private import lib.hashes;
+private import lib.digest.stateful;
 private import lib.message;
 
 private import daemon.cache.metadata;
@@ -161,7 +162,7 @@ public:
 class WriteableAsset : BaseAsset {
 protected:
     CacheMap cacheMap;
-    Digest[HashType] hashes;
+    IStatefulDigest[HashType] hashes;
     ulong hashedPtr;
     HashIdsListener updateHashIds;
     bool usefsync;
@@ -171,13 +172,25 @@ public:
      ***********************************************************************************/
     this(FilePath path, AssetMetaData metadata, ulong size,
          HashIdsListener updateHashIds, bool usefsync) {
-        foreach (type; Hashers)
-            hashes[type] = HashMap[type].factory();
+        resetHashes();
         this.updateHashIds = updateHashIds;
         this.usefsync = usefsync;
         super(path, metadata); // Parent calls open()
         truncate(size);           // We resize it to right size
-        log = Log.lookup("daemon.cache.writeasset."~path.name[0..8]);
+        log = Log.lookup("daemon.cache.writeasset."~path.name[0..8]); // TODO: fix order and double-init
+    }
+
+    /************************************************************************************
+     * Init hashing from offset zero and with clean state.
+     ***********************************************************************************/
+    private void resetHashes() {
+        hashes = null;
+        hashedPtr = 0;
+        foreach (type; Hashers) {
+            auto factory = HashMap[type].factory;
+            if (factory)
+                hashes[type] = factory();
+        }
     }
 
     /************************************************************************************
@@ -188,6 +201,17 @@ public:
         scope idxFile = new File(idxPath.toString, File.Style(File.Access.Read, File.Open.Create));
         cacheMap = new CacheMap();
         cacheMap.load(idxFile);
+        hashedPtr = cacheMap.header.hashedAmount;
+        foreach (type, hasher; hashes) {
+            if (type in cacheMap.header.hashes) {
+                hasher.load(cacheMap.header.hashes[type]);
+            } else {
+                if (hashedPtr != 0)
+                    log.warn("Missing {} in stored hashState. Forced-reset, will trigger blocking rehash.", HashMap[type]);
+                resetHashes();
+                break;
+            }
+        }
         File.open(path.toString, File.Style(File.Access.ReadWrite, File.Open.Sedate));
     }
 
@@ -233,8 +257,15 @@ public:
     void sync() {
         scope CacheMap cmapToWrite;
         synchronized (this) {
-            if (cacheMap)
+            if (cacheMap) {
+                // TODO: Refactor this
+                cacheMap.header.hashedAmount = hashedPtr;
+                foreach (type, hasher; hashes) {
+                    auto buf = new ubyte[hasher.maxStateSize];
+                    cacheMap.header.hashes[type] = hasher.save(buf);
+                }
                 cmapToWrite = new CacheMap(cacheMap);
+            }
         }
         if (usefsync)
             fdatasync(fileHandle);
