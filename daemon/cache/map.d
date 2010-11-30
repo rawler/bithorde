@@ -38,8 +38,8 @@ final class CacheMap {
 
     struct Header {
         ubyte ver = 2;            /// Version of the current map
-        ulong hashed_amount;      /// Amount of bytes hashed starting from pos0
-        ubyte[][HashType] hashes; /// Hash-states from pos0->hashed_amount
+        ulong hashedAmount;      /// Amount of bytes hashed starting from pos0
+        ubyte[][HashType] hashes; /// Hash-states from pos0->hashedAmount
     }
 
     /************************************************************************************
@@ -110,8 +110,8 @@ public:
     /************************************************************************************
      * squash useless 0-size segments. Artifact from beta1, won't be needed later.
      ***********************************************************************************/
-    void store_hashes(ulong hashed_amount, ubyte[][HashType] hashes) {
-        header.hashed_amount = hashed_amount;
+    void store_hashes(ulong hashedAmount, ubyte[][HashType] hashes) {
+        header.hashedAmount = hashedAmount;
         header.hashes = null;
         foreach (k,v; hashes) {
             header.hashes[k] = v.dup;
@@ -154,7 +154,7 @@ public:
 
         // Read header
         header.ver = stream.getByte;
-        header.hashed_amount = stream.getLong;
+        header.hashedAmount = stream.getLong;
 
         // Read hashes
         header.hashes = null;
@@ -193,7 +193,7 @@ public:
         } catch (Exception e) {
             segments.length = 0;
             header.ver = 1;
-            header.hashed_amount = 0;
+            header.hashedAmount = 0;
             header.hashes = null;
         }
         return this;
@@ -209,7 +209,7 @@ public:
 
         // Write header
         ds.putByte(header.ver);
-        ds.putLong(header.hashed_amount);
+        ds.putLong(header.hashedAmount);
 
         // Write hashes
         ds.putShort(header.hashes.length);

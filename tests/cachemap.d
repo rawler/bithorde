@@ -52,7 +52,7 @@ void test_roundtrip() {
 
     synchronized (Stderr.stream) { Stderr("Verifying...").newline; }
 
-    if ( (map.header.hashed_amount != TEST_HASH_COUNT)
+    if ( (map.header.hashedAmount != TEST_HASH_COUNT)
         || !(HashType.TREE_TIGER in map.header.hashes)
         || (map.header.hashes[HashType.TREE_TIGER] != TEST_HASH) )
         throw new AssertException("Failed hashes-test", __FILE__, __LINE__);
@@ -77,7 +77,7 @@ void test_v1_load() {
     if ( (!map.has(10,18))
         || (map.has(28,1))
         || (map.header.ver != 2) // Data should be auto-converted to v2 on load.
-        || (map.header.hashed_amount != 0) )
+        || (map.header.hashedAmount != 0) )
         throw new AssertException("Failed", __FILE__, __LINE__);
 
     synchronized (Stderr.stream) { Stderr("SUCCESS!").newline; }
