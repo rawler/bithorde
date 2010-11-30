@@ -24,20 +24,19 @@ private import tango.text.convert.Format;
 private import tango.text.Util;
 
 public import tango.util.digest.Digest;
-private import tango.util.digest.Sha1;
-private import tango.util.digest.Sha256;
 
 private static import base32 = lib.base32;
 private static import hex = lib.hex;
 private import lib.digest.ED2K;
-private import lib.digest.Tiger;
 private import lib.digest.HashTree;
+private import lib.digest.stateful;
+private import lib.digest.Tiger;
 private import lib.message;
 
 /****************************************************************************************
  * The only function anyone need, really ;)
  ***************************************************************************************/
-Digest hashFactory(TYPE:Digest)() {
+IStatefulDigest hashFactory(TYPE:IStatefulDigest)() {
     return new TYPE;
 }
 
@@ -54,7 +53,9 @@ char[] base32NoPad(ubyte[] input) {
 struct HashDetail {
     HashType pbType;
     char[] name;
-    Digest function() factory;
+
+    /// Digester-factory for the hashId. May be null, indicating legacy hash-format.
+    IStatefulDigest function() factory;
     char[] function(ubyte[]) magnetFormatter;
     ubyte[] function(char[]) magnetDeformatter;
 }
@@ -67,9 +68,9 @@ HashDetail[char[]] HashNameMap;
  ***************************************************************************************/
 static this() {
     auto hashes = [
-        HashDetail(HashType.SHA1, "sha1", &hashFactory!(Sha1), &base32NoPad, &base32.decode),
+        HashDetail(HashType.SHA1, "sha1", null, &base32NoPad, &base32.decode),
+        HashDetail(HashType.ED2K, "ed2k", null, &base32NoPad, &base32.decode),
         HashDetail(HashType.TREE_TIGER, "tree:tiger", &hashFactory!(HashTree!(Tiger)), &base32NoPad, &base32.decode),
-        HashDetail(HashType.ED2K, "ed2k", &hashFactory!(ED2K), &base32NoPad, &base32.decode),
     ];
     foreach (h; hashes) {
         HashMap[h.pbType] = h;
