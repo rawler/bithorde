@@ -69,6 +69,11 @@ package class MerkleDamgard : Digest, IStatefulDigest
         private uint    bytes;
         private ubyte[] buffer;
 
+        /// Satisfy IStatefulDigest
+        char[] hexDigest(char[] buffer = null) {
+            return super.hexDigest(buffer);
+        }
+
         /***********************************************************************
 
                 Constructs the digest

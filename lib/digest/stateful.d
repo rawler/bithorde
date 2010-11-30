@@ -16,10 +16,14 @@
  ***************************************************************************************/
 module lib.digest.stateful;
 
+public import tango.util.digest.Digest;
+
 /****************************************************************************************
  * IStatefulDigest is the interface for Digesters able to store and load their state.
  * The state should be represented by a variable sequence of bytes in machine-
  * independent form. (Network Byte Order where it applies)
+ *
+ * TODO: Refactor to take OutputData-instances, or at least OutputStreams directly.
  ***************************************************************************************/
 interface IStatefulDigest {
     /************************************************************************************
@@ -38,4 +42,13 @@ interface IStatefulDigest {
      * size of the buffer the caller needs to allocate before calling store().
      ***********************************************************************************/
     size_t maxStateSize();
+
+    /// See: tango.util.digest.Digest
+    Digest update(void[] data);
+    /// ditto
+    ubyte[] binaryDigest(ubyte[] buffer = null);
+    /// ditto
+    uint digestSize();
+    /// ditto
+    char[] hexDigest(char[] buffer = null);
 }

@@ -36,8 +36,17 @@ final class Tiger : MerkleDamgard, IStatefulDigest
         private const uint      padChar = 0x01;
 
         /***********************************************************************
-
+                Satisfy IStatefulDigest
         ***********************************************************************/
+        char[] hexDigest(char[] buffer = null) {
+            return super.hexDigest(buffer);
+        }
+        Tiger update(void[] data) {
+            return super.update(data);
+        }
+        ubyte[] binaryDigest(ubyte[] buffer = null) {
+            return super.binaryDigest(buffer);
+        }
 
         private static const ulong[3] initial =
         [
