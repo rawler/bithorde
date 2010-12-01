@@ -159,7 +159,7 @@ public:
         auto buf = allocDigestBuf;
         auto hash = hasher.binaryDigest(buf);
         int i;
-        for (; hashes[i]; i++) {
+        for (; hashes[i].length; i++) {
             hasher.update(x"01");
             hasher.update(hashes[i]);
             hasher.update(hash);
@@ -186,7 +186,7 @@ public:
             while (data.length >= munch) {
                 hasher.update(data[0..munch]);
                 mergeUp();
-                data = data[munch..length];
+                data = data[munch..$];
                 munch = segmentsize;
             }
             buffered = data.length;
@@ -200,7 +200,7 @@ public:
         Get the final digest-result
 
         Remarks:
-        After completion, reset() the digest state
+        After completion, reset()s the digest state
     ***********************************************************************/
     ubyte[] binaryDigest(ubyte[] buffer_ = null) {
         if (buffered || (!hashes[0] && !root_idx))
@@ -220,12 +220,12 @@ public:
                     ret = hasher.binaryDigest(buffer_);
                     assert(ret.ptr == buffer_.ptr);
                 } else {
-                    buffer_[] = hashes[i];
+                    ret = buffer_[] = hashes[i];
                 }
             }
         }
         reset();
-        return buffer_;
+        return ret;
     }
 
     debug (UnitTest)
@@ -233,7 +233,9 @@ public:
         // Needs a Hash implementation to test with.
         import lib.digest.Tiger;
         import tango.core.tools.TraceExceptions;
-        unittest
+        static import base32 = lib.base32;
+
+        unittest // From http://web.archive.org/web/20080316033726/http://www.open-content.net/specs/draft-jchapweske-thex-02.html
         {
             static char[][] test_inputs = [
                 "",
@@ -243,17 +245,46 @@ public:
             ];
 
             static char[][] test_results = [
-                "5d9ed00a030e638bdb753a6a24fb900e5a63b8e73e6c25b6",
-                "aabbcca084acecd0511d1f6232a17bfaefa441b2982e5548",
-                "5fbd0e62ad016d596b77d1d28883b94fed78ecbaf4640914",
-                "7e591c1cd8f2e6121fdbcd8071ba279626b771642d10a3db",
+                "LWPNACQDBZRYXW3VHJVCJ64QBZNGHOHHHZWCLNQ",
+                "VK54ZIEEVTWNAUI5D5RDFIL37LX2IQNSTAXFKSA",
+                "L66Q4YVNAFWVS23X2HJIRA5ZJ7WXR3F26RSASFA",
+                "PZMRYHGY6LTBEH63ZWAHDORHSYTLO4LEFUIKHWY",
             ];
 
             auto h = new HashTree!(Tiger);
             foreach (uint i, char[] input; test_inputs)
             {
                 h.update(input);
-                char[] digest = h.hexDigest();
+                char[] digest = base32.encode(h.binaryDigest, false);
+                assert(digest == test_results[i],
+                        "("~digest~") != ("~test_results[i]~")");
+            }
+        }
+
+        unittest // Verify X*11*"A" for various X
+        {
+            static uint[] test_iters = [
+                10,
+                11,
+                21,
+                22,
+                337,
+            ];
+
+            static char[][] test_results = [
+                "VYX67IZT5P7ZDZXZAIMZEQJTUGR4X547Z3BGEAY",
+                "IWJQ24BQ4WZI2DSJOY2UXTUREPMEVPBP32LKGNA",
+                "VBQ7BISX6FA4VHW6VFYLDIL45UAKVLPFZN5UILA",
+                "5E6JJPXXFIL6Q6WEYO7MWIUU6I4QWD7PS5SWGIY",
+                "LTCFSQXC3WVNIGVNLWHJKHXADRUN2Q24XL5P3OY",
+            ];
+
+            auto h = new HashTree!(Tiger);
+            foreach (uint i, uint x; test_iters)
+            {
+                for (; x > 0; x--)
+                    h.update("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
+                char[] digest = base32.encode(h.binaryDigest, false);
                 assert(digest == test_results[i],
                         "("~digest~") != ("~test_results[i]~")");
             }
