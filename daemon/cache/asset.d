@@ -163,7 +163,7 @@ class WriteableAsset : BaseAsset {
 protected:
     CacheMap cacheMap;
     IStatefulDigest[HashType] hashes;
-    ulong hashedPtr;
+    ulong hashedPtr, _length;
     HashIdsListener updateHashIds;
     bool usefsync;
 public:
@@ -177,6 +177,7 @@ public:
         this.usefsync = usefsync;
         super(path, metadata); // Parent calls open()
         truncate(size);           // We resize it to right size
+        _length = size;
         log = Log.lookup("daemon.cache.writeasset."~path.name[0..8]); // TODO: fix order and double-init
     }
 
@@ -295,7 +296,7 @@ protected:
             foreach (hash; hashes) {
                 hash.update(buf[0..bufsize]);
             }
-            if (zeroBlockSize == length)
+            if (zeroBlockSize == _length)
                 finish();
             else
                 hashedPtr = zeroBlockSize;
