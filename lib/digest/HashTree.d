@@ -18,22 +18,27 @@
  ******************************************************************************/
 module lib.digest.HashTree;
 
+private import tango.io.device.Array;
+private import tango.io.stream.Data;
 private import tango.util.container.more.Stack;
 private import tango.util.digest.Digest;
+
+private import lib.digest.stateful;
+private import ne = lib.networkendian;
 
 /*******************************************************************************
  * Implementation of the Merkle Hash Tree.
  *
  * References: http://en.wikipedia.org/wiki/Hash_tree
 *******************************************************************************/
-class HashTree(DIGEST) : Digest {
+class HashTree(DIGEST:IStatefulDigest) : Digest, IStatefulDigest {
 private:
     DIGEST hasher;
     ubyte[][128] hashes; // 128-level tree, with the default 1k blocksize is a VERY large file of trillions of exabytes, yet consumes only 3.5k of memory to hash (with tiger)
     uint segmentsize;
     ubyte root_idx;
     size_t buffered;
-    Stack!(ubyte[],hashes.length) _freeList;
+    Stack!(ubyte[], hashes.length) _freeList;
 public:
     this (size_t segmentsize=1024)
     {
@@ -42,6 +47,73 @@ public:
         for (int i; i < hashes.length; i++)
             _freeList.push(new ubyte[digestSize]);
         reset();
+    }
+
+    private ubyte[] allocDigestBuf() {
+        if (_freeList.size)
+            return _freeList.pop;
+        else
+            return new ubyte[digestSize];
+    }
+
+    private void freeDigestBuf(ubyte[] buf) {
+        if (_freeList.unused)
+            _freeList.push(buf);
+        else
+            delete buf;
+    }
+
+    /***********************************************************************
+        Store state to provided buffer
+    ***********************************************************************/
+    ubyte[] save(ubyte[] buf) {
+        auto wbuf = buf[hasher.save(buf).length..$];
+        auto arr = new Array(wbuf, 0);
+        auto outp = new DataOutput(arr);
+        outp.endian(DataOutput.Network);
+        outp.int8(root_idx);
+        foreach (h; hashes[0..root_idx+1]) {
+            outp.int8(h.length);
+            if (h.length) {
+                auto w = outp.write(h);
+                assert(w == h.length);
+            }
+        }
+        outp.int32(segmentsize);
+        outp.int32(buffered);
+        return buf[0..(wbuf.ptr-buf.ptr)+arr.limit];
+    }
+
+    /***********************************************************************
+        Load state from provided buffer
+    ***********************************************************************/
+    size_t load(ubyte[] buf) {
+        auto rbuf = buf[hasher.load(buf)..$];
+        auto arr = new Array(rbuf);
+        auto inp = new DataInput(arr);
+        inp.endian(DataInput.Network);
+        root_idx = inp.int8;
+        foreach (ref h; hashes[0..root_idx+1]) {
+            ubyte blen = inp.int8;
+            if (blen) {
+                assert(blen == digestSize);
+                h = allocDigestBuf;
+                auto r = inp.read(h);
+                assert(r == blen);
+            }
+        }
+        segmentsize = inp.int32;
+        buffered = inp.int32;
+        return (rbuf.ptr - buf.ptr) + arr.position;
+    }
+
+    /***********************************************************************
+        Maximum size of state. Depends on underlying hash.
+    ***********************************************************************/
+    size_t maxStateSize() {
+        return segmentsize.sizeof + root_idx.sizeof +
+               buffered.sizeof + (hashes.length*(1+hasher.digestSize)) +
+               hasher.maxStateSize;
     }
 
     /***********************************************************************
@@ -62,8 +134,8 @@ public:
     void reset()
     {
         foreach (ref buf; hashes) {
-            if (buf) {
-                _freeList.push(buf);
+            if (buf.length) {
+                freeDigestBuf(buf);
                 buf = null;
             }
         }
@@ -77,7 +149,7 @@ public:
         Process a finished segment, and push node to tree
     ***********************************************************************/
     private void mergeUp() {
-        auto buf = _freeList.pop();
+        auto buf = allocDigestBuf;
         auto hash = hasher.binaryDigest(buf);
         int i;
         for (; hashes[i]; i++) {
@@ -86,7 +158,7 @@ public:
             hasher.update(hash);
             hash = hasher.binaryDigest(buf);
 
-            _freeList.push(hashes[i]);
+            freeDigestBuf(hashes[i]);
             hashes[i] = null;
         }
         hashes[i] = hash;
@@ -128,7 +200,7 @@ public:
             mergeUp();
 
         if ((!buffer_) || (buffer_.length < digestSize))
-            buffer_ = new ubyte[digestSize];
+            buffer_ = allocDigestBuf;
         ubyte[] ret = null;
         hasher.reset();
         // Merge everything up to root
@@ -152,7 +224,8 @@ public:
     debug (UnitTest)
     {
         // Needs a Hash implementation to test with.
-        import tango.util.digest.Tiger;
+        import lib.digest.Tiger;
+        import tango.core.tools.TraceExceptions;
         unittest
         {
             static char[][] test_inputs = [
@@ -176,6 +249,39 @@ public:
                 char[] digest = h.hexDigest();
                 assert(digest == test_results[i],
                         "("~digest~") != ("~test_results[i]~")");
+            }
+        }
+
+        unittest // Verify save/load works as intended
+        {
+            auto test = x"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+            auto testcnt = 1024;
+            auto reference = new HashTree!(Tiger);
+            for (auto i=0; i < testcnt; i++)
+                reference.update(test);
+            auto result = reference.hexDigest;
+
+            ubyte[] buf = new ubyte[reference.maxStateSize];
+
+            for (auto split = 0; split <= testcnt; split+=16) {
+                scope a = new HashTree!(Tiger);
+                for (auto i=0; i < split; i++)
+                    a.update(test);
+                scope state1 = a.save(buf).dup;
+
+                for (auto i=split; i < testcnt; i++)
+                    a.update(test);
+                assert(a.hexDigest() == result);
+
+                scope b = new HashTree!(Tiger);
+                b.load(state1);
+                scope state2 = b.save(buf).dup;
+                assert(state1 == state2);
+
+                for (auto i=split; i < testcnt; i++)
+                    b.update(test);
+
+                assert(b.hexDigest() == result);
             }
         }
     }

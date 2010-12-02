@@ -229,13 +229,14 @@ package class MerkleDamgard : Digest, IStatefulDigest
                 Load state from provided buffer
 
         ***********************************************************************/
-        void load(ubyte[] buf) {
+        size_t load(ubyte[] buf) {
                 const bs = bytes.sizeof;
                 auto bmem = (cast(ubyte*)&bytes)[0..bs];
                 bmem[0..$] = buf[0..bs];
                 ne.bswapa32(bmem);
                 auto bufFill = bytes % buffer.length;
                 buffer[0..bufFill] = buf[bs..bs+bufFill];
+                return bs+bufFill;
         }
 
         /***********************************************************************

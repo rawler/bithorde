@@ -84,7 +84,7 @@ final class Tiger : MerkleDamgard, IStatefulDigest
                 Load state from provided buffer
 
         ***********************************************************************/
-        void load(ubyte[] buf) {
+        size_t load(ubyte[] buf) {
                 const cs = context.sizeof;
                 auto cmem = cast(ubyte[])context;
                 cmem[0..$] = buf[0..cs];
@@ -93,7 +93,7 @@ final class Tiger : MerkleDamgard, IStatefulDigest
                 auto nmem = (cast(ubyte*)&npass)[0..ns];
                 nmem[0..$] = buf[cs..cs+ns];
                 ne.bswapa32(nmem);
-                super.load(buf[cs+ns..$]);
+                return cs + ns + super.load(buf[cs+ns..$]);
         }
 
         /***********************************************************************
@@ -929,7 +929,7 @@ debug(UnitTest)
         }
         }
 
-        unittest
+        unittest // Verify save/load works as intended
         {
             auto test = x"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
                         x"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
@@ -938,7 +938,7 @@ debug(UnitTest)
             auto reference = new Tiger();
             auto result = reference.update(test).hexDigest;
 
-            for (auto split = 0; split < 128; split++) {
+            for (auto split = 0; split <= 128; split++) {
                 ubyte[256] buf;
 
                 scope a = new Tiger();

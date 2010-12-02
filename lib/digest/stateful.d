@@ -29,9 +29,9 @@ interface IStatefulDigest {
     ubyte[] save(ubyte[] buf);
 
     /************************************************************************************
-     * Load the state provided in buf
+     * Load the state provided in buf, and return the number of consumed bytes.
      ***********************************************************************************/
-    void load(ubyte[] buf);
+    size_t load(ubyte[] buf);
 
     /************************************************************************************
      * Return the maximum required size for preserving the state. In short, the
