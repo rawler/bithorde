@@ -1,3 +1,19 @@
+bithorde (0.0.9+0.1rc1) maverick; urgency=low
+
+  * Cached zero-block hashing. Stores partially computed zero-block hashes of 
+    assets between bithorde restarts. Reduces problems with blocking hashing
+    during streaming.
+  * Reduced hash-generation to only Tiger-TreeHashes (tree:tiger). Reduces
+    cpu-load greatly. Hashes md5 and sha1-ids generated will keep the id:s, but
+    won't be retained on upload.
+  * Disable fsync by default. Causes noticeable blocks on streaming. Can be re-
+    enabled in config.
+  * Fixed bug in TreeHashes generating faulty checksums. Existing assets will
+    still remain valid through md5 and sha1.
+  * Some minor fixes.
+
+ -- Ulrik Mikaelsson <ulrik.mikaelsson@gmail.com>  Sun, 05 Dec 2010 17:34:24 +0100
+
 bithorde (0.0.9+0.1beta6) maverick; urgency=low
 
   * Some feature-improvements;
