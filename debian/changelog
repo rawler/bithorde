@@ -1,3 +1,9 @@
+bithorde (0.1) maverick; urgency=low
+
+  * Re-tag for 0.1 release.
+
+ -- Ulrik Mikaelsson <ulrik.mikaelsson@gmail.com>  Wed, 22 Dec 2010 11:48:19 +0100
+
 bithorde (0.0.9+0.1rc1) maverick; urgency=low
 
   * Cached zero-block hashing. Stores partially computed zero-block hashes of 
