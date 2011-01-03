@@ -70,6 +70,7 @@ function wait_until_found() {
 function daemons_start() {
     clean && setup || exit_error "Failed setup"
     trap daemons_stop EXIT
+    touch a.log b.log # Make sure they exist
     "$SERVER" a.config &> a.log &
     DAEMON1=$!
     echo Daemon A is $DAEMON1
