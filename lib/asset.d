@@ -46,5 +46,5 @@ interface IAsset {
 
 /// Callbacks for requests
 alias void delegate(IAsset, Status, AssetStatus) BHAssetStatusCallback;
-alias void delegate(IAsset, Status, ReadRequest, ReadResponse) BHReadCallback;
+alias void delegate(Status, ReadRequest, ReadResponse) BHReadCallback;
 

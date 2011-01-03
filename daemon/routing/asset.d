@@ -86,7 +86,7 @@ public:
         } else {
             auto resp = new ReadResponse;
             resp.status = Status.NOTFOUND;
-            cb(this, Status.NOTFOUND, null, resp);
+            cb(Status.NOTFOUND, null, resp);
         }
     }
 

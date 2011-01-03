@@ -137,7 +137,7 @@ public:
             resp.offset = offset;
             resp.content = buf[0..got];
         }
-        cb(this, resp.status, null, resp); // TODO: should really hold reference to req
+        cb(resp.status, null, resp); // TODO: should really hold reference to req
     }
 
     /************************************************************************************
@@ -221,9 +221,9 @@ public:
      ***********************************************************************************/
     synchronized void aSyncRead(ulong offset, uint length, BHReadCallback cb) {
         if (length == 0) {
-            cb(this, message.Status.SUCCESS, null, null);
+            cb(message.Status.SUCCESS, null, null);
         } else if (this.cacheMap && !this.cacheMap.has(offset, length)) {
-            cb(this, message.Status.NOTFOUND, null, null);
+            cb(message.Status.NOTFOUND, null, null);
         } else {
             super.aSyncRead(offset, length, cb);
         }
@@ -418,9 +418,9 @@ private:
         void fail() {
             auto resp = new lib.message.ReadResponse;
             resp.status = message.Status.NOTFOUND;
-            cb(this.outer, resp.status, null, resp);
+            cb(resp.status, null, resp);
         }
-        void callback(IAsset asset, message.Status status, message.ReadRequest req, message.ReadResponse resp) {
+        void callback(message.Status status, message.ReadRequest req, message.ReadResponse resp) {
             if (status == message.Status.SUCCESS && resp && resp.content.length) {
                 if (cacheMap) // May no longer be open for writing, due to stale requests
                     add(resp.offset, resp.content);

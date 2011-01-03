@@ -176,11 +176,11 @@ class BitHordeFilesystem : Filesystem {
          *******************************************************************************/
         void read(ReadRequest* r) {
             if (r.size == 0) {
-                r.onReadResponse(null, Status.SUCCESS, null, null);
+                r.onReadResponse(Status.SUCCESS, null, null);
             } else if (asset && !asset.closed) {
                 asset.aSyncRead(r.offset, r.size, &r.onReadResponse);
             } else {
-                r.onReadResponse(null, Status.INVALID_HANDLE, null, null);
+                r.onReadResponse(Status.INVALID_HANDLE, null, null);
             }
         }
     }
@@ -241,7 +241,7 @@ class BitHordeFilesystem : Filesystem {
         off_t offset;
         size_t size;
 
-        void onReadResponse(IAsset _asset, Status sCode, lib.message.ReadRequest _, ReadResponse resp) {
+        void onReadResponse(Status sCode, lib.message.ReadRequest _, ReadResponse resp) {
             if (size == 0) { // EOF, we have not requested anything
                 fuse_reply_buf(req, null, size);
             } else if ((sCode == Status.SUCCESS) &&

@@ -79,7 +79,7 @@ public:
     this(Client c) {
         client = c;
     }
-    final void callback(IAsset asset, message.Status status, message.ReadRequest remoteReq, message.ReadResponse remoteResp) {
+    final void callback(message.Status status, message.ReadRequest remoteReq, message.ReadResponse remoteResp) {
         if (client && !client.closed) {
             scope resp = new message.ReadResponse;
             resp.rpcId = rpcId;
@@ -93,7 +93,7 @@ public:
         delete this;
     }
     void abort(message.Status s) {
-        callback(null, s, null, null);
+        callback(s, null, null);
     }
 }
 

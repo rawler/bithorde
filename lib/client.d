@@ -62,7 +62,7 @@ class RemoteAsset : private IAsset {
                 retries -= 1;
                 client.sendRPCRequest(this);
             } else {
-                _callback(this.outer, s, this, resp);
+                _callback(s, this, resp);
             }
         }
         void abort(message.Status s) {
@@ -161,7 +161,7 @@ public:
     /// ditto
     void aSyncRead(ulong offset, uint size, BHReadCallback readCallback, ushort retries, TimeSpan timeout) {
         if (closed || (!client) || client.closed)
-            readCallback(this, message.Status.DISCONNECTED, null, null);
+            readCallback(message.Status.DISCONNECTED, null, null);
         auto req = new ReadRequest(readCallback, retries);
         req.offset = offset;
         req.size = size;
