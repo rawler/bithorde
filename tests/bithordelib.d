@@ -130,6 +130,7 @@ void testLibTimeout(SteppingServer s) {
     }, TimeSpan.fromMillis(500));
     LOG.info("Request sent, expecting Timeout");
     client.run();
+    s.step(2);
 }
 
 /****************************************************************************************
