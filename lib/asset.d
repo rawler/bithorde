@@ -21,7 +21,7 @@ public import tango.core.Traits;
 
 import lib.message;
 
-alias ushort  AssetHandle;
+alias ushort AssetHandle;
 
 /****************************************************************************************
  * Definitition of a BitHorde asset

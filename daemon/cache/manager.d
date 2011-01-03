@@ -57,6 +57,8 @@ const FLUSH_INTERVAL_SEC = 30;
  ***************************************************************************************/
 class CacheManager : IAssetSource {
     class MetaData : daemon.cache.metadata.AssetMetaData, IServerAsset {
+        mixin IAsset.StatusSignal;
+
         private BaseAsset _openAsset;
 
         void onStatusUpdate(IAsset asset, message.Status sCode, message.AssetStatus s) {
@@ -71,6 +73,10 @@ class CacheManager : IAssetSource {
             if (_openAsset)
                 attachWatcher(&onStatusUpdate);
             return _openAsset;
+        }
+
+        void onBackingUpdate(IAsset backing, message.Status sCode, message.AssetStatus s) {
+            _statusSignal.call(this, sCode, s);
         }
 
         /********************************************************************************
@@ -101,7 +107,6 @@ class CacheManager : IAssetSource {
             return _openAsset !is null;
         }
         synchronized bool isWritable() {
-            log.trace("Is Writable: {}", cast(void*)(cast(WriteableAsset)_openAsset));
             return (cast(WriteableAsset)_openAsset) !is null;
         }
 
@@ -121,15 +126,6 @@ class CacheManager : IAssetSource {
                 return _openAsset.size;
             else
                 assert(false);
-        }
-
-        synchronized void attachWatcher(BHAssetStatusCallback watcher) {
-            if (_openAsset) return _openAsset.attachWatcher(watcher);
-            else assert(false);
-        }
-        synchronized void detachWatcher(BHAssetStatusCallback watcher) {
-            if (_openAsset) return _openAsset.detachWatcher(watcher);
-            else assert(false);
         }
 
         synchronized void aSyncRead(ulong offset, uint length, BHReadCallback cb) {
@@ -162,6 +158,8 @@ class CacheManager : IAssetSource {
         void updateHashIds(message.Identifier[] ids) {
             this.hashIds = ids;
             addToIdMap(this);
+
+            _statusSignal.call(this, message.Status.SUCCESS, null);
         }
     }
 

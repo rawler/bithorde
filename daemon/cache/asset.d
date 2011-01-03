@@ -66,11 +66,16 @@ private static ubyte[] tlsBuffer(uint size) {
 
 alias void delegate(Identifier[]) HashIdsListener;
 
+interface IAssetData {
+    void aSyncRead(ulong offset, uint length, BHReadCallback);
+    ulong size();
+    void close();
+}
+
 /****************************************************************************************
  * Base for all kinds of cached assets. Provides basic reading functionality
  ***************************************************************************************/
-class BaseAsset : private File, IServerAsset {
-    mixin IAsset.StatusSignal;
+class BaseAsset : private File, public IAssetData {
 protected:
     FilePath path;
     FilePath idxPath;
@@ -323,13 +328,11 @@ protected:
             hashIds[i++] = hashId;
         }
 
-        updateHashIds(hashIds);
-
         cacheMap = null;
         sync();
         idxPath.remove();
 
-        _statusSignal.call(this, message.Status.SUCCESS, null);
+        updateHashIds(hashIds);
     }
 }
 
@@ -362,7 +365,7 @@ public:
     this (FilePath path, AssetMetaData metadata, IServerAsset remoteAsset,
           HashIdsListener updateHashIds, bool usefsync) {
         this.remoteAsset = remoteAsset;
-        remoteAsset.attachWatcher(&onBackingUpdate);
+        remoteAsset.attachWatcher(&metadata.onBackingUpdate);
         super(path, metadata, remoteAsset.size, updateHashIds, usefsync); // TODO: Verify remoteAsset.size against local file
         log = Log.lookup("daemon.cache.cachingasset." ~ path.name[0..8]);
         log.trace("Caching remoteAsset of size {}", size);
@@ -387,11 +390,6 @@ protected:
 private:
     void realRead(ulong offset, uint length, BHReadCallback cb) {
         super.aSyncRead(offset, length, cb);
-    }
-
-    void onBackingUpdate(IAsset backing, message.Status sCode, message.AssetStatus s) {
-        log.trace("Was here");
-        _statusSignal.call(this, sCode, s);
     }
 
     /************************************************************************************
