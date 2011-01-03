@@ -207,18 +207,20 @@ protected:
     {
         auto req = new daemon.client.BindRead(this);
         req.decode(buf);
+
+        // Test if asset-handle is previously used.
+        auto openAsset = req.handle in openAssets;
+        if (openAsset) {
+            openAsset.close();
+            openAssets.remove(req.handle);
+        }
+
         if (req.idsIsSet) {
             log.trace("Got open request #{}, {}", req.uuid, formatMagnet(req.ids, 0));
             if (!req.uuidIsSet)
                 req.uuid = rand.uniformR2!(ulong)(1,ulong.max);
             openAssets[req.handle] = new BoundAsset(req);
         } else {
-            auto openAsset = req.handle in openAssets;
-            if (openAsset) {
-                openAsset.close();
-                openAssets[req.handle] = null;
-            }
-
             scope resp = new message.AssetStatus();
             resp.handle = req.handle;
             resp.status = message.Status.NOTFOUND;
