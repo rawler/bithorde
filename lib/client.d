@@ -407,6 +407,7 @@ protected:
      ***********************************************************************************/
     protected void onAssetClosed(RemoteAsset asset) {
         freeAssetHandles.push(asset.handle);
+        boundAssets[asset.handle] = null;
     }
 
     /************************************************************************************
