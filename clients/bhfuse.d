@@ -42,6 +42,11 @@ private import tango.util.container.more.Heap;
 private import tango.util.log.AppendConsole;
 private import tango.util.log.LayoutDate;
 private import tango.util.log.Log;
+version(Windows)
+{
+ 	import tango.sys.win32.UserGdi;
+    extern(Windows) HWND GetConsoleWindow();
+} 
 
 private import lib.arguments;
 private import lib.cachedalloc;
@@ -541,8 +546,32 @@ int main(char[][] args)
             log.error("Did not find user 'nobody'. Running with root privileges!");
         }
     }
-
-    auto pump = new Pump([cast(IProcessor)fs, client]);
+    
+    static Pump pump;
+    pump = new Pump([cast(IProcessor)fs, client]);
+    
+    version(Posix)
+    {
+        //allow clean shutdown on signal
+        static extern(C) void shutdown(int sig)
+        {
+            pump.close();
+        }
+        signal(SIGINT, &shutdown);
+        signal(SIGTERM, &shutdown);
+    }
+    
+    version(Windows)
+    {
+        //allow clean shutdown on signal
+        static extern(Windows) WINBOOL shutdown(uint sig)
+        {
+         	pump.close();
+            return true;
+        }
+        SetConsoleCtrlHandler(&shutdown, true);
+    }
+    
     pump.run();
     return 0;
 }
