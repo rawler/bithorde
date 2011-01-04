@@ -21,6 +21,7 @@ module lib.pumping;
 public import tango.io.model.IConduit;
 public import tango.io.selector.model.ISelector;
 import tango.io.selector.Selector;
+import tango.io.selector.SelectorException;
 import tango.time.Clock;
 
 /****************************************************************************************
@@ -108,15 +109,16 @@ public:
      * Shuts down this pump, stops the main loop and frees resources.
      ***********************************************************************************/
     void close() {
-        selector.close;
+        auto s = selector;
         selector = null;
+        s.close;
     }
 
     /************************************************************************************
      * Run until closed
      ***********************************************************************************/
     void run() {
-        while (selector) {
+        try while (selector) {
             Time nextDeadline = Time.max;
             foreach (p; processors) {
                 auto t = p.nextDeadline;
@@ -139,6 +141,10 @@ public:
             auto now = Clock.now;
             foreach (p; processors)
                 p.processTimeouts(now);
+        } catch (SelectorException e) {
+            // Ignore thrown SelectException during shutdown, due to Tango ticket #2025
+            if (selector)
+                throw e;
         }
     }
 }
