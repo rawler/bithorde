@@ -202,20 +202,30 @@ if __name__ == '__main__':
     from base64 import b32decode
     import sys
 
-    assetId = None
+    def parseTigerHash(string):
+        string = string + "="*(5-(len(string)%5)) # Pad with = for b32decodes:s pleasure
+        return b32decode(string, True)
 
     class MyAsset(Asset):
         def onStatusUpdate(self, status):
-            print "Asset status: %s" % status
+            print "Asset status: %s, %s" % (self.requestId, message._STATUS.values_by_number[status.status].name)
             Asset.onStatusUpdate(self, status)
-            self.client.close()
+            self.client.gotResponse(self, status)
 
     class MyClient(Client):
         def nodeConnected(self):
-            print "Node (%s) connected, asking for asset." % (self.remoteUser)
-            asset = MyAsset()
-            self.allocateHandle(asset)
-            asset.bind({message.TREE_TIGER: assetId})
+            print "Node (%s) connected, asking for asset(s)." % (self.remoteUser)
+            self.requestCount = len(assetIds)
+            for assetId in assetIds:
+                asset = MyAsset()
+                asset.requestId = assetId
+                self.allocateHandle(asset)
+                asset.bind({message.TREE_TIGER: parseTigerHash(assetId)})
+
+        def gotResponse(self, asset, status):
+            self.requestCount -= 1
+            if not self.requestCount:
+                self.close()
 
     class MyFactory(ClientFactory):
         def clientConnectionFailed(self, connector, reason):
@@ -226,10 +236,10 @@ if __name__ == '__main__':
             print "Connection lost - goodbye!"
             reactor.stop()
 
-    if len(sys.argv) == 2:
-        assetId = b32decode(sys.argv[1], True)
+    if len(sys.argv) > 1:
+        assetIds = sys.argv[1:]
         reactor.connectUNIX("/tmp/bithorde", MyFactory(MyClient))
         reactor.run()
     else:
-        print "Usage: %s <tiger tree hash: base32>" % sys.argv[0]
+        print "Usage: %s <tiger tree hash: base32> ..." % sys.argv[0]
 
