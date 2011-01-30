@@ -15,9 +15,10 @@
 # ready to be added to ADD_EXECUTABLE/ADD_LIBRARY. E.g,
 #
 #  WRAP_PROTO(PROTO_SRC myproto.proto external.proto)
-#  ADD_EXECUTABLE(server ${server_SRC} {PROTO_SRC})
+#  ADD_EXECUTABLE(server ${server_SRC} ${PROTO_SRC})
 #
 # Author: Esben Mose Hansen <esben at ange.dk>, (C) Ange Optimization ApS 2008
+# Modified For Python By: Ulrik Mikaelsson (C) 2010
 #
 # Redistribution and use is allowed according to the terms of the BSD license.
 # For details see the accompanying COPYING-CMAKE-SCRIPTS file.
@@ -50,24 +51,22 @@ ENDIF (PROTOBUF_LIBRARY AND PROTOBUF_INCLUDE_DIR AND PROTOBUF_PROTOC_EXECUTABLE)
 
 IF (PROTOBUF_FOUND)
   # Define the WRAP_PROTO function
-  FUNCTION(WRAP_PROTO VAR)
+  FUNCTION(WRAP_PROTO_PYTHON VAR)
     IF (NOT ARGN)
-      MESSAGE(SEND_ERROR "Error: WRAP PROTO called without any proto files")
+      MESSAGE(SEND_ERROR "Error: WRAP_PROTO_PYTHON called without any proto files")
       RETURN()
     ENDIF(NOT ARGN)
 
-    SET(INCL)
     SET(${VAR})
     FOREACH(FIL ${ARGN})
       GET_FILENAME_COMPONENT(ABS_FIL ${FIL} ABSOLUTE)
       GET_FILENAME_COMPONENT(FIL_WE ${FIL} NAME_WE)
-      LIST(APPEND ${VAR} "${CMAKE_CURRENT_BINARY_DIR}/${FIL_WE}.pb.cc")
-      LIST(APPEND INCL "${CMAKE_CURRENT_BINARY_DIR}/${FIL_WE}.pb.h")
+      LIST(APPEND ${VAR} "${CMAKE_CURRENT_BINARY_DIR}/${FIL_WE}_pb2.py")
 
       ADD_CUSTOM_COMMAND(
-        OUTPUT ${${VAR}} ${INCL}
+        OUTPUT ${${VAR}}
         COMMAND  ${PROTOBUF_PROTOC_EXECUTABLE}
-        ARGS --cpp_out  ${CMAKE_CURRENT_BINARY_DIR} --proto_path ${CMAKE_CURRENT_SOURCE_DIR} ${ABS_FIL}
+        ARGS --python_out  ${CMAKE_CURRENT_BINARY_DIR} --proto_path ${CMAKE_CURRENT_SOURCE_DIR} ${ABS_FIL}
         DEPENDS ${ABS_FIL}
         COMMENT "Running protocol buffer compiler on ${FIL}"
         VERBATIM )
@@ -76,5 +75,5 @@ IF (PROTOBUF_FOUND)
 
     SET(${VAR} ${${VAR}} PARENT_SCOPE)
 
-  ENDFUNCTION(WRAP_PROTO)
+  ENDFUNCTION(WRAP_PROTO_PYTHON)
 ENDIF(PROTOBUF_FOUND)
