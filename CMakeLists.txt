@@ -36,10 +36,12 @@ INSTALL(FILES template.config
 )
 
 # PyBitHorde
+set(PyHorde_INSTALL_DIR python CACHE PATH "Where should the Python client-library be installed?")
+
 WRAP_PROTO_PYTHON(BITHORDE_PROTO ${CMAKE_SOURCE_DIR}/bithorde.proto)
-ADD_CUSTOM_TARGET(pybithorde ALL DEPENDS ${BITHORDE_PROTO})
+ADD_CUSTOM_TARGET(PyHorde ALL DEPENDS ${BITHORDE_PROTO})
 INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/python/bithorde.py ${BITHORDE_PROTO}
-  DESTINATION python
+  DESTINATION ${PyHorde_INSTALL_DIR}
 )
 
 # Tests
