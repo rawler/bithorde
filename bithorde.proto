@@ -57,7 +57,7 @@ message AssetStatus { // Server->Client, confirm bind-status (respond to Bind-Re
   // any sense, but only relative to other assets in the same pipe. Each node estimates
   // availability of assets by this number, factored in the availability and priority of
   // the Serving-Friend itself. (Bandwidth, uptime, ...)
-  optional uint availability = 5;
+  optional uint32 availability = 5;
 }
 
 message Read {

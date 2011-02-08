@@ -15,7 +15,7 @@ export DEB_BUILD_OPTIONS=nostrip
 	dh  $@
 
 override_dh_auto_configure:
-	dh_auto_configure -- -DCONF_INSTALL_DIR="/etc"
+	dh_auto_configure -- -DCONF_INSTALL_DIR="/etc" -DPyHorde_INSTALL_DIR="/usr/share/pyshared"
 
 override_dh_installinit:
 	dh_installinit --name=bhfuse

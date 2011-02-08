@@ -6,6 +6,7 @@ project (BitHorde)
 # Init D-stuff
 set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 FIND_PACKAGE(D REQUIRED)
+FIND_PACKAGE(ProtocolBuffers REQUIRED)
 
 set(D_DEBUG_KEYS "" CACHE STRING "Special debug-keywords to build with.")
 add_d_debugs(${D_DEBUG_KEYS})
@@ -32,6 +33,15 @@ set(CONF_INSTALL_DIR etc CACHE PATH "Where should config-template be installed?"
 INSTALL(FILES template.config
   DESTINATION ${CONF_INSTALL_DIR}
   RENAME bithorde.conf
+)
+
+# PyBitHorde
+set(PyHorde_INSTALL_DIR python CACHE PATH "Where should the Python client-library be installed?")
+
+WRAP_PROTO_PYTHON(BITHORDE_PROTO ${CMAKE_SOURCE_DIR}/bithorde.proto)
+ADD_CUSTOM_TARGET(PyHorde ALL DEPENDS ${BITHORDE_PROTO})
+INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/python/bithorde.py ${BITHORDE_PROTO}
+  DESTINATION ${PyHorde_INSTALL_DIR}
 )
 
 # Tests
