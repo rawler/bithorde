@@ -25,10 +25,12 @@ private import tango.net.device.Berkeley;
 private import tango.net.device.LocalSocket;
 private import tango.net.device.Socket;
 private import tango.net.InternetAddress;
+private import tango.stdc.errno;
 private import tango.stdc.posix.sys.stat;
 private import tango.stdc.signal;
 private import unistd = tango.stdc.posix.unistd;
 private import Text = tango.text.Util;
+private import tango.sys.Common;
 private import tango.time.Clock;
 private import tango.util.container.more.Stack;
 private import tango.util.Convert;
@@ -50,6 +52,10 @@ version (linux) {
         Handle fileHandle() { return cast(Handle)_handle; }
         this() {
             _handle = eventfd(0, 0);
+            if (_handle < 0) {
+                int errorCode = errno;
+                throw new Exception("Error creating eventfd: " ~ SysError.lookup(errorCode), __FILE__, __LINE__);
+            }
         }
         ~this() {
             unistd.close (_handle);
