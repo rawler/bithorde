@@ -24,7 +24,6 @@ private import tango.time.Time;
 private import tango.util.log.Log;
 
 import daemon.server;
-import daemon.cache.asset;
 import daemon.cache.manager;
 import lib.asset;
 import lib.client;
@@ -165,8 +164,8 @@ class Client : lib.client.Client {
             return assetSource.aSyncRead(offset, length, cb);
         }
         void addDataSegment(message.DataSegment req) {
-            auto asset = cast(WriteableAsset)assetSource;
-            if (asset)
+            auto asset = cast(CacheManager.MetaData)assetSource;
+            if (asset && asset.isWritable)
                 asset.add(req.offset, req.content);
             else
                 log.warn("Client trying to write to non-writeable asset!");

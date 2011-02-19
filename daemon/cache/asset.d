@@ -69,7 +69,7 @@ alias void delegate(Identifier[]) HashIdsListener;
 /****************************************************************************************
  * Base for all kinds of cached assets. Provides basic reading functionality
  ***************************************************************************************/
-class BaseAsset : private File, public IServerAsset {
+class BaseAsset : private File, IServerAsset {
     mixin IAsset.StatusSignal;
 protected:
     FilePath path;
@@ -358,29 +358,11 @@ class UploadAsset : WriteableAsset {
  ***************************************************************************************/
 class CachingAsset : WriteableAsset {
     IServerAsset remoteAsset;
-
-    /************************************************************************************
-     * Structure holding WeakReference to this, so we can attach it to events without
-     * preventing GC of this.
-     ***********************************************************************************/
-    struct RemoteWatcher {
-        WeakReference!(CachingAsset) assetRef;
-        void setAsset(CachingAsset asset) {
-            assetRef = new typeof(assetRef)(asset);
-        }
-        void onBackingUpdate(IAsset backing, message.Status sCode, message.AssetStatus s) {
-            auto asset = assetRef();
-            if (asset)
-                asset._statusSignal.call(asset, sCode, s);
-        }
-    }
 public:
     this (FilePath path, AssetMetaData metadata, IServerAsset remoteAsset,
           HashIdsListener updateHashIds, bool usefsync) {
         this.remoteAsset = remoteAsset;
-        auto watcher = new RemoteWatcher();
-        watcher.setAsset(this);
-        remoteAsset.attachWatcher(&watcher.onBackingUpdate);
+        remoteAsset.attachWatcher(&onBackingUpdate);
         super(path, metadata, remoteAsset.size, updateHashIds, usefsync); // TODO: Verify remoteAsset.size against local file
         log = Log.lookup("daemon.cache.cachingasset." ~ path.name[0..8]);
         log.trace("Caching remoteAsset of size {}", size);
@@ -405,6 +387,11 @@ protected:
 private:
     void realRead(ulong offset, uint length, BHReadCallback cb) {
         super.aSyncRead(offset, length, cb);
+    }
+
+    void onBackingUpdate(IAsset backing, message.Status sCode, message.AssetStatus s) {
+        log.trace("Was here");
+        _statusSignal.call(this, sCode, s);
     }
 
     /************************************************************************************
