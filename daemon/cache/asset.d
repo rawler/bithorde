@@ -72,10 +72,49 @@ interface IAssetData {
     void close();
 }
 
+/************************************************************************************
+ * Class for file with stateless read/write. I/E no need for the user to care about
+ * read/write position.
+ ***********************************************************************************/
+class StatelessFile : File {
+    /****************************************************************************************
+     * Reads as many bytes as possible into dst, and returns the amount.
+     ***************************************************************************************/
+    ssize_t pRead(ulong pos, void[] dst) {
+        version (Posix) { // Posix has pread() for atomic seek+read
+            ssize_t got = pread(fileHandle, dst.ptr, dst.length, pos);
+            if (got is -1)
+                error;
+            else
+               if (got is 0 && dst.length > 0)
+                   return Eof;
+            return got;
+        } else synchronized (this) {
+            seek(pos);
+            return read(buf);
+        }
+    }
+
+    /****************************************************************************************
+     * Reads as many bytes as possible into buf, and returns the amount.
+     ***************************************************************************************/
+    ssize_t pWrite(ulong pos, void[] src) {
+        version (Posix) { // Posix has pwrite() for atomic write+seek
+            ssize_t written = pwrite(fileHandle, src.ptr, src.length, pos);
+            if (written is -1)
+                error;
+            return written;
+        } else synchronized (this) {
+            seek(pos);
+            return write(data);
+        }
+    }
+}
+
 /****************************************************************************************
  * Base for all kinds of cached assets. Provides basic reading functionality
  ***************************************************************************************/
-class BaseAsset : private File, public IAssetData {
+class BaseAsset : private StatelessFile, public IAssetData {
 protected:
     FilePath path;
     FilePath idxPath;
@@ -127,12 +166,8 @@ public:
      ***********************************************************************************/
     synchronized void aSyncRead(ulong offset, uint length, BHReadCallback cb) {
         ubyte[] buf = tlsBuffer(length);
-        version (Posix) { // Posix has pread() for atomic seek+read
-            auto got = pread(fileHandle, buf.ptr, length, offset);
-        } else {
-            seek(offset);
-            auto got = read(buf);
-        }
+        auto _length = length; // Avoid scope-problems for next line
+        auto got = pRead(offset, buf[0.._length]);
         auto resp = new lib.message.ReadResponse;
         if (got == 0 || got == Eof) {
             resp.status = message.Status.NOTFOUND;
@@ -240,12 +275,7 @@ public:
     synchronized void add(ulong offset, ubyte[] data) {
         if (!cacheMap)
             throw new IOException("Trying to write to a completed file");
-        version (Posix) { // Posix has pwrite() for atomic write+seek
-            auto written = pwrite(fileHandle, data.ptr, data.length, offset);
-        } else {
-            seek(offset);
-            auto written = write(data);
-        }
+        auto written = pWrite(offset, data);
         if (written == data.length) {
             cacheMap.add(offset, written);
             updateHashes();
@@ -296,7 +326,7 @@ protected:
         if (zeroBlockSize > hashedPtr) {
             auto bufsize = zeroBlockSize - hashedPtr;
             auto buf = tlsBuffer(bufsize);
-            auto got = pread(fileHandle, buf.ptr, bufsize, hashedPtr);
+            auto got = pRead(hashedPtr, buf[0..bufsize]);
             assert(got == bufsize);
             foreach (hash; hashes) {
                 hash.update(buf[0..bufsize]);
