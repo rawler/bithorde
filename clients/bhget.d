@@ -134,6 +134,52 @@ public:
         }
         return currentOffset;
     }
+    void flush() {
+        _output.flush();
+    }
+}
+
+/************************************************************************************
+ * Separate structure for keeping track of request-response times.
+ ***********************************************************************************/
+struct RequestStats {
+    class NotFoundException : Exception { this() { super("Entry not found"); } }
+    struct Entry {
+        ulong offset;
+        size_t size;
+        Time time;
+    }
+    Entry[PARALLEL_REQUESTS] inFlight;
+
+    ulong worst_ms;
+    ulong sum_ms;
+    ulong count;
+
+    void markBegin(ulong offset, size_t size, Time now) {
+        foreach (i, ent; inFlight) {
+            if (ent == ent.init) {
+                inFlight[i] = Entry(offset, size, now);
+                return;
+            }
+        }
+        assert(false); // Should not reach here.
+    }
+
+    void markDone(ulong offset, size_t size, Time now) {
+        foreach (i, ent; inFlight) {
+            if (ent.offset == offset && ent.size == size) {
+                auto delta = (now-ent.time).millis;
+                if (delta > worst_ms)
+                    worst_ms = delta;
+                sum_ms += delta;
+                count += 1;
+
+                inFlight[i] = Entry.init;
+                return;
+            }
+        }
+        throw new NotFoundException;
+    }
 }
 
 /****************************************************************************************
@@ -149,6 +195,8 @@ private:
     int exitStatus;      /// When done, what's the exitStatus?
     GetArguments args;   /// Args for the fetch
     ProgressBar pBar;    /// Progressbar, if desired
+
+    RequestStats rStats; /// Room for request-time bookkeeping.
 public:
     /************************************************************************************
      * Setup output and send async request for opening specified asset
@@ -189,6 +237,12 @@ public:
                 pBar.finish(orderOffset);
             else
                 Stderr.newline;
+            if (args.verbose) {
+                auto count = rStats.count;
+                auto avg = count?rStats.sum_ms/count:0;
+                auto worst = rStats.worst_ms;
+                Stderr.format("Requests: {} Avg: {}ms Worst: {}ms", count, avg, worst).newline;
+            }
         }
     }
 private:
@@ -251,6 +305,8 @@ private:
         if (length > CHUNK_SIZE)
             length = CHUNK_SIZE;
         if (length > 0) {
+            if (args.verbose)
+                rStats.markBegin(orderOffset, length, Clock.now);
             this.asset.aSyncRead(orderOffset, length, &onRead);
             orderOffset += length;
         }
@@ -267,6 +323,8 @@ private:
             return exit_error(-1, "Segment-mismatch, got less than asked for.");
         if (req.offset != resp.offset)
             return exit_error(-1, "Segment-mismatch, wrong offset");
+        if (args.verbose)
+            rStats.markDone(resp.offset, resp.content.length, Clock.now);
 
         if (output.queue(resp.offset, resp.content) >= asset.size)
             exit(0);
@@ -275,7 +333,6 @@ private:
         if (pBar)
             pBar.update(orderOffset);
     }
-
 }
 
 /****************************************************************************************
