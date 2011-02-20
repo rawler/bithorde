@@ -204,7 +204,7 @@ public:
 class WriteableAsset : BaseAsset {
 protected:
     CacheMap cacheMap;
-    IStatefulDigest[HashType] hashes;
+    IStatefulDigest[HashType] hashers;
     ulong hashedPtr;
     HashIdsListener updateHashIds;
     bool usefsync;
@@ -227,12 +227,12 @@ public:
      * Init hashing from offset zero and with clean state.
      ***********************************************************************************/
     private void resetHashes() {
-        hashes = null;
+        hashers = null;
         hashedPtr = 0;
         foreach (type; Hashers) {
             auto factory = HashMap[type].factory;
             if (factory)
-                hashes[type] = factory();
+                hashers[type] = factory();
         }
     }
 
@@ -245,7 +245,7 @@ public:
         cacheMap = new CacheMap();
         cacheMap.load(idxFile);
         hashedPtr = cacheMap.header.hashedAmount;
-        foreach (type, hasher; hashes) {
+        foreach (type, hasher; hashers) {
             if (type in cacheMap.header.hashes) {
                 hasher.load(cacheMap.header.hashes[type]);
             } else {
@@ -298,7 +298,7 @@ public:
             if (cacheMap) {
                 // TODO: Refactor this
                 cacheMap.header.hashedAmount = hashedPtr;
-                foreach (type, hasher; hashes) {
+                foreach (type, hasher; hashers) {
                     auto buf = new ubyte[hasher.maxStateSize];
                     cacheMap.header.hashes[type] = hasher.save(buf);
                 }
@@ -330,7 +330,7 @@ protected:
             auto buf = tlsBuffer(bufsize);
             auto got = pRead(hashedPtr, buf[0..bufsize]);
             assert(got == bufsize);
-            foreach (hash; hashes) {
+            foreach (hash; hashers) {
                 hash.update(buf[0..bufsize]);
             }
             if (zeroBlockSize == _size)
@@ -350,9 +350,9 @@ protected:
         assert(cacheMap.assetSize == length);
         log.trace("Asset complete");
 
-        auto hashIds = new message.Identifier[hashes.length];
+        auto hashIds = new message.Identifier[hashers.length];
         uint i;
-        foreach (type, hash; hashes) {
+        foreach (type, hash; hashers) {
             auto digest = hash.binaryDigest;
             auto hashId = new message.Identifier;
             hashId.type = type;
