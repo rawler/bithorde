@@ -120,6 +120,7 @@ protected:
     FilePath idxPath;
     Logger log;
     AssetMetaData _metadata;
+    ulong _size;
 public:
     /************************************************************************************
      * IncompleteAssetException is thrown if a not-fully-cached asset were to be Opened
@@ -133,6 +134,7 @@ public:
 
         super();
         assetOpen(path);
+        this._size = length;
     }
 
     /************************************************************************************
@@ -191,7 +193,7 @@ public:
      * Find the size of the asset.
      ***********************************************************************************/
     final ulong size() {
-        return length;
+        return _size;
     }
 }
 
@@ -203,7 +205,7 @@ class WriteableAsset : BaseAsset {
 protected:
     CacheMap cacheMap;
     IStatefulDigest[HashType] hashes;
-    ulong hashedPtr, _length;
+    ulong hashedPtr;
     HashIdsListener updateHashIds;
     bool usefsync;
 public:
@@ -217,7 +219,7 @@ public:
         this.usefsync = usefsync;
         super(path, metadata); // Parent calls open()
         truncate(size);           // We resize it to right size
-        _length = size;
+        _size = size;
         log = Log.lookup("daemon.cache.writeasset."~path.name[0..8]); // TODO: fix order and double-init
     }
 
@@ -331,7 +333,7 @@ protected:
             foreach (hash; hashes) {
                 hash.update(buf[0..bufsize]);
             }
-            if (zeroBlockSize == _length)
+            if (zeroBlockSize == _size)
                 finish();
             else
                 hashedPtr = zeroBlockSize;
