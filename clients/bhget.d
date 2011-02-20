@@ -71,9 +71,12 @@ public:
         if (!super.parse(arguments))
             throw new IllegalArgumentException("Failed to parse arguments:\n" ~ errors(&stderr.layout.sprint));
 
-        ids = parseUri(this[null].assigned[0], name);
+        auto id_arg = this[null].assigned[0];
+        ids = parseUri(id_arg, name);
         if (!ids)
-            throw new IllegalArgumentException("Failed to parse Uri. Supported styles are magnet-links, and ed2k-links");
+            ids = parseLink(id_arg, name);
+        if (!ids)
+            throw new IllegalArgumentException("Failed to parse Uri. Supported asset-specs are magnet-links, or a symlink with a filename being a magnet-link.");
 
         stdout = getAutoBool("stdout", delegate bool() {
             return !name;
@@ -85,6 +88,19 @@ public:
         socketUri = this["sockuri"].assigned[0];
 
         return true;
+    }
+
+    private Identifier[] parseLink(char[] arg, ref char[] fname) {
+        char[4096] buf;
+        ssize_t len = readlink((arg~'\0').ptr, buf.ptr, buf.length);
+        if (len > 0) {
+            char[] dirname;
+            auto uri = tail(buf[0..len], "/", dirname);
+            return parseUri(uri, fname);
+        } else {
+            fname = null;
+            return null;
+        }
     }
 }
 
