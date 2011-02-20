@@ -223,8 +223,10 @@ private:
             if (args.verbose)
                 Stderr.format("Asset found, size is {}kB.", asset.size / 1024).newline;
 
-            if (args.progressBar)
-                pBar = new ProgressBar(asset.size, (args.name ? args.name : "<unnamed>") ~ " : ", "kB", 1024);
+            if (args.progressBar) {
+                char[] junk;
+                pBar = new ProgressBar(asset.size, (args.name ? tail(args.name, "/", junk) : "<unnamed>") ~ " : ", "kB", 1024);
+            }
 
             this.asset = asset;
 
