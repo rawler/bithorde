@@ -216,7 +216,10 @@ public:
                     onClientDisconnect(c);
                     c.close();
                 } catch (Exception e) {
-                    log.error("Exception when closing client {}", e);
+                    if (e.file && e.line)
+                        log.error("Exception when closing client {} ({}:{})", e, e.file, e.line);
+                    else
+                        log.error("Exception when closing client {}", e);
                 }
             }
         }
