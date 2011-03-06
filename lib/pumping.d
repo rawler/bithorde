@@ -20,9 +20,19 @@ module lib.pumping;
 
 public import tango.io.model.IConduit;
 public import tango.io.selector.model.ISelector;
+
+import tango.core.Exception;
+import tango.io.device.Device : IODevice = Device;
 import tango.io.selector.Selector;
 import tango.io.selector.SelectorException;
+import tango.net.device.Socket : Socket;
+import tango.sys.Common;
+import tango.sys.consts.errno;
 import tango.time.Clock;
+
+import tango.stdc.posix.fcntl;
+import tango.stdc.stdlib;
+import tango.stdc.string;
 
 /****************************************************************************************
  * Processors are the work-horses of the Pump framework. Each processor tracks
@@ -48,6 +58,201 @@ interface IProcessor {
      * Let the processor process all it's timeouts expected to happen until now.
      ***********************************************************************************/
     void processTimeouts(Time now);
+
+    /************************************************************************************
+     * Enslaved to a pump
+     ***********************************************************************************/
+    void onBound(Pump pump);
+}
+
+class BaseConnection : IProcessor {
+    class BufferException : Exception {
+        this() {
+            super("Not enough space to write data");
+        }
+    }
+
+    /************************************************************************************
+     * Needs overriding for handling
+     * Returns: the amount of bytes consumed from the buffer
+     ***********************************************************************************/
+    abstract size_t onData(ubyte[] data);
+
+    /************************************************************************************
+     * Should probably be overridden to react on closed connections.
+     ***********************************************************************************/
+    void onClosed() {};
+
+    struct Buffer {
+        ubyte[] _data;
+        size_t fill;
+
+        void realloc(size_t size) {
+            _data = (cast(ubyte*).realloc(_data.ptr, size))[0..size];
+        }
+
+        void pop(size_t size) {
+            assert(size <= fill);
+            fill -= size;
+            if (fill > 0)
+                memmove(_data.ptr, _data.ptr+size, fill);
+        }
+
+        void queue(ubyte[] data) in {
+            assert(hasRoom(data.length));
+        } body {
+            auto newFill = fill + data.length;
+            this._data[fill..newFill] = data;
+            fill = newFill;
+        }
+
+        bool hasRoom(size_t size) {
+            return fill+size <= _data.length;
+        }
+
+        ubyte[] freeSpace() {
+            return _data[fill..$];
+        }
+
+        ubyte[] valid() {
+            return _data[0..fill];
+        }
+    }
+private:
+    Pump pump;
+    ISelectable[1] selectHandle;
+    IConduit conduit;
+    Buffer writeBuf, readBuf;
+public:
+    this(IODevice device, size_t bufsize) {
+        _setupHandle(device);
+        selectHandle[0] = device;
+        conduit = device;
+        writeBuf.realloc(bufsize);
+    }
+
+    this(Socket socket, size_t bufsize) {
+        _setupHandle(socket);
+        selectHandle[0] = socket;
+        conduit = socket;
+        writeBuf.realloc(bufsize);
+        readBuf.realloc(bufsize);
+    }
+
+    ~this() {
+        writeBuf.realloc(0);
+        readBuf.realloc(0);
+    }
+
+    private void _setupHandle(ISelectable s) {
+        auto handle = s.fileHandle;
+        int x = fcntl(handle, F_GETFL, 0);
+        x |= O_NONBLOCK;
+        if(fcntl(handle, F_SETFL, x) is -1)
+           throw new IOException("Unable to set conduit non-blocking: " ~ SysError.lookup(SysError.lastCode));
+    }
+
+    private void _dequeue() {
+        
+    }
+
+    /************************************************************************************
+     * Implement IProcessor
+     ***********************************************************************************/
+    ISelectable[] conduits() {
+        return selectHandle;
+    }
+    void process(ref SelectionKey cause) {
+        if (cause.events & (Event.Error | Event.Hangup)) {
+          close();
+          return;
+        }
+        if (cause.events & (Event.Read)) {
+            int read = conduit.read(readBuf.freeSpace);
+            assert(read >= 0);
+            if (read == 0) {
+                close();
+            } else { 
+                readBuf.fill += read;
+                auto processed = onData(readBuf.valid());
+                readBuf.pop(processed); 
+            }
+        }
+    }
+    void onBound(Pump pump) {
+        this.pump = pump;
+    }
+
+    void write(ubyte[] data) {
+        if (!writeBuf.hasRoom(data.length))
+            throw new IOException("Not enough bufferspace to write");
+        if (writeBuf.fill)
+            return writeBuf.queue(data);
+
+        auto written = posix.write(selectHandle[0].fileHandle, data.ptr, data.length);
+        if (written is -1) {
+            auto ecode = SysError.lastCode;
+            switch (ecode) {
+                case EWOULDBLOCK:
+                    return writeBuf.queue(data);
+                default:
+                    throw new IOException("Failed to write: " ~ SysError.lookup(ecode));
+            }
+        } else if (written != data.length) {
+            // TODO: select for writable
+            return writeBuf.queue(data[written..$]);
+        }
+    }
+
+    void close() {
+        conduit.close();
+        onClosed();
+    }
+
+    /// Default to no deadlines. Subclasses may override
+    Time nextDeadline() { return Time.max; } 
+    void processTimeouts(Time now) {}
+}
+
+/****************************************************************************************
+ * Implements a Server-template for Pumpable, acception connections and creating new
+ * CONNECTION instances for incoming connections.
+ ***************************************************************************************/
+class BaseSocketServer(T) : IProcessor {
+    abstract BaseConnection onConnection(Socket s);
+    void onClosed() {};
+
+private:
+    Pump pump;
+    ISelectable[1] selectHandle;
+    T serverSocket;
+public:
+    this(T serverSocket) {
+        selectHandle[0] = this.serverSocket = serverSocket;
+    }
+
+    void close() {
+        serverSocket.close();
+        onClosed();
+    }
+
+    /************************************************************************************
+     * Implement IProcessor
+     ***********************************************************************************/
+    ISelectable[] conduits() {
+        return selectHandle;
+    }
+    void process(ref SelectionKey cause) {
+        assert(cause.events & Event.Read);
+        auto newSock = this.serverSocket.accept();
+        auto newConnection = onConnection(newSock);
+        pump.registerConduit(newSock, newConnection);
+    }
+    void onBound(Pump pump) {
+        this.pump = pump;
+    }
+    Time nextDeadline() { return Time.max; } // IGNORED
+    void processTimeouts(Time now) {} // IGNORED
 }
 
 /****************************************************************************************
@@ -62,9 +267,10 @@ public:
     /************************************************************************************
      * Create a Pump with a possible initial list of processors
      ***********************************************************************************/
-    this(IProcessor[] processors=[]) {
+    this(IProcessor[] processors=[], uint sizeHint=0) {
         selector = new Selector;
-        selector.open(processors.length, processors.length * 2);
+        if (!sizeHint) sizeHint = processors.length ? processors.length : 8;
+        selector.open(sizeHint, sizeHint * 2);
         foreach (p; processors)
             registerProcessor(p);
     }
@@ -88,6 +294,7 @@ public:
         if (!has(p))
             processors ~= p;
         selector.register(c, Event.Read, cast(Object)p);
+        p.onBound(this);
     }
 
     /************************************************************************************
@@ -103,6 +310,7 @@ public:
     void registerProcessor(IProcessor p) {
         foreach (c; p.conduits)
             registerConduit(c, p);
+        p.onBound(this);
     }
 
     /************************************************************************************
@@ -136,7 +344,7 @@ public:
                         toRemove ~= key.conduit; // Delayed removal to not break traversal
                     }
                 }
-                foreach (c; toRemove) unregisterConduit(c);
+//                foreach (c; toRemove) unregisterConduit(c);
             }
             auto now = Clock.now;
             foreach (p; processors)
@@ -146,5 +354,60 @@ public:
             if (selector)
                 throw e;
         }
+    }
+}
+
+debug(UnitTest) {
+    import tango.net.device.LocalSocket;
+    import tango.io.Stdout;
+
+    class ServerTest : BaseSocketServer!(LocalServerSocket) {
+        this(LocalServerSocket s) { super(s); }
+        void delegate() whenDone;
+        BaseConnection onConnection(Socket s) {
+            return new ServerConnection(s, this);
+        }
+        void onClosed() {
+            whenDone();
+        }
+    }
+    class ServerConnection : BaseConnection {
+        ServerTest server;
+        this(Socket s, ServerTest server) {
+            super(s, 4096);
+            this.server = server;
+        }
+        size_t onData(ubyte[] data) {
+            write(data);
+            return data.length;
+        }
+        void onClosed() {
+            server.close();
+        }
+    }
+    class ClientTest : BaseConnection {
+        this(Socket s) { super(s, 4096); }
+        size_t onData(ubyte[] data) {
+            assert(data == cast(ubyte[])x"1122334455");
+            close();
+            return data.length;
+        }
+    }
+
+    unittest {
+        auto pump = new Pump;
+
+        auto serverSocket = new LocalServerSocket("/tmp/pumpingtest");
+        auto server = new ServerTest(serverSocket);
+        server.whenDone = &pump.close;
+        pump.registerProcessor(server);
+
+        auto clientSocket = new LocalSocket("/tmp/pumpingtest");
+        auto client = new ClientTest(clientSocket);
+        pump.registerProcessor(client);
+
+        client.write(cast(ubyte[])x"1122334455");
+        
+        pump.run();
     }
 }
