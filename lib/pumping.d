@@ -129,6 +129,7 @@ public:
         selectHandle[0] = device;
         conduit = device;
         writeBuf.realloc(bufsize);
+        readBuf.realloc(bufsize);
     }
 
     this(Socket socket, size_t bufsize) {
@@ -152,8 +153,32 @@ public:
            throw new IOException("Unable to set conduit non-blocking: " ~ SysError.lookup(SysError.lastCode));
     }
 
+    /************************************************************************************
+     * Tries writing the provided buffer, raising Exception on error, calling close if
+     * other side closed connection.
+     * Returns: The amount of bytes actually written.
+     ***********************************************************************************/
+    private size_t _tryWrite(ubyte[] buf) {
+        auto written = posix.write(selectHandle[0].fileHandle, buf.ptr, buf.length);
+        if (written is -1) {
+            auto ecode = SysError.lastCode;
+            switch (ecode) {
+                case EWOULDBLOCK:
+                    return 0;
+                default:
+                    throw new IOException("Failed to write: " ~ SysError.lookup(ecode));
+            }
+        } else if (written == 0) {
+            close();
+        }
+        return written;
+    }
+
     private void _dequeue() {
-        
+        auto written = _tryWrite(writeBuf.valid);
+        if (written) writeBuf.pop(written);
+        if (!writeBuf.fill)
+            this.pump.registerConduit(selectHandle[0], this, false);
     }
 
     /************************************************************************************
@@ -167,15 +192,18 @@ public:
           close();
           return;
         }
+        if (cause.events & (Event.Write)) {
+            _dequeue();
+        }
         if (cause.events & (Event.Read)) {
             int read = conduit.read(readBuf.freeSpace);
             assert(read >= 0);
             if (read == 0) {
                 close();
-            } else { 
+            } else {
                 readBuf.fill += read;
                 auto processed = onData(readBuf.valid());
-                readBuf.pop(processed); 
+                readBuf.pop(processed);
             }
         }
     }
@@ -189,17 +217,10 @@ public:
         if (writeBuf.fill)
             return writeBuf.queue(data);
 
-        auto written = posix.write(selectHandle[0].fileHandle, data.ptr, data.length);
-        if (written is -1) {
-            auto ecode = SysError.lastCode;
-            switch (ecode) {
-                case EWOULDBLOCK:
-                    return writeBuf.queue(data);
-                default:
-                    throw new IOException("Failed to write: " ~ SysError.lookup(ecode));
-            }
-        } else if (written != data.length) {
-            // TODO: select for writable
+        auto written = _tryWrite(data);
+        if (written != data.length) {
+            assert(this.pump);
+            this.pump.registerConduit(this.selectHandle[0], this, true);
             return writeBuf.queue(data[written..$]);
         }
     }
@@ -290,10 +311,11 @@ public:
      * Register a conduit to a processor. The Processor may or may not be registered in
      * this pump before.
      ***********************************************************************************/
-    void registerConduit(ISelectable c, IProcessor p) {
+    void registerConduit(ISelectable c, IProcessor p, bool write = false) {
         if (!has(p))
             processors ~= p;
-        selector.register(c, Event.Read, cast(Object)p);
+        auto mask = write ? Event.Read | Event.Write : Event.Read;
+        selector.register(c, mask, cast(Object)p);
         p.onBound(this);
     }
 
@@ -378,7 +400,8 @@ debug(UnitTest) {
             this.server = server;
         }
         size_t onData(ubyte[] data) {
-            write(data);
+            write(data[0..4]);
+            write(data[4..$]);
             return data.length;
         }
         void onClosed() {
@@ -388,9 +411,14 @@ debug(UnitTest) {
     class ClientTest : BaseConnection {
         this(Socket s) { super(s, 4096); }
         size_t onData(ubyte[] data) {
-            assert(data == cast(ubyte[])x"1122334455");
-            close();
-            return data.length;
+            if (data[0..4] == cast(ubyte[])x"11223344") {
+                write(cast(ubyte[])x"66778899");
+                return 4;
+            } else {
+                assert(data == cast(ubyte[])x"5566778899");
+                close();
+                return data.length;
+            }
         }
     }
 
@@ -407,7 +435,7 @@ debug(UnitTest) {
         pump.registerProcessor(client);
 
         client.write(cast(ubyte[])x"1122334455");
-        
+
         pump.run();
     }
 }
