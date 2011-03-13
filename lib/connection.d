@@ -26,9 +26,11 @@ private import tango.time.Clock;
 private import tango.util.MinMax;
 private import tango.util.container.more.Heap;
 private import tango.util.container.more.Stack;
+private import tango.util.log.Log;
 
 public import message = lib.message;
 private import lib.protobuf;
+private import lib.pumping;
 private import lib.timeout;
 
 /****************************************************************************************
@@ -155,7 +157,7 @@ struct Counters {
  * All underlying BitHorde connections run through this class. Deals with low-level
  * serialization and request-id-mapping.
  ***************************************************************************************/
-class Connection
+class Connection : BaseConnection
 {
     alias void delegate(Connection c, message.Type t, ubyte[] msg) ProcessCallback;
     static class InvalidMessage : Exception {
@@ -164,13 +166,12 @@ class Connection
     static class InvalidResponse : InvalidMessage {
         this () { super("Invalid response recieved"); }
     }
+    Signal!(Connection) onDisconnected;
+    ProcessCallback messageHandler;
 protected:
-    Socket socket;
-    ubyte[] frontbuf, backbuf, left;
     ByteBuffer msgbuf;
     char[] _myname, _peername;
-    ProcessCallback messageHandler;
-    ProcessCallback _processCallback;
+    Logger log;
 protected:
 
     /// inFlightRequests contains actual requests, and is the allocation-heap for IFR:s
@@ -256,11 +257,13 @@ public:
     /************************************************************************************
      * Create named connection, and perform HandShake
      ***********************************************************************************/
-    this(char[] myname, ProcessCallback cb)
+    this(Pump p, Socket s)
     {
+        if (s.socket.addressFamily is AddressFamily.INET)
+            s.socket.setNoDelay(true);
+        super(p, s, 1024*1024);
         this._myname = myname;
-        this._processCallback = cb;
-        counters.lastSwitch = Clock.now;
+        reset();
     }
 
     ~this() {
@@ -270,6 +273,9 @@ public:
      * Initialise connection members
      ***********************************************************************************/
     protected void reset() {
+        this.counters.lastSwitch = Clock.now;
+        this.log = Log.lookup("lib.connection");
+
         this._freeIds = _freeIds.init;
         this.timeouts = new TimeoutQueue;
         this.lingerIds = lingerIds.init;
@@ -277,85 +283,53 @@ public:
         this._peername = _peername.init;
         this.messageHandler = &processHandShake;
 
-        this.frontbuf = new ubyte[8192];
-        this.backbuf = new ubyte[8192];
-        this.left = [];
         this.msgbuf = new ByteBuffer(8192);
         this.inFlightRequests = new InFlightRequest[16];
     }
 
     /************************************************************************************
-     * Bind open Socket to this connection and performs handshake
-     ***********************************************************************************/
-    public void handshake(Socket s) {
-        reset();
-
-        this.socket = s;
-        if (s.socket.addressFamily is AddressFamily.INET)
-            this.socket.socket.setNoDelay(true);
-
-        sayHello();
-        expectHello();
-    }
-
-    final bool closed() { return (socket is null); }
-
-    /************************************************************************************
-     * Begin closing of the connection
-     ***********************************************************************************/
-    void shutdown() {
-        if (closed)
-            return;
-        socket.shutdown();
-        socket.close();
-        socket = null;
-    }
-
-    /************************************************************************************
      * Finish closing by sending DISCONNECTED notifications to all waiting callbacks.
      ***********************************************************************************/
-    void close() {
+    void onClosed() {
         foreach (ifr; inFlightRequests) {
             if (ifr.req)
                 ifr.req.abort(message.Status.DISCONNECTED);
         }
+        onDisconnected(this);
     }
 
     /************************************************************************************
-     * Read any new data from underlying socket. Blocks until data is available.
+     * Process incoming data, trying to parse out messages
      ***********************************************************************************/
-    synchronized bool readNewData() {
-        if (closed)
-            throw new IOException("Connection closed");
-        swapBufs();
-        int read = socket.read(frontbuf[left.length..length]);
-        if (read > 0) {
-            left = frontbuf[0..left.length+read];
-            return true;
-        } else
-            return false;
+    size_t onData(ubyte[] data) {
+        size_t processed, msgsize;
+        while (data.length && ((msgsize = processMessage(data[processed..length])) > 0))
+            processed += msgsize;
+        return processed;
     }
 
     /************************************************************************************
      * Process a single message read from previous readNewData()
      ***********************************************************************************/
-    synchronized bool processMessage()
+    synchronized size_t processMessage(ubyte inBuf[])
     {
-        auto buf = left;
+        auto decodeBuf = inBuf;
         message.Type type;
         size_t msglen;
-        if (decode_val!(message.Type)(buf, type) && decode_val!(size_t)(buf, msglen) && (buf.length >= msglen)) {
-            assert((type & 0b0000_0111) == 0b0010, "Expected message type, but got something else");
-            type >>= 3;
-
-            auto totallength = (buf.ptr - left.ptr) /*length of type and length*/ + msglen;
+        if (decode_val!(message.Type)(decodeBuf, type) && decode_val!(size_t)(decodeBuf, msglen) && (decodeBuf.length >= msglen)) {
+            auto totallength = (decodeBuf.ptr - inBuf.ptr) /*length of type and length*/ + msglen;
             counters.addRecvPacket(totallength);
+            try {
+                assert((type & 0b0000_0111) == 0b0010, "Expected message type, but got something else");
+                type >>= 3;
 
-            left = buf[msglen..length]; // Make sure to remove message from queue before processing
-            messageHandler(this, type, buf[0..msglen]);
-            return true;
+                messageHandler(this, type, decodeBuf[0..msglen]);
+            } catch (Exception e) {
+                log.error("Exception ({}:{}) in handling incoming Message: {}", e.file, e.line, e.msg);
+            }
+            return totallength;
         } else {
-            return false;
+            return 0;
         }
     }
 
@@ -383,7 +357,7 @@ public:
 
     final char[] peername() { return _peername; }
     final char[] myname() { return _myname; }
-    final Address remoteAddress() { return socket ? socket.socket.remoteAddress : null; }
+// TODO: Remove    final Address remoteAddress() { return socket ? socket.socket.remoteAddress : null; }
     char[] toString() {
         return peername;
     }
@@ -393,45 +367,24 @@ public:
      * operations, such as uploading new assets.
      ***********************************************************************************/
     bool isTrusted() {
-        if (closed)
+        return true;
+/+ TODO: Implement       if (closed)
             return false;
-        return socket.socket.remoteAddress.addressFamily == AddressFamily.UNIX;
+        return socket.socket.remoteAddress.addressFamily == AddressFamily.UNIX;+/
     }
 
     /************************************************************************************
-     * Process a single Message
+     * Initiate handshake
      ***********************************************************************************/
-private:
-    /// Initiate HandShake
-    void sayHello() {
+    void sayHello(char[] myname) in {
+        assert(messageHandler is &processHandShake);
+        assert(myname.length);
+    } body {
+        this._myname = myname;
         scope handshake = new message.HandShake;
         handshake.name = _myname;
         handshake.protoversion = 1;
         sendMessage(handshake);
-    }
-    /// Complete HandShake
-    void expectHello() {
-        while (!processMessage() && readNewData()) {}
-        if (!_peername)
-            throw new AssertException("Other side did not greet with handshake", __FILE__, __LINE__);
-    }
-
-    /************************************************************************************
-     * The connection works on a double-buffered system. swapBufs swaps the buffers, and
-     * copies any remainder from old frontbuf to new frontbuf.
-     ***********************************************************************************/
-    void swapBufs() {
-        auto remainder = left.length;
-        if ((remainder * 2) > backbuf.length) { // When old frontBuf was more than half-full
-            auto newsize = remainder * 2;       // Alloc new backbuf
-            delete backbuf;                     // TODO: Implement some upper-limit
-            backbuf = new ubyte[newsize];
-        }
-        backbuf[0..remainder] = left; // Copy remainder to backbuf
-        left = frontbuf;              // Remember current frontbuf
-        frontbuf = backbuf;           // Switch new frontbuf to current backbuf
-        backbuf = left;               // And new backbuf is our current frontbuf
-        left = frontbuf[0..remainder];
     }
 package:
     /************************************************************************************
@@ -446,7 +399,7 @@ package:
         encode_val!(ushort)((m.typeId << 3) | 0b0000_0010, msgbuf);
         auto buf = msgbuf.data;
         counters.addSentPacket(buf.length);
-        socket.write(buf);
+        write(buf);
         return buf;
     }
 
@@ -472,8 +425,10 @@ protected:
         scope handshake = new message.HandShake;
         handshake.decode(msg);
         _peername = handshake.name.dup;
-        messageHandler = _processCallback;
+        if (!_peername)
+            throw new AssertException("Other side did not greet with handshake", __FILE__, __LINE__);
         assert(handshake.protoversion == 1);
+        this.log = Log.lookup("lib.client."~peername);
         onHandshakeDone(_peername);
     }
 }

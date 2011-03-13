@@ -25,7 +25,7 @@ import tango.core.Exception;
 import tango.io.device.Device : IODevice = Device;
 import tango.io.selector.Selector;
 import tango.io.selector.SelectorException;
-import tango.net.device.Socket : Socket;
+import tango.net.device.Socket : Socket, Address;
 import tango.sys.Common;
 import tango.sys.consts.errno;
 import tango.time.Clock;
@@ -221,9 +221,16 @@ public:
     }
 
     void close() {
+        if (closed)
+            return;
         pump.unregisterProcessor(this);
         conduit.close();
+        conduit = null;
         onClosed();
+    }
+
+    bool closed() {
+        return conduit is null;
     }
 
     /// Default to no deadlines. Subclasses may override

@@ -23,7 +23,7 @@ private import tango.core.tools.TraceExceptions;
 private import tango.io.FilePath;
 private import tango.io.selector.Selector;
 private import tango.io.Stdout;
-private import tango.net.device.Berkeley : Address;
+private import tango.net.device.Berkeley : Address, SocketType, ProtocolType;
 private import tango.net.device.LocalSocket;
 private import tango.net.device.Socket : Socket;
 private import tango.stdc.errno;
@@ -44,13 +44,14 @@ private import tango.util.log.LayoutDate;
 private import tango.util.log.Log;
 version(Windows)
 {
- 	import tango.sys.win32.UserGdi;
+    import tango.sys.win32.UserGdi;
     extern(Windows) HWND GetConsoleWindow();
 } 
 
 private import lib.arguments;
 private import lib.cachedalloc;
 private import lib.client;
+private import lib.connection;
 private import lib.fuse;
 private import lib.hashes;
 private import lib.message;
@@ -58,59 +59,6 @@ private import lib.pumping;
 
 const HandleTimeoutTime = TimeSpan.fromMillis(500);
 const HandleTimeoutLimit = 16;
-
-/*-------------- Main program below ---------------*/
-class BHFuseClient : SimpleClient, IProcessor {
-    private Address _remoteAddr;
-
-    this(Address addr, char[] myname) {
-        _remoteAddr = addr;
-        super(addr, myname);
-    }
-
-    /********************************************************************************
-     * Thrown when theres no hope of reconnecting. At this point, Fuse is already
-     * prepared for shutting down.
-     *******************************************************************************/
-    class DisconnectedException : Exception {
-        this() { super("Disconnected"); }
-    }
-
-    /********************************************************************************
-     * Thrown when reconnect has succeeded. Recieving code should retry last attempt
-     *******************************************************************************/
-    class ReconnectedException : Exception {
-        this() { super("Reconnected"); }
-    }
-
-    /********************************************************************************
-     * Tries to reconnect. Will not return normally, only return is either
-     * ReconnectedException, which will allow calling code to trigger retry, or
-     * DisconnectedException, at which point fuse will already be prepared for
-     * termination
-     *******************************************************************************/
-    void onDisconnected() {
-        super.onDisconnected();
-
-        // TODO: Implement reconnection again
-    }
-
-    protected Socket currentConnection;
-    protected Signal!(Socket) newConnection;
-
-    protected Socket connect(Address addr) {
-        currentConnection = super.connect(addr);
-        newConnection(currentConnection);
-        return currentConnection;
-    }
-public: // IProcessor interface-implementation
-    ISelectable.Handle fileHandle() {
-        return currentConnection.fileHandle;
-    }
-    void process(ref SelectionKey key) { super.process(key); }
-    Time nextDeadline() { return super.nextDeadline; }
-    void processTimeouts(Time now) { super.processTimeouts(now); }
-}
 
 class BitHordeFilesystem : Filesystem {
     class INode {
@@ -311,7 +259,7 @@ class BitHordeFilesystem : Filesystem {
     }
 private:
     FUSEArguments args;
-    BHFuseClient client;
+    Client client;
     INode[uint] inodes;
     INode[char[]] inodeNameMap;
     fuse_ino_t ino = 2;
@@ -325,7 +273,7 @@ private:
             return null;
     }
 public:
-    this(FilePath mountpoint, BHFuseClient client, FUSEArguments args) {
+    this(FilePath mountpoint, Client client, FUSEArguments args) {
         char[][] fuse_args = ["bhfuse", "-ofsname=bhfuse", "-oallow_other"];
         if (args.do_debug)
             fuse_args ~= "-d";
@@ -520,14 +468,20 @@ int main(char[][] args)
         Log.root.level = Level.Info;
     Log.root.add(new AppendConsole(new LayoutDate));
 
+    static Pump pump;
+    pump = new Pump([], 2);
+
     auto addr = new LocalAddress(arguments.sockPath);
-    auto client = new BHFuseClient(addr, "bhfuse");
+    auto socket = new Socket(addr.addressFamily, SocketType.STREAM, ProtocolType.IP);
+    socket.connect(addr);
+    auto client = new Client("bhfuse", new Connection(pump, socket));
 
     auto mountdir = FilePath(arguments.mountpoint).absolute("/");
     auto oldmask = umask(0022);
     mountdir.create();
     umask(oldmask);
     scope BitHordeFilesystem fs = new BitHordeFilesystem(mountdir, client, arguments);
+    pump.registerProcessor(fs);
 
     if (geteuid() == 0) {
         auto log = Log.lookup("main");
@@ -546,10 +500,7 @@ int main(char[][] args)
             log.error("Did not find user 'nobody'. Running with root privileges!");
         }
     }
-    
-    static Pump pump;
-    pump = new Pump([cast(IProcessor)fs, client]);
-    
+
     version(Posix)
     {
         //allow clean shutdown on signal
@@ -560,7 +511,7 @@ int main(char[][] args)
         signal(SIGINT, &shutdown);
         signal(SIGTERM, &shutdown);
     }
-    
+
     version(Windows)
     {
         //allow clean shutdown on signal
@@ -571,7 +522,7 @@ int main(char[][] args)
         }
         SetConsoleCtrlHandler(&shutdown, true);
     }
-    
+
     pump.run();
     return 0;
 }

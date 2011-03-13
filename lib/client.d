@@ -30,6 +30,7 @@ private import tango.util.MinMax;
 public import lib.asset;
 import lib.connection;
 import lib.protobuf;
+import lib.pumping;
 import lib.timeout;
 
 alias void delegate(Object) DEvent;
@@ -219,40 +220,15 @@ public:
     /************************************************************************************
      * Create a BitHorde client by name and an IPv4Address, or a LocalAddress.
      ***********************************************************************************/
-    this (Address addr, char[] name)
+    this (char[] name, Connection connection)
     {
-        this(name);
-        connect(addr);
-    }
-
-    /************************************************************************************
-     * Create BitHorde client on provided Socket
-     ***********************************************************************************/
-    this (Socket s, char[] name) {
-        this(name);
-        connection.handshake(s);
-    }
-
-    /************************************************************************************
-     * Private common-initialization ctor
-     ***********************************************************************************/
-    private this(char[] name) {
+        this.connection = connection;
         this.log = Log.lookup("lib.client");
-        connection = new Connection(name, &process);
         connection.onHandshakeDone.attach = &onConnectionHandshakeDone;
         timeouts = new TimeoutQueue;
         boundAssets = new RemoteAsset[16];
         nextStatPrint = Clock.now + StatInterval;
-    }
-
-    /************************************************************************************
-     * Connect to specified address
-     ***********************************************************************************/
-    protected Socket connect(Address addr) {
-        auto socket = new Socket(addr.addressFamily, SocketType.STREAM, ProtocolType.IP);
-        socket.connect(addr);
-        connection.handshake(socket);
-        return socket;
+        connection.sayHello(name);
     }
 
     /************************************************************************************
@@ -260,6 +236,7 @@ public:
      ***********************************************************************************/
     private void onConnectionHandshakeDone(char[] peername) {
         this.log = Log.lookup("lib.client."~peername);
+        this.connection.messageHandler = &process;
     }
 
     char[] peername() {
@@ -268,10 +245,9 @@ public:
 
     void close()
     {
-        connection.shutdown();
+        connection.close();
         foreach (asset; boundAssets) if (asset)
             asset.close();
-        connection.close();
 
         log.trace("Closed...");
     }
@@ -469,65 +445,38 @@ protected:
  ***************************************************************************************/
 class SimpleClient : Client {
 private:
-    Selector selector;
+    Pump pump;
 public:
     /************************************************************************************
      * Create client by name, and connect to given address.
      *
-     * The SimpleClient is driven by the application in some manner, either by
-     * continually calling pump(), or yielding to run(), which will run the client until
-     * it is closed.
+     * The SimpleClient is driven by the application, by yielding to run(), which will
+     * run the client until it is closed.
      ***********************************************************************************/
     this (Address addr, char[] name)
     {
-        super(addr, name);
+        this.pump = new Pump;
+        auto c = connect(addr, name);
+        c.onDisconnected.attach(&onDisconnected);
+        super(name, c);
     }
 
     /************************************************************************************
      * Intercept new connection and create Selector for it
      ***********************************************************************************/
-    protected Socket connect(Address addr) {
-        auto retval = super.connect(addr);
-        selector = new Selector();
-        selector.open(1,1);
-        selector.register(retval, Event.Read|Event.Error);
-        return retval;
+    protected Connection connect(Address addr, char[] name) {
+        auto socket = new Socket(addr.addressFamily, SocketType.STREAM, ProtocolType.IP);
+        socket.connect(addr);
+        return new Connection(pump, socket);
     }
 
     /************************************************************************************
      * Handle remote-side-initiated disconnect. Can be supplemented/overridden in
      * subclasses.
      ***********************************************************************************/
-    protected void onDisconnected() {
+    protected void onDisconnected(Connection) {
         close();
-    }
-
-    /************************************************************************************
-     * Run exactly one cycle of readNewData, processMessage*, processTimeouts
-     ***********************************************************************************/
-    synchronized void pump() {
-        auto timeout = nextDeadline - Clock.now;
-        if ((timeout > TimeSpan.zero) && (selector.select(timeout) > 0)) {
-            foreach (key; selector.selectedSet())
-                process(key);
-        }
-        processTimeouts(Clock.now);
-    }
-
-    /************************************************************************************
-     * Process a single SelectionKey event
-     ***********************************************************************************/
-    void process(ref SelectionKey key) {
-        if (key.isReadable) {
-            auto read = connection.readNewData();
-            if (read) {
-                while (connection.processMessage()) {}
-            } else {
-                onDisconnected();
-            }
-        } else if (key.isError || key.isHangup) {
-            onDisconnected();
-        }
+        pump.close();
     }
 
     /************************************************************************************
@@ -536,7 +485,6 @@ public:
      * timeout:s).
      ***********************************************************************************/
     void run() {
-        while (!closed)
-            pump();
+        pump.run();
     }
 }
