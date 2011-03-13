@@ -104,13 +104,12 @@ class BHFuseClient : SimpleClient, IProcessor {
         return currentConnection;
     }
 public: // IProcessor interface-implementation
-    ISelectable[] conduits() {
-        return [currentConnection];
+    ISelectable.Handle fileHandle() {
+        return currentConnection.fileHandle;
     }
     void process(ref SelectionKey key) { super.process(key); }
     Time nextDeadline() { return super.nextDeadline; }
     void processTimeouts(Time now) { super.processTimeouts(now); }
-    void onBound( Pump pump ) {}; // IGNORED
 }
 
 class BitHordeFilesystem : Filesystem {
@@ -351,7 +350,6 @@ public:
             handleTimeouts.peek.callback();
         }
     }
-    void onBound( Pump pump ) {}; // IGNORED
 
 protected:
     /************************************************************************************

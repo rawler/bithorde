@@ -29,6 +29,7 @@ import tango.net.device.Socket : Socket;
 import tango.sys.Common;
 import tango.sys.consts.errno;
 import tango.time.Clock;
+import tango.util.container.HashSet;
 
 import tango.stdc.posix.fcntl;
 import tango.stdc.stdlib;
@@ -38,12 +39,7 @@ import tango.stdc.string;
  * Processors are the work-horses of the Pump framework. Each processor tracks
  * their own conduits and timeouts.
  ***************************************************************************************/
-interface IProcessor {
-    /************************************************************************************
-     * Which Conduits can trigger events for this IProcessor?
-     ***********************************************************************************/
-    ISelectable[] conduits();
-
+interface IProcessor : ISelectable {
     /************************************************************************************
      * Process an event from the pump
      ***********************************************************************************/
@@ -58,11 +54,6 @@ interface IProcessor {
      * Let the processor process all it's timeouts expected to happen until now.
      ***********************************************************************************/
     void processTimeouts(Time now);
-
-    /************************************************************************************
-     * Enslaved to a pump
-     ***********************************************************************************/
-    void onBound(Pump pump);
 }
 
 class BaseConnection : IProcessor {
@@ -120,24 +111,28 @@ class BaseConnection : IProcessor {
     }
 private:
     Pump pump;
-    ISelectable[1] selectHandle;
+    ISelectable.Handle selectHandle;
     IConduit conduit;
     Buffer writeBuf, readBuf;
 public:
-    this(IODevice device, size_t bufsize) {
+    this(Pump p, IODevice device, size_t bufsize) {
+        pump = p;
         _setupHandle(device);
-        selectHandle[0] = device;
+        selectHandle = device.fileHandle;
         conduit = device;
         writeBuf.realloc(bufsize);
         readBuf.realloc(bufsize);
+        pump.registerProcessor(this);
     }
 
-    this(Socket socket, size_t bufsize) {
+    this(Pump p, Socket socket, size_t bufsize) {
+        pump = p;
         _setupHandle(socket);
-        selectHandle[0] = socket;
+        selectHandle = socket.fileHandle;
         conduit = socket;
         writeBuf.realloc(bufsize);
         readBuf.realloc(bufsize);
+        pump.registerProcessor(this);
     }
 
     ~this() {
@@ -159,7 +154,8 @@ public:
      * Returns: The amount of bytes actually written.
      ***********************************************************************************/
     private size_t _tryWrite(ubyte[] buf) {
-        auto written = posix.write(selectHandle[0].fileHandle, buf.ptr, buf.length);
+        assert(buf.length > 0);
+        auto written = posix.write(fileHandle, buf.ptr, buf.length);
         if (written is -1) {
             auto ecode = SysError.lastCode;
             switch (ecode) {
@@ -178,13 +174,13 @@ public:
         auto written = _tryWrite(writeBuf.valid);
         if (written) writeBuf.pop(written);
         if (!writeBuf.fill)
-            this.pump.registerConduit(selectHandle[0], this, false);
+            this.pump.registerProcessor(this, false);
     }
 
     /************************************************************************************
      * Implement IProcessor
      ***********************************************************************************/
-    ISelectable[] conduits() {
+    ISelectable.Handle fileHandle() {
         return selectHandle;
     }
     void process(ref SelectionKey cause) {
@@ -207,11 +203,10 @@ public:
             }
         }
     }
-    void onBound(Pump pump) {
-        this.pump = pump;
-    }
 
     void write(ubyte[] data) {
+        if (!data.length)
+            return;
         if (!writeBuf.hasRoom(data.length))
             throw new IOException("Not enough bufferspace to write");
         if (writeBuf.fill)
@@ -220,12 +215,13 @@ public:
         auto written = _tryWrite(data);
         if (written != data.length) {
             assert(this.pump);
-            this.pump.registerConduit(this.selectHandle[0], this, true);
+            this.pump.registerProcessor(this, true);
             return writeBuf.queue(data[written..$]);
         }
     }
 
     void close() {
+        pump.unregisterProcessor(this);
         conduit.close();
         onClosed();
     }
@@ -244,12 +240,16 @@ class BaseSocketServer(T) : IProcessor {
     void onClosed() {};
 
 private:
-    Pump pump;
-    ISelectable[1] selectHandle;
+    ISelectable.Handle selectHandle;
     T serverSocket;
+protected:
+    Pump pump;
 public:
-    this(T serverSocket) {
-        selectHandle[0] = this.serverSocket = serverSocket;
+    this(Pump p, T serverSocket) {
+        this.pump = p;
+        this.serverSocket = serverSocket;
+        selectHandle = serverSocket.fileHandle;
+        pump.registerProcessor(this);
     }
 
     void close() {
@@ -260,17 +260,14 @@ public:
     /************************************************************************************
      * Implement IProcessor
      ***********************************************************************************/
-    ISelectable[] conduits() {
+    ISelectable.Handle fileHandle() {
         return selectHandle;
     }
     void process(ref SelectionKey cause) {
         assert(cause.events & Event.Read);
         auto newSock = this.serverSocket.accept();
         auto newConnection = onConnection(newSock);
-        pump.registerConduit(newSock, newConnection);
-    }
-    void onBound(Pump pump) {
-        this.pump = pump;
+        pump.registerProcessor(newConnection);
     }
     Time nextDeadline() { return Time.max; } // IGNORED
     void processTimeouts(Time now) {} // IGNORED
@@ -283,7 +280,7 @@ public:
 class Pump {
 private:
     ISelector selector;
-    IProcessor[] processors;
+    HashSet!(IProcessor) processors;
 public:
     /************************************************************************************
      * Create a Pump with a possible initial list of processors
@@ -292,6 +289,7 @@ public:
         selector = new Selector;
         if (!sizeHint) sizeHint = processors.length ? processors.length : 8;
         selector.open(sizeHint, sizeHint * 2);
+        this.processors = new typeof(this.processors);
         foreach (p; processors)
             registerProcessor(p);
     }
@@ -311,28 +309,19 @@ public:
      * Register a conduit to a processor. The Processor may or may not be registered in
      * this pump before.
      ***********************************************************************************/
-    void registerConduit(ISelectable c, IProcessor p, bool write = false) {
-        if (!has(p))
-            processors ~= p;
+    void registerProcessor(IProcessor p, bool write = false) {
+        processors.add(p);
         auto mask = write ? Event.Read | Event.Write : Event.Read;
-        selector.register(c, mask, cast(Object)p);
-        p.onBound(this);
+        selector.register(p, mask, cast(Object)p);
     }
 
     /************************************************************************************
      * Unregister a conduit from this processor.
      ***********************************************************************************/
-    void unregisterConduit(ISelectable c) {
-        selector.unregister(c);
-    }
-
-    /************************************************************************************
-     * Register an IProcessor in this pump, including all it's conduits.
-     ***********************************************************************************/
-    void registerProcessor(IProcessor p) {
-        foreach (c; p.conduits)
-            registerConduit(c, p);
-        p.onBound(this);
+    void unregisterProcessor(IProcessor c) {
+        if (selector)
+            selector.unregister(c);
+        processors.remove(c);
     }
 
     /************************************************************************************
@@ -355,7 +344,7 @@ public:
                 if (t < nextDeadline)
                     nextDeadline = t;
             }
-            ISelectable[] toRemove;
+            IProcessor[] toRemove;
             auto timeout = nextDeadline-Clock.now;
             if ((timeout > TimeSpan.zero) && (selector.select(timeout)>0)) {
                 foreach (SelectionKey key; selector.selectedSet())
@@ -363,10 +352,10 @@ public:
                     auto processor = cast(IProcessor)key.attachment;
                     processor.process(key);
                     if (key.isError() || key.isHangup() || key.isInvalidHandle()) {
-                        toRemove ~= key.conduit; // Delayed removal to not break traversal
+                        toRemove ~= processor; // Delayed removal to not break traversal
                     }
                 }
-//                foreach (c; toRemove) unregisterConduit(c);
+                foreach (c; toRemove) unregisterProcessor(c);
             }
             auto now = Clock.now;
             foreach (p; processors)
@@ -384,10 +373,10 @@ debug(UnitTest) {
     import tango.io.Stdout;
 
     class ServerTest : BaseSocketServer!(LocalServerSocket) {
-        this(LocalServerSocket s) { super(s); }
+        this(Pump p, LocalServerSocket s) { super(p,s); }
         void delegate() whenDone;
         BaseConnection onConnection(Socket s) {
-            return new ServerConnection(s, this);
+            return new ServerConnection(pump, s, this);
         }
         void onClosed() {
             whenDone();
@@ -395,13 +384,13 @@ debug(UnitTest) {
     }
     class ServerConnection : BaseConnection {
         ServerTest server;
-        this(Socket s, ServerTest server) {
-            super(s, 4096);
+        this(Pump p, Socket s, ServerTest server) {
+            super(p, s, 4096);
             this.server = server;
         }
         size_t onData(ubyte[] data) {
-            write(data[0..4]);
-            write(data[4..$]);
+            write(data[0..3]);
+            write(data[3..$]);
             return data.length;
         }
         void onClosed() {
@@ -409,13 +398,14 @@ debug(UnitTest) {
         }
     }
     class ClientTest : BaseConnection {
-        this(Socket s) { super(s, 4096); }
+        ubyte[] lastRecieved;
+        this(Pump p, Socket s) { super(p, s, 4096); }
         size_t onData(ubyte[] data) {
             if (data[0..4] == cast(ubyte[])x"11223344") {
                 write(cast(ubyte[])x"66778899");
                 return 4;
             } else {
-                assert(data == cast(ubyte[])x"5566778899");
+                lastRecieved = data;
                 close();
                 return data.length;
             }
@@ -426,16 +416,16 @@ debug(UnitTest) {
         auto pump = new Pump;
 
         auto serverSocket = new LocalServerSocket("/tmp/pumpingtest");
-        auto server = new ServerTest(serverSocket);
+        auto server = new ServerTest(pump, serverSocket);
         server.whenDone = &pump.close;
-        pump.registerProcessor(server);
 
         auto clientSocket = new LocalSocket("/tmp/pumpingtest");
-        auto client = new ClientTest(clientSocket);
-        pump.registerProcessor(client);
+        auto client = new ClientTest(pump, clientSocket);
 
         client.write(cast(ubyte[])x"1122334455");
 
         pump.run();
+        assert(client.lastRecieved == cast(ubyte[])x"5566778899");
+        Stderr("Pumping.UnitTest: SUCCESS").newline;
     }
 }
