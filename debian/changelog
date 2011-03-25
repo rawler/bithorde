@@ -1,3 +1,11 @@
+bithorde (0.1.2) maverick; urgency=low
+
+  * Minor fixes;
+   - [daemon/server]Properly report error if support for eventfd is missing in kernel.
+   - [debian/upstart]Wait for all filesystems to be mounted, before starting bithorded, to avoid racy start.
+
+ -- Ulrik Mikaelsson <ulrik.mikaelsson@gmail.com>  Fri, 25 Mar 2011 21:32:42 +0100
+
 bithorde (0.1.1) maverick; urgency=low
 
   * Minor fixes; 
