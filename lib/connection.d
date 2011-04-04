@@ -262,9 +262,9 @@ public:
     {
         if (s.socket.addressFamily is AddressFamily.INET)
             s.socket.setNoDelay(true);
-        super(p, s, 1024*1024);
         this._myname = myname;
         reset();
+        super(p, s, 1024*1024);
     }
 
     ~this() {
@@ -273,7 +273,7 @@ public:
     /************************************************************************************
      * Initialise connection members
      ***********************************************************************************/
-    protected void reset() {
+    private void reset() {
         this.counters.lastSwitch = Clock.now;
         this.log = Log.lookup("lib.connection");
 
@@ -344,7 +344,7 @@ public:
     /************************************************************************************
      * Process waiting timeouts expected to fire up until now.
      ***********************************************************************************/
-    synchronized void processTimeouts(Time now) {
+    void processTimeouts(Time now) {
         timeouts.emit(now);
     }
 
