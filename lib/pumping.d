@@ -56,6 +56,13 @@ interface IProcessor : ISelectable {
     void processTimeouts(Time now);
 }
 
+version (Posix) {
+    import tango.stdc.posix.signal;
+    static this() {
+        sigignore(SIGPIPE);
+    }
+}
+
 version (linux) {
     import tango.stdc.posix.unistd;
     extern (C) int eventfd(uint initval, int flags);
@@ -187,7 +194,7 @@ public:
      ***********************************************************************************/
     private size_t _tryWrite(ubyte[] buf) {
         assert(buf.length > 0);
-        auto written = posix.write(fileHandle, buf.ptr, buf.length);
+        auto written = .write(fileHandle, buf.ptr, buf.length);
         if (written is -1) {
             auto ecode = SysError.lastCode;
             switch (ecode) {
@@ -227,10 +234,9 @@ public:
         }
         if (cause.events & (Event.Read)) {
             int read = conduit.read(readBuf.freeSpace);
-            assert(read >= 0);
-            if (read == 0) {
+            if (read == conduit.Eof) {
                 close();
-            } else {
+            } else if (read > 0) {
                 readBuf.fill += read;
                 auto processed = onData(readBuf.valid());
                 readBuf.pop(processed);
