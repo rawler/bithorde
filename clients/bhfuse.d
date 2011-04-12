@@ -299,6 +299,7 @@ public:
         }
     }
 
+    void close() {} // TODO
 protected:
     /************************************************************************************
      * FUSE-hook for mapping a name in a directory to an inode.

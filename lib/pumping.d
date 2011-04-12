@@ -54,6 +54,11 @@ interface IProcessor : ISelectable {
      * Let the processor process all it's timeouts expected to happen until now.
      ***********************************************************************************/
     void processTimeouts(Time now);
+
+    /************************************************************************************
+     * Close the underlying resources managed by the IProcessor
+     ***********************************************************************************/
+    void close();
 }
 
 version (Posix) {
@@ -330,6 +335,7 @@ private:
     ISelector selector;
     HashSet!(IProcessor) processors;
     EventFD evfd;               /// Used for sending events breaking select
+    bool closed;
 public:
     /************************************************************************************
      * Create a Pump with a possible initial list of processors
@@ -373,7 +379,7 @@ public:
      * Unregister a conduit from this processor.
      ***********************************************************************************/
     void unregisterProcessor(IProcessor c) {
-        if (selector)
+        if (!closed)
             selector.unregister(c);
         processors.remove(c);
     }
@@ -382,9 +388,7 @@ public:
      * Shuts down this pump, stops the main loop and frees resources.
      ***********************************************************************************/
     void close() {
-        auto s = selector;
-        selector = null;
-        s.close;
+        closed = true;
         evfd.signal();
     }
 
@@ -392,7 +396,8 @@ public:
      * Run until closed
      ***********************************************************************************/
     void run() {
-        try while (selector) {
+        scope(exit) cleanup;
+        try while (!closed) {
             Time nextDeadline = Time.max;
             foreach (p; processors) {
                 auto t = p.nextDeadline;
@@ -403,7 +408,8 @@ public:
             if ((timeout > TimeSpan.zero) && (selector.select(timeout)>0)) {
                 foreach (SelectionKey key; selector.selectedSet()) {
                     auto processor = cast(IProcessor)key.attachment;
-                    processor.process(key);
+                    if (processor)
+                        processor.process(key);
                 }
             }
             auto now = Clock.now;
@@ -411,9 +417,15 @@ public:
                 p.processTimeouts(now);
         } catch (SelectorException e) {
             // Ignore thrown SelectException during shutdown, due to Tango ticket #2025
-            if (selector)
+            if (!closed)
                 throw e;
         }
+    }
+
+    private void cleanup() {
+        foreach (p; processors)
+            p.close();
+        selector.close;
     }
 }
 
