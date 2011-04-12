@@ -167,6 +167,7 @@ class Connection : BaseConnection
         this () { super("Invalid response recieved"); }
     }
     Signal!(Connection) onDisconnected;
+    Signal!(Connection) sigWriteClear;
     ProcessCallback messageHandler;
 protected:
     ByteBuffer msgbuf;
@@ -306,6 +307,13 @@ public:
         while (data.length && ((msgsize = processMessage(data[processed..length])) > 0))
             processed += msgsize;
         return processed;
+    }
+
+    /************************************************************************************
+     * Transmit signal the connection is now ready to send more data.
+     ***********************************************************************************/
+    void onWriteClear() {
+        sigWriteClear.call(this);
     }
 
     /************************************************************************************

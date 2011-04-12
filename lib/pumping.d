@@ -56,6 +56,31 @@ interface IProcessor : ISelectable {
     void processTimeouts(Time now);
 }
 
+version (linux) {
+    import tango.stdc.posix.unistd;
+    extern (C) int eventfd(uint initval, int flags);
+    class EventFD : ISelectable {
+        int _handle;
+        Handle fileHandle() { return cast(Handle)_handle; }
+        this() {
+            _handle = eventfd(0, 0);
+        }
+        ~this() {
+            .close (_handle);
+        }
+        void signal() {
+            static ulong add = 1;
+            auto written = .write(_handle, &add, add.sizeof);
+        }
+        void clear() {
+            static ulong res;
+            .read(_handle, &res, res.sizeof);
+        }
+    }
+} else {
+    static assert(0, "Server needs abort-implementation for non-linux OS");
+}
+
 class BaseConnection : IProcessor {
     class BufferException : Exception {
         this() {
@@ -72,7 +97,13 @@ class BaseConnection : IProcessor {
     /************************************************************************************
      * Should probably be overridden to react on closed connections.
      ***********************************************************************************/
-    void onClosed() {};
+    void onClosed() {}
+
+    /************************************************************************************
+     * Will be signalled when the internal buffer is cleared, when the connection is
+     * ready to queue more data for sending.
+     ***********************************************************************************/
+    void onWriteClear() {}
 
     struct Buffer {
         ubyte[] _data;
@@ -89,12 +120,13 @@ class BaseConnection : IProcessor {
                 memmove(_data.ptr, _data.ptr+size, fill);
         }
 
-        void queue(ubyte[] data) in {
+        size_t queue(ubyte[] data) in {
             assert(hasRoom(data.length));
         } body {
             auto newFill = fill + data.length;
             this._data[fill..newFill] = data;
             fill = newFill;
+            return data.length;
         }
 
         bool hasRoom(size_t size) {
@@ -173,8 +205,10 @@ public:
     private void _dequeue() {
         auto written = _tryWrite(writeBuf.valid);
         if (written) writeBuf.pop(written);
-        if (!writeBuf.fill)
+        if (!writeBuf.fill) {
             this.pump.registerProcessor(this, false);
+            this.onWriteClear();
+        }
     }
 
     /************************************************************************************
@@ -204,20 +238,22 @@ public:
         }
     }
 
-    void write(ubyte[] data) {
-        if (!data.length)
-            return;
+    size_t write(ubyte[] data) in {
+        assert(data.length > 0);
+    } body {
         if (!writeBuf.hasRoom(data.length))
-            throw new IOException("Not enough bufferspace to write");
-        if (writeBuf.fill)
-            return writeBuf.queue(data);
-
-        auto written = _tryWrite(data);
-        if (written != data.length) {
-            assert(this.pump);
-            this.pump.registerProcessor(this, true);
-            return writeBuf.queue(data[written..$]);
+            return 0;
+        if (writeBuf.fill) {
+            writeBuf.queue(data);
+        } else {
+            auto written = _tryWrite(data);
+            if (written != data.length) {
+                assert(this.pump);
+                writeBuf.queue(data[written..$]);
+                this.pump.registerProcessor(this, true);
+            }
         }
+        return data.length;
     }
 
     void close() {
@@ -274,7 +310,6 @@ public:
         assert(cause.events & Event.Read);
         auto newSock = this.serverSocket.accept();
         auto newConnection = onConnection(newSock);
-        pump.registerProcessor(newConnection);
     }
     Time nextDeadline() { return Time.max; } // IGNORED
     void processTimeouts(Time now) {} // IGNORED
@@ -288,15 +323,21 @@ class Pump {
 private:
     ISelector selector;
     HashSet!(IProcessor) processors;
+    EventFD evfd;               /// Used for sending events breaking select
 public:
     /************************************************************************************
      * Create a Pump with a possible initial list of processors
      ***********************************************************************************/
     this(IProcessor[] processors=[], uint sizeHint=0) {
-        selector = new Selector;
+        this.selector = new Selector;
         if (!sizeHint) sizeHint = processors.length ? processors.length : 8;
         selector.open(sizeHint, sizeHint * 2);
         this.processors = new typeof(this.processors);
+
+        // Setup eventFD
+        this.evfd = new EventFD;
+        this.selector.register(evfd, Event.Read);
+
         foreach (p; processors)
             registerProcessor(p);
     }
@@ -338,6 +379,7 @@ public:
         auto s = selector;
         selector = null;
         s.close;
+        evfd.signal();
     }
 
     /************************************************************************************
@@ -351,18 +393,12 @@ public:
                 if (t < nextDeadline)
                     nextDeadline = t;
             }
-            IProcessor[] toRemove;
             auto timeout = nextDeadline-Clock.now;
             if ((timeout > TimeSpan.zero) && (selector.select(timeout)>0)) {
-                foreach (SelectionKey key; selector.selectedSet())
-                {
+                foreach (SelectionKey key; selector.selectedSet()) {
                     auto processor = cast(IProcessor)key.attachment;
                     processor.process(key);
-                    if (key.isError() || key.isHangup() || key.isInvalidHandle()) {
-                        toRemove ~= processor; // Delayed removal to not break traversal
-                    }
                 }
-                foreach (c; toRemove) unregisterProcessor(c);
             }
             auto now = Clock.now;
             foreach (p; processors)

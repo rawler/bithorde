@@ -168,12 +168,15 @@ public:
         client.sendRPCRequest(req, timeout);
     }
 
-    void sendDataSegment(ulong offset, ubyte[] data) {
+    size_t sendDataSegment(ulong offset, ubyte[] data) {
         auto msg = new message.DataSegment;
         msg.handle = handle;
         msg.offset = offset;
         msg.content = data;
-        client.sendNotification(msg);
+        if (client.sendNotification(msg))
+            return data.length;
+        else
+            return 0;
     }
 
     final ulong size() {
@@ -217,6 +220,8 @@ private:
     protected Logger log;
 public:
     Connection connection;
+    Signal!(Client) sigWriteClear;
+
     /************************************************************************************
      * Create a BitHorde client by name and an IPv4Address, or a LocalAddress.
      ***********************************************************************************/
@@ -225,6 +230,7 @@ public:
         this.connection = connection;
         this.log = Log.lookup("lib.client");
         connection.onHandshakeDone.attach = &onConnectionHandshakeDone;
+        connection.sigWriteClear.attach(&_onWriteClear);
         timeouts = new TimeoutQueue;
         boundAssets = new RemoteAsset[16];
         nextStatPrint = Clock.now + StatInterval;
