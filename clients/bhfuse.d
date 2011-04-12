@@ -137,7 +137,7 @@ class BitHordeFilesystem : Filesystem {
             this.pathName = pathName;
             this.asset = asset;
             this.openCount = 0;
-            this.ids = asset.requestIds;
+            this.ids = asset.ids;
             this.size = asset.size;
             this.ino = allocateIno;
             setHandleTimeout();

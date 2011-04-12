@@ -81,7 +81,7 @@ protected:
      ***********************************************************************************/
     this(Client c, message.BindRead req, BHAssetStatusCallback cb, bool singleShotStatus = true) {
         this(c, cb, singleShotStatus);
-        this.requestIds = req.ids;
+        this.ids = req.ids;
     }
     this(Client c, message.BindWrite req, BHAssetStatusCallback cb, bool singleShotStatus = true) {
         this(c, cb, singleShotStatus);
@@ -117,6 +117,11 @@ protected:
         } else {
             if (resp.sizeIsSet)
                 this._size = resp.size;
+            if (resp.idsIsSet) {
+                this.ids = resp.ids;
+                foreach (ref id; ids)
+                    id.id = id.id.dup;
+            }
             scope sig = _statusSignal; // Store away sig for call
             if (singleShotStatus)
                 _statusSignal = _statusSignal.init;
@@ -144,7 +149,7 @@ protected:
 public:
     ushort handle;
     ulong _size;
-    message.Identifier[] requestIds;
+    message.Identifier[] ids;
 
     /************************************************************************************
      * aSyncRead as of IAsset. With or without explicit retry-count
@@ -347,6 +352,7 @@ protected:
             sendMessage(msg);
         } catch (IOException e) {
             log.trace("Ignored exception: {}", e);
+            return 0;
         }
     }
     synchronized void sendRPCRequest(message.RPCRequest req,
