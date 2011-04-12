@@ -174,13 +174,12 @@ private:
     BoundAsset[uint] openAssets;
     Logger log;
 public:
-    this (Server server, Socket s)
+    this (Server server, Connection c)
     {
         this.server = server;
         this.cacheMgr = server.cacheMgr;
         this.log = Log.lookup("daemon.client");
-        super(s, server.name);
-        this.log = Log.lookup("daemon.client."~peername);
+        super(server.name, c);
     }
 
     /************************************************************************************
@@ -202,7 +201,13 @@ public:
         log.trace("Serving {} Assets", openAssets.length);
         super.dumpStats(now);
     }
+
 protected:
+    void onConnectionHandshakeDone(char[] peername) {
+        this.log = Log.lookup("daemon.client."~peername);
+        super.onConnectionHandshakeDone(peername);
+    }
+
     void processBindRead(Connection c, ubyte[] buf)
     {
         auto req = new daemon.client.BindRead(this);

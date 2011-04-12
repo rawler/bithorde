@@ -220,6 +220,8 @@ private:
     protected Logger log;
 public:
     Connection connection;
+    Signal!(Client) authenticated;
+    Signal!(Client) disconnected;
     Signal!(Client) sigWriteClear;
 
     /************************************************************************************
@@ -229,7 +231,8 @@ public:
     {
         this.connection = connection;
         this.log = Log.lookup("lib.client");
-        connection.onHandshakeDone.attach = &onConnectionHandshakeDone;
+        connection.onHandshakeDone.attach(&onConnectionHandshakeDone);
+        connection.onDisconnected.attach(&_onDisconnected);
         connection.sigWriteClear.attach(&_onWriteClear);
         timeouts = new TimeoutQueue;
         boundAssets = new RemoteAsset[16];
@@ -240,9 +243,24 @@ public:
     /************************************************************************************
      * As soon as we've got a remote name, let the logger reflect it.
      ***********************************************************************************/
-    private void onConnectionHandshakeDone(char[] peername) {
+    protected void onConnectionHandshakeDone(char[] peername) {
         this.log = Log.lookup("lib.client."~peername);
         this.connection.messageHandler = &process;
+        authenticated.call(this);
+    }
+
+    /************************************************************************************
+     * Pass on onDisconnected call
+     ***********************************************************************************/
+    protected void _onDisconnected(Connection) {
+        disconnected.call(this);
+    }
+
+    /************************************************************************************
+     * Pass on sigWriteClear call
+     ***********************************************************************************/
+    protected void _onWriteClear(Connection) {
+        sigWriteClear.call(this);
     }
 
     char[] peername() {
@@ -321,17 +339,17 @@ public:
             log.trace("Stats: {}", connection.counters);
     }
 protected:
-    synchronized void sendMessage(message.Message msg) {
-        connection.sendMessage(msg);
+    synchronized size_t sendMessage(message.Message msg) {
+        return connection.sendMessage(msg);
     }
 
     /************************************************************************************
      * Send message, but don't care about delivery. IE, catch IOExceptions and just
      * ignore them.
      ***********************************************************************************/
-    void sendNotification(message.Message msg) {
+    size_t sendNotification(message.Message msg) {
         try {
-            sendMessage(msg);
+            return sendMessage(msg);
         } catch (IOException e) {
             log.trace("Ignored exception: {}", e);
             return 0;
@@ -463,7 +481,6 @@ public:
     {
         this.pump = new Pump;
         auto c = connect(addr, name);
-        c.onDisconnected.attach(&onDisconnected);
         super(name, c);
     }
 
@@ -480,7 +497,8 @@ public:
      * Handle remote-side-initiated disconnect. Can be supplemented/overridden in
      * subclasses.
      ***********************************************************************************/
-    protected void onDisconnected(Connection) {
+    protected void _onDisconnected(Connection c) {
+        super._onDisconnected(c);
         close();
         pump.close();
     }

@@ -70,15 +70,6 @@ class SteppingServer : Server {
         thread.start();
     }
 
-    bool _processMessageQueue(Connection c) {
-        Semaphore oldSem;
-        do {
-            oldSem = sem;
-            sem.wait();
-        } while (sem != oldSem); // Make sure semaphore wasn't reset
-        return super._processMessageQueue(c);
-    }
-
     void step(int steps=1) {
         for (;steps>0; steps--)
             sem.notify();

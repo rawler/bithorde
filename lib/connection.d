@@ -296,7 +296,7 @@ public:
             if (ifr.req)
                 ifr.req.abort(message.Status.DISCONNECTED);
         }
-        onDisconnected(this);
+        onDisconnected.call(this);
     }
 
     /************************************************************************************
@@ -304,7 +304,7 @@ public:
      ***********************************************************************************/
     size_t onData(ubyte[] data) {
         size_t processed, msgsize;
-        while (data.length && ((msgsize = processMessage(data[processed..length])) > 0))
+        while ((processed < data.length) && ((msgsize = processMessage(data[processed..length])) > 0))
             processed += msgsize;
         return processed;
     }
@@ -398,7 +398,7 @@ package:
     /************************************************************************************
      * Send any kind of message, just serialize and push
      ***********************************************************************************/
-    synchronized ubyte[] sendMessage(message.Message m) {
+    synchronized size_t sendMessage(message.Message m) {
         if (closed)
             throw new IOException("Connection closed");
         msgbuf.reset();
@@ -407,8 +407,7 @@ package:
         encode_val!(ushort)((m.typeId << 3) | 0b0000_0010, msgbuf);
         auto buf = msgbuf.data;
         counters.addSentPacket(buf.length);
-        write(buf);
-        return buf;
+        return write(buf);
     }
 
     /************************************************************************************
