@@ -109,7 +109,7 @@ protected:
     TimeoutQueue.EventId statusTimeout;
     void updateStatus(message.AssetStatus resp) {
         if (statusTimeout.cb.ptr) {
-            client.timeouts.abort(statusTimeout);
+            client.connection.timeouts.abort(statusTimeout);
             statusTimeout = statusTimeout.init;
             logRequestResponse(Clock.now - openedTime);
         }
@@ -215,7 +215,6 @@ private:
     RemoteAsset[] boundAssets;
     Stack!(ushort) freeAssetHandles;
     ushort nextNewHandle;
-    TimeoutQueue timeouts;
     Time nextStatPrint;
     protected Logger log;
 public:
@@ -234,7 +233,6 @@ public:
         connection.onHandshakeDone.attach(&onConnectionHandshakeDone);
         connection.onDisconnected.attach(&_onDisconnected);
         connection.sigWriteClear.attach(&_onWriteClear);
-        timeouts = new TimeoutQueue;
         boundAssets = new RemoteAsset[16];
         nextStatPrint = Clock.now + StatInterval;
         connection.sayHello(name);
@@ -253,6 +251,7 @@ public:
      * Pass on onDisconnected call
      ***********************************************************************************/
     protected void _onDisconnected(Connection) {
+        close();
         disconnected.call(this);
     }
 
@@ -312,27 +311,6 @@ public:
         return connection.getLoad();
     }
 
-    /************************************************************************************
-     * Figure next timeout for this client
-     ***********************************************************************************/
-    Time nextDeadline() {
-        auto result = min!(Time)(timeouts.nextDeadline, connection.nextDeadline);
-        result = min!(Time)(result, nextStatPrint);
-        return result;
-    }
-
-    /************************************************************************************
-     * Process any passed timeouts
-     ***********************************************************************************/
-    void processTimeouts(Time now) {
-        timeouts.emit(now);
-        connection.processTimeouts(now);
-        if (now >= nextStatPrint) {
-            dumpStats(now);
-            nextStatPrint = now + StatInterval;
-        }
-    }
-
     void dumpStats(Time now) {
         connection.counters.doSwitch(now);
         if (!connection.counters.empty)
@@ -371,7 +349,7 @@ protected:
         boundAssets[asset.handle] = asset;
         asset.openedTime = Clock.now;
         sendMessage(req);
-        asset.statusTimeout = timeouts.registerIn(timeout, &asset.triggerTimeout);
+        asset.statusTimeout = connection.timeouts.registerIn(timeout, &asset.triggerTimeout);
     }
 
     bool closed() {

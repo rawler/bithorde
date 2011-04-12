@@ -118,9 +118,12 @@ public:
     }
 
     /************************************************************************************
-     * Runs shutdown. Set running to false and signal evfd.
+     * Runs shutdown. Set running to false and close pump.
      ***********************************************************************************/
     synchronized void shutdown() {
+        running = false;
+        tcpServer.close();
+        unixServer.close();
         pump.close();
     }
 
@@ -152,10 +155,17 @@ protected:
      * a Client, and add it to the Pump.
      ***********************************************************************************/
     Connection _hookupSocket(Socket s) {
-        auto conn = new Connection(pump, s);
+        auto conn = _createConnection(s);
         auto c = new Client(this, conn);
         c.authenticated.attach(&onClientConnect);
         return conn;
+    }
+
+    /************************************************************************************
+     * Overridable connection Factory, so tests can hook up special connections.
+     ***********************************************************************************/
+    Connection _createConnection(Socket s) {
+        return new Connection(pump, s);
     }
 
     void onClientConnect(lib.client.Client c)

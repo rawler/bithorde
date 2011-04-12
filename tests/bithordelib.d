@@ -17,6 +17,7 @@
 module tests.libbithorde;
 
 private import tango.core.Thread;
+private import tango.core.sync.Mutex;
 private import tango.core.sync.Semaphore;
 private import tango.core.tools.TraceExceptions;
 private import tango.io.Console;
@@ -39,15 +40,56 @@ import daemon.routing.friend;
 import lib.client;
 import lib.connection;
 import lib.message;
+import lib.pumping;
 
 /****************************************************************************************
  * A stepping-server is a test-mockup allowing us to drive a server one request at a time
  ***************************************************************************************/
 class SteppingServer : Server {
-    Semaphore sem;
     Thread thread;
+    Semaphore sem;
+    Mutex m;
+    SteppingConnection[] connections;
 
-    this(char[] name, ushort port, Server[] friends=[]) {
+    /************************************************************************************
+     * A connection that can be halted and processed, one message at a time.
+     ***********************************************************************************/
+    class SteppingConnection : Connection {
+        ProcessCallback realMessageHandler;
+
+        this(Pump p, Socket s) {
+            connections ~= this;
+            super(p, s);
+        }
+
+        private void _proxyMessageHandler(Connection c, message.Type t, ubyte[] buf) {
+            synchronized (this) sem.wait();
+            return realMessageHandler(c, t, buf);
+        }
+        ProcessCallback messageHandler(ProcessCallback h) {
+            super.messageHandler(&_proxyMessageHandler);
+            return realMessageHandler = h;
+        }
+    }
+
+    /************************************************************************************
+     * Fork new server in separate thread.
+     ***********************************************************************************/
+    static SteppingServer launch(char[] name, ushort port, Server[] friends=[]) {
+        auto parent = Thread.getThis;
+        auto newName = "S_"~name;
+        auto oldName = parent.name; // Temporarily overwrite name of current thread, to make pretty logs.
+        parent.name = newName;
+        auto s = new SteppingServer(name, port, friends);
+        auto thread = s.thread = new Thread(&s.run);
+        thread.name = newName;
+        thread.isDaemon = true;
+        thread.start();
+        parent.name = oldName;
+        return s;
+    }
+
+    private this(char[] name, ushort port, Server[] friends=[]) {
         auto c = new Config;
         c.name = "TestServer-"~name;
         c.port = port;
@@ -62,12 +104,17 @@ class SteppingServer : Server {
             c.friends[srv.name] = f;
         }
 
-        sem = new Semaphore;
-        super(c);
+        m = new Mutex(this);
+        sem = new Semaphore();
 
-        thread = new Thread(&run);
-        thread.isDaemon = true;
-        thread.start();
+        super(c);
+    }
+
+    /************************************************************************************
+     * _createConnection overridden with SteppingConnection
+     ***********************************************************************************/
+    Connection _createConnection(Socket s) {
+        return new SteppingConnection(pump, s);
     }
 
     void step(int steps=1) {
@@ -76,9 +123,13 @@ class SteppingServer : Server {
     }
 
     void reset(uint steps=0) {
-        auto oldsem = sem;
-        sem = new Semaphore(steps);
-        oldsem.notify;
+        while (!m.tryLock) {
+            sem.notify();
+        }
+        scope(exit) m.unlock();
+        auto oldSem = sem;
+        volatile sem = new Semaphore(steps);
+        oldSem.notify();
     }
 
     void shutdown() {
@@ -138,7 +189,7 @@ void testServerTimeout(SteppingServer src, SteppingServer proxy) {
     auto sendTime = Clock.now;
     client.open(ids, delegate(IAsset asset, Status status, AssetStatus resp) {
         assert(asset, "Asset is null");
-        assert(resp !is null, "Did not get expected response");
+        assert(resp !is null, "Did not get expected response-message");
         if (status == Status.NOTFOUND) {
             gotTimeout = true;
             client.close();
@@ -176,7 +227,7 @@ Identifier[] testAssetUpload(SteppingServer dst) {
 
         if (resp && (status == Status.SUCCESS)) {
             if (resp.idsIsSet) { // Upload Complete, got response
-                retVal = resp.ids;
+                retVal = asset.ids;
                 LOG.info("SUCCESS! Digest is {}", retVal[0].id);
                 expectedStatus = Status.INVALID_HANDLE;
                 client.close();
@@ -241,7 +292,7 @@ void testRestartWithPartialAsset(SteppingServer src, Identifier[] ids) {
     const chunkSize = 5;
     src.reset(1000);
 
-    auto proxy = new SteppingServer("RestartProxy", 23416, [src]);
+    auto proxy = SteppingServer.launch("RestartProxy", 23416, [src]);
     scope (exit) {
         proxy.reset(1000);
         proxy.shutdown();
@@ -267,7 +318,7 @@ void testRestartWithPartialAsset(SteppingServer src, Identifier[] ids) {
     LOG.info("Shutting down server");
     proxy.shutdown();
     LOG.info("Restarting server");
-    proxy = new SteppingServer("RestartProxy", 23416, [src]);
+    proxy = SteppingServer.launch("RestartProxy", 23416, [src]);
     proxy.reset(1000);
     LOG.info("Reconnecting client");
     client = createClient(proxy);
@@ -285,7 +336,7 @@ void testRestartWithPartialAsset(SteppingServer src, Identifier[] ids) {
     LOG.info("Retrying fetch");
     client.open(ids, delegate(IAsset _asset, Status status, AssetStatus resp) {
         asset = cast(RemoteAsset)_asset;
-        assert(asset && (status == Status.SUCCESS), "Failed opening");
+        assert(asset && (status == Status.SUCCESS), "Failed opening, status is "~statusToString(status));
 
         asset.aSyncRead(pos, chunkSize, &gotResponse2, 2, TimeSpan.fromMillis(500));
     });
@@ -325,6 +376,7 @@ void testSourceGone(SteppingServer src, SteppingServer proxy, Identifier[] ids) 
         gotNewStatus = true;
         client.close();
     }
+
     client.open(ids, delegate(IAsset _asset, Status status, AssetStatus resp) {
         asset = cast(RemoteAsset)_asset;
         assert(asset && (status == Status.SUCCESS), "Failed opening, status is " ~ statusToString(status));
@@ -345,18 +397,33 @@ void testSourceGone(SteppingServer src, SteppingServer proxy, Identifier[] ids) 
 /// Log for all the tests
 static Logger LOG;
 
+public class MyLayout : Appender.Layout {
+    private import tango.text.convert.TimeStamp : format8601;
+    private import  tango.text.convert.Format;
+    void format (LogEvent event, size_t delegate(void[]) dg) {
+        auto thread = Thread.getThis;
+        char[32] timebuf;
+        auto time = format8601(timebuf, event.time);
+        char[128] preamblebuf;
+        if (thread.name) dg(Format.sprint(preamblebuf, "{} @{} {} [{}] - ", time, thread.name, event.levelName, event.name));
+        else             dg(Format.sprint(preamblebuf, "{} @{} {} [{}] - ", time, cast(void*)thread, event.levelName, event.name));
+        dg(event.toString);
+    }
+}
+
 /// Execute all the tests in order
 void main() {
-    Log.root.add(new AppendConsole(new LayoutDate));
+    Log.root.add(new AppendConsole(new MyLayout));
     LOG = Log.lookup("libtest");
+    Thread.getThis.name = "client";
 
     synchronized (Cerr.stream) { Stderr("\nTesting ClientTimeout\n=====================\n").newline; }
-    auto src = new SteppingServer("Src", 23412);
+    auto src = SteppingServer.launch("Src", 23412);
     scope(exit) src.shutdown();
     testLibTimeout(src);
 
     synchronized (Cerr.stream) { Stderr("\nTesting ServerTimeout\n=====================\n").newline; }
-    auto proxy = new SteppingServer("Proxy", 23415, [src]);
+    auto proxy = SteppingServer.launch("Proxy", 23415, [src]);
     scope(exit) proxy.shutdown();
     testServerTimeout(src, proxy);
 
@@ -370,7 +437,7 @@ void main() {
     testRestartWithPartialAsset(src, ids);
 
     synchronized (Cerr.stream) { Stderr("\nTesting Dropping Source\n=======================================\n").newline; }
-    auto node3 = new SteppingServer("Node3", 23417, [src, proxy]);
+    auto node3 = SteppingServer.launch("Node3", 23417, [src, proxy]);
     scope(exit) node3.shutdown();
     testSourceGone(src, node3, ids);
 

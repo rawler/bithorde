@@ -168,7 +168,9 @@ class Connection : BaseConnection
     }
     Signal!(Connection) onDisconnected;
     Signal!(Connection) sigWriteClear;
-    ProcessCallback messageHandler;
+
+    private ProcessCallback _messageHandler;
+    ProcessCallback messageHandler(ProcessCallback h) { return _messageHandler = h; }
 protected:
     ByteBuffer msgbuf;
     char[] _myname, _peername;
@@ -282,7 +284,7 @@ public:
         this.lingerIds = lingerIds.init;
         this.nextid = nextid.init;
         this._peername = _peername.init;
-        this.messageHandler = &processHandShake;
+        this._messageHandler = &processHandShake;
 
         this.msgbuf = new ByteBuffer(8192);
         this.inFlightRequests = new InFlightRequest[16];
@@ -317,7 +319,7 @@ public:
     }
 
     /************************************************************************************
-     * Process a single message read from previous readNewData()
+     * Process a single message read from onData()
      ***********************************************************************************/
     synchronized size_t processMessage(ubyte inBuf[])
     {
@@ -331,7 +333,7 @@ public:
                 assert((type & 0b0000_0111) == 0b0010, "Expected message type, but got something else");
                 type >>= 3;
 
-                messageHandler(this, type, decodeBuf[0..msglen]);
+                _messageHandler(this, type, decodeBuf[0..msglen]);
             } catch (Exception e) {
                 log.error("Exception ({}:{}) in handling incoming Message: {}", e.file, e.line, e.msg);
             }
@@ -385,7 +387,7 @@ public:
      * Initiate handshake
      ***********************************************************************************/
     void sayHello(char[] myname) in {
-        assert(messageHandler is &processHandShake);
+        assert(_messageHandler is &processHandShake);
         assert(myname.length);
     } body {
         this._myname = myname;
