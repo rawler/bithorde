@@ -33,6 +33,8 @@ import lib.hashes;
 import message = lib.message;
 import lib.protobuf;
 
+auto MAX_OPEN_ASSETS = 4096;
+
 /****************************************************************************************
  * Interface for the various forms of server-assets. (BaseAsset, CachingAsset,
  * ForwardedAsset...)
@@ -103,17 +105,18 @@ class Client : lib.client.Client {
     class BoundAsset : IServerAsset {
         uint handle;
         IServerAsset assetSource;
+        bool closed;
     protected:
         /// Construct from BindRead request
         this (BindRead req) {
             handle = req.handle;
-            openAssets[handle] = this;
+            setAsset(handle, this);
             req.pushCallback(&onBindReadReply);
             server.findAsset(req);
         }
         this (message.BindWrite req) {
             handle = req.handle;
-            openAssets[handle] = this;
+            setAsset(handle, this);
             server.uploadAsset(req, &onAssetStatus);
         }
     private:
@@ -147,8 +150,9 @@ class Client : lib.client.Client {
         }
         void close() {
             log.trace("Closed asset {}", handle);
+            closed = true;
             assetSource = null;
-            openAssets.remove(handle);
+            setAsset(handle,null);
             GC.collect();
         }
         void attachWatcher(BHAssetStatusCallback) {} // Doesn't make sense?
@@ -171,7 +175,7 @@ class Client : lib.client.Client {
 private:
     Server server;
     CacheManager cacheMgr;
-    BoundAsset[uint] openAssets;
+    BoundAsset[] openAssets;
     Logger log;
 public:
     this (Server server, Connection c)
@@ -193,13 +197,34 @@ public:
      ***********************************************************************************/
     void close() {
         super.close();
+        foreach (asset; openAssets) if (asset)
+            asset.close();
         openAssets = null;
         GC.collect();
     }
 
     void dumpStats(Time now) {
-        log.trace("Serving {} Assets", openAssets.length);
+        uint count;
+        foreach (asset; openAssets)
+            if (asset) count ++;
+        log.trace("Serving {} Assets", count);
         super.dumpStats(now);
+    }
+
+private:
+    BoundAsset getAsset(uint i) {
+        if (i >= openAssets.length)
+            return null;
+        else
+            return openAssets[i];
+    }
+
+    BoundAsset setAsset(uint i, BoundAsset asset) {
+        if (i > MAX_OPEN_ASSETS)
+            throw new IllegalElementException("Asset handle too large");
+        if (i >= openAssets.length)
+            openAssets.length = openAssets.length + 1;
+        return openAssets[i] = asset;
     }
 
 protected:
@@ -214,17 +239,17 @@ protected:
         req.decode(buf);
 
         // Test if asset-handle is previously used.
-        auto openAsset = req.handle in openAssets;
+        auto openAsset = getAsset(req.handle);
         if (openAsset) {
             openAsset.close();
-            openAssets.remove(req.handle);
+            setAsset(req.handle, null);
         }
 
         if (req.idsIsSet) {
             log.trace("Got open request #{}, {}", req.uuid, formatMagnet(req.ids, 0));
             if (!req.uuidIsSet)
                 req.uuid = rand.uniformR2!(ulong)(1,ulong.max);
-            openAssets[req.handle] = new BoundAsset(req);
+            setAsset(req.handle, new BoundAsset(req));
         } else {
             scope resp = new message.AssetStatus();
             resp.handle = req.handle;
@@ -251,7 +276,7 @@ protected:
         req.decode(buf);
         IAsset asset;
         try {
-            asset = openAssets[req.handle];
+            asset = getAsset(req.handle);
         } catch (ArrayBoundsException e) {
             delete req;
             scope resp = new message.ReadResponse;
@@ -266,7 +291,7 @@ protected:
         scope req = new message.DataSegment();
         req.decode(buf);
         try {
-            auto asset = cast(BoundAsset)openAssets[req.handle];
+            auto asset = getAsset(req.handle);
             asset.addDataSegment(req);
         } catch (ArrayBoundsException e) {
             log.error("DataSegment to invalid handle");
