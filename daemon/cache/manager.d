@@ -311,8 +311,6 @@ public:
                     req.callback(cachingAsset, sCode, s);
                 } catch (IOException e) {
                     log.error("While opening asset: {}", e);
-                    if (metaAsset)
-                        purgeAsset(metaAsset);
                     req.callback(null, message.Status.ERROR, null);
                 }
             }
@@ -361,7 +359,6 @@ public:
                 return meta.openAsset();
             } catch (IOException e) {
                 log.error("While opening asset: {}", e);
-                purgeAsset(meta);
                 return null;
             }
         }
