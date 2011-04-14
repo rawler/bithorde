@@ -179,7 +179,7 @@ void testLibTimeout(SteppingServer s) {
  * Verifies that the bithorde server times out stale forwarded requests correctly.
  ***************************************************************************************/
 void testServerTimeout(SteppingServer src, SteppingServer proxy) {
-    src.reset(1);
+    src.reset(0);
     proxy.reset(100);
     Thread.sleep(0.2);
     auto client = createClient(proxy);
@@ -190,14 +190,14 @@ void testServerTimeout(SteppingServer src, SteppingServer proxy) {
     client.open(ids, delegate(IAsset asset, Status status, AssetStatus resp) {
         assert(asset, "Asset is null");
         assert(resp !is null, "Did not get expected response-message");
+        auto elapsed = Clock.now - sendTime;
+        assert(elapsed.millis > 300, "Too little time has passed. Can't be result of Timeout.");
         if (status == Status.NOTFOUND) {
             gotTimeout = true;
             client.close();
         } else {
             assert(false, "Expected NOTFOUND but got other status " ~ statusToString(status));
         }
-        auto elapsed = Clock.now - sendTime;
-        assert(elapsed.millis > 300, "Too little time has passed. Can't be result of Timeout.");
     }, TimeSpan.fromMillis(1000));
     LOG.info("Request sent, expecting Timeout");
     client.run();
