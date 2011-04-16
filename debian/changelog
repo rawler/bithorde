@@ -1,3 +1,20 @@
+bithorde (0.1.2) maverick; urgency=low
+
+  * Minor fixes;
+   - [daemon/server]Properly report error if support for eventfd is missing in kernel.
+   - [debian/upstart]Wait for all filesystems to be mounted, before starting bithorded, to avoid racy start.
+
+ -- Ulrik Mikaelsson <ulrik.mikaelsson@gmail.com>  Fri, 25 Mar 2011 21:32:42 +0100
+
+bithorde (0.1.1) maverick; urgency=low
+
+  * Minor fixes; 
+   - [daemon/client]Always close previously bound assets before possibly binding a new asset to the handle.
+   - [lib/client]Remove closed assets from boundAssets-list.
+   - [bhfuse]Fix clean shutdown, by mwarning. (issue #18)
+
+ -- Ulrik Mikaelsson <ulrik.mikaelsson@gmail.com>  Tue, 08 Feb 2011 21:42:09 +0100
+
 bithorde (0.1) maverick; urgency=low
 
   * Re-tag for 0.1 release.

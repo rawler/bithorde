@@ -1,6 +1,5 @@
 
-
-start on net-device-up
+start on (filesystem and net-device-up IFACE!=lo)
 
 exec /usr/bin/bithorded /etc/bithorde.conf
 respawn
