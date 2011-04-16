@@ -352,7 +352,6 @@ protected:
             sendMessage(msg);
         } catch (IOException e) {
             log.trace("Ignored exception: {}", e);
-            return 0;
         }
     }
     synchronized void sendRPCRequest(message.RPCRequest req,
