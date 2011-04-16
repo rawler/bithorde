@@ -30,6 +30,7 @@ private import tango.util.MinMax;
 public import lib.asset;
 import lib.connection;
 import lib.protobuf;
+import lib.pumping;
 import lib.timeout;
 
 alias void delegate(Object) DEvent;
@@ -108,7 +109,7 @@ protected:
     TimeoutQueue.EventId statusTimeout;
     void updateStatus(message.AssetStatus resp) {
         if (statusTimeout.cb.ptr) {
-            client.timeouts.abort(statusTimeout);
+            client.connection.timeouts.abort(statusTimeout);
             statusTimeout = statusTimeout.init;
             logRequestResponse(Clock.now - openedTime);
         }
@@ -167,12 +168,15 @@ public:
         client.sendRPCRequest(req, timeout);
     }
 
-    void sendDataSegment(ulong offset, ubyte[] data) {
+    size_t sendDataSegment(ulong offset, ubyte[] data) {
         auto msg = new message.DataSegment;
         msg.handle = handle;
         msg.offset = offset;
         msg.content = data;
-        client.sendNotification(msg);
+        if (client.sendNotification(msg))
+            return data.length;
+        else
+            return 0;
     }
 
     final ulong size() {
@@ -211,55 +215,51 @@ private:
     RemoteAsset[] boundAssets;
     Stack!(ushort) freeAssetHandles;
     ushort nextNewHandle;
-    TimeoutQueue timeouts;
     Time nextStatPrint;
     protected Logger log;
 public:
     Connection connection;
+    Signal!(Client) authenticated;
+    Signal!(Client) disconnected;
+    Signal!(Client) sigWriteClear;
+
     /************************************************************************************
      * Create a BitHorde client by name and an IPv4Address, or a LocalAddress.
      ***********************************************************************************/
-    this (Address addr, char[] name)
+    this (char[] name, Connection connection)
     {
-        this(name);
-        connect(addr);
-    }
-
-    /************************************************************************************
-     * Create BitHorde client on provided Socket
-     ***********************************************************************************/
-    this (Socket s, char[] name) {
-        this(name);
-        connection.handshake(s);
-    }
-
-    /************************************************************************************
-     * Private common-initialization ctor
-     ***********************************************************************************/
-    private this(char[] name) {
+        this.connection = connection;
         this.log = Log.lookup("lib.client");
-        connection = new Connection(name, &process);
-        connection.onHandshakeDone.attach = &onConnectionHandshakeDone;
-        timeouts = new TimeoutQueue;
+        connection.onHandshakeDone.attach(&onConnectionHandshakeDone);
+        connection.onDisconnected.attach(&_onDisconnected);
+        connection.sigWriteClear.attach(&_onWriteClear);
         boundAssets = new RemoteAsset[16];
         nextStatPrint = Clock.now + StatInterval;
-    }
-
-    /************************************************************************************
-     * Connect to specified address
-     ***********************************************************************************/
-    protected Socket connect(Address addr) {
-        auto socket = new Socket(addr.addressFamily, SocketType.STREAM, ProtocolType.IP);
-        socket.connect(addr);
-        connection.handshake(socket);
-        return socket;
+        connection.sayHello(name);
     }
 
     /************************************************************************************
      * As soon as we've got a remote name, let the logger reflect it.
      ***********************************************************************************/
-    private void onConnectionHandshakeDone(char[] peername) {
+    protected void onConnectionHandshakeDone(char[] peername) {
         this.log = Log.lookup("lib.client."~peername);
+        this.connection.messageHandler = &process;
+        authenticated.call(this);
+    }
+
+    /************************************************************************************
+     * Pass on onDisconnected call
+     ***********************************************************************************/
+    protected void _onDisconnected(Connection) {
+        close();
+        disconnected.call(this);
+    }
+
+    /************************************************************************************
+     * Pass on sigWriteClear call
+     ***********************************************************************************/
+    protected void _onWriteClear(Connection) {
+        sigWriteClear.call(this);
     }
 
     char[] peername() {
@@ -268,10 +268,9 @@ public:
 
     void close()
     {
-        connection.shutdown();
+        connection.close();
         foreach (asset; boundAssets) if (asset)
             asset.close();
-        connection.close();
 
         log.trace("Closed...");
     }
@@ -312,44 +311,23 @@ public:
         return connection.getLoad();
     }
 
-    /************************************************************************************
-     * Figure next timeout for this client
-     ***********************************************************************************/
-    Time nextDeadline() {
-        auto result = min!(Time)(timeouts.nextDeadline, connection.nextDeadline);
-        result = min!(Time)(result, nextStatPrint);
-        return result;
-    }
-
-    /************************************************************************************
-     * Process any passed timeouts
-     ***********************************************************************************/
-    void processTimeouts(Time now) {
-        timeouts.emit(now);
-        connection.processTimeouts(now);
-        if (now >= nextStatPrint) {
-            dumpStats(now);
-            nextStatPrint = now + StatInterval;
-        }
-    }
-
     void dumpStats(Time now) {
         connection.counters.doSwitch(now);
         if (!connection.counters.empty)
             log.trace("Stats: {}", connection.counters);
     }
 protected:
-    synchronized void sendMessage(message.Message msg) {
-        connection.sendMessage(msg);
+    synchronized size_t sendMessage(message.Message msg) {
+        return connection.sendMessage(msg);
     }
 
     /************************************************************************************
      * Send message, but don't care about delivery. IE, catch IOExceptions and just
      * ignore them.
      ***********************************************************************************/
-    void sendNotification(message.Message msg) {
+    size_t sendNotification(message.Message msg) {
         try {
-            sendMessage(msg);
+            return sendMessage(msg);
         } catch (IOException e) {
             log.trace("Ignored exception: {}", e);
         }
@@ -370,7 +348,7 @@ protected:
         boundAssets[asset.handle] = asset;
         asset.openedTime = Clock.now;
         sendMessage(req);
-        asset.statusTimeout = timeouts.registerIn(timeout, &asset.triggerTimeout);
+        asset.statusTimeout = connection.timeouts.registerIn(timeout, &asset.triggerTimeout);
     }
 
     bool closed() {
@@ -468,65 +446,38 @@ protected:
  ***************************************************************************************/
 class SimpleClient : Client {
 private:
-    Selector selector;
+    Pump pump;
 public:
     /************************************************************************************
      * Create client by name, and connect to given address.
      *
-     * The SimpleClient is driven by the application in some manner, either by
-     * continually calling pump(), or yielding to run(), which will run the client until
-     * it is closed.
+     * The SimpleClient is driven by the application, by yielding to run(), which will
+     * run the client until it is closed.
      ***********************************************************************************/
     this (Address addr, char[] name)
     {
-        super(addr, name);
+        this.pump = new Pump;
+        auto c = connect(addr, name);
+        super(name, c);
     }
 
     /************************************************************************************
      * Intercept new connection and create Selector for it
      ***********************************************************************************/
-    protected Socket connect(Address addr) {
-        auto retval = super.connect(addr);
-        selector = new Selector();
-        selector.open(1,1);
-        selector.register(retval, Event.Read|Event.Error);
-        return retval;
+    protected Connection connect(Address addr, char[] name) {
+        auto socket = new Socket(addr.addressFamily, SocketType.STREAM, ProtocolType.IP);
+        socket.connect(addr);
+        return new Connection(pump, socket);
     }
 
     /************************************************************************************
      * Handle remote-side-initiated disconnect. Can be supplemented/overridden in
      * subclasses.
      ***********************************************************************************/
-    protected void onDisconnected() {
+    protected void _onDisconnected(Connection c) {
+        super._onDisconnected(c);
         close();
-    }
-
-    /************************************************************************************
-     * Run exactly one cycle of readNewData, processMessage*, processTimeouts
-     ***********************************************************************************/
-    synchronized void pump() {
-        auto timeout = nextDeadline - Clock.now;
-        if ((timeout > TimeSpan.zero) && (selector.select(timeout) > 0)) {
-            foreach (key; selector.selectedSet())
-                process(key);
-        }
-        processTimeouts(Clock.now);
-    }
-
-    /************************************************************************************
-     * Process a single SelectionKey event
-     ***********************************************************************************/
-    void process(ref SelectionKey key) {
-        if (key.isReadable) {
-            auto read = connection.readNewData();
-            if (read) {
-                while (connection.processMessage()) {}
-            } else {
-                onDisconnected();
-            }
-        } else if (key.isError || key.isHangup) {
-            onDisconnected();
-        }
+        pump.close();
     }
 
     /************************************************************************************
@@ -535,7 +486,6 @@ public:
      * timeout:s).
      ***********************************************************************************/
     void run() {
-        while (!closed)
-            pump();
+        pump.run();
     }
 }

@@ -107,6 +107,8 @@ public:
         file = new File(args.file.toString);
 
         client.beginUpload(file.length, &onStatusUpdate);
+
+        client.sigWriteClear.attach(&fillQueue);
     }
     ~this(){
         if (asset)
@@ -166,25 +168,24 @@ private:
             pBar = new ProgressBar(file.length, args.file.name ~ " : ", "kB", 1024);
 
         pos = file.position;
-        while (pos < file.length) {
-            ubyte[CHUNK_SIZE] buf;
-            auto read = file.read(buf);
-            if (read > 0) {
-                asset.sendDataSegment(pos, buf[0..read]);
-                pos += read;
+        fillQueue(client);
+    }
 
-                if (pBar)
-                    pBar.update(pos);
-            } else {
-                Stderr("Failed to read chunk from pos").newline;
-                exit(-1);
+    void fillQueue(Client c) {
+        ubyte[CHUNK_SIZE] buf;
+        file.seek(pos);
+        while (pos < file.length) {
+            ssize_t read = file.read(buf);
+            if (read != file.Eof) {
+                auto oldPos = pos;
+                if (asset.sendDataSegment(oldPos, buf[0..read])) {
+                    pos += read;
+                    if (pBar)
+                        pBar.update(pos);
+                } else {
+                    break;
+                }
             }
-        }
-        if (args.progressBar) {
-            if (exitStatus == 0) // Successful finish
-                pBar.finish(pos);
-            else
-                Stderr.newline;
         }
     }
 
@@ -193,6 +194,12 @@ private:
      * Print these, and exit
      ***********************************************************************************/
     void onComplete(IAsset asset, Status status, Identifier[] ids) {
+        if (args.progressBar) {
+            if (exitStatus == 0) // Successful finish
+                pBar.finish(pos);
+            else
+                Stderr.newline;
+        }
         if (status == Status.SUCCESS) {
             Stdout(formatMagnet(ids, pos, args.file.file)).newline;
             foreach (id; ids) if (id.type == HashType.ED2K) {

@@ -18,9 +18,8 @@ module daemon.server;
 
 private import tango.core.Exception;
 private import tango.core.Thread;
-// private import tango.core.tools.TraceExceptions; // Disabled due to poor Tracing-performance.
+private import tango.core.tools.TraceExceptions; // Disabled due to poor Tracing-performance.
 private import tango.io.FilePath;
-private import tango.io.selector.Selector;
 private import tango.net.device.Berkeley;
 private import tango.net.device.LocalSocket;
 private import tango.net.device.Socket;
@@ -43,49 +42,28 @@ private import daemon.routing.friend;
 private import daemon.routing.router;
 private import lib.asset;
 private import lib.connection;
+private import lib.pumping;
 private import message = lib.message;
-
-version (linux) {
-    extern (C) int eventfd(uint initval, int flags);
-    class EventFD : ISelectable {
-        int _handle;
-        Handle fileHandle() { return cast(Handle)_handle; }
-        this() {
-            _handle = eventfd(0, 0);
-            if (_handle < 0) {
-                int errorCode = errno;
-                throw new Exception("Error creating eventfd: " ~ SysError.lookup(errorCode), __FILE__, __LINE__);
-            }
-        }
-        ~this() {
-            unistd.close (_handle);
-        }
-        void signal() {
-            static ulong add = 1;
-            auto written = unistd.write(_handle, &add, add.sizeof);
-        }
-        void clear() {
-            static ulong res;
-            unistd.read(_handle, &res, res.sizeof);
-        }
-    }
-} else {
-    static assert(0, "Server needs abort-implementation for non-linux OS");
-}
 
 class Server : IAssetSource
 {
+    class ConnectionWrapper(T) : BaseSocketServer!(T) {
+        this(Pump p, T s) { super(p,s); }
+        Connection onConnection(Socket s) {
+            return _hookupSocket(s);
+        }
+    }
 package:
-    ISelector selector;
     CacheManager cacheMgr;
     Router router;
     Friend[char[]] offlineFriends;
     Thread serverThread;
     Thread reconnectThread;
-    ServerSocket tcpServer;
-    LocalServerSocket unixServer;
+    ConnectionWrapper!(ServerSocket) tcpServer;
+    ConnectionWrapper!(LocalServerSocket) unixServer;
     bool running = true;
-    EventFD evfd;               /// Used for sending events breaking select
+
+    Pump pump;
 
     static Logger log;
     static this() {
@@ -99,20 +77,15 @@ public:
         // Setup basics
         this.config = config;
         this.name = config.name;
-        this.running = true;
 
-        // Setup selector
-        this.selector = new Selector;
-        this.selector.open(10, 10);
-
-        // Setup event selector
-        this.evfd = new EventFD;
-        this.selector.register(evfd, Event.Read);
+        // Setup Pump
+        this.pump = new Pump([], 16);
 
         // Setup servers
         log.info("Listening to tcp-port {}", config.port);
-        this.tcpServer = new ServerSocket(new InternetAddress(IPv4Address.ADDR_ANY, config.port), 32, true);
-        selector.register(tcpServer, Event.Read);
+        auto tcpServerSocket = new ServerSocket(new InternetAddress(IPv4Address.ADDR_ANY, config.port), 32, true);
+        tcpServer = new typeof(tcpServer)(pump, tcpServerSocket);
+
         if (config.unixSocket) {
             auto sockF = new FilePath(config.unixSocket);
             auto old_mask = umask(0); // Temporarily clear umask so socket is mode 777
@@ -120,8 +93,8 @@ public:
             if (sockF.exists())
                 sockF.remove();
             log.info("Listening to unix-socket {}", config.unixSocket);
-            this.unixServer = new LocalServerSocket(config.unixSocket);
-            selector.register(unixServer, Event.Read);
+            auto unixServerSocket = new LocalServerSocket(config.unixSocket);
+            unixServer = new typeof(unixServer)(pump, unixServerSocket);
         }
 
         // Setup helper functions, routing and caching
@@ -135,10 +108,6 @@ public:
         log.info("Started");
     }
 
-    ~this() {
-        running = false;
-    }
-
     void run() {
         cacheMgr.start();
         serverThread = Thread.getThis;
@@ -147,8 +116,17 @@ public:
         reconnectThread.isDaemon = true;
         reconnectThread.start();
 
-        while (running)
-            pump();
+        pump.run();
+    }
+
+    /************************************************************************************
+     * Runs shutdown. Set running to false and close pump.
+     ***********************************************************************************/
+    synchronized void shutdown() {
+        running = false;
+        tcpServer.close();
+        unixServer.close();
+        pump.close();
     }
 
     /************************************************************************************
@@ -157,77 +135,11 @@ public:
     private void cleanup() {
         running = false;
         try {
-            foreach (sk; selector) {
-                auto sock = cast(Socket)(sk.conduit);
-                if (sock) {
-                    sock.shutdown();
-                    sock.detach();
-                }
-            }
-            tcpServer = null;
-            unixServer = null;
             cacheMgr.shutdown();
         } catch (Exception e) {
             log.error("Error in cleanup {}", e);
         } finally {
             serverThread = null;
-        }
-    }
-
-    /************************************************************************************
-     * Runs shutdown. Set running to false and signal evfd.
-     ***********************************************************************************/
-    synchronized void shutdown() {
-        running = false;
-        evfd.signal();
-        // Wait for cleanup, unless we're the thread supposed to do the cleanup.
-        while (serverThread && (serverThread != Thread.getThis)) {
-            Thread.sleep(0.1);
-            evfd.signal();
-        }
-    }
-
-    protected void pump()
-    {
-        scope SelectionKey[] removeThese;
-        auto nextDeadline = Time.max;
-        foreach (key; selector) {
-            if (auto c = cast(Client)key.attachment) {
-                auto cnd = c.nextDeadline;
-                if (cnd < nextDeadline) nextDeadline = cnd;
-            }
-        }
-        auto timeout = nextDeadline - Clock.now;
-        if (timeout > TimeSpan.zero) {
-            auto triggers = selector.select(timeout);
-            if (!running) // Shutdown started
-                return;
-            if (triggers > 0) {
-                foreach (SelectionKey event; selector.selectedSet()) {
-                    if (event.isError || event.isHangup || event.isInvalidHandle ||
-                            !processSelectEvent(event))
-                        removeThese ~= event;
-                }
-            }
-        }
-        auto now = Clock.now;
-        foreach (key; selector) {
-            auto c = cast(Client)key.attachment;
-            if (c) c.processTimeouts(now);
-        }
-        foreach (event; removeThese) {
-            selector.unregister(event.conduit);
-            if (auto c = cast(Client)event.attachment) { // Connection has attached client
-                try {
-                    onClientDisconnect(c);
-                    c.close();
-                } catch (Exception e) {
-                    if (e.file && e.line)
-                        log.error("Exception when closing client {} ({}:{})", e, e.file, e.line);
-                    else
-                        log.error("Exception when closing client {}", e);
-                }
-            }
         }
     }
 
@@ -238,88 +150,52 @@ public:
     void uploadAsset(message.BindWrite req, BHAssetStatusCallback cb) {
         cacheMgr.uploadAsset(req, cb);
     }
+
 protected:
-    void onClientConnect(Client c, Connection conn)
+    /************************************************************************************
+     * Hooks up given socket into this server, wrapping it to a Connection, assigning to
+     * a Client, and add it to the Pump.
+     ***********************************************************************************/
+    Connection _hookupSocket(Socket s) {
+        auto conn = _createConnection(s);
+        auto c = new Client(this, conn);
+        c.authenticated.attach(&onClientConnect);
+        return conn;
+    }
+
+    /************************************************************************************
+     * Overridable connection Factory, so tests can hook up special connections.
+     ***********************************************************************************/
+    Connection _createConnection(Socket s) {
+        return new Connection(pump, s);
+    }
+
+    void onClientConnect(lib.client.Client c)
     {
         Friend f;
         auto peername = c.peername;
 
+        c.disconnected.attach(&onClientDisconnect);
+
         synchronized (this) if (peername in offlineFriends) {
             f = offlineFriends[peername];
             offlineFriends.remove(peername);
-            f.connected(c);
+            f.connected(cast(daemon.client.Client)c);
             router.registerFriend(f);
         }
 
-        log.info("{} {} connected: {}", f?"Friend":"Client", peername, conn.remoteAddress);
+        log.info("{} {} connected: {}", f?"Friend":"Client", peername, "unknown"); // TODO: Reimplement c.connection.remoteAddress);
     }
 
-    void onClientDisconnect(Client c)
+    void onClientDisconnect(lib.client.Client _c)
     {
+        auto c = cast(daemon.client.Client)_c;
         auto f = router.unregisterFriend(c);
         if (f) {
             f.disconnected();
             synchronized (this) offlineFriends[f.name] = f;
         }
         log.info("{} {} disconnected", f?"Friend":"Client", c.peername);
-    }
-
-    protected bool _processMessageQueue(Connection c) {
-        try {
-            while (c.processMessage()) {}
-            return true;
-        } catch (Exception e) {
-            char[] excInfo = "";
-            e.writeOut(delegate(char[] msg){excInfo ~= msg;});
-            log.fatal("Connection {} triggered an unhandled exception; {}", c.peername, excInfo);
-            return false;
-        }
-    }
-
-    private bool _handshakeAndSetup(Socket s) {
-        bool abortSocket() {
-            s.shutdown();
-            s.close();
-            return false;
-        }
-        Client c;
-        try {
-            c = new Client(this, s);
-        } catch (Exception e) {
-            char[] excInfo = "";
-            e.writeOut(delegate(char[] msg){excInfo ~= msg;});
-            log.fatal("New connection triggered an unhandled exception; {}", excInfo);
-            return abortSocket();
-        }
-        onClientConnect(c, c.connection);
-        selector.register(s, Event.Read, c);
-
-        // ATM, there may be stale data in the buffers from the HandShake that needs processing
-        // Perhaps try to rework internal API so that the HandShake is handled in normal run-loop?
-        if (!_processMessageQueue(c.connection)) {
-            onClientDisconnect(c);
-            return abortSocket();
-        }
-        return true;
-    }
-
-    bool processSelectEvent(SelectionKey event)
-    in { assert(event.isReadable); }
-    body {
-        if (event.conduit is tcpServer) {
-            _handshakeAndSetup(tcpServer.accept());
-        } else if (event.conduit is unixServer) {
-            _handshakeAndSetup(unixServer.accept());
-        } else if (event.conduit is evfd) {
-            evfd.clear();
-        } else {
-            auto c = cast(Client)event.attachment;
-            if (c.connection.readNewData())
-                return _processMessageQueue(c.connection);
-            else
-                return false;
-        }
-        return true;
     }
 
     void reconnectLoop() {
@@ -332,7 +208,7 @@ protected:
             try {
                 s.connect(f.findAddress);
                 consumed = true;
-                _handshakeAndSetup(s);
+                _hookupSocket(s);
             } catch (SocketException e) {
             } catch (Exception e) {
                 log.error("Caught unexpected exception {} while connecting to friend '{}'", e, f.name);
