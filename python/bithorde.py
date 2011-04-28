@@ -8,6 +8,7 @@ Twisted-based implementation.
 
 import socket
 import os, os.path
+from base64 import b32decode as _b32decode
 
 import bithorde_pb2 as message
 
@@ -198,13 +199,12 @@ class ClientFactory(protocol.ClientFactory):
     def __init__(self, c):
         self.protocol = c
 
-if __name__ == '__main__':
-    from base64 import b32decode
-    import sys
+def b32decode(string):
+    string = string + "="*(5-(len(string)%5)) # Pad with = for b32decodes:s pleasure
+    return _b32decode(string, True)
 
-    def parseTigerHash(string):
-        string = string + "="*(5-(len(string)%5)) # Pad with = for b32decodes:s pleasure
-        return b32decode(string, True)
+if __name__ == '__main__':
+    import sys
 
     class MyAsset(Asset):
         def onStatusUpdate(self, status):
@@ -220,7 +220,7 @@ if __name__ == '__main__':
                 asset = MyAsset()
                 asset.requestId = assetId
                 self.allocateHandle(asset)
-                asset.bind({message.TREE_TIGER: parseTigerHash(assetId)})
+                asset.bind({message.TREE_TIGER: b32decode(assetId)})
 
         def gotResponse(self, asset, status):
             self.requestCount -= 1
