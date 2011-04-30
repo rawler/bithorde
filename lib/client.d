@@ -330,6 +330,7 @@ protected:
             return sendMessage(msg);
         } catch (IOException e) {
             log.trace("Ignored exception: {}", e);
+            return 0;
         }
     }
     synchronized void sendRPCRequest(message.RPCRequest req,
@@ -410,10 +411,11 @@ protected:
     synchronized void processAssetStatus(Connection c, ubyte[] buf) {
         scope resp = new message.AssetStatus;
         resp.decode(buf);
-        log.trace("Recieved AssetStatus for handle {}", resp.handle);
-        auto asset = (boundAssets.length>resp.handle)?boundAssets[resp.handle]:null;
-        assert(asset, "Got AssetStatus for unknown handle");
-        asset.updateStatus(resp);
+        auto handle = resp.handle;
+        auto asset = (boundAssets.length>handle)?boundAssets[handle]:null;
+        log.trace("Recieved AssetStatus for handle {}", handle);
+        if (asset)
+            asset.updateStatus(resp);
     }
     synchronized void processReadResponse(Connection c, ubyte[] buf) {
         scope resp = new message.ReadResponse;

@@ -201,11 +201,7 @@ protected:
         } else {
             target.rpcId = nextid++;
             if (inFlightRequests.length <= target.rpcId) {
-                // TODO: Why not .length = ???
-                auto newInFlightRequests = new InFlightRequest[inFlightRequests.length*2];
-                newInFlightRequests[0..inFlightRequests.length] = inFlightRequests;
-                delete inFlightRequests;
-                inFlightRequests = newInFlightRequests;
+                inFlightRequests.length = inFlightRequests.length*2;
 
                 // Timeouts is now full of broken callbacks, rebuild
                 timeouts.clear();

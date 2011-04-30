@@ -223,7 +223,7 @@ private:
         if (i > MAX_OPEN_ASSETS)
             throw new IllegalElementException("Asset handle too large");
         if (i >= openAssets.length)
-            openAssets.length = openAssets.length + 1;
+            openAssets.length = openAssets.length + 5 + (i-openAssets.length)*2;
         return openAssets[i] = asset;
     }
 
