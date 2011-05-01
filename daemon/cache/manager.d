@@ -445,14 +445,17 @@ private:
             scope ubyte[][] staleAssets;
             foreach (asset; localIdMap) {
                 if (!asset.assetPath.exists) {
-                    foreach (id; asset.hashIds) {
+                    foreach (id; asset.hashIds) if (id.type in hashIdMap) {
                         auto map = hashIdMap[id.type];
-                        if (map[id.id] == asset)
+                        if ((id.id in map) &&
+                            (map[id.id] == asset))
                             map.remove(id.id);
                     }
                     staleAssets ~= asset.localId;
                 } else foreach (id; asset.hashIds) {
-                    if (hashIdMap[id.type][id.id] != asset)
+                    if ((id.type in hashIdMap) &&
+                        (id.id in hashIdMap[id.type]) &&
+                        (hashIdMap[id.type][id.id] != asset))
                     staleAssets ~= asset.localId;
                 }
             }
@@ -512,14 +515,16 @@ private:
     synchronized void addToIdMap(MetaData asset) {
         localIdMap[asset.localId] = asset;
         foreach (id; asset.hashIds) {
-            auto oldAsset = id.id in hashIdMap[id.type];
-            if (oldAsset) { // Asset already exist
-                // Remove old asset to avoid conflict with new asset.
-                // TODO: What if old asset has id-types not covered by new asset?
-                //       or possible differing values for different hashId:s?
-                localIdMap.remove(oldAsset.localId);
+            if (id.type in hashIdMap) {
+                auto oldAsset = id.id in hashIdMap[id.type];
+                if (oldAsset) { // Asset already exist
+                    // Remove old asset to avoid conflict with new asset.
+                    // TODO: What if old asset has id-types not covered by new asset?
+                    //       or possible differing values for different hashId:s?
+                    localIdMap.remove(oldAsset.localId);
+                }
+                hashIdMap[id.type][id.id] = asset;
             }
-            hashIdMap[id.type][id.id] = asset;
         }
         idMapDirty = true;
     }
