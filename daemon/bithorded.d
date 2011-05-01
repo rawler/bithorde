@@ -27,6 +27,7 @@ private import tango.stdc.posix.signal;
 private import tango.stdc.posix.sys.stat;
 private import tango.stdc.posix.unistd;
 private import tango.stdc.stdlib;
+private import tango.text.Arguments;
 private import tango.util.log.AppendConsole;
 private import tango.util.log.AppendFile;
 private import tango.util.log.LayoutDate;
@@ -51,10 +52,14 @@ extern (C) void exit_handler(int sig) {
 /**
  * Main entry for server daemon
  */
-public int main(char[][] args)
+public int main(char[][] _args)
 {
-    if (args.length != 2) {
-        Stderr.format("Usage: {} <config>", args[0]).newline;
+    auto args = new Arguments;
+    args("debug").aliased('d');
+    args(null).title("config").required.params(1);
+    if (!args.parse(_args[1..$])) {
+        Stderr(args.errors(&Stderr.layout.sprint)).newline;
+        Stderr.format("Usage: {} {-d|--debug} <config>", _args[0]).newline;
         return -1;
     }
 
@@ -66,10 +71,12 @@ public int main(char[][] args)
     signal(SIGINT, &exit_handler);
 
     // Parse config
-    auto config = new Config(args[1]);
+    auto config = new Config(args(null).assigned[0]);
+
+    auto doDebug = args("debug").set || config.doDebug;
 
     // Setup logging
-    if (config.doDebug)
+    if (doDebug)
         Log.root.add(new AppendConsole(new LayoutDate));
     else if (config.logfile)
         Log.root.add(new AppendFile(config.logfile.toString, new LayoutDate));
@@ -77,7 +84,7 @@ public int main(char[][] args)
     // Try to setup server instance
     s = new Server(config);
     // Daemonize
-    if (!config.doDebug) {
+    if (!doDebug) {
         Cin.input.close();
         Cout.output.close();
         Cerr.output.close();
