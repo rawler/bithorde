@@ -429,9 +429,10 @@ private:
         idMapDirty = false;
     }
 
-    /*************************************************************************
-     * Walks through assets in dir, purging those not referenced by the idmap
-     ************************************************************************/
+    /************************************************************************************
+     * Walks through assets in dir, purging those not referenced by the idmap then walks
+     * through the localIdMap, purging those ids not found in the asset directory.
+     ***********************************************************************************/
     synchronized void garbageCollect() {
         debug (Performance) {
             Time started = Clock.now;
@@ -439,22 +440,45 @@ private:
         }
 
         log.info("Beginning garbage collection");
-        ubyte[LOCALID_LENGTH] idbuf;
-        auto path = assetDir.dup.append("dummy");
-        ulong cleaned;
-        foreach (fileInfo; assetDir) {
-            char[] name, suffix;
-            name = head(fileInfo.name, ".", suffix);
-            if (name.length==(idbuf.length*2) && (suffix=="idx" || suffix=="")) {
-                auto id = hex.decode(name, idbuf);
-                if (!(id in localIdMap)) {
-                    path.name = fileInfo.name;
-                    path.remove();
-                    cleaned += fileInfo.bytes;
+
+        /* remove redundant and faulty assets from localIdMap */ {
+            scope ubyte[][] staleAssets;
+            foreach (asset; localIdMap) {
+                if (!asset.assetPath.exists) {
+                    foreach (id; asset.hashIds) {
+                        auto map = hashIdMap[id.type];
+                        if (map[id.id] == asset)
+                            map.remove(id.id);
+                    }
+                    staleAssets ~= asset.localId;
+                } else foreach (id; asset.hashIds) {
+                    if (hashIdMap[id.type][id.id] != asset)
+                    staleAssets ~= asset.localId;
+                }
+            }
+            foreach (id; staleAssets) {
+                localIdMap.remove(id);
+            }
+        }
+
+        ulong bytesFreed;
+        /* Clear out files not referenced by localIdMap */ {
+            ubyte[LOCALID_LENGTH] idbuf;
+            auto path = assetDir.dup.append("dummy");
+            foreach (fileInfo; assetDir) {
+                char[] name, suffix;
+                name = head(fileInfo.name, ".", suffix);
+                if (name.length==(idbuf.length*2) && (suffix=="idx" || suffix=="")) {
+                    auto id = hex.decode(name, idbuf);
+                    if (!(id in localIdMap)) {
+                        path.name = fileInfo.name;
+                        path.remove();
+                        bytesFreed += fileInfo.bytes;
+                    }
                 }
             }
         }
-        log.info("Garbage collection done. {} KB freed", (cleaned + 512) / 1024);
+        log.info("Garbage collection done. {} KB freed", (bytesFreed + 512) / 1024);
     }
 
     /*************************************************************************
@@ -488,6 +512,13 @@ private:
     synchronized void addToIdMap(MetaData asset) {
         localIdMap[asset.localId] = asset;
         foreach (id; asset.hashIds) {
+            auto oldAsset = id.id in hashIdMap[id.type];
+            if (oldAsset) { // Asset already exist
+                // Remove old asset to avoid conflict with new asset.
+                // TODO: What if old asset has id-types not covered by new asset?
+                //       or possible differing values for different hashId:s?
+                localIdMap.remove(oldAsset.localId);
+            }
             hashIdMap[id.type][id.id] = asset;
         }
         idMapDirty = true;
