@@ -397,10 +397,17 @@ public:
     this (FilePath path, AssetMetaData metadata, IServerAsset remoteAsset,
           HashIdsListener updateHashIds, bool usefsync) {
         this.remoteAsset = remoteAsset;
+        remoteAsset.takeRef(this);
         remoteAsset.attachWatcher(&metadata.onBackingUpdate);
         super(path, metadata, remoteAsset.size, updateHashIds, usefsync); // TODO: Verify remoteAsset.size against local file
         log = Log.lookup("daemon.cache.cachingasset." ~ path.name[0..8]);
         log.trace("Caching remoteAsset of size {}", size);
+    }
+
+    void close() {
+        if (remoteAsset)
+            remoteAsset.dropRef(this);
+        super.close();
     }
 
     synchronized void aSyncRead(ulong offset, uint length, BHReadCallback cb) {

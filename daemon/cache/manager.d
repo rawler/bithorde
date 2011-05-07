@@ -42,6 +42,7 @@ import daemon.cache.asset;
 private import daemon.cache.metadata;
 private import daemon.client;
 private import daemon.config;
+private import daemon.refcount;
 private import daemon.routing.router;
 
 const FS_MINFREE = 0.1; // Amount of filesystem that should always be kept unused.
@@ -56,6 +57,7 @@ const FLUSH_INTERVAL_SEC = 30;
 class CacheManager : IAssetSource {
     class MetaData : daemon.cache.metadata.AssetMetaData, IServerAsset {
         mixin IAsset.StatusSignal;
+        mixin RefCountTarget;
 
         private BaseAsset _openAsset;
 
@@ -110,7 +112,8 @@ class CacheManager : IAssetSource {
 
         synchronized void close() {
             scope(exit) _openAsset = null;
-            _openAsset.close();
+            if (_openAsset)
+                _openAsset.close();
         }
 
         synchronized void sync() {

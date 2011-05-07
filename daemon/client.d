@@ -25,6 +25,8 @@ private import tango.util.log.Log;
 
 import daemon.server;
 import daemon.cache.manager;
+import daemon.refcount;
+
 import lib.asset;
 import lib.client;
 import lib.connection;
@@ -40,6 +42,10 @@ auto MAX_OPEN_ASSETS = 4096;
  ***************************************************************************************/
 interface IServerAsset : IAsset {
     message.Identifier[] hashIds();
+
+    // TODO: Should really inherit IRefCounted, but that seems to cause a stupid compiler-bug.
+    void takeRef(Object o);
+    void dropRef(Object o);
 }
 interface IAssetSource {
     void findAsset(daemon.client.BindRead req);
@@ -101,7 +107,7 @@ class Client : lib.client.Client {
     /************************************************************************************
      * Represents a ServerAsset bound to a client-handle
      ***********************************************************************************/
-    class BoundAsset : IServerAsset {
+    class BoundAsset : IAsset {
         uint handle;
         IServerAsset assetSource;
         bool closed;
@@ -129,6 +135,8 @@ class Client : lib.client.Client {
         void onAssetStatus(IAsset asset, message.Status sCode, message.AssetStatus s) {
             log.trace("Informing client on status {} on handle {}", message.statusToString(sCode), handle);
             assetSource = cast(IServerAsset)asset;
+            if (assetSource)
+                assetSource.takeRef(this);
             if (!closed) {
                 scope resp = new message.AssetStatus;
                 resp.handle = handle;
@@ -150,6 +158,8 @@ class Client : lib.client.Client {
         void close() {
             log.trace("Closed asset {}", handle);
             closed = true;
+            if (assetSource)
+                assetSource.dropRef(this);
             assetSource = null;
             setAsset(handle,null);
             GC.collect();
