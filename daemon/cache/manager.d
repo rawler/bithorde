@@ -52,8 +52,6 @@ const FLUSH_INTERVAL_SEC = 30;
 /****************************************************************************************
  * Overseeing Cache-manager, keeping state of all cache-assets, and mapping from id:s to
  * Assets.
- *
- * Copyright: Ulrik Mikaelsson, All rights reserved
  ***************************************************************************************/
 class CacheManager : IAssetSource {
     class MetaData : daemon.cache.metadata.AssetMetaData, IServerAsset {
