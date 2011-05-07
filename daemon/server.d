@@ -184,7 +184,7 @@ protected:
             router.registerFriend(f);
         }
 
-        log.info("{} {} connected: {}", f?"Friend":"Client", peername, "unknown"); // TODO: Reimplement c.connection.remoteAddress);
+        log.info("{} {} connected: {}", f?"Friend":"Client", peername, c.peerAddress);
     }
 
     void onClientDisconnect(lib.client.Client _c)

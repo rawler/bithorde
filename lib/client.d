@@ -266,6 +266,10 @@ public:
         return connection.peername;
     }
 
+    Address peerAddress() {
+        return connection.remoteAddress;
+    }
+
     void close()
     {
         connection.close();
