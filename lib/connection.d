@@ -157,7 +157,7 @@ struct Counters {
  * All underlying BitHorde connections run through this class. Deals with low-level
  * serialization and request-id-mapping.
  ***************************************************************************************/
-class Connection : BaseConnection
+class Connection : BaseSocket
 {
     alias void delegate(Connection c, message.Type t, ubyte[] msg) ProcessCallback;
     static class InvalidMessage : Exception {

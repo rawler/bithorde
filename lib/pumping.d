@@ -95,7 +95,7 @@ version (linux) {
     static assert(0, "Server needs abort-implementation for non-linux OS");
 }
 
-class BaseConnection : IProcessor {
+class BaseConnection(TYPE: IConduit) : IProcessor {
     class BufferException : Exception {
         this() {
             super("Not enough space to write data");
@@ -155,27 +155,17 @@ class BaseConnection : IProcessor {
             return _data[0..fill];
         }
     }
-private:
+protected:
     Pump pump;
     ISelectable.Handle selectHandle;
-    IConduit conduit;
+    TYPE conduit;
     Buffer writeBuf, readBuf;
 public:
-    this(Pump p, IODevice device, size_t bufsize) {
+    this(Pump p, TYPE conduit, size_t bufsize) {
         pump = p;
-        _setupHandle(device);
-        selectHandle = device.fileHandle;
-        conduit = device;
-        writeBuf.realloc(bufsize);
-        readBuf.realloc(bufsize);
-        pump.registerProcessor(this);
-    }
-
-    this(Pump p, Socket socket, size_t bufsize) {
-        pump = p;
-        _setupHandle(socket);
-        selectHandle = socket.fileHandle;
-        conduit = socket;
+        _setupHandle(conduit);
+        selectHandle = conduit.fileHandle;
+        this.conduit = conduit;
         writeBuf.realloc(bufsize);
         readBuf.realloc(bufsize);
         pump.registerProcessor(this);
@@ -287,12 +277,22 @@ public:
     void processTimeouts(Time now) {}
 }
 
+class BaseSocket : BaseConnection!(Socket) {
+    this(Pump p, Socket socket, size_t bufsize) {
+        super(p, socket, bufsize);
+    }
+
+    Address remoteAddress() {
+        return conduit.native.remoteAddress;
+    }
+}
+
 /****************************************************************************************
  * Implements a Server-template for Pumpable, acception connections and creating new
  * CONNECTION instances for incoming connections.
  ***************************************************************************************/
 class BaseSocketServer(T) : IProcessor {
-    abstract BaseConnection onConnection(Socket s);
+    abstract BaseSocket onConnection(Socket s);
     void onClosed() {};
 
 private:
@@ -445,7 +445,7 @@ debug(UnitTest) {
             whenDone();
         }
     }
-    class ServerConnection : BaseConnection {
+    class ServerConnection : BaseSocket {
         ServerTest server;
         this(Pump p, Socket s, ServerTest server) {
             super(p, s, 4096);
