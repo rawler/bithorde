@@ -21,8 +21,9 @@ module daemon.cache.metadata;
 private import tango.time.Time;
 private import tango.util.Convert;
 
-import lib.hashes;
-import hex = lib.hex;
+private import lib.asset;
+private import lib.hashes;
+private import hex = lib.hex;
 private import lib.message;
 private import lib.protobuf;
 
@@ -37,6 +38,8 @@ class AssetMetaData : ProtoBufMessage {
     mixin ProtoBufCodec!(PBMapping("localId",   1),
                          PBMapping("hashIds",   2),
                          PBMapping("rating",    3));
+
+    abstract void onBackingUpdate(IAsset backing, Status sCode, AssetStatus s);
 
     /************************************************************************************
      * Increase the rating by noting interest in this asset.

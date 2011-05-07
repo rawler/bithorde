@@ -24,8 +24,9 @@ private import tango.time.Time;
 private import tango.util.log.Log;
 
 import daemon.server;
-import daemon.cache.asset;
 import daemon.cache.manager;
+import daemon.refcount;
+
 import lib.asset;
 import lib.client;
 import lib.connection;
@@ -41,6 +42,10 @@ auto MAX_OPEN_ASSETS = 4096;
  ***************************************************************************************/
 interface IServerAsset : IAsset {
     message.Identifier[] hashIds();
+
+    // TODO: Should really inherit IRefCounted, but that seems to cause a stupid compiler-bug.
+    void takeRef(Object o);
+    void dropRef(Object o);
 }
 interface IAssetSource {
     void findAsset(daemon.client.BindRead req);
@@ -80,7 +85,7 @@ public:
     this(Client c) {
         client = c;
     }
-    final void callback(IAsset asset, message.Status status, message.ReadRequest remoteReq, message.ReadResponse remoteResp) {
+    final void callback(message.Status status, message.ReadRequest remoteReq, message.ReadResponse remoteResp) {
         if (client && !client.closed) {
             scope resp = new message.ReadResponse;
             resp.rpcId = rpcId;
@@ -94,7 +99,7 @@ public:
         delete this;
     }
     void abort(message.Status s) {
-        callback(null, s, null, null);
+        callback(s, null, null);
     }
 }
 
@@ -102,7 +107,7 @@ class Client : lib.client.Client {
     /************************************************************************************
      * Represents a ServerAsset bound to a client-handle
      ***********************************************************************************/
-    class BoundAsset : IServerAsset {
+    class BoundAsset : IAsset {
         uint handle;
         IServerAsset assetSource;
         bool closed;
@@ -130,6 +135,8 @@ class Client : lib.client.Client {
         void onAssetStatus(IAsset asset, message.Status sCode, message.AssetStatus s) {
             log.trace("Informing client on status {} on handle {}", message.statusToString(sCode), handle);
             assetSource = cast(IServerAsset)asset;
+            if (assetSource)
+                assetSource.takeRef(this);
             if (!closed) {
                 scope resp = new message.AssetStatus;
                 resp.handle = handle;
@@ -151,6 +158,8 @@ class Client : lib.client.Client {
         void close() {
             log.trace("Closed asset {}", handle);
             closed = true;
+            if (assetSource)
+                assetSource.dropRef(this);
             assetSource = null;
             setAsset(handle,null);
             GC.collect();
@@ -165,8 +174,8 @@ class Client : lib.client.Client {
             return assetSource.aSyncRead(offset, length, cb);
         }
         void addDataSegment(message.DataSegment req) {
-            auto asset = cast(WriteableAsset)assetSource;
-            if (asset)
+            auto asset = cast(CacheManager.MetaData)assetSource;
+            if (asset && asset.isWritable)
                 asset.add(req.offset, req.content);
             else
                 log.warn("Client trying to write to non-writeable asset!");

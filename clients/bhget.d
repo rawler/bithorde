@@ -315,8 +315,7 @@ private:
     /************************************************************************************
      * When new data arrives, order more, or exit if done
      ***********************************************************************************/
-    void onRead(IAsset asset, Status status, ReadRequest req, ReadResponse resp) {
-        assert(asset == this.asset);
+    void onRead(Status status, ReadRequest req, ReadResponse resp) {
         if (status != Status.SUCCESS)
             return exit_error(-1, "Read-failure, status {}", statusToString(status));
         if (req.size > resp.content.length)

@@ -18,7 +18,6 @@
 module daemon.cache.manager;
 
 private import tango.core.Exception;
-private import tango.core.WeakRef;
 private import tango.core.Thread;
 private import tango.io.device.File;
 private import tango.io.FilePath;
@@ -43,9 +42,9 @@ import daemon.cache.asset;
 private import daemon.cache.metadata;
 private import daemon.client;
 private import daemon.config;
+private import daemon.refcount;
 private import daemon.routing.router;
 
-alias WeakReference!(File) AssetRef;
 const FS_MINFREE = 0.1; // Amount of filesystem that should always be kept unused.
 const M = 1024*1024;
 
@@ -54,47 +53,103 @@ const FLUSH_INTERVAL_SEC = 30;
 /****************************************************************************************
  * Overseeing Cache-manager, keeping state of all cache-assets, and mapping from id:s to
  * Assets.
- *
- * Copyright: Ulrik Mikaelsson, All rights reserved
  ***************************************************************************************/
 class CacheManager : IAssetSource {
-    class MetaData : daemon.cache.metadata.AssetMetaData {
-        private AssetRef _openAsset;
-        this() {
-            _openAsset = new AssetRef(null);
-        }
+    class MetaData : daemon.cache.metadata.AssetMetaData, IServerAsset {
+        mixin IAsset.StatusSignal;
+        mixin RefCountTarget;
+
+        private BaseAsset _openAsset;
+
         void onStatusUpdate(IAsset asset, message.Status sCode, message.AssetStatus s) {
             if (sCode != sCode.SUCCESS)
                 setAsset(null);
         }
-        synchronized BaseAsset setAsset(BaseAsset newAsset) {
-            if (auto oldAsset = this.asset)
-                oldAsset.detachWatcher(&onStatusUpdate);
-            _openAsset.set(newAsset);
-            if (newAsset)
-                newAsset.attachWatcher(&onStatusUpdate);
-            return newAsset;
+
+        private synchronized BaseAsset setAsset(BaseAsset newAsset) {
+            if (_openAsset)
+                detachWatcher(&onStatusUpdate);
+            _openAsset = newAsset;
+            if (_openAsset)
+                attachWatcher(&onStatusUpdate);
+            return _openAsset;
+        }
+
+        void onBackingUpdate(IAsset backing, message.Status sCode, message.AssetStatus s) {
+            _statusSignal.call(this, sCode, s);
         }
 
         /********************************************************************************
          * Throws: IOException if asset is not found
          *******************************************************************************/
-        synchronized BaseAsset openAsset() {
-            if (auto retval = cast(BaseAsset)_openAsset()) {
-                return retval;
+        synchronized MetaData openRead() {
+            if (isOpen) { // If something is already holding it open, just use it.
+                return this;
             } else if (idxPath.exists) {
                 return null;
             } else {
-                return setAsset(new BaseAsset(assetPath, this));
+                setAsset(new BaseAsset(assetPath, this));
+                return this;
             }
         }
-        synchronized BaseAsset asset() {
-            if (auto retval = cast(BaseAsset)_openAsset()) {
-                return retval;
-            } else {
-                return null;
-            }
+
+        synchronized MetaData openUpload(ulong size) {
+            setAsset(new UploadAsset(assetPath, this, size, &updateHashIds, usefsync));
+            return this;
         }
+
+        synchronized MetaData openCaching(IServerAsset sourceAsset) {
+            setAsset(new CachingAsset(assetPath, this, sourceAsset, &updateHashIds, usefsync));
+            return this;
+        }
+
+        synchronized bool isOpen() {
+            return _openAsset !is null;
+        }
+        synchronized bool isWritable() {
+            return (cast(WriteableAsset)_openAsset) !is null;
+        }
+
+        synchronized void close() {
+            scope(exit) _openAsset = null;
+            if (_openAsset)
+                _openAsset.close();
+        }
+
+        synchronized void sync() {
+            auto asset = cast(WriteableAsset)_openAsset;
+            if (asset)
+                asset.sync();
+        }
+
+        synchronized ulong size() {
+            if (_openAsset)
+                return _openAsset.size;
+            else
+                assert(false);
+        }
+
+        synchronized void aSyncRead(ulong offset, uint length, BHReadCallback cb) {
+            if (_openAsset)
+                return _openAsset.aSyncRead(offset, length, cb);
+            else
+                assert(false);
+        }
+
+        synchronized void add(ulong offset, ubyte[] data) {
+            if (_openAsset)
+                return _openAsset.add(offset, data);
+            else
+                assert(false);
+        }
+
+        message.Identifier[] hashIds() {
+            return super.hashIds();
+        }
+        message.Identifier[] hashIds(message.Identifier[] ids) {
+            return super.hashIds(ids);
+        }
+
         FilePath assetPath() {
             return assetDir.dup.append(ascii.toLower(hex.encode(localId)));
         }
@@ -104,6 +159,8 @@ class CacheManager : IAssetSource {
         void updateHashIds(message.Identifier[] ids) {
             this.hashIds = ids;
             addToIdMap(this);
+
+            _statusSignal.call(this, message.Status.SUCCESS, null);
         }
     }
 
@@ -233,7 +290,7 @@ public:
             MetaData loser;
             auto loserRating = long.max;
             foreach (meta; this.localIdMap) {
-                if (meta.asset) // Is Open
+                if (meta.isOpen) // Is Open
                     continue;
                 auto rating = meta.rating;
                 if (rating < loserRating) {
@@ -302,13 +359,10 @@ public:
                 req.callback(asset, sCode, s); // Just forward without caching
             } else { // 
                 try {
-                    auto path = metaAsset.assetPath;
-                    assert(cast(bool)path.exists == foundAsset);
-                    auto cachingAsset = new CachingAsset(path, metaAsset, asset,
-                            &metaAsset.updateHashIds, usefsync);
-                    metaAsset.setAsset(cachingAsset);
+                    assert(cast(bool)metaAsset.assetPath.exists == foundAsset);
+                    metaAsset.openCaching(asset);
                     log.trace("Responding with status {}", message.statusToString(sCode));
-                    req.callback(cachingAsset, sCode, s);
+                    req.callback(metaAsset, sCode, s);
                 } catch (IOException e) {
                     log.error("While opening asset: {}", e);
                     req.callback(null, message.Status.ERROR, null);
@@ -346,17 +400,17 @@ public:
      * Implements IAssetSource.findAsset. Tries to get a hold of a certain asset.
      ***********************************************************************************/
     void findAsset(BindRead req) {
-        void fromCache(MetaData meta, BaseAsset asset) {
+        void fromCache(MetaData meta) {
             log.trace("serving {} from cache", hex.encode(meta.localId));
-            req.callback(asset, message.Status.SUCCESS, null);
+            req.callback(meta, message.Status.SUCCESS, null);
         }
         void forwardRequest() {
             req.pushCallback(&_forwardedCallback);
             router.findAsset(req);
         }
-        BaseAsset tryOpen(MetaData meta) {
+        IServerAsset tryOpen(MetaData meta) {
             try { // Needs to handle IOErrors here, to not lock meta while purging.
-                return meta.openAsset();
+                return meta.openRead();
             } catch (IOException e) {
                 log.error("While opening asset: {}", e);
                 return null;
@@ -364,11 +418,10 @@ public:
         }
 
         auto metaAsset = findMetaAsset(req.ids);
-
         if (!metaAsset) {
             forwardRequest();
-        } else if (auto asset = tryOpen(metaAsset)) {
-            fromCache(metaAsset, asset);
+        } else if (tryOpen(metaAsset)) {
+            fromCache(metaAsset);
         } else {
             log.trace("Incomplete asset, forwarding {}", req);
             forwardRequest();
@@ -384,9 +437,9 @@ public:
                 MetaData meta = newMetaAsset();
                 auto path = meta.assetPath;
                 assert(!path.exists());
-                auto asset = new UploadAsset(path, meta, req.size, &meta.updateHashIds, usefsync);
-                asset.attachWatcher(callback);
-                callback(asset, message.Status.SUCCESS, null);
+                meta.openUpload(req.size);
+                meta.attachWatcher(callback);
+                callback(meta, message.Status.SUCCESS, null);
             } else {
                 callback(null, message.Status.NORESOURCES, null);
             }
@@ -490,11 +543,8 @@ private:
     synchronized void saveIdMap() {
         scope map = new IdMap;
         synchronized (this) map.assets = localIdMap.values;
-        foreach (meta; map.assets) {
-            auto asset = cast(WriteableAsset)meta.asset;
-            if (asset)
-                asset.sync();
-        }
+        foreach (meta; map.assets)
+            meta.sync;
         scope tmpFile = idMapPath.dup.cat(".tmp");
         scope file = new File (tmpFile.toString, File.ReadWriteCreate);
         file.write (map.encode());

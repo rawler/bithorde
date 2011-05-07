@@ -66,21 +66,66 @@ private static ubyte[] tlsBuffer(uint size) {
 
 alias void delegate(Identifier[]) HashIdsListener;
 
-/****************************************************************************************
+interface IAssetData {
+    void aSyncRead(ulong offset, uint length, BHReadCallback);
+    ulong size();
+    void close();
+}
+
+/*****************************************************************************************
+ * Class for file with stateless read/write. I/E no need for the user to care about
+ * read/write position.
+ ****************************************************************************************/
+class StatelessFile : File {
+    /*************************************************************************************
+     * Reads as many bytes as possible into dst, and returns the amount.
+     ************************************************************************************/
+    ssize_t pRead(ulong pos, void[] dst) {
+        version (Posix) { // Posix has pread() for atomic seek+read
+            ssize_t got = pread(fileHandle, dst.ptr, dst.length, pos);
+            if (got is -1)
+                error;
+            else
+               if (got is 0 && dst.length > 0)
+                   return Eof;
+            return got;
+        } else synchronized (this) {
+            seek(pos);
+            return read(buf);
+        }
+    }
+
+    /*************************************************************************************
+     * Reads as many bytes as possible into buf, and returns the amount.
+     ************************************************************************************/
+    ssize_t pWrite(ulong pos, void[] src) {
+        version (Posix) { // Posix has pwrite() for atomic write+seek
+            ssize_t written = pwrite(fileHandle, src.ptr, src.length, pos);
+            if (written is -1)
+                error;
+            return written;
+        } else synchronized (this) {
+            seek(pos);
+            return write(data);
+        }
+    }
+}
+
+/*****************************************************************************************
  * Base for all kinds of cached assets. Provides basic reading functionality
- ***************************************************************************************/
-class BaseAsset : private File, public IServerAsset {
-    mixin IAsset.StatusSignal;
+ ****************************************************************************************/
+class BaseAsset : private StatelessFile, public IAssetData {
 protected:
     FilePath path;
     FilePath idxPath;
     Logger log;
     AssetMetaData _metadata;
+    ulong _size;
 public:
-    /************************************************************************************
+    /*************************************************************************************
      * IncompleteAssetException is thrown if a not-fully-cached asset were to be Opened
      * directly as a BaseAsset
-     ***********************************************************************************/
+     ************************************************************************************/
     this(FilePath path, AssetMetaData metadata) {
         this.path = path;
         this.idxPath = path.dup.suffix(".idx");
@@ -89,27 +134,28 @@ public:
 
         super();
         assetOpen(path);
+        this._size = length;
     }
 
-    /************************************************************************************
+    /*************************************************************************************
      * assetOpen - Overridable function to really open or create the asset.
-     ***********************************************************************************/
+     ************************************************************************************/
     void assetOpen(FilePath path) {
         File.open(path.toString);
     }
 
-    /************************************************************************************
+    /*************************************************************************************
      * Asset is closed, unregistered, and resources closed. Afterwards, should be
      * awaiting garbage collection.
-     ***********************************************************************************/
+     ************************************************************************************/
     void close() {
         super.close();
     }
 
-    /************************************************************************************
+    /*************************************************************************************
      * Implements IServerAsset.hashIds()
      * TODO: IServerAsset perhaps should be migrated to MetaData?
-     ***********************************************************************************/
+     ************************************************************************************/
     Identifier[] hashIds() {
         if (_metadata)
             return _metadata.hashIds;
@@ -117,17 +163,13 @@ public:
             return null;
     }
 
-    /************************************************************************************
+    /*************************************************************************************
      * Read a single segment from the Asset
-     ***********************************************************************************/
+     ************************************************************************************/
     synchronized void aSyncRead(ulong offset, uint length, BHReadCallback cb) {
         ubyte[] buf = tlsBuffer(length);
-        version (Posix) { // Posix has pread() for atomic seek+read
-            auto got = pread(fileHandle, buf.ptr, length, offset);
-        } else {
-            seek(offset);
-            auto got = read(buf);
-        }
+        auto _length = length; // Avoid scope-problems for next line
+        auto got = pRead(offset, buf[0.._length]);
         auto resp = new lib.message.ReadResponse;
         if (got == 0 || got == Eof) {
             resp.status = message.Status.NOTFOUND;
@@ -137,39 +179,39 @@ public:
             resp.offset = offset;
             resp.content = buf[0..got];
         }
-        cb(this, resp.status, null, resp); // TODO: should really hold reference to req
+        cb(resp.status, null, resp); // TODO: should really hold reference to req
     }
 
-    /************************************************************************************
+    /*************************************************************************************
      * Adding segments is not supported for BaseAsset
-     ***********************************************************************************/
+     ************************************************************************************/
     void add(ulong offset, ubyte[] data) {
         throw new IOException("Trying to write to a completed file");
     }
 
-    /************************************************************************************
+    /*************************************************************************************
      * Find the size of the asset.
-     ***********************************************************************************/
+     ************************************************************************************/
     final ulong size() {
-        return length;
+        return _size;
     }
 }
 
-/****************************************************************************************
+/*****************************************************************************************
  * WriteableAsset implements uploading to Assets, and forms a base for CachingAsset and
  * UploadAsset
- ***************************************************************************************/
+ ****************************************************************************************/
 class WriteableAsset : BaseAsset {
 protected:
     CacheMap cacheMap;
-    IStatefulDigest[HashType] hashes;
-    ulong hashedPtr, _length;
+    IStatefulDigest[HashType] hashers;
+    ulong hashedPtr;
     HashIdsListener updateHashIds;
     bool usefsync;
 public:
-    /************************************************************************************
+    /*************************************************************************************
      * Create WriteableAsset by path and size
-     ***********************************************************************************/
+     ************************************************************************************/
     this(FilePath path, AssetMetaData metadata, ulong size,
          HashIdsListener updateHashIds, bool usefsync) {
         resetHashes();
@@ -177,33 +219,33 @@ public:
         this.usefsync = usefsync;
         super(path, metadata); // Parent calls open()
         truncate(size);           // We resize it to right size
-        _length = size;
+        _size = size;
         log = Log.lookup("daemon.cache.writeasset."~path.name[0..8]); // TODO: fix order and double-init
     }
 
-    /************************************************************************************
+    /*************************************************************************************
      * Init hashing from offset zero and with clean state.
-     ***********************************************************************************/
+     ************************************************************************************/
     private void resetHashes() {
-        hashes = null;
+        hashers = null;
         hashedPtr = 0;
         foreach (type; Hashers) {
             auto factory = HashMap[type].factory;
             if (factory)
-                hashes[type] = factory();
+                hashers[type] = factory();
         }
     }
 
-    /************************************************************************************
+    /*************************************************************************************
      * Create and open a WriteableAsset. Make sure to create cacheMap first, create the
      * file, and then truncate it to the right size.
-     ***********************************************************************************/
+     ************************************************************************************/
     void assetOpen(FilePath path) {
         scope idxFile = new File(idxPath.toString, File.Style(File.Access.Read, File.Open.Create));
         cacheMap = new CacheMap();
         cacheMap.load(idxFile);
         hashedPtr = cacheMap.header.hashedAmount;
-        foreach (type, hasher; hashes) {
+        foreach (type, hasher; hashers) {
             if (type in cacheMap.header.hashes) {
                 hasher.load(cacheMap.header.hashes[type]);
             } else {
@@ -216,31 +258,26 @@ public:
         File.open(path.toString, File.Style(File.Access.ReadWrite, File.Open.Sedate));
     }
 
-    /************************************************************************************
+    /*************************************************************************************
      * Asynchronous read, first checking the cacheMap has the block we're looking for.
-     ***********************************************************************************/
+     ************************************************************************************/
     synchronized void aSyncRead(ulong offset, uint length, BHReadCallback cb) {
         if (length == 0) {
-            cb(this, message.Status.SUCCESS, null, null);
+            cb(message.Status.SUCCESS, null, null);
         } else if (this.cacheMap && !this.cacheMap.has(offset, length)) {
-            cb(this, message.Status.NOTFOUND, null, null);
+            cb(message.Status.NOTFOUND, null, null);
         } else {
             super.aSyncRead(offset, length, cb);
         }
     }
 
-    /************************************************************************************
+    /*************************************************************************************
      * Add a data-segment to the asset, and update the CacheMap
-     ***********************************************************************************/
+     ************************************************************************************/
     synchronized void add(ulong offset, ubyte[] data) {
         if (!cacheMap)
             throw new IOException("Trying to write to a completed file");
-        version (Posix) { // Posix has pwrite() for atomic write+seek
-            auto written = pwrite(fileHandle, data.ptr, data.length, offset);
-        } else {
-            seek(offset);
-            auto written = write(data);
-        }
+        auto written = pWrite(offset, data);
         if (written == data.length) {
             cacheMap.add(offset, written);
             updateHashes();
@@ -249,19 +286,19 @@ public:
         }
     }
 
-    /************************************************************************************
+    /*************************************************************************************
      * Make sure to synchronize asset data, and flush cachemap to disk.
      * Params:
      *   usefsync = control whether fsync is used, or simply flushing to filesystem is
      *              enough
-     ***********************************************************************************/
+     ************************************************************************************/
     void sync() {
         scope CacheMap cmapToWrite;
         synchronized (this) {
             if (cacheMap) {
                 // TODO: Refactor this
                 cacheMap.header.hashedAmount = hashedPtr;
-                foreach (type, hasher; hashes) {
+                foreach (type, hasher; hashers) {
                     auto buf = new ubyte[hasher.maxStateSize];
                     cacheMap.header.hashes[type] = hasher.save(buf);
                 }
@@ -283,29 +320,29 @@ public:
         }
     }
 protected:
-    /************************************************************************************
+    /*************************************************************************************
      * Check if more data is available for hashing
-     ***********************************************************************************/
+     ************************************************************************************/
     void updateHashes() {
         auto zeroBlockSize = cacheMap.zeroBlockSize;
         if (zeroBlockSize > hashedPtr) {
             auto bufsize = zeroBlockSize - hashedPtr;
             auto buf = tlsBuffer(bufsize);
-            auto got = pread(fileHandle, buf.ptr, bufsize, hashedPtr);
+            auto got = pRead(hashedPtr, buf[0..bufsize]);
             assert(got == bufsize);
-            foreach (hash; hashes) {
+            foreach (hash; hashers) {
                 hash.update(buf[0..bufsize]);
             }
-            if (zeroBlockSize == _length)
+            if (zeroBlockSize == _size)
                 finish();
             else
                 hashedPtr = zeroBlockSize;
         }
     }
 
-    /************************************************************************************
+    /*************************************************************************************
      * Post-finish hooks. Finalize the digests, add to assetMap, and remove the CacheMap
-     ***********************************************************************************/
+     ************************************************************************************/
     synchronized void finish() {
         assert(updateHashIds);
         assert(cacheMap);
@@ -313,9 +350,9 @@ protected:
         assert(cacheMap.assetSize == length);
         log.trace("Asset complete");
 
-        auto hashIds = new message.Identifier[hashes.length];
+        auto hashIds = new message.Identifier[hashers.length];
         uint i;
-        foreach (type, hash; hashes) {
+        foreach (type, hash; hashers) {
             auto digest = hash.binaryDigest;
             auto hashId = new message.Identifier;
             hashId.type = type;
@@ -323,67 +360,54 @@ protected:
             hashIds[i++] = hashId;
         }
 
-        updateHashIds(hashIds);
-
         cacheMap = null;
         sync();
         idxPath.remove();
 
-        _statusSignal.call(this, message.Status.SUCCESS, null);
+        updateHashIds(hashIds);
     }
 }
 
-/****************************************************************************************
+/*****************************************************************************************
  * Assets in the "upload"-phase.
- ***************************************************************************************/
+ ****************************************************************************************/
 class UploadAsset : WriteableAsset {
     this(FilePath path, AssetMetaData metadata, ulong size,
          HashIdsListener updateHashIds, bool usefsync) {
         super(path, metadata, size, updateHashIds, usefsync);
     }
 
-    /************************************************************************************
+    /*************************************************************************************
      * UploadAssets will have zero-rating until they are complete. When complete, set
      * to max.
-     ***********************************************************************************/
+     ************************************************************************************/
     void finish() {
         _metadata.setMaxRating(Clock.now);
         super.finish();
     }
 }
 
-/****************************************************************************************
+/*****************************************************************************************
  * CachingAsset is an important workhorse in the entire system. Implements a currently
  * caching asset, still not completely locally available.
- ***************************************************************************************/
+ ****************************************************************************************/
 class CachingAsset : WriteableAsset {
     IServerAsset remoteAsset;
-
-    /************************************************************************************
-     * Structure holding WeakReference to this, so we can attach it to events without
-     * preventing GC of this.
-     ***********************************************************************************/
-    struct RemoteWatcher {
-        WeakReference!(CachingAsset) assetRef;
-        void setAsset(CachingAsset asset) {
-            assetRef = new typeof(assetRef)(asset);
-        }
-        void onBackingUpdate(IAsset backing, message.Status sCode, message.AssetStatus s) {
-            auto asset = assetRef();
-            if (asset)
-                asset._statusSignal.call(asset, sCode, s);
-        }
-    }
 public:
     this (FilePath path, AssetMetaData metadata, IServerAsset remoteAsset,
           HashIdsListener updateHashIds, bool usefsync) {
         this.remoteAsset = remoteAsset;
-        auto watcher = new RemoteWatcher();
-        watcher.setAsset(this);
-        remoteAsset.attachWatcher(&watcher.onBackingUpdate);
+        remoteAsset.takeRef(this);
+        remoteAsset.attachWatcher(&metadata.onBackingUpdate);
         super(path, metadata, remoteAsset.size, updateHashIds, usefsync); // TODO: Verify remoteAsset.size against local file
         log = Log.lookup("daemon.cache.cachingasset." ~ path.name[0..8]);
         log.trace("Caching remoteAsset of size {}", size);
+    }
+
+    void close() {
+        if (remoteAsset)
+            remoteAsset.dropRef(this);
+        super.close();
     }
 
     synchronized void aSyncRead(ulong offset, uint length, BHReadCallback cb) {
@@ -394,9 +418,9 @@ public:
         r.tryRead();
     }
 protected:
-    /************************************************************************************
+    /*************************************************************************************
      * Triggered when the underlying cache is complete.
-     ***********************************************************************************/
+     ************************************************************************************/
     void finish() body {
         // TODO: Validate hashId:s
         super.finish();
@@ -407,10 +431,10 @@ private:
         super.aSyncRead(offset, length, cb);
     }
 
-    /************************************************************************************
+    /*************************************************************************************
      * Every read-operation for non-cached data results in a ForwardedRead, which tracks
      * a forwarded ReadRequest, recieves the response, and updates the CachingAsset.
-     ***********************************************************************************/
+     ************************************************************************************/
     class ForwardedRead {
         ulong offset;
         uint length;
@@ -431,9 +455,9 @@ private:
         void fail() {
             auto resp = new lib.message.ReadResponse;
             resp.status = message.Status.NOTFOUND;
-            cb(this.outer, resp.status, null, resp);
+            cb(resp.status, null, resp);
         }
-        void callback(IAsset asset, message.Status status, message.ReadRequest req, message.ReadResponse resp) {
+        void callback(message.Status status, message.ReadRequest req, message.ReadResponse resp) {
             if (status == message.Status.SUCCESS && resp && resp.content.length) {
                 if (cacheMap) // May no longer be open for writing, due to stale requests
                     add(resp.offset, resp.content);

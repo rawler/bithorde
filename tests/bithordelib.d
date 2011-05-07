@@ -259,7 +259,7 @@ void testAssetFetchWithTimeout(SteppingServer src, Identifier[] ids) {
     uint pos;
     RemoteAsset asset;
 
-    void gotResponse(IAsset asset, Status status, ReadRequest req, ReadResponse resp) {
+    void gotResponse(Status status, ReadRequest req, ReadResponse resp) {
         assert(status == Status.SUCCESS, "Read should have succeded, but got status " ~ statusToString(status));
         pos += chunkSize;
         if (pos < asset.size)
@@ -304,7 +304,7 @@ void testRestartWithPartialAsset(SteppingServer src, Identifier[] ids) {
     uint pos;
     RemoteAsset asset;
 
-    void gotResponse1(IAsset asset, Status status, ReadRequest req, ReadResponse resp) {
+    void gotResponse1(Status status, ReadRequest req, ReadResponse resp) {
         assert(status == Status.SUCCESS, "First-Read should have succeded, but got status " ~ statusToString(status));
         client.close();
     }
@@ -323,7 +323,7 @@ void testRestartWithPartialAsset(SteppingServer src, Identifier[] ids) {
     LOG.info("Reconnecting client");
     client = createClient(proxy);
 
-    void gotResponse2(IAsset asset, Status status, ReadRequest req, ReadResponse resp) {
+    void gotResponse2(Status status, ReadRequest req, ReadResponse resp) {
         assert(status == Status.SUCCESS, "Read should have succeded, but got status " ~ statusToString(status));
         pos += chunkSize;
         if (pos < asset.size)
@@ -359,7 +359,7 @@ void testSourceGone(SteppingServer src, SteppingServer proxy, Identifier[] ids) 
     bool gotNewStatus;
     uint origAvailable;
 
-    void readResponse(IAsset asset, Status status, ReadRequest req, ReadResponse resp) {
+    void readResponse(Status status, ReadRequest req, ReadResponse resp) {
         assert(status == Status.SUCCESS, "First-Read should have succeded, but got status " ~ statusToString(status));
         if (src) {
             LOG.info("Shutting down source");

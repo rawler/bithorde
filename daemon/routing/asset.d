@@ -22,6 +22,7 @@ private import lib.client;
 private import lib.message;
 
 private import daemon.client;
+private import daemon.refcount;
 
 /// Used to notify router that request completed (regardless of success)
 alias void delegate(daemon.client.BindRead) RequestCompleted;
@@ -32,6 +33,7 @@ alias void delegate(daemon.client.BindRead) RequestCompleted;
  ***************************************************************************************/
 private class ForwardedAsset : IServerAsset {
     mixin IAsset.StatusSignal;
+    mixin RefCountTarget;
 private:
     daemon.client.BindRead req;
     RemoteAsset[] backingAssets;
@@ -86,7 +88,7 @@ public:
         } else {
             auto resp = new ReadResponse;
             resp.status = Status.NOTFOUND;
-            cb(this, Status.NOTFOUND, null, resp);
+            cb(Status.NOTFOUND, null, resp);
         }
     }
 
