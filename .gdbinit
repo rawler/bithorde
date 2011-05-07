@@ -1,3 +1,3 @@
 # Configure for D-debugging
-handle SIGUSR1 SIGUSR2 PIPE pass nostop noprint
+handle SIGUSR1 SIGUSR2 SIGPIPE pass nostop noprint
 
