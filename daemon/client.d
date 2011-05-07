@@ -134,9 +134,14 @@ class Client : lib.client.Client {
         }
         void onAssetStatus(IAsset asset, message.Status sCode, message.AssetStatus s) {
             log.trace("Informing client on status {} on handle {}", message.statusToString(sCode), handle);
-            assetSource = cast(IServerAsset)asset;
-            if (assetSource)
-                assetSource.takeRef(this);
+            auto newAssetSource = cast(IServerAsset)asset;
+            if (newAssetSource != assetSource) {
+                if (assetSource)
+                    assetSource.dropRef(this);
+                if (newAssetSource)
+                    newAssetSource.takeRef(this);
+                assetSource = newAssetSource;
+            }
             if (!closed) {
                 scope resp = new message.AssetStatus;
                 resp.handle = handle;
@@ -205,11 +210,10 @@ public:
      * Cleanup when client closes
      ***********************************************************************************/
     void close() {
-        super.close();
         foreach (asset; openAssets) if (asset)
             asset.close();
         openAssets = null;
-        GC.collect();
+        super.close();
     }
 
     void dumpStats(Time now) {
