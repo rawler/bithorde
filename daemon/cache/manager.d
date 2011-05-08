@@ -173,6 +173,10 @@ class CacheManager : IAssetSource {
         auto newMeta = new MetaData();
         auto localId = new ubyte[LOCALID_LENGTH];
         rand.randomizeUniform!(ubyte[],false)(localId);
+        while (localId in localIdMap) {
+            log.warn("Random generated ID conflict with previously used ID.");
+            rand.randomizeUniform!(ubyte[],false)(localId);
+        }
         newMeta.localId = localId;
         addToIdMap(newMeta);
         return newMeta;
