@@ -140,7 +140,11 @@ class Client : lib.client.Client {
                     assetSource.dropRef(this);
                 if (newAssetSource)
                     newAssetSource.takeRef(this);
-                assetSource = newAssetSource;
+
+                if (closed)
+                    newAssetSource.dropRef(this); // Immediately close the reference again if we're already closed.
+                else
+                    assetSource = newAssetSource;
             }
             if (!closed) {
                 scope resp = new message.AssetStatus;
