@@ -66,7 +66,7 @@ class CacheManager : IAssetSource {
                 setAsset(null);
         }
 
-        private synchronized BaseAsset setAsset(BaseAsset newAsset) {
+        private BaseAsset setAsset(BaseAsset newAsset) {
             if (_openAsset) {
                 detachWatcher(&onStatusUpdate);
                 _openAsset.close();
@@ -84,7 +84,7 @@ class CacheManager : IAssetSource {
         /********************************************************************************
          * Throws: IOException if asset is not found
          *******************************************************************************/
-        synchronized MetaData openRead() {
+        MetaData openRead() {
             if (isOpen) { // If something is already holding it open, just use it.
                 return this;
             } else if (idxPath.exists) {
@@ -95,54 +95,54 @@ class CacheManager : IAssetSource {
             }
         }
 
-        synchronized MetaData openUpload(ulong size) {
+        MetaData openUpload(ulong size) {
             setAsset(new UploadAsset(assetPath, this, size, &updateHashIds, usefsync));
             return this;
         }
 
-        synchronized MetaData openCaching(IServerAsset sourceAsset) {
+        MetaData openCaching(IServerAsset sourceAsset) {
             setAsset(new CachingAsset(assetPath, this, sourceAsset, &updateHashIds, usefsync));
             return this;
         }
 
-        synchronized bool isOpen() {
+        bool isOpen() {
             return _openAsset !is null;
         }
-        synchronized bool isWritable() {
+        bool isWritable() {
             return (cast(WriteableAsset)_openAsset) !is null;
         }
 
-        synchronized void close() {
+        void close() {
             scope(exit) _openAsset = null;
             if (_openAsset)
                 _openAsset.close();
         }
 
-        synchronized void sync() {
+        void sync() {
             auto asset = cast(WriteableAsset)_openAsset;
             if (asset)
                 asset.sync();
         }
 
-        synchronized ulong size() {
+        ulong size() {
             if (_openAsset)
                 return _openAsset.size;
             else
                 assert(false);
         }
 
-        synchronized void aSyncRead(ulong offset, uint length, BHReadCallback cb) {
+        void aSyncRead(ulong offset, uint length, BHReadCallback cb) {
             if (_openAsset)
                 return _openAsset.aSyncRead(offset, length, cb);
             else
-                assert(false);
+                assert(false, "Trying to read from closed asset.");
         }
 
-        synchronized void add(ulong offset, ubyte[] data) {
+        void add(ulong offset, ubyte[] data) {
             if (_openAsset)
                 return _openAsset.add(offset, data);
             else
-                assert(false);
+                assert(false, "Trying to add to closed asset.");
         }
 
         message.Identifier[] hashIds() {
