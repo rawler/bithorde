@@ -135,16 +135,17 @@ class Client : lib.client.Client {
         void onAssetStatus(IAsset asset, message.Status sCode, message.AssetStatus s) {
             log.trace("Informing client on status {} on handle {}", message.statusToString(sCode), handle);
             auto newAssetSource = cast(IServerAsset)asset;
-            if (newAssetSource != assetSource) {
-                if (assetSource)
-                    assetSource.dropRef(this);
-                if (newAssetSource)
-                    newAssetSource.takeRef(this);
+            if (newAssetSource && newAssetSource !is assetSource) {
+                newAssetSource.takeRef(this);
 
-                if (closed)
-                    newAssetSource.dropRef(this); // Immediately close the reference again if we're already closed.
-                else
+                if (closed) {
+                    newAssetSource.dropRef(this); // Immediately drop the reference again if we're already closed.
+                } else if (assetSource is null) {
                     assetSource = newAssetSource;
+                } else { // Detect invalid assigns.
+                    newAssetSource.dropRef(this);
+                    throw new AssertException("Attempted to change AssetSource of existing BoundAsset", __FILE__, __LINE__);
+                }
             }
             if (!closed) {
                 scope resp = new message.AssetStatus;
