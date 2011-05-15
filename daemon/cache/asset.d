@@ -343,7 +343,7 @@ protected:
     /*************************************************************************************
      * Post-finish hooks. Finalize the digests, add to assetMap, and remove the CacheMap
      ************************************************************************************/
-    synchronized void finish() {
+    void finish() {
         assert(updateHashIds);
         assert(cacheMap);
         assert(cacheMap.segcount == 1);
@@ -351,18 +351,20 @@ protected:
         log.trace("Asset complete");
 
         auto hashIds = new message.Identifier[hashers.length];
-        uint i;
-        foreach (type, hash; hashers) {
-            auto digest = hash.binaryDigest;
-            auto hashId = new message.Identifier;
-            hashId.type = type;
-            hashId.id = digest.dup;
-            hashIds[i++] = hashId;
-        }
+        synchronized (this) {
+            uint i;
+            foreach (type, hash; hashers) {
+                auto digest = hash.binaryDigest;
+                auto hashId = new message.Identifier;
+                hashId.type = type;
+                hashId.id = digest.dup;
+                hashIds[i++] = hashId;
+            }
 
-        cacheMap = null;
-        sync();
-        idxPath.remove();
+            cacheMap = null;
+            sync();
+            idxPath.remove();
+        }
 
         updateHashIds(hashIds);
     }
