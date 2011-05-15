@@ -63,7 +63,7 @@ class SteppingServer : Server {
         }
 
         private void _proxyMessageHandler(Connection c, message.Type t, ubyte[] buf) {
-            synchronized (this) sem.wait();
+            synchronized (this.outer) sem.wait();
             return realMessageHandler(c, t, buf);
         }
         ProcessCallback messageHandler(ProcessCallback h) {
