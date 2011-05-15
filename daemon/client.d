@@ -17,7 +17,6 @@
 module daemon.client;
 
 private import tango.core.Exception;
-private import tango.core.Memory;
 private import tango.math.random.Random;
 private import tango.net.device.Socket;
 private import tango.time.Time;
@@ -172,7 +171,6 @@ class Client : lib.client.Client {
                 assetSource.dropRef(this);
             assetSource = null;
             setAsset(handle,null);
-            GC.collect();
         }
         void attachWatcher(BHAssetStatusCallback) {} // Doesn't make sense?
         void detachWatcher(BHAssetStatusCallback) {} // Doesn't make sense?
