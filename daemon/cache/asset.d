@@ -407,8 +407,7 @@ public:
     }
 
     void close() {
-        if (remoteAsset)
-            remoteAsset.dropRef(this);
+        closeUpstream();
         super.close();
     }
 
@@ -426,9 +425,17 @@ protected:
     void finish() body {
         // TODO: Validate hashId:s
         super.finish();
-        remoteAsset = null;
+        closeUpstream();
     }
 private:
+    void closeUpstream() {
+        if (remoteAsset) {
+            remoteAsset.detachWatcher(&_metadata.onBackingUpdate);
+            remoteAsset.dropRef(this);
+            remoteAsset = null;
+        }
+    }
+
     void realRead(ulong offset, uint length, BHReadCallback cb) {
         super.aSyncRead(offset, length, cb);
     }
