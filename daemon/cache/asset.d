@@ -274,16 +274,16 @@ public:
     /*************************************************************************************
      * Add a data-segment to the asset, and update the CacheMap
      ************************************************************************************/
-    synchronized void add(ulong offset, ubyte[] data) {
+    void add(ulong offset, ubyte[] data) {
         if (!cacheMap)
             throw new IOException("Trying to write to a completed file");
-        auto written = pWrite(offset, data);
-        if (written == data.length) {
+        synchronized (this) {
+            auto written = pWrite(offset, data);
+            if (written != data.length)
+                throw new IOException("Failed to write received segment. Disk full?");
             cacheMap.add(offset, written);
-            updateHashes();
-        } else {
-            throw new IOException("Failed to write received segment. Disk full?");
         }
+        updateHashes();
     }
 
     /*************************************************************************************
