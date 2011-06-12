@@ -102,7 +102,7 @@ public:
         }
 
         if (config.httpPort) {
-            auto proxy = new HTTPMgmtProxy(&onManagementRequest);
+            auto proxy = new HTTPMgmtProxy("BitHorded Monitor", &onManagementRequest);
             httpServer = new HTTPPumpingServer(pump, "localhost", config.httpPort, &proxy.opCall);
         }
 
@@ -166,20 +166,20 @@ protected:
      ***********************************************************************************/
     MgmtEntry[] onManagementRequest(char[][] path) {
         if (path.length > 0) switch (path[0]) {
-            case "router":
+            case "friends":
                 return router.onManagementRequest(path[1..$]);
             case "cache":
                 return cacheMgr.onManagementRequest(path[1..$]);
-            case "clients":
+            case "connections":
                 return clientManagement(path[1..$]);
             default:
                 throw new HTTPMgmtProxy.Error(404, "Not found");
         } else {
             auto cacheStats = to!(char[])(cacheMgr.assetCount) ~ ": " ~ to!(char[])(cacheMgr.size / (1024.0*1024*1024)) ~ "GB";
             return [
-                MgmtEntry.link("router", to!(char[])(router.friendCount)),
+                MgmtEntry.link("friends", to!(char[])(router.friendCount)),
                 MgmtEntry.link("cache", cacheStats),
-                MgmtEntry.link("clients", to!(char[])(connectedClients.length))
+                MgmtEntry.link("connections", to!(char[])(connectedClients.length))
             ];
         }
     }
