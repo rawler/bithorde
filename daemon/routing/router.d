@@ -17,6 +17,7 @@
 module daemon.routing.router;
 
 private import tango.time.Time;
+private import tango.util.Convert;
 private import tango.util.log.Log;
 
 private import lib.httpserver;
@@ -76,9 +77,18 @@ public:
      * Handles incoming management-requests
      ***********************************************************************************/
     MgmtEntry[] onManagementRequest(char[][] path) {
-        return [];
+        if (path.length) {
+            throw new HTTPMgmtProxy.Error(404, "Unknown path");
+        } else {
+            MgmtEntry[] res;
+            foreach (f; connectedFriends) {
+                auto connect_parms = (f.c && f.c.peerAddress) ? f.c.peerAddress.toString : "unknown";
+                res ~= MgmtEntry(f.name, connect_parms);
+            }
+            return res;
+        }
     }
-    
+
     /************************************************************************************
      * Expose number of connected friends.
      ***********************************************************************************/

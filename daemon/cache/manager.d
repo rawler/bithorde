@@ -482,7 +482,8 @@ public:
     MgmtEntry[] onManagementRequest(char[][] path) {
         MgmtEntry[] res;
         foreach (asset; localIdMap) {
-            auto desc = to!(char[])(asset.isOpen) ~ ", " ~ asset.magnetLink;
+            auto assetOpen = asset.isOpen ? "open" : "closed";
+            auto desc = assetOpen ~ ", " ~ asset.magnetLink;
             res ~= MgmtEntry(asset.localIdBase32, desc);
         }
         return res;
