@@ -42,6 +42,7 @@ private import daemon.routing.friend;
 private import daemon.routing.router;
 private import lib.asset;
 private import lib.connection;
+private import lib.httpserver;
 private import lib.pumping;
 private import message = lib.message;
 
@@ -61,7 +62,10 @@ package:
     Thread reconnectThread;
     ConnectionWrapper!(ServerSocket) tcpServer;
     ConnectionWrapper!(LocalServerSocket) unixServer;
+    HTTPPumpingServer httpServer;
     bool running = true;
+
+    Client[char[]] connectedClients;
 
     Pump pump;
 
@@ -95,6 +99,11 @@ public:
             log.info("Listening to unix-socket {}", config.unixSocket);
             auto unixServerSocket = new LocalServerSocket(config.unixSocket);
             unixServer = new typeof(unixServer)(pump, unixServerSocket);
+        }
+
+        if (config.httpPort) {
+            auto proxy = new HTTPMgmtProxy("BitHorded Monitor", &onManagementRequest);
+            httpServer = new HTTPPumpingServer(pump, "localhost", config.httpPort, &proxy.opCall);
         }
 
         // Setup helper functions, routing and caching
@@ -153,6 +162,44 @@ public:
 
 protected:
     /************************************************************************************
+     * Handles incoming management-requests
+     ***********************************************************************************/
+    MgmtEntry[] onManagementRequest(char[][] path) {
+        if (path.length > 0) switch (path[0]) {
+            case "friends":
+                return router.onManagementRequest(path[1..$]);
+            case "cache":
+                return cacheMgr.onManagementRequest(path[1..$]);
+            case "connections":
+                return clientManagement(path[1..$]);
+            default:
+                throw new HTTPMgmtProxy.Error(404, "Not found");
+        } else {
+            auto cacheStats = to!(char[])(cacheMgr.assetCount) ~ ": " ~ to!(char[])(cacheMgr.size / (1024.0*1024*1024)) ~ "GB";
+            return [
+                MgmtEntry.link("friends", to!(char[])(router.friendCount)),
+                MgmtEntry.link("cache", cacheStats),
+                MgmtEntry.link("connections", to!(char[])(connectedClients.length))
+            ];
+        }
+    }
+
+    MgmtEntry[] clientManagement(char[][] path) {
+        if (path.length > 0) {
+            throw new HTTPMgmtProxy.Error(404, "Not found");
+        } else {
+            MgmtEntry[] res;
+            foreach (c; connectedClients) {
+                auto downstreamAssetCount = to!(char[])(c.downstreamAssetCount);
+                auto upstreamAssetCount = to!(char[])(c.upstreamAssetCount);
+                auto desc = "-"~downstreamAssetCount~"+"~upstreamAssetCount~", "~c.peerAddress.toString;
+                res ~= MgmtEntry(c.peername, desc);
+            }
+            return res;
+        }
+    }
+
+    /************************************************************************************
      * Hooks up given socket into this server, wrapping it to a Connection, assigning to
      * a Client, and add it to the Pump.
      ***********************************************************************************/
@@ -170,12 +217,14 @@ protected:
         return new Connection(pump, s);
     }
 
-    void onClientConnect(lib.client.Client c)
+    void onClientConnect(lib.client.Client _c)
     {
         Friend f;
+        auto c = cast(daemon.client.Client)_c;
         auto peername = c.peername;
 
         c.disconnected.attach(&onClientDisconnect);
+        connectedClients[peername] = c;
 
         synchronized (this) if (peername in offlineFriends) {
             f = offlineFriends[peername];
@@ -195,6 +244,7 @@ protected:
             f.disconnected();
             synchronized (this) offlineFriends[f.name] = f;
         }
+        connectedClients.remove(c.peername);
         log.info("{} {} disconnected", f?"Friend":"Client", c.peername);
     }
 

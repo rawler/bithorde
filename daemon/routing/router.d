@@ -17,13 +17,15 @@
 module daemon.routing.router;
 
 private import tango.time.Time;
+private import tango.util.Convert;
 private import tango.util.log.Log;
 
+private import lib.httpserver;
 private import lib.message;
 
-private import daemon.client;
-private import daemon.routing.asset;
 private import daemon.routing.friend;
+private import daemon.routing.asset;
+private import daemon.client;
 private import daemon.server;
 
 /****************************************************************************************
@@ -69,6 +71,29 @@ public:
         } else {
             return null;
         }
+    }
+
+    /************************************************************************************
+     * Handles incoming management-requests
+     ***********************************************************************************/
+    MgmtEntry[] onManagementRequest(char[][] path) {
+        if (path.length) {
+            throw new HTTPMgmtProxy.Error(404, "Unknown path");
+        } else {
+            MgmtEntry[] res;
+            foreach (f; connectedFriends) {
+                auto connect_parms = (f.c && f.c.peerAddress) ? f.c.peerAddress.toString : "unknown";
+                res ~= MgmtEntry(f.name, connect_parms);
+            }
+            return res;
+        }
+    }
+
+    /************************************************************************************
+     * Expose number of connected friends.
+     ***********************************************************************************/
+    uint friendCount() {
+        return connectedFriends.length;
     }
 private:
     /************************************************************************************

@@ -29,16 +29,19 @@ private import tango.text.convert.Format;
 private import tango.text.Util;
 private import tango.time.Time;
 private import tango.time.Clock;
+private import tango.util.Convert;
 private import tango.util.log.Log;
 
 static if ( !is(typeof(fdatasync) == function ) )
     extern (C) int fdatasync(int);
 
 private import lib.asset;
+static private import base32 = lib.base32;
 private import lib.hashes;
+private import lib.httpserver;
 private import lib.protobuf;
 
-import daemon.cache.asset;
+private import daemon.cache.asset;
 private import daemon.cache.metadata;
 private import daemon.client;
 private import daemon.config;
@@ -164,6 +167,17 @@ class CacheManager : IAssetSource {
 
             _statusSignal.call(this, message.Status.SUCCESS, null);
         }
+
+        char[] magnetLink() {
+            if (isOpen)
+                return formatMagnet(hashIds, size);
+            else
+                return formatMagnet(hashIds, 0);
+        }
+
+        char[] localIdBase32() {
+            return base32.encode(localId);
+        }
     }
 
     /************************************************************************************
@@ -265,6 +279,13 @@ public:
             }
         }
         return retval;
+    }
+
+    /************************************************************************************
+     * Expose the number of assets in cache
+     ***********************************************************************************/
+    uint assetCount() {
+        return localIdMap.length;
     }
 
     /************************************************************************************
@@ -455,6 +476,18 @@ public:
         }
     }
 
+    /************************************************************************************
+     * Handles incoming management-requests
+     ***********************************************************************************/
+    MgmtEntry[] onManagementRequest(char[][] path) {
+        MgmtEntry[] res;
+        foreach (asset; localIdMap) {
+            auto assetOpen = asset.isOpen ? "open" : "closed";
+            auto desc = assetOpen ~ ", " ~ asset.magnetLink;
+            res ~= MgmtEntry(asset.localIdBase32, desc);
+        }
+        return res;
+    }
 private:
     /*************************************************************************
      * The IdMap is a dummy-object for storing the mapping between hashIds

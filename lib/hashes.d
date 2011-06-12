@@ -81,10 +81,7 @@ static this() {
 /****************************************************************************************
  * Format asset details into Magnet URI.
  ***************************************************************************************/
-char[] formatMagnet(Identifier[] ids, ulong length, char[] name = null)
-in {
-    assert(ids.length > 0);
-} body {
+char[] formatMagnet(Identifier[] ids, ulong length, char[] name = null) {
     scope array = new Array(64,64);
     array.write("magnet:?");
     uint idx;

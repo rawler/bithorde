@@ -56,6 +56,7 @@ class Config
     char[] name;
     ushort port = 1337;
     char[] unixSocket = "/tmp/bithorde";
+    ushort httpPort = 0;
     char[] setuid, setgid;
     FilePath cachedir;
     ulong cacheMaxSize;                        /// Maximum cacheSize, in MB
@@ -122,6 +123,9 @@ private:
                 this.unixSocket = value.dup;
             else
                 this.unixSocket = null;
+            break;
+        case "httpport":
+            this.httpPort = to!(ushort)(value);
             break;
         case "cachedir":
             this.cachedir = new FilePath(value);
