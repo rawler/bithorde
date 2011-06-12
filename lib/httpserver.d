@@ -197,10 +197,12 @@ class HTTPMgmtProxy {
         }
     }
 private:
+    char[] title;
     Handler root;
     Logger log;
 public:
-    this(Handler root) {
+    this(char[] title, Handler root) {
+        this.title = title;
         this.root = root;
         this.log = Log.lookup("httpmgmtproxy");
     }
@@ -215,21 +217,72 @@ public:
 
         try {
             auto res = root(path);
-            char[] responseString;
-            foreach (entry; res) {
-                char[1024] buf;
-                if (entry.islink)
-                    responseString ~= layout(buf, " -> %0 : %1\n", entry.name, entry.value);
-                else
-                    responseString ~= layout(buf, " %0 : %1\n", entry.name, entry.value);
+
+            bool renderHTML = false;
+            foreach (h; request.headers) {
+                if (h.name == "Accept" && containsPattern(h.value, "text/html"))
+                    renderHTML = true;
             }
-            return response.respond(200, responseString);
+
+            auto responseString = renderHTML ? formatHTML(res) : formatText(res);
+            auto mimeType = renderHTML ? "text/html" : "text/plain";
+            return response.respond(200, responseString, mimeType);
         } catch (Error e) {
             return response.respond(e.httpcode, e.msg);
         } catch (Exception e) {
             log.trace("Internal error: {}, {}:{}", e, e.file, e.line);
             return response.respond(500, "Internal error");
         }
+    }
+
+private:
+    char[] formatText(MgmtEntry[] entries) {
+        char[] res;
+        foreach (entry; entries) {
+            char[1024] buf;
+            if (entry.islink)
+                res ~= layout(buf, " -> %0 : %1\n", entry.name, entry.value);
+            else
+                res ~= layout(buf, " %0 : %1\n", entry.name, entry.value);
+        }
+        return res;
+    }
+
+    char[] formatHTML(MgmtEntry[] entries) {
+        char[2048] buf;
+        char[] res = layout(buf, "<html>
+<head>
+<title>%0</title>
+<style type=\"text/css\">
+table {
+  border: 1px solid #A3A3A3;
+  border-collapse: collapse;
+  border-spacing: 0px;
+}
+th {
+  background-color: #BBCCFF;
+}
+td {
+  border: 1px solid #A3A3A3;
+  border-collapse: collapse;
+  border-spacing: 0px;
+  padding-right: 10px;
+  padding-left: 5px;
+}
+</style>
+</head>
+<body>
+    <h1>%0</h1>
+    <table><tr><th>Name</th><th>Description</th>
+", title).dup;
+        foreach (entry; entries) {
+            if (entry.islink)
+                res ~= layout(buf, "<tr><td><a href=\"%0\">%0</a></td><td>%1</td><tr>\n", entry.name, entry.value);
+            else
+                res ~= layout(buf, "<tr><td>%0</td><td>%1</td><tr>\n", entry.name, entry.value);
+        }
+        res ~= "</table></body></html>";
+        return res;
     }
 }
 
