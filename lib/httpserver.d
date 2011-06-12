@@ -1,5 +1,5 @@
 /****************************************************************************************
- * Tiny http-server-implementation over the Pumping IO-framework.
+ * Tiny limited http-server-implementation over the Pumping IO-framework.
  *
  * Copyright (C) 2010 Ulrik Mikaelsson <ulrik.mikaelsson@gmail.com>
  *
@@ -24,8 +24,6 @@ import tango.net.device.Socket;
 import tango.text.Util;
 
 import lib.pumping;
-
-    import tango.io.Stdout;
 
 const CRLF = "\r\n";
 
@@ -101,6 +99,19 @@ struct HTTPMessage {
         dg(CRLF);
         dg(payload);
     }
+
+    void respond(ushort code, char[] content, char[] mimeType="text/plain") {
+        command.code = to!(char[])(code);
+        addHeader("Content-Type", mimeType);
+        payload = content;
+    }
+
+    void addHeader(char name[], char[] value) {
+        headers.length = headers.length + 1;
+        auto hdr = &headers[$-1];
+        hdr.name = name;
+        hdr.value = value;
+    }
 }
 
 alias void delegate(HTTPMessage* request, out HTTPMessage response) HTTPHandler;
@@ -108,6 +119,7 @@ alias void delegate(HTTPMessage* request, out HTTPMessage response) HTTPHandler;
 class HTTPConnection : BaseSocket {
     HTTPMessage currentRequest;
     HTTPHandler handler;
+    ubyte[] buf;
 
     this(Pump p, Socket s, HTTPHandler handler) {
         super(p, s, 16*1024);
@@ -118,21 +130,34 @@ class HTTPConnection : BaseSocket {
         if (currentRequest.complete) {
             HTTPMessage response;
             handler(&currentRequest, response);
-
+            response.command.httpver = currentRequest.command.httpver;
             if (!response.command.code) {
                 response.command = currentRequest.command;
                 response.command.code = "500";
             }
-            ubyte[] buf;
             size_t buffer(void[] _buf) {
                 buf ~= cast(ubyte[])_buf;
                 return _buf.length;
             }
             response.write(&buffer);
-            this.write(buf);
-            this.close();
+            writeReply();
         }
         return consumed;
+    }
+
+    void writeReply() {
+        while (buf.length) {
+            auto written = this.write(buf[0..min(1024u,buf.length)]);
+            if (written)
+                buf = buf[written..$];
+            else
+                return; // Wait for next onWriteClear
+        }
+        this.close();
+    }
+
+    void onWriteClear() {
+        writeReply();
     }
 }
 
