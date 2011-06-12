@@ -219,14 +219,17 @@ public:
         super.close();
     }
 
-    void dumpStats(Time now) {
-        uint count;
-        foreach (asset; openAssets)
-            if (asset) count ++;
-        log.trace("Serving {} Assets", count);
+    synchronized void dumpStats(Time now) {
+        log.trace("Serving {} Assets", downstreamAssetCount);
         super.dumpStats(now);
     }
 
+    synchronized uint downstreamAssetCount() {
+        uint count;
+        foreach (asset; openAssets)
+            if (asset) count ++;
+        return count;
+    }
 private:
     BoundAsset getAsset(uint i) {
         if (i >= openAssets.length)

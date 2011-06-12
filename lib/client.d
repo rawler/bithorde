@@ -270,6 +270,15 @@ public:
         return connection.remoteAddress;
     }
 
+    uint upstreamAssetCount() {
+        uint count;
+        foreach (asset; boundAssets) {
+            if (asset && !asset.closed)
+                count++;
+        }
+        return count;
+    }
+
     void close()
     {
         connection.close();

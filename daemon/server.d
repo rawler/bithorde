@@ -65,6 +65,8 @@ package:
     HTTPPumpingServer httpServer;
     bool running = true;
 
+    Client[char[]] connectedClients;
+
     Pump pump;
 
     static Logger log;
@@ -168,13 +170,32 @@ protected:
                 return router.onManagementRequest(path[1..$]);
             case "cache":
                 return cacheMgr.onManagementRequest(path[1..$]);
+            case "clients":
+                return clientManagement(path[1..$]);
             default:
                 throw new HTTPMgmtProxy.Error(404, "Not found");
         } else {
             auto cacheStats = to!(char[])(cacheMgr.assetCount) ~ ": " ~ to!(char[])(cacheMgr.size / (1024.0*1024*1024)) ~ "GB";
-            MgmtEntry[] retval = [MgmtEntry.link("router", to!(char[])(router.friendCount)),
-                                  MgmtEntry.link("cache", cacheStats)];
-            return retval;
+            return [
+                MgmtEntry.link("router", to!(char[])(router.friendCount)),
+                MgmtEntry.link("cache", cacheStats),
+                MgmtEntry.link("clients", to!(char[])(connectedClients.length))
+            ];
+        }
+    }
+
+    MgmtEntry[] clientManagement(char[][] path) {
+        if (path.length > 0) {
+            throw new HTTPMgmtProxy.Error(404, "Not found");
+        } else {
+            MgmtEntry[] res;
+            foreach (c; connectedClients) {
+                auto downstreamAssetCount = to!(char[])(c.downstreamAssetCount);
+                auto upstreamAssetCount = to!(char[])(c.upstreamAssetCount);
+                auto desc = "-"~downstreamAssetCount~"+"~upstreamAssetCount~", "~c.peerAddress.toString;
+                res ~= MgmtEntry(c.peername, desc);
+            }
+            return res;
         }
     }
 
@@ -196,12 +217,14 @@ protected:
         return new Connection(pump, s);
     }
 
-    void onClientConnect(lib.client.Client c)
+    void onClientConnect(lib.client.Client _c)
     {
         Friend f;
+        auto c = cast(daemon.client.Client)_c;
         auto peername = c.peername;
 
         c.disconnected.attach(&onClientDisconnect);
+        connectedClients[peername] = c;
 
         synchronized (this) if (peername in offlineFriends) {
             f = offlineFriends[peername];
@@ -221,6 +244,7 @@ protected:
             f.disconnected();
             synchronized (this) offlineFriends[f.name] = f;
         }
+        connectedClients.remove(c.peername);
         log.info("{} {} disconnected", f?"Friend":"Client", c.peername);
     }
 
