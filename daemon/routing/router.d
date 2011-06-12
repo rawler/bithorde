@@ -19,11 +19,12 @@ module daemon.routing.router;
 private import tango.time.Time;
 private import tango.util.log.Log;
 
+private import lib.httpserver;
 private import lib.message;
 
-private import daemon.client;
-private import daemon.routing.asset;
 private import daemon.routing.friend;
+private import daemon.routing.asset;
+private import daemon.client;
 private import daemon.server;
 
 /****************************************************************************************
@@ -69,6 +70,20 @@ public:
         } else {
             return null;
         }
+    }
+
+    /************************************************************************************
+     * Handles incoming management-requests
+     ***********************************************************************************/
+    MgmtEntry[] onManagementRequest(char[][] path) {
+        return [];
+    }
+    
+    /************************************************************************************
+     * Expose number of connected friends.
+     ***********************************************************************************/
+    uint friendCount() {
+        return connectedFriends.length;
     }
 private:
     /************************************************************************************

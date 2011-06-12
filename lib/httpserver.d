@@ -22,6 +22,9 @@ module lib.httpserver;
 import tango.net.device.Berkeley;
 import tango.net.device.Socket;
 import tango.text.Util;
+import tango.util.Convert;
+import tango.util.log.Log;
+import tango.util.MinMax;
 
 import lib.pumping;
 
@@ -174,7 +177,65 @@ class HTTPPumpingServer : BaseSocketServer!(ServerSocket) {
     }
 }
 
+struct MgmtEntry {
+    char[] name;
+    char[] value;
+    bool islink;
+    static MgmtEntry link(char[] name, char[] value) {
+        return MgmtEntry(name, value, true);
+    }
+}
+
+class HTTPMgmtProxy {
+    alias MgmtEntry[] delegate(char[][]path) Handler;
+
+    static class Error: Exception {
+        ushort httpcode;
+        this(ushort httpcode, char[] msg = "Error in MgmtDispatch") {
+            this.httpcode = httpcode;
+            super(msg);
+        }
+    }
+private:
+    Handler root;
+    Logger log;
+public:
+    this(Handler root) {
+        this.root = root;
+        this.log = Log.lookup("httpmgmtproxy");
+    }
+
+    void opCall(HTTPMessage* request, out HTTPMessage response) {
+        if (request.command.code != "GET")
+            return response.respond(405, "Only GET-requests supported");
+
+        auto path = delimit(strip(request.command.url, '/'), "/");
+        if (path[0] == "")
+            path = path[1..$];
+
+        try {
+            auto res = root(path);
+            char[] responseString;
+            foreach (entry; res) {
+                char[1024] buf;
+                if (entry.islink)
+                    responseString ~= layout(buf, " -> %0 : %1\n", entry.name, entry.value);
+                else
+                    responseString ~= layout(buf, " %0 : %1\n", entry.name, entry.value);
+            }
+            return response.respond(200, responseString);
+        } catch (Error e) {
+            return response.respond(e.httpcode, e.msg);
+        } catch (Exception e) {
+            log.trace("Internal error: {}, {}:{}", e, e.file, e.line);
+            return response.respond(500, "Internal error");
+        }
+    }
+}
+
 debug (HTTPPumpingTest) {
+    import tango.io.Stdout;
+
     void main() {
         void echo(HTTPMessage* request, out HTTPMessage response) {
             response.command = request.command;

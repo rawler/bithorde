@@ -42,6 +42,7 @@ private import daemon.routing.friend;
 private import daemon.routing.router;
 private import lib.asset;
 private import lib.connection;
+private import lib.httpserver;
 private import lib.pumping;
 private import message = lib.message;
 
@@ -61,6 +62,7 @@ package:
     Thread reconnectThread;
     ConnectionWrapper!(ServerSocket) tcpServer;
     ConnectionWrapper!(LocalServerSocket) unixServer;
+    HTTPPumpingServer httpServer;
     bool running = true;
 
     Pump pump;
@@ -95,6 +97,11 @@ public:
             log.info("Listening to unix-socket {}", config.unixSocket);
             auto unixServerSocket = new LocalServerSocket(config.unixSocket);
             unixServer = new typeof(unixServer)(pump, unixServerSocket);
+        }
+
+        if (config.httpPort) {
+            auto proxy = new HTTPMgmtProxy(&onManagementRequest);
+            httpServer = new HTTPPumpingServer(pump, "localhost", config.httpPort, &proxy.opCall);
         }
 
         // Setup helper functions, routing and caching
@@ -152,6 +159,25 @@ public:
     }
 
 protected:
+    /************************************************************************************
+     * Handles incoming management-requests
+     ***********************************************************************************/
+    MgmtEntry[] onManagementRequest(char[][] path) {
+        if (path.length > 0) switch (path[0]) {
+            case "router":
+                return router.onManagementRequest(path[1..$]);
+            case "cache":
+                return cacheMgr.onManagementRequest(path[1..$]);
+            default:
+                throw new HTTPMgmtProxy.Error(404, "Not found");
+        } else {
+            auto cacheStats = to!(char[])(cacheMgr.assetCount) ~ ": " ~ to!(char[])(cacheMgr.size / (1024.0*1024*1024)) ~ "GB";
+            MgmtEntry[] retval = [MgmtEntry.link("router", to!(char[])(router.friendCount)),
+                                  MgmtEntry.link("cache", cacheStats)];
+            return retval;
+        }
+    }
+
     /************************************************************************************
      * Hooks up given socket into this server, wrapping it to a Connection, assigning to
      * a Client, and add it to the Pump.
