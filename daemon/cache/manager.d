@@ -40,6 +40,7 @@ static private import base32 = lib.base32;
 private import lib.hashes;
 private import lib.httpserver;
 private import lib.protobuf;
+private import lib.pumping;
 
 private import daemon.cache.asset;
 private import daemon.cache.metadata;
@@ -161,8 +162,12 @@ class CacheManager : IAssetSource {
         FilePath idxPath() {
             return assetPath.cat(".idx");
         }
+
         void updateHashIds(message.Identifier[] ids) {
             this.hashIds = ids;
+            pump.queueCallback(&notifyHashUpdate);
+        }
+        private void notifyHashUpdate() {
             addToIdMap(this);
 
             _statusSignal.call(this, message.Status.SUCCESS, null);
@@ -218,6 +223,7 @@ protected:
     bool idMapDirty;
     Thread idMapFlusher;
     bool usefsync;
+    Pump pump;
 
     static Logger log;
     static this() {
@@ -227,13 +233,14 @@ public:
     /************************************************************************************
      * Create a CacheManager with a given asset-directory and underlying Router-instance
      ***********************************************************************************/
-    this(FilePath assetDir, ulong maxSize, bool usefsync, Router router) {
+    this(FilePath assetDir, ulong maxSize, bool usefsync, Router router, Pump pump) {
         if (!(assetDir.exists && assetDir.isFolder && assetDir.isWritable))
             throw new ConfigException(assetDir.toString ~ " must be an existing writable directory");
         this.assetDir = assetDir;
         this.maxSize = maxSize;
         this.usefsync = usefsync;
         this.router = router;
+        this.pump = pump;
 
         idMapPath = this.assetDir.dup.append("index.protobuf");
         if (idMapPath.exists) {
