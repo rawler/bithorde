@@ -212,6 +212,9 @@ public:
  ***************************************************************************************/
 class Client {
 private:
+    char[] myName;
+    ubyte[] delegate(char[]) keyResolver;
+
     RemoteAsset[] boundAssets;
     Stack!(ushort) freeAssetHandles;
     ushort nextNewHandle;
@@ -223,26 +226,53 @@ public:
     Signal!(Client) disconnected;
     Signal!(Client) sigWriteClear;
 
-    /************************************************************************************
-     * Create a BitHorde client by name and an IPv4Address, or a LocalAddress.
-     ***********************************************************************************/
-    this (char[] name, Connection connection)
-    {
+    private void init(char[] name, Connection connection) {
+        this.myName = name;
         this.connection = connection;
         this.log = Log.lookup("lib.client");
-        connection.onHandshakeDone.attach(&onConnectionHandshakeDone);
+        connection.onAuthenticated.attach(&_onConnectionAuthenticated);
+        connection.onPeerPresented.attach(&_onPeerPresented);
         connection.onDisconnected.attach(&_onDisconnected);
         connection.sigWriteClear.attach(&_onWriteClear);
         boundAssets = new RemoteAsset[16];
         nextStatPrint = Clock.now + StatInterval;
-        connection.sayHello(name);
+    }
+
+    /************************************************************************************
+     * Create a BitHorde client by name and a connection, and begin handshake.
+     ***********************************************************************************/
+    this (char[] name, Connection connection, ubyte[] sharedKey=null) {
+        init(name, connection);
+        connection.sayHello(name, sharedKey);
+    }
+
+    /************************************************************************************
+     * Create a BitHorde client by name and a connection, and wait for peer to initiate
+     * the handShake.
+     ***********************************************************************************/
+    this (char[] name, Connection connection, ubyte[] delegate(char[])keyResolver) {
+        init(name, connection);
+        this.keyResolver = keyResolver;
+    }
+
+    /************************************************************************************
+     * React on peer 1st step-handshake. Figure out sharedKey if appropriate, and
+     * send handshake, if not already done.
+     ***********************************************************************************/
+    protected void _onPeerPresented(Connection c) {
+        auto peername = c.peername;
+        this.log = Log.lookup("lib.client."~peername);
+        ubyte[] sharedKey = null;
+        if (keyResolver)
+            sharedKey = keyResolver(peername);
+        if (!c.myname)
+            c.sayHello(myName, sharedKey);
     }
 
     /************************************************************************************
      * As soon as we've got a remote name, let the logger reflect it.
      ***********************************************************************************/
-    protected void onConnectionHandshakeDone(char[] peername) {
-        this.log = Log.lookup("lib.client."~peername);
+    protected void _onConnectionAuthenticated(Connection c) {
         this.connection.messageHandler = &process;
         authenticated.call(this);
     }
@@ -469,11 +499,11 @@ public:
      * The SimpleClient is driven by the application, by yielding to run(), which will
      * run the client until it is closed.
      ***********************************************************************************/
-    this (Address addr, char[] name)
+    this (Address addr, char[] name, ubyte[] sharedKey=null)
     {
         this.pump = new Pump;
         auto c = connect(addr, name);
-        super(name, c);
+        super(name, c, sharedKey);
     }
 
     /************************************************************************************

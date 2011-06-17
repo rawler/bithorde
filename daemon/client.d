@@ -195,12 +195,20 @@ private:
     BoundAsset[] openAssets;
     Logger log;
 public:
-    this (Server server, Connection c)
-    {
+    this (Server server, Connection c, ubyte[] delegate(char[]) keyResolver) {
+        init(server, c);
+        super(server.name, c, keyResolver);
+    }
+
+    this (Server server, Connection c, ubyte[] sharedKey) {
+        init(server, c);
+        super(server.name, c, sharedKey);
+    }
+
+    private void init(Server server, Connection c) {
         this.server = server;
         this.cacheMgr = server.cacheMgr;
         this.log = Log.lookup("daemon.client");
-        super(server.name, c);
     }
 
     /************************************************************************************
@@ -247,9 +255,9 @@ private:
     }
 
 protected:
-    void onConnectionHandshakeDone(char[] peername) {
-        this.log = Log.lookup("daemon.client."~peername);
-        super.onConnectionHandshakeDone(peername);
+    void _onPeerPresented(Connection c) {
+        this.log = Log.lookup("daemon.client."~c.peername);
+        super._onPeerPresented(c);
     }
 
     void processBindRead(Connection c, ubyte[] buf)

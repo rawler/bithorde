@@ -51,7 +51,7 @@ class Server : IAssetSource
     class ConnectionWrapper(T) : BaseSocketServer!(T) {
         this(Pump p, T s) { super(p,s); }
         Connection onConnection(Socket s) {
-            return _hookupSocket(s);
+            return _hookupIncoming(s);
         }
     }
 package:
@@ -203,11 +203,28 @@ protected:
      * Hooks up given socket into this server, wrapping it to a Connection, assigning to
      * a Client, and add it to the Pump.
      ***********************************************************************************/
-    Connection _hookupSocket(Socket s) {
+    Connection _hookupIncoming(Socket s) {
         auto conn = _createConnection(s);
-        auto c = new Client(this, conn);
+        auto c = new Client(this, conn, &_resolveSharedKey);
         c.authenticated.attach(&onClientConnect);
         return conn;
+    }
+
+    Connection _hookupOutgoing(Socket s, Friend f) {
+        auto conn = _createConnection(s);
+        auto c = new Client(this, conn, f.sharedKey);
+        c.authenticated.attach(&onClientConnect);
+        return conn;
+    }
+
+    /************************************************************************************
+     * Resolves a friend name to an expected shared key.
+     ***********************************************************************************/
+    ubyte[] _resolveSharedKey(char[] peername) {
+        if (peername in config.friends)
+            return config.friends[peername].sharedKey;
+        else
+            return null;
     }
 
     /************************************************************************************
@@ -258,7 +275,7 @@ protected:
             try {
                 s.connect(f.findAddress);
                 consumed = true;
-                _hookupSocket(s);
+                _hookupOutgoing(s, f);
             } catch (SocketException e) {
             } catch (Exception e) {
                 log.error("Caught unexpected exception {} while connecting to friend '{}'", e, f.name);

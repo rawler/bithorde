@@ -23,6 +23,7 @@ private import tango.net.InternetAddress;
 private import Text = tango.text.Util;
 private import tango.text.Unicode;
 private import tango.util.Convert;
+private import base64 = tango.util.encode.Base64;
 
 private import daemon.routing.friend;
 
@@ -170,6 +171,9 @@ private:
             if (!value)
                 throw new ConfigException("Wrong format on " ~ friendName ~ ".addr. Should be <host>:<port>");
             friend.port = to!(ushort)(value);
+            break;
+        case "key":
+            friend.sharedKey = base64.decode(value);
             break;
         default:
             throw new ConfigException("Unknown friend option: " ~ friendName ~ "." ~ option);

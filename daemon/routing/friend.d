@@ -44,6 +44,9 @@ package:
     /// Set to a client instance, if friend is currently connected
     Client c;
 
+    /// SharedKey
+    public ubyte[] sharedKey;
+
     public bool isConnected() { return c !is null; }
     public void connected(Client c) { this.c = c; }
     public void disconnected() { this.c = null; }

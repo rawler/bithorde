@@ -19,6 +19,7 @@ module lib.connection;
 private import tango.core.Exception;
 private import tango.core.Signal;
 private import tango.io.model.IConduit;
+private import tango.math.random.Random;
 private import tango.net.device.Berkeley;
 private import tango.net.device.Socket;
 private import tango.text.convert.Format;
@@ -169,6 +170,12 @@ class Connection : BaseSocket
     Signal!(Connection) onDisconnected;
     Signal!(Connection) sigWriteClear;
 
+    /// Signal indicating other side has initiated handshake
+    Signal!(Connection) onPeerPresented;
+
+    /// Signal indicating handshake is done
+    Signal!(Connection) onAuthenticated;
+
     private ProcessCallback _messageHandler;
     ProcessCallback messageHandler(ProcessCallback h) { return _messageHandler = h; }
 protected:
@@ -189,6 +196,12 @@ protected:
     LingerIdQueue lingerIds;
     /// Last resort, new-id allocation
     ushort nextid;
+
+    /// Key used for auth and encryption on this connection.
+    ubyte[] _sharedKey;
+
+    /// The challenge we used for authentication
+    ubyte[] _sentChallenge;
 
     /************************************************************************************
      * Allocate a requestId for given request
@@ -250,14 +263,11 @@ protected:
 public:
     /// Public statistics-module
     Counters counters;
-    /// Signal indicating handshake is done
-    Signal!(char[]) onHandshakeDone;
 
     /************************************************************************************
      * Create named connection, and perform HandShake
      ***********************************************************************************/
-    this(Pump p, Socket s)
-    {
+    this(Pump p, Socket s) {
         if (s.socket.addressFamily is AddressFamily.INET)
             s.socket.setNoDelay(true);
         this._myname = myname;
@@ -363,7 +373,6 @@ public:
 
     final char[] peername() { return _peername; }
     final char[] myname() { return _myname; }
-// TODO: Remove    final Address remoteAddress() { return socket ? socket.socket.remoteAddress : null; }
     char[] toString() {
         return peername;
     }
@@ -373,23 +382,32 @@ public:
      * operations, such as uploading new assets.
      ***********************************************************************************/
     bool isTrusted() {
-        return true;
-/+ TODO: Implement       if (closed)
+        if (closed)
             return false;
-        return socket.socket.remoteAddress.addressFamily == AddressFamily.UNIX;+/
+        return conduit.socket.remoteAddress.addressFamily == AddressFamily.UNIX;
     }
 
     /************************************************************************************
      * Initiate handshake
      ***********************************************************************************/
-    void sayHello(char[] myname) in {
+    void sayHello(char[] myname, ubyte[] sharedKey) in {
         assert(_messageHandler is &processHandShake);
         assert(myname.length);
     } body {
         this._myname = myname;
         scope handshake = new message.HandShake;
         handshake.name = _myname;
-        handshake.protoversion = 1;
+        handshake.protoversion = 2;
+
+        _sharedKey = sharedKey;
+        if (sharedKey) {
+            _sentChallenge = new ubyte[16];
+            rand.randomizeUniform!(ubyte[], false)(_sentChallenge);
+            handshake.challenge = this._sentChallenge;
+        } else {
+            _sentChallenge = null;
+        }
+
         sendMessage(handshake);
     }
 package:
@@ -435,6 +453,21 @@ protected:
         if (!handshake.protoversionIsSet)
             throw new AssertException("Other side did not include protocol version in handshake.", __FILE__, __LINE__);
         this.log = Log.lookup("lib.client."~peername);
-        onHandshakeDone(_peername);
+
+        onPeerPresented(this);
+
+        if (handshake.challenge) {
+            if (_sharedKey) {
+                // TODO
+            } else {
+                throw new AssertException(_peername ~ " required unknown authentication.", __FILE__, __LINE__);
+            }
+         } else {
+            if (_sharedKey) {
+                throw new AssertException(_peername ~ " were expected to authenticate.", __FILE__, __LINE__);
+            } else {
+                onAuthenticated(this);
+            }
+        }
     }
 }
