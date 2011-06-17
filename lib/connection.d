@@ -432,7 +432,8 @@ protected:
         _peername = handshake.name.dup;
         if (!_peername)
             throw new AssertException("Other side did not greet with handshake", __FILE__, __LINE__);
-        assert(handshake.protoversion == 1);
+        if (!handshake.protoversionIsSet)
+            throw new AssertException("Other side did not include protocol version in handshake.", __FILE__, __LINE__);
         this.log = Log.lookup("lib.client."~peername);
         onHandshakeDone(_peername);
     }
