@@ -295,12 +295,12 @@ public:
  ***************************************************************************************/
 class FilteredConnection(TYPE) : BaseConnection!(TYPE) {
     alias size_t delegate(ubyte[], ubyte[]) Filter;
-    Filter readFilter = null, writeFilter = null;
+    private Filter _readFilter = null, _writeFilter = null;
 
     /************************************************************************************
      * Instantiate the filtered connection. Note the need to install filters using
-     * setFilters() after instantiation. This since both ends might want to exchange
-     * filter parameters in the clear first.
+     * set(Read|Write)Filter() after instantiation. This since both ends might want to
+     * exchange filter parameters in the clear first.
      ***********************************************************************************/
     this(Pump p, Socket socket, size_t bufsize) {
         super(p, socket, bufsize);
@@ -313,9 +313,12 @@ class FilteredConnection(TYPE) : BaseConnection!(TYPE) {
      *        other side may have sent filter-parameters at the same time as first
      *        filtered messages.
      ***********************************************************************************/
-    void setFilters(Filter write, Filter read) {
-        writeFilter = write;
-        readFilter = read;
+    void readFilter(Filter f) {
+        _readFilter = f;
+    }
+    /// Ditto
+    void writeFilter(Filter f) {
+        _writeFilter = f;
     }
 
     /************************************************************************************
@@ -324,8 +327,8 @@ class FilteredConnection(TYPE) : BaseConnection!(TYPE) {
      *        wasted after this function returns.
      ***********************************************************************************/
     size_t write(ubyte[] data) {
-        if (writeFilter) {
-            auto processed = writeFilter(data, data);
+        if (_writeFilter) {
+            auto processed = _writeFilter(data, data);
             assert(processed == data.length);
         }
         return super.write(data);
@@ -335,8 +338,8 @@ class FilteredConnection(TYPE) : BaseConnection!(TYPE) {
      * Override the _filterRead-hook in BaseConnection.
      ***********************************************************************************/
     protected void _filterRead(ubyte[] data) {
-        if (readFilter) {
-            auto processed = readFilter(data, data);
+        if (_readFilter) {
+            auto processed = _readFilter(data, data);
             assert(processed == data.length);
         }
     }
@@ -525,7 +528,8 @@ debug(UnitTest) {
         void delegate() whenDone;
         FilteredSocket onConnection(Socket s) {
             auto c = new ServerConnection(pump, s, this);
-            c.setFilters(writeFilter, readFilter);
+            c.readFilter = readFilter;
+            c.writeFilter = writeFilter;
             return c;
         }
         void onClosed() {
@@ -602,7 +606,8 @@ debug(UnitTest) {
 
         auto clientSocket = new LocalSocket(SOCKET);
         auto client = new ClientTest(pump, clientSocket);
-        client.setFilters(&filter, &filter);
+        client.readFilter = &filter;
+        client.writeFilter = &filter;
 
         client.write(cast(ubyte[])x"1122334455".dup);
 
