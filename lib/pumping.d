@@ -432,13 +432,16 @@ public:
 }
 
 debug(UnitTest) {
-    import tango.net.device.LocalSocket;
+    import tango.core.Thread;
+    import tango.core.sync.Mutex;
+    import tango.io.Path : FS;
     import tango.io.Stdout;
+    import tango.net.device.LocalSocket;
 
     class ServerTest : BaseSocketServer!(LocalServerSocket) {
         this(Pump p, LocalServerSocket s) { super(p,s); }
         void delegate() whenDone;
-        BaseConnection onConnection(Socket s) {
+        BaseSocket onConnection(Socket s) {
             return new ServerConnection(pump, s, this);
         }
         void onClosed() {
@@ -460,7 +463,7 @@ debug(UnitTest) {
             server.close();
         }
     }
-    class ClientTest : BaseConnection {
+    class ClientTest : BaseSocket {
         ubyte[] lastRecieved;
         this(Pump p, Socket s) { super(p, s, 4096); }
         size_t onData(ubyte[] data) {
@@ -476,13 +479,16 @@ debug(UnitTest) {
     }
 
     unittest {
+        const SOCKET = "/tmp/pumpingtest";
         auto pump = new Pump;
 
-        auto serverSocket = new LocalServerSocket("/tmp/pumpingtest");
+        FS.remove(SOCKET);
+        scope(exit) FS.remove(SOCKET);
+        auto serverSocket = new LocalServerSocket(SOCKET);
         auto server = new ServerTest(pump, serverSocket);
         server.whenDone = &pump.close;
 
-        auto clientSocket = new LocalSocket("/tmp/pumpingtest");
+        auto clientSocket = new LocalSocket(SOCKET);
         auto client = new ClientTest(pump, clientSocket);
 
         client.write(cast(ubyte[])x"1122334455");
