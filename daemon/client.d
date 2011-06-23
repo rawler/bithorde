@@ -256,8 +256,20 @@ private:
 
 protected:
     void _onPeerPresented(Connection c) {
+        auto config = server.config;
+        auto peerAddress = c.remoteAddress;
+        auto peerAccepted = c.peername in config.friends
+                            || config.allowanon
+                            || (peerAddress.addressFamily == AddressFamily.UNIX)
+                            || ((peerAddress.addressFamily == AddressFamily.INET)
+                                && ((cast(IPv4Address)peerAddress).addr == 0x7f000001)); // 127.0.0.1
+
+        if (peerAccepted)
+            super._onPeerPresented(c);
+        else
+            throw new AuthenticationFailure("Server does not allow anonymous connections.");
+
         this.log = Log.lookup("daemon.client."~c.peername);
-        super._onPeerPresented(c);
     }
 
     void processBindRead(Connection c, ubyte[] buf)

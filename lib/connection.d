@@ -188,11 +188,12 @@ class Connection : FilteredSocket
 
     private ProcessCallback _messageHandler;
     ProcessCallback messageHandler(ProcessCallback h) { return _messageHandler = h; }
+
+    ubyte protoversion = 2;
 protected:
     ByteBuffer msgbuf;
     char[] _myname, _peername;
     Logger log;
-protected:
 
     /// inFlightRequests contains actual requests, and is the allocation-heap for IFR:s
     InFlightRequest[] inFlightRequests;
@@ -209,6 +210,7 @@ protected:
 
     /// Key used for auth and encryption on this connection.
     ubyte[] _sharedKey;
+    public ubyte[] sharedKey() { return _sharedKey; }
 
     /// The challenge we used for authentication
     ubyte[] _sentChallenge;
@@ -402,12 +404,13 @@ public:
      ***********************************************************************************/
     void sayHello(char[] myname, ubyte[] sharedKey) in {
         assert(_messageHandler is &processHandShake);
-        assert(myname.length);
+        assert(myname.length, "empty/unspecified name");
+        assert(protoversion >= 2 || !sharedKey, "sharedKey is only supported for protoversion >= 2");
     } body {
         this._myname = myname;
         scope handshake = new message.HandShake;
         handshake.name = _myname;
-        handshake.protoversion = 2;
+        handshake.protoversion = protoversion;
 
         _sharedKey = sharedKey;
         if (sharedKey) {
@@ -458,6 +461,9 @@ protected:
         return new CounterCipher!(AES)(aesKey, cipheriv);
     }
 
+    /************************************************************************************
+     * Create and send handShakeConfirmation
+     ***********************************************************************************/
     void confirmChallenge(message.HandShake handshake) in {
         assert(_myname && _sharedKey);
     } body {
@@ -471,7 +477,11 @@ protected:
         sendMessage(msg);
 
         writeFilter = &newCipherFromIV(cipheriv).update;
-        _messageHandler = &processHandShakeConfirmation;
+    }
+
+    void handleAuthFail(AuthenticationFailure e) {
+        log.warn("Authentication failure: {}", e.msg);
+        close();
     }
 
     /************************************************************************************
@@ -483,25 +493,31 @@ protected:
             throw new AssertException("Unexpected message Type: " ~ to!(char[])(t), __FILE__, __LINE__);
         scope handshake = new message.HandShake;
         handshake.decode(msg);
-        _peername = handshake.name.dup;
-        if (!_peername)
-            throw new AssertException("Other side did not greet with handshake", __FILE__, __LINE__);
-        if (!handshake.protoversionIsSet)
-            throw new AssertException("Other side did not include protocol version in handshake.", __FILE__, __LINE__);
-        this.log = Log.lookup("lib.client."~peername);
 
-        onPeerPresented(this);
+            if (!handshake.name)
+                throw new AssertException("Other side did not greet with handshake", __FILE__, __LINE__);
+            _peername = handshake.name.dup;
+            this.log = Log.lookup("lib.client."~_peername);
 
-        if (handshake.challenge) {
-            if (_sharedKey)
-                confirmChallenge(handshake);
-            else
-                throw new AssertException(_peername ~ " required unknown authentication.", __FILE__, __LINE__);
-        } else {
-            if (_sharedKey)
-                throw new AssertException(_peername ~ " were expected to require authentication.", __FILE__, __LINE__);
-            else
+            if (!handshake.protoversionIsSet)
+                throw new AssertException("Other side did not include protocol version in handshake.", __FILE__, __LINE__);
+            protoversion = handshake.protoversion;
+
+        try {
+            onPeerPresented(this);
+
+            if (handshake.challenge) {
+                if (_sharedKey) {
+                    confirmChallenge(handshake);
+                    _messageHandler = &processHandShakeConfirmation;
+                } else {
+                    throw new AuthenticationFailure(_peername ~ " required unknown authentication.");
+                }
+            }
+            if (!_sharedKey) // No auth required
                 onAuthenticated(this);
+        } catch (AuthenticationFailure e) {
+            handleAuthFail(e);
         }
     }
 

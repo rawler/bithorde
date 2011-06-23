@@ -262,9 +262,14 @@ public:
     protected void _onPeerPresented(Connection c) {
         auto peername = c.peername;
         this.log = Log.lookup("lib.client."~peername);
-        ubyte[] sharedKey = null;
+
+        ubyte[] sharedKey = c.sharedKey;
         if (keyResolver)
             sharedKey = keyResolver(peername);
+
+        if (sharedKey && c.protoversion < 2)
+            throw new AuthenticationFailure("Auth required from client running old protocol.");
+
         if (!c.myname)
             c.sayHello(myName, sharedKey);
     }
@@ -403,6 +408,7 @@ protected:
         try {
             with (message) switch (type) {
             case Type.HandShake:
+            case Type.HandShakeConfirm:
                 throw new Connection.InvalidMessage("Handshake not allowed after initialization");
             case Type.BindRead: processBindRead(c, msg); break;
             case Type.BindWrite: processBindWrite(c, msg); break;

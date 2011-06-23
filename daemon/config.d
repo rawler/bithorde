@@ -65,6 +65,7 @@ class Config
     Friend[char[]] friends;
     bool doDebug = false;
     bool usefsync = false;
+    bool allowanon = true;
 
     /************************************************************************************
      * Create Config object from file
@@ -113,20 +114,8 @@ private:
      *************************************************************************/
     void parseServerOption(char[] option, char[] value) {
         switch (option) {
-        case "port":
-            this.port = to!(ushort)(value);
-            break;
-        case "name":
-            this.name = value.dup;
-            break;
-        case "unixsocket":
-            if (value.length)
-                this.unixSocket = value.dup;
-            else
-                this.unixSocket = null;
-            break;
-        case "httpport":
-            this.httpPort = to!(ushort)(value);
+        case "allowanon":
+            this.allowanon = parseBool(value);
             break;
         case "cachedir":
             this.cachedir = new FilePath(value);
@@ -134,8 +123,20 @@ private:
         case "cachesize":
             this.cacheMaxSize = to!(ulong)(value);
             break;
+        case "debug":
+            this.doDebug = parseBool(value);
+            break;
+        case "httpport":
+            this.httpPort = to!(ushort)(value);
+            break;
         case "logfile":
             this.logfile = new FilePath(value);
+            break;
+        case "name":
+            this.name = value.dup;
+            break;
+        case "port":
+            this.port = to!(ushort)(value);
             break;
         case "setuid":
             this.setuid = value.dup;
@@ -143,14 +144,17 @@ private:
         case "setgid":
             this.setgid = value.dup;
             break;
-        case "debug":
-            this.doDebug = parseBool(value);
+        case "unixsocket":
+            if (value.length)
+                this.unixSocket = value.dup;
+            else
+                this.unixSocket = null;
             break;
         case "usefsync":
             this.usefsync = parseBool(value);
             break;
         default:
-            throw new ConfigException("Unknown server option "~value~"ASA");
+            throw new ConfigException("Unknown server option "~option);
         }
     }
 
