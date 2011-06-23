@@ -294,7 +294,7 @@ public:
  *        is intact afterwards.
  ***************************************************************************************/
 class FilteredConnection(TYPE) : BaseConnection!(TYPE) {
-    alias size_t delegate(ubyte[], ubyte[]) Filter;
+    alias size_t delegate(void[], void[]) Filter;
     private Filter _readFilter = null, _writeFilter = null;
 
     /************************************************************************************
@@ -588,7 +588,9 @@ debug(UnitTest) {
     }
 
     unittest {
-        size_t filter(ubyte[] input, ubyte[] output) {
+        size_t filter(void[] input_, void[] output_) {
+            auto input = cast(ubyte[])input_;
+            auto output = cast(ubyte[])output_;
             ubyte key = 0xAA;
             foreach (i,b; input)
                 output[i] = b ^ key;

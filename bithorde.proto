@@ -43,7 +43,7 @@ message HandShake { // Must be first message in stream
  *
  *  Authentication works by each peer sending a challenge to other part, asking for
  *  proof that the other part has a copy of a secret pre-share key. The challenge is
- *  fulfilled by the other part answering the Sha256-sum of the key+challenge.
+ *  fulfilled by the other part answering the HMAC-Sha256 of the message-parts.
  *
  * The parts may also in the second stage decide to inform it's messages will be
  * encrypted. The cipher may be chosen by the sender from the Cipher-enumeration. To

@@ -23,12 +23,18 @@ private import tango.math.random.Random;
 private import tango.net.device.Berkeley;
 private import tango.net.device.Socket;
 private import tango.text.convert.Format;
+private import tango.util.cipher.AES;
+private import tango.util.cipher.Cipher;
 private import tango.time.Clock;
-private import tango.util.MinMax;
 private import tango.util.container.more.Heap;
 private import tango.util.container.more.Stack;
+private import tango.util.Convert;
+private import tango.util.digest.Sha256;
 private import tango.util.log.Log;
+private import tango.util.MinMax;
 
+private import lib.cipher.counter;
+private import lib.cipher.hmac;
 public import message = lib.message;
 private import lib.protobuf;
 private import lib.pumping;
@@ -154,11 +160,15 @@ struct Counters {
     }
 }
 
+class AuthenticationFailure : Exception {
+    this(char[] msg) { super(msg); }
+}
+
 /****************************************************************************************
  * All underlying BitHorde connections run through this class. Deals with low-level
  * serialization and request-id-mapping.
  ***************************************************************************************/
-class Connection : BaseSocket
+class Connection : FilteredSocket
 {
     alias void delegate(Connection c, message.Type t, ubyte[] msg) ProcessCallback;
     static class InvalidMessage : Exception {
@@ -438,13 +448,39 @@ package:
         ifr.req = req;
         ifr.timeout = timeouts.registerIn(timeout, &ifr.triggerTimeout);
     }
+
 protected:
+    Cipher newCipherFromIV(ubyte[] cipheriv) in {
+        assert(_sharedKey);
+    } body{
+        auto aesKey = _sharedKey.dup;
+        aesKey.length = 16;
+        return new CounterCipher!(AES)(aesKey, cipheriv);
+    }
+
+    void confirmChallenge(message.HandShake handshake) in {
+        assert(_myname && _sharedKey);
+    } body {
+        scope msg = new message.HandShakeConfirm;
+        auto cipheriv = new ubyte[16];
+        rand.randomizeUniform!(ubyte[], false)(cipheriv);
+        msg.cipheriv = cipheriv;
+        auto confirmSource = handshake.challenge ~ cipheriv;
+        msg.authentication = HMAC!(Sha256)(_sharedKey, confirmSource);
+
+        sendMessage(msg);
+
+        writeFilter = &newCipherFromIV(cipheriv).update;
+        _messageHandler = &processHandShakeConfirmation;
+    }
+
     /************************************************************************************
      * HandShakes are the only thing Connection handles by itself. After initialization,
      * they are illegal.
      ***********************************************************************************/
     void processHandShake(Connection c, message.Type t, ubyte[] msg) {
-        assert(t == message.Type.HandShake);
+        if (t != message.Type.HandShake)
+            throw new AssertException("Unexpected message Type: " ~ to!(char[])(t), __FILE__, __LINE__);
         scope handshake = new message.HandShake;
         handshake.decode(msg);
         _peername = handshake.name.dup;
@@ -457,17 +493,36 @@ protected:
         onPeerPresented(this);
 
         if (handshake.challenge) {
-            if (_sharedKey) {
-                // TODO
-            } else {
+            if (_sharedKey)
+                confirmChallenge(handshake);
+            else
                 throw new AssertException(_peername ~ " required unknown authentication.", __FILE__, __LINE__);
-            }
-         } else {
-            if (_sharedKey) {
-                throw new AssertException(_peername ~ " were expected to authenticate.", __FILE__, __LINE__);
-            } else {
+        } else {
+            if (_sharedKey)
+                throw new AssertException(_peername ~ " were expected to require authentication.", __FILE__, __LINE__);
+            else
                 onAuthenticated(this);
-            }
         }
+    }
+
+    /// Ditto
+    void processHandShakeConfirmation(Connection c, message.Type t, ubyte[] msg) in {
+        assert(_sharedKey);
+        assert(_sentChallenge);
+    } body {
+        if (t != message.Type.HandShakeConfirm)
+            throw new AuthenticationFailure(_peername ~ " did not send HandShakeConfirm, but: " ~ to!(char[])(t));
+        scope confirmation = new message.HandShakeConfirm;
+        confirmation.decode(msg);
+
+        auto confirmSource = _sentChallenge ~ confirmation.cipheriv;
+        if (confirmation.authentication != HMAC!(Sha256)(_sharedKey, confirmSource))
+            throw new AuthenticationFailure("Attempted authentication failed for " ~ _peername);
+
+        // Peer is now validated.
+        if (confirmation.cipheriv)
+            readFilter = &newCipherFromIV(confirmation.cipheriv).update;
+
+        onAuthenticated(this);
     }
 }

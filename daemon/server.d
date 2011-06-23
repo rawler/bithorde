@@ -48,7 +48,7 @@ private import message = lib.message;
 
 class Server : IAssetSource
 {
-    class ConnectionWrapper(T) : BaseSocketServer!(T) {
+    class ConnectionWrapper(T) : BaseSocketServer!(T, FilteredSocket) {
         this(Pump p, T s) { super(p,s); }
         Connection onConnection(Socket s) {
             return _hookupIncoming(s);
