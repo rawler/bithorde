@@ -19,6 +19,7 @@ module daemon.routing.friend;
 private import tango.net.InternetAddress;
 
 private import daemon.client;
+private import lib.message;
 
 /****************************************************************************************
  * A Friend, as opposed to a client, is a node that requests can be forwarded to. This
@@ -45,7 +46,16 @@ package:
     Client c;
 
     /// SharedKey
-    public ubyte[] sharedKey;
+    private ubyte[] _sharedKey;
+    public ubyte[] sharedKey() { return _sharedKey; }
+    public ubyte[] sharedKey(ubyte[] value) {
+        if (sendCipher == message.CipherType.CLEARTEXT)
+            sendCipher = message.CipherType.RC4;
+        return _sharedKey = value;
+    }
+
+    /// SharedKey
+    public message.CipherType sendCipher;
 
     public bool isConnected() { return c !is null; }
     public void connected(Client c) { this.c = c; }

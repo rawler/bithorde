@@ -213,7 +213,6 @@ public:
 class Client {
 private:
     char[] myName;
-    ubyte[] delegate(char[]) keyResolver;
 
     RemoteAsset[] boundAssets;
     Stack!(ushort) freeAssetHandles;
@@ -241,18 +240,11 @@ public:
     /************************************************************************************
      * Create a BitHorde client by name and a connection, and begin handshake.
      ***********************************************************************************/
-    this (char[] name, Connection connection, ubyte[] sharedKey=null) {
+    this (char[] name, Connection connection, bool sayHello = true) {
         init(name, connection);
-        connection.sayHello(name, sharedKey);
-    }
 
-    /************************************************************************************
-     * Create a BitHorde client by name and a connection, and wait for peer to initiate
-     * the handShake.
-     ***********************************************************************************/
-    this (char[] name, Connection connection, ubyte[] delegate(char[])keyResolver) {
-        init(name, connection);
-        this.keyResolver = keyResolver;
+        if (sayHello)
+            connection.sayHello(name, message.CipherType.CLEARTEXT, null);
     }
 
     /************************************************************************************
@@ -262,16 +254,6 @@ public:
     protected void _onPeerPresented(Connection c) {
         auto peername = c.peername;
         this.log = Log.lookup("lib.client."~peername);
-
-        ubyte[] sharedKey = c.sharedKey;
-        if (keyResolver)
-            sharedKey = keyResolver(peername);
-
-        if (sharedKey && c.protoversion < 2)
-            throw new AuthenticationFailure("Auth required from client running old protocol.");
-
-        if (!c.myname)
-            c.sayHello(myName, sharedKey);
     }
 
     /************************************************************************************
@@ -509,7 +491,7 @@ public:
     {
         this.pump = new Pump;
         auto c = connect(addr, name);
-        super(name, c, sharedKey);
+        super(name, c);
     }
 
     /************************************************************************************

@@ -26,6 +26,7 @@ private import tango.util.Convert;
 private import base64 = tango.util.encode.Base64;
 
 private import daemon.routing.friend;
+private import lib.message;
 
 /****************************************************************************************
  * Exception thrown when config failed parsing
@@ -179,6 +180,28 @@ private:
         case "key":
             friend.sharedKey = base64.decode(value);
             break;
+        case "sendCipher":
+            switch (toLower(value)) {
+                case "none":
+                case "clear":
+                case "cleartext":
+                    friend.sendCipher = CipherType.CLEARTEXT;
+                    break;
+                case "xor":
+                    friend.sendCipher = CipherType.XOR;
+                    break;
+                case "rc4":
+                case "arc4":
+                case "arcfour":
+                    friend.sendCipher = CipherType.RC4;
+                    break;
+                case "aes":
+                case "aes_ctr":
+                    friend.sendCipher = CipherType.AES_CTR;
+                    break;
+                default:
+                    throw new ConfigException("Unrecognized cipher " ~ value);
+            }
         default:
             throw new ConfigException("Unknown friend option: " ~ friendName ~ "." ~ option);
         }

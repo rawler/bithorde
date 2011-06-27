@@ -25,6 +25,7 @@ private import tango.net.device.Socket;
 private import tango.text.convert.Format;
 private import tango.util.cipher.AES;
 private import tango.util.cipher.Cipher;
+private import tango.util.cipher.RC4;
 private import tango.time.Clock;
 private import tango.util.container.more.Heap;
 private import tango.util.container.more.Stack;
@@ -211,6 +212,11 @@ protected:
     /// Key used for auth and encryption on this connection.
     ubyte[] _sharedKey;
     public ubyte[] sharedKey() { return _sharedKey; }
+
+    /// Ciphers used for sending to/recieving from connection.
+    message.CipherType _sendCipher, _recvCipher = message.CipherType.CLEARTEXT;
+    public message.CipherType sendCipher() { return _sendCipher; }
+    public message.CipherType recvCipher() { return _recvCipher; }
 
     /// The challenge we used for authentication
     ubyte[] _sentChallenge;
@@ -402,10 +408,11 @@ public:
     /************************************************************************************
      * Initiate handshake
      ***********************************************************************************/
-    void sayHello(char[] myname, ubyte[] sharedKey) in {
+    void sayHello(char[] myname, message.CipherType cipher, ubyte[] sharedKey) in {
+        // TODO: What about CLEARTEXT && sharedKey and the other way around?
         assert(_messageHandler is &processHandShake);
         assert(myname.length, "empty/unspecified name");
-        assert(protoversion >= 2 || !sharedKey, "sharedKey is only supported for protoversion >= 2");
+        assert(protoversion >= 2 || !(sharedKey || cipher), "sharedKey is only supported for protoversion >= 2");
     } body {
         this._myname = myname;
         scope handshake = new message.HandShake;
@@ -420,6 +427,8 @@ public:
         } else {
             _sentChallenge = null;
         }
+
+        _sendCipher = cipher;
 
         sendMessage(handshake);
     }
@@ -453,12 +462,27 @@ package:
     }
 
 protected:
-    Cipher newCipherFromIV(ubyte[] cipheriv) in {
+    Cipher newCipherFromIV(message.CipherType type, ubyte[] cipheriv) in {
         assert(_sharedKey);
-    } body{
-        auto aesKey = _sharedKey.dup;
-        aesKey.length = 16;
-        return new CounterCipher!(AES)(aesKey, cipheriv);
+        assert(type != message.CipherType.CLEARTEXT);
+    } body {
+        switch (type) {
+            case message.CipherType.XOR:
+                throw new AssertException("XOR not implemented yet.", __FILE__, __LINE__);
+                break;
+            case message.CipherType.RC4:
+                auto rckey = HMAC!(Sha256)(_sharedKey, cipheriv);
+                auto cipher = new RC4(true, rckey);
+                ubyte[1536] junk;
+                cipher.update(junk, junk); // Best practice for RC4 is to discard first 6 * 256-bytes of keyStream
+                return cipher;
+            case message.CipherType.AES_CTR:
+                auto aesKey = _sharedKey.dup;
+                aesKey.length = 16;
+                return new CounterCipher!(AES)(aesKey, cipheriv);
+            default:
+                throw new AuthenticationFailure("Unexpected Cipher requested in newCipherFromIV: " ~ to!(char[])(type));
+        }
     }
 
     /************************************************************************************
@@ -468,15 +492,36 @@ protected:
         assert(_myname && _sharedKey);
     } body {
         scope msg = new message.HandShakeConfirm;
-        auto cipheriv = new ubyte[16];
-        rand.randomizeUniform!(ubyte[], false)(cipheriv);
-        msg.cipheriv = cipheriv;
-        auto confirmSource = handshake.challenge ~ cipheriv;
+        auto confirmSource = handshake.challenge;
+
+        Cipher cipher = null;
+        if (_sendCipher != message.CipherType.CLEARTEXT) {
+            ubyte[] cipheriv;
+            switch (_sendCipher) {
+                case message.CipherType.XOR:
+                case message.CipherType.RC4:
+                    cipheriv = new ubyte[256/8];
+                    break;
+                case message.CipherType.AES_CTR:
+                    cipheriv = new ubyte[16];
+                    break;
+                default:
+                    throw new AuthenticationFailure("Unexpected sendCipher requested: " ~ to!(char[])(_sendCipher));
+            }
+            rand.randomizeUniform!(ubyte[], false)(cipheriv);
+
+            msg.cipher = _sendCipher;
+            msg.cipheriv = cipheriv;
+
+            confirmSource ~= cast(ubyte)_sendCipher ~ cipheriv;
+            cipher = newCipherFromIV(_sendCipher, cipheriv);
+        }
         msg.authentication = HMAC!(Sha256)(_sharedKey, confirmSource);
 
         sendMessage(msg);
 
-        writeFilter = &newCipherFromIV(cipheriv).update;
+        if (cipher)
+            writeFilter = &cipher.update;
     }
 
     void handleAuthFail(AuthenticationFailure e) {
@@ -494,14 +539,14 @@ protected:
         scope handshake = new message.HandShake;
         handshake.decode(msg);
 
-            if (!handshake.name)
-                throw new AssertException("Other side did not greet with handshake", __FILE__, __LINE__);
-            _peername = handshake.name.dup;
-            this.log = Log.lookup("lib.client."~_peername);
+        if (!handshake.name)
+            throw new AssertException("Other side did not greet with handshake", __FILE__, __LINE__);
+        _peername = handshake.name.dup;
+        this.log = Log.lookup("lib.client."~_peername);
 
-            if (!handshake.protoversionIsSet)
-                throw new AssertException("Other side did not include protocol version in handshake.", __FILE__, __LINE__);
-            protoversion = handshake.protoversion;
+        if (!handshake.protoversionIsSet)
+            throw new AssertException("Other side did not include protocol version in handshake.", __FILE__, __LINE__);
+        protoversion = handshake.protoversion;
 
         try {
             onPeerPresented(this);
@@ -531,13 +576,21 @@ protected:
         scope confirmation = new message.HandShakeConfirm;
         confirmation.decode(msg);
 
-        auto confirmSource = _sentChallenge ~ confirmation.cipheriv;
+        auto confirmSource = _sentChallenge;
+        if (confirmation.cipherIsSet)
+            confirmSource ~= cast(ubyte)confirmation.cipher;
+        if (confirmation.cipherivIsSet)
+            confirmSource ~= confirmation.cipheriv;
         if (confirmation.authentication != HMAC!(Sha256)(_sharedKey, confirmSource))
             throw new AuthenticationFailure("Attempted authentication failed for " ~ _peername);
 
+        _recvCipher = confirmation.cipher;
         // Peer is now validated.
-        if (confirmation.cipheriv)
-            readFilter = &newCipherFromIV(confirmation.cipheriv).update;
+        if (_recvCipher != message.CipherType.CLEARTEXT) {
+            if (!confirmation.cipheriv.length)
+                throw new AuthenticationFailure("Remote side specified encryption without IV");
+            readFilter = &newCipherFromIV(_recvCipher, confirmation.cipheriv).update;
+        }
 
         onAuthenticated(this);
     }
