@@ -8,6 +8,13 @@ enum HashType
   ED2K = 4;
 }
 
+enum CipherType {
+  CLEARTEXT = 0;    // Cleartext
+  XOR = 1;          // Very fast, pure-obfuscation. Keeps nosy people out, but not secure at all.
+  RC4 = 2;          // ArcFour. Quite fast, but has some security-weaknesses. See http://en.wikipedia.org/wiki/RC4 for details.
+  AES_CTR = 3;      // Highly secure, but comparatively slow/cpu-intensive.
+}
+
 enum Status {
   NONE = 0;
   SUCCESS = 1;
@@ -27,7 +34,33 @@ message Identifier {
 
 message HandShake { // Must be first message in stream
   required string name = 1;
-  required uint32 protoversion = 2 [default = 1];
+  required uint32 protoversion = 2 [default = 2];
+  optional bytes challenge = 3;   // Set if sender requires authentication of other part.
+}
+
+/****************************************************************************************
+ * A word on authentication and encryption.
+ *
+ *  Authentication works by each peer sending a challenge to other part, asking for
+ *  proof that the other part has a copy of a secret pre-share key. The challenge is
+ *  fulfilled by the other part answering the Sha256-sum of the key+challenge.
+ *
+ * The parts may also in the second stage decide to inform it's messages will be
+ * encrypted. The cipher may be chosen by the sender from the Cipher-enumeration. To
+ * enable encryption, the sender must also include a cipheriv/nonce in the
+ * HandShakeConfirmation.
+ *
+ * The HandShake is finally confirmed and authenticated by HMAC[SHA256]-hashing:
+ *   shared_key ~ recieved_challenge ~ cipher(as single byte-int) ~ cipheriv
+ *
+ * NOTE: There is currently no negotiation over supported Ciphers. Sender decides what
+ *       cipher to use. The behavior if recipient cannot support that cipher is
+ *       undefined.
+ ***************************************************************************************/
+message HandShakeConfirmed { // Must be second message in stream (or skipped if no challenge recieved)
+  optional CipherType cipher = 1;    // Cipher used by sender.
+  optional bytes cipheriv = 2;       // Set if sender is encrypting the rest of the conversation
+  required bytes authentication = 3; // SHA256 of shared key + recieved challenge + sent cipheriv
 }
 
 /****************************************************************************************
@@ -77,9 +110,18 @@ message Read {
 }
 
 message DataSegment {
-    required uint32 handle = 1;   // Asset handle for the data
-    required uint64 offset = 2;   // Content start offset
-    required bytes content = 3;   // Content to write
+  required uint32 handle = 1;   // Asset handle for the data
+  required uint64 offset = 2;   // Content start offset
+  required bytes content = 3;   // Content to write
+}
+
+/****************************************************************************************
+ * Empty dummy-message to send when testing connectivity.
+ * Peer should respond with any type of message within the specified timeout (in milli-
+ * seconds) or be considered disconnected.
+ ***************************************************************************************/
+message Ping {
+  required uint32 timeout = 1;
 }
 
 // Dummy message to document the stream message-ids itself.
@@ -93,4 +135,6 @@ message Stream
   repeated Read.Response readRes        = 6;
   repeated BindWrite bindWrite          = 7;
   repeated DataSegment dataSeg          = 8;
+  repeated HandShakeConfirmed handShakeConfirm = 9;
+  repeated Ping ping = 10;
 }

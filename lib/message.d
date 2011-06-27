@@ -37,6 +37,8 @@ enum Type : uint
     ReadResponse = 6,
     BindWrite = 7,
     DataSegment = 8,
+    HandShakeConfirm = 9,
+    Ping = 10,
 }
 
 public abstract class Message : ProtoBufMessage {
@@ -66,7 +68,7 @@ public:
     abstract Type typeId();
 }
 
-enum HashType : uint
+enum HashType : ubyte
 {
     SHA1 = 1,
     SHA256 = 2,
@@ -74,7 +76,14 @@ enum HashType : uint
     ED2K = 4,
 }
 
-enum Status : uint {
+enum CipherType : ubyte {
+    CLEARTEXT = 0,
+    XOR = 1,
+    RC4 = 2,
+    AES_CTR = 3,
+}
+
+enum Status : ubyte {
     NONE = 0,
     SUCCESS = 1,
     NOTFOUND = 2,
@@ -145,9 +154,27 @@ class Identifier : ProtoBufMessage {
 class HandShake : Message {
     mixin(PBField!(char[], "name"));
     mixin(PBField!(ubyte, "protoversion"));
+    mixin(PBField!(ubyte[], "challenge"));
     mixin ProtoBufCodec!(PBMapping("name", 1),
-                         PBMapping("protoversion", 2));
+                         PBMapping("protoversion", 2),
+                         PBMapping("challenge", 3));
     Type typeId() { return Type.HandShake; }
+}
+
+class HandShakeConfirm : Message {
+    mixin(PBField!(CipherType, "cipher"));
+    mixin(PBField!(ubyte[], "cipheriv"));
+    mixin(PBField!(ubyte[], "authentication"));
+    mixin ProtoBufCodec!(PBMapping("cipher", 1),
+                         PBMapping("cipheriv", 2),
+                         PBMapping("authentication", 3));
+    Type typeId() { return Type.HandShakeConfirm; }
+}
+
+class Ping : Message {
+    mixin(PBField!(uint, "timeout"));
+    mixin ProtoBufCodec!(PBMapping("timeout", 1));
+    Type typeId() { return Type.Ping; }
 }
 
 package class BindRequest : Message {
