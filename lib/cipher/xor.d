@@ -19,6 +19,7 @@ module lib.cipher.xor;
 
 import tango.core.Exception;
 import tango.util.cipher.Cipher;
+import tango.util.Convert;
 import tango.util.MinMax;
 
 /****************************************************************************************
@@ -37,8 +38,8 @@ private:
   size_t _used;
 public:
     this(ubyte[] key) {
-        if (key.length < _keyBuf.size)
-            throw new AssertException("Needs at least "~(_keyBuf.size*8)~" bits of key.", __FILE__, __LINE__);
+        if (key.length < _keyBuf.sizeof)
+            throw new AssertException("Needs at least "~to!(char[])(_keyBuf.sizeof*8)~" bits of key.", __FILE__, __LINE__);
         _keyBuf[] = key;
         _key64[] = cast(ulong[])_keyBuf;
     }
@@ -58,9 +59,9 @@ public:
                     out64[i] = in64[i] ^ k;
             } else {
                 auto keyBlock = _keyBuf[_used..$];
-                blkLen = min(input.length, keyBlock.length-_used);
-                foreach (i, c; input[0..blkLen])
-                    output[i] = c ^ keyBlock[i];
+                blkLen = min(input.length, keyBlock.length);
+                foreach (i, k; keyBlock[0..blkLen])
+                    output[i] = input[i] ^ k;
                 _used = (_used + blkLen) % _keyBuf.length;
             }
             input = input[blkLen..$];

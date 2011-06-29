@@ -118,7 +118,7 @@ public:
                     u64out[i] = u64in[i] ^ u64key;
             } else {
                 auto keyBlock = _keyStreamBlock[_used..$];
-                blkLen = min(input.length, (keyBlock.length-_used));
+                blkLen = min(input.length, keyBlock.length);
                 foreach (i, c; input[0..blkLen])
                     output[i] = c ^ keyBlock[i];
             }
