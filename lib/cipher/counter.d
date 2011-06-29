@@ -17,24 +17,48 @@ module lib.cipher.counter;
  * limitations under the License.
  ***************************************************************************************/
 
+import tango.stdc.posix.arpa.inet;
 import tango.util.cipher.Cipher;
 import tango.util.MinMax;
+
+import tango.io.Stdout;
+private ulong bigEndian64(ulong value) {
+    version (LittleEndian) {
+        return ((cast(ulong)htonl(value)) << 32) | htonl(value >> 32);
+    }
+    version (BigEndian) { return value; }
+}
+
+unittest {
+    version (LittleEndian) {
+        assert(bigEndian64(0x0011223344556677UL)
+                        == 0x7766554433221100UL);
+    }
+    version (BigEndian) {
+        assert(bigEndian64(0x0011223344556677UL)
+                        == 0x0011223344556677UL);
+    }
+}
 
 /****************************************************************************************
  * Implements the CTR/Counter Mode of Operation to convert a BlockCipher into a valid
  * StreamCipher.
+ * The Counter itself is constructed by 64 leading bits unchanged by the counter, and 64
+ * trailing bits incremented by the counter, and when needed wrapped.
+ * See also: http://csrc.nist.gov/publications/nistpubs/800-38a/sp800-38a.pdf
  ***************************************************************************************/
 class CounterCipher(BlockCipherIMPL) : Cipher {
 private:
     BlockCipherIMPL _cipher;
     ubyte[] _nonce;
 
-    ubyte[] _keyStreamBlock;
-    ubyte[] _tmpBuf;
-    int _used;
-    ulong _counter;
+    ubyte[] _counterBlock;
+    ulong* _counter;
 
-    ulong[] _u64nonce, _u64tmpBuf, _u64keyStreamBlock;
+    ubyte[] _keyStreamBlock;
+    ulong[] _u64keyStreamBlock;
+    int _used;
+
 public:
     /************************************************************************************
      * Create a CounterCipher from a given BlockCipher, and IV/Nonce
@@ -43,12 +67,11 @@ public:
      ***********************************************************************************/
     this(ubyte[] key, ubyte[] nonce) {
         _cipher = new BlockCipherIMPL(true, key);
-        assert(!(_cipher.blockSize % 8), "Cipher with a blocksize evenly divisible by eight is assumed2.");
+        assert(!(_cipher.blockSize % 8), "Cipher with a blocksize evenly divisible by eight is assumed.");
         if (nonce.length != _cipher.blockSize)
             invalid("Nonce needs to be the blockSize of the used cipher");
 
-        _nonce = cast(ubyte[])nonce.dup;
-        _u64nonce = cast(ulong[])_nonce;
+        _nonce = nonce.dup;
         reset();
     }
 
@@ -63,12 +86,13 @@ public:
     void reset() {
         _initialized = true;
         _cipher.reset();
+
         _keyStreamBlock = new ubyte[_nonce.length];
         _u64keyStreamBlock = cast(ulong[])_keyStreamBlock;
-        _tmpBuf = _nonce.dup;
-        _u64tmpBuf = cast(ulong[])_tmpBuf;
         _used = _keyStreamBlock.length;
-        _counter = 0;
+
+        _counterBlock = _nonce.dup;
+        _counter = cast(ulong*)_counterBlock+1;
     }
 
     /************************************************************************************
@@ -94,7 +118,7 @@ public:
                     u64out[i] = u64in[i] ^ u64key;
             } else {
                 auto keyBlock = _keyStreamBlock[_used..$];
-                blkLen = min(input.length, keyBlock.length);
+                blkLen = min(input.length, (keyBlock.length-_used));
                 foreach (i, c; input[0..blkLen])
                     output[i] = c ^ keyBlock[i];
             }
@@ -108,49 +132,34 @@ public:
     }
 
 private:
-    void writeInLittleEndian(ulong val, ubyte[] buf) {
-        version (LittleEndian) {
-            auto ptr = cast(ulong*)(buf.ptr);
-            *ptr = val;
-        } else {
-            static assert (false, "Needs implementation");
-        }
-    }
-
     void nextKeyBlock() {
-        _tmpBuf[0..$] = 0;
-        writeInLittleEndian(_counter++, _tmpBuf);
-        foreach (i, ref u64; _u64tmpBuf) {
-            u64 ^= _u64nonce[i];
-        }
-        _cipher.update(_tmpBuf, _keyStreamBlock);
+        _cipher.update(_counterBlock, _keyStreamBlock);
         _used = 0;
+        *_counter = bigEndian64(bigEndian64(*_counter)+1);
     }
 }
 
 
 debug (UnitTest) {
+    // Test-vectors from http://csrc.nist.gov/publications/nistpubs/800-38a/sp800-38a.pdf
     import tango.util.cipher.AES;
-    import tango.io.Stdout;
     unittest {
-        void testRoundtrip(char[] key, char[] nonce, char[] clearText, ubyte[] expectedCipher) {
-            auto encrypter = new CounterCipher!(AES)(cast(ubyte[])key, cast(ubyte[])nonce);
+        auto key = x"2b7e151628aed2a6abf7158809cf4f3c";
+        auto nonce = x"f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff";
 
-            auto cipherText = new ubyte[clearText.length];
-            encrypter.update(clearText, cipherText);
-            assert(expectedCipher == cipherText);
+        auto encrypter = new CounterCipher!(AES)(cast(ubyte[])key, cast(ubyte[])nonce);
+        auto decrypter = new CounterCipher!(AES)(cast(ubyte[])key, cast(ubyte[])nonce);
 
-            auto decrypter = new CounterCipher!(AES)(cast(ubyte[])key, cast(ubyte[])nonce);
-
-            auto clearText2 = new char[clearText.length];
-            decrypter.update(cipherText, clearText2);
-
-            assert(clearText == clearText2);
+        void test(char[] input, char[] cipherText) {
+            char[16] store1, store2;
+            encrypter.update(input, store1);
+            assert(store1 == cipherText);
+            decrypter.update(store1, store2);
+            assert(store2 == input);
         }
-
-        testRoundtrip("Some 16-bit Key.", "Some 16-bit Nonc", "", []);
-        testRoundtrip("Some 16-bit Key.", "Some 16-bit Nonc", "T", [81]);
-        testRoundtrip("Some 16-bit Key.", "Some 16-bit Key.", "The", [123, 63, 85]);
-        testRoundtrip("Some 16-bit Key.", "Some 16-bit Key.", "The quick brown fox jumps over the lazy dog", [123, 63, 85, 162, 134, 27, 194, 32, 202, 27, 131, 241, 233, 196, 129, 129, 100, 39, 159, 69, 144, 209, 163, 29, 140, 172, 72, 32, 169, 85, 20, 142, 84, 164, 38, 8, 135, 242, 116, 186, 86, 30, 96]);
+        test(x"6bc1bee22e409f96e93d7e117393172a", x"874d6191b620e3261bef6864990db6ce");
+        test(x"ae2d8a571e03ac9c9eb76fac45af8e51", x"9806f66b7970fdff8617187bb9fffdff");
+        test(x"30c81c46a35ce411e5fbc1191a0a52ef", x"5ae4df3edbd5d35e5b4f09020db03eab");
+        test(x"f69f2445df4f9b17ad2b417be66c3710", x"1e031dda2fbe03d1792170a0f3009cee");
     }
 }
