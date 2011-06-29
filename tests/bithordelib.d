@@ -39,6 +39,7 @@ import daemon.routing.friend;
 
 import lib.client;
 import lib.connection;
+import lib.hashes;
 import lib.message;
 import lib.pumping;
 
@@ -228,7 +229,7 @@ Identifier[] testAssetUpload(SteppingServer dst) {
         if (resp && (status == Status.SUCCESS)) {
             if (resp.idsIsSet) { // Upload Complete, got response
                 retVal = asset.ids;
-                LOG.info("SUCCESS! Digest is {}", retVal[0].id);
+                LOG.info("SUCCESS! Assetid is", formatMagnet(asset.ids, 0));
                 expectedStatus = Status.INVALID_HANDLE;
                 client.close();
             } else { // Initial "ok to upload"-response

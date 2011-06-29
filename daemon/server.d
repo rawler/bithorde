@@ -48,10 +48,10 @@ private import message = lib.message;
 
 class Server : IAssetSource
 {
-    class ConnectionWrapper(T) : BaseSocketServer!(T) {
+    class ConnectionWrapper(T) : BaseSocketServer!(T, FilteredSocket) {
         this(Pump p, T s) { super(p,s); }
         Connection onConnection(Socket s) {
-            return _hookupSocket(s);
+            return _hookupConnection(s);
         }
     }
 package:
@@ -203,7 +203,7 @@ protected:
      * Hooks up given socket into this server, wrapping it to a Connection, assigning to
      * a Client, and add it to the Pump.
      ***********************************************************************************/
-    Connection _hookupSocket(Socket s) {
+    Connection _hookupConnection(Socket s) {
         auto conn = _createConnection(s);
         auto c = new Client(this, conn);
         c.authenticated.attach(&onClientConnect);
@@ -258,7 +258,8 @@ protected:
             try {
                 s.connect(f.findAddress);
                 consumed = true;
-                _hookupSocket(s);
+                auto c = _hookupConnection(s);
+                c.sayHello(name, f.sendCipher, f.sharedKey);
             } catch (SocketException e) {
             } catch (Exception e) {
                 log.error("Caught unexpected exception {} while connecting to friend '{}'", e, f.name);

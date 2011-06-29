@@ -23,8 +23,10 @@ private import tango.net.InternetAddress;
 private import Text = tango.text.Util;
 private import tango.text.Unicode;
 private import tango.util.Convert;
+private import base64 = tango.util.encode.Base64;
 
 private import daemon.routing.friend;
+private import lib.message;
 
 /****************************************************************************************
  * Exception thrown when config failed parsing
@@ -64,6 +66,7 @@ class Config
     Friend[char[]] friends;
     bool doDebug = false;
     bool usefsync = false;
+    bool allowanon = true;
 
     /************************************************************************************
      * Create Config object from file
@@ -112,20 +115,8 @@ private:
      *************************************************************************/
     void parseServerOption(char[] option, char[] value) {
         switch (option) {
-        case "port":
-            this.port = to!(ushort)(value);
-            break;
-        case "name":
-            this.name = value.dup;
-            break;
-        case "unixsocket":
-            if (value.length)
-                this.unixSocket = value.dup;
-            else
-                this.unixSocket = null;
-            break;
-        case "httpport":
-            this.httpPort = to!(ushort)(value);
+        case "allowanon":
+            this.allowanon = parseBool(value);
             break;
         case "cachedir":
             this.cachedir = new FilePath(value);
@@ -133,8 +124,20 @@ private:
         case "cachesize":
             this.cacheMaxSize = to!(ulong)(value);
             break;
+        case "debug":
+            this.doDebug = parseBool(value);
+            break;
+        case "httpport":
+            this.httpPort = to!(ushort)(value);
+            break;
         case "logfile":
             this.logfile = new FilePath(value);
+            break;
+        case "name":
+            this.name = value.dup;
+            break;
+        case "port":
+            this.port = to!(ushort)(value);
             break;
         case "setuid":
             this.setuid = value.dup;
@@ -142,14 +145,17 @@ private:
         case "setgid":
             this.setgid = value.dup;
             break;
-        case "debug":
-            this.doDebug = parseBool(value);
+        case "unixsocket":
+            if (value.length)
+                this.unixSocket = value.dup;
+            else
+                this.unixSocket = null;
             break;
         case "usefsync":
             this.usefsync = parseBool(value);
             break;
         default:
-            throw new ConfigException("Unknown server option "~value~"ASA");
+            throw new ConfigException("Unknown server option "~option);
         }
     }
 
@@ -171,6 +177,31 @@ private:
                 throw new ConfigException("Wrong format on " ~ friendName ~ ".addr. Should be <host>:<port>");
             friend.port = to!(ushort)(value);
             break;
+        case "key":
+            friend.sharedKey = base64.decode(value);
+            break;
+        case "sendCipher":
+            switch (toLower(value)) {
+                case "none":
+                case "clear":
+                case "cleartext":
+                    friend.sendCipher = CipherType.CLEARTEXT;
+                    break;
+                case "xor":
+                    friend.sendCipher = CipherType.XOR;
+                    break;
+                case "rc4":
+                case "arc4":
+                case "arcfour":
+                    friend.sendCipher = CipherType.RC4;
+                    break;
+                case "aes":
+                case "aes_ctr":
+                    friend.sendCipher = CipherType.AES_CTR;
+                    break;
+                default:
+                    throw new ConfigException("Unrecognized cipher " ~ value);
+            }
         default:
             throw new ConfigException("Unknown friend option: " ~ friendName ~ "." ~ option);
         }

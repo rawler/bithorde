@@ -19,15 +19,24 @@ module lib.connection;
 private import tango.core.Exception;
 private import tango.core.Signal;
 private import tango.io.model.IConduit;
+private import tango.math.random.Random;
 private import tango.net.device.Berkeley;
 private import tango.net.device.Socket;
 private import tango.text.convert.Format;
+private import tango.util.cipher.AES;
+private import tango.util.cipher.Cipher;
+private import tango.util.cipher.RC4;
 private import tango.time.Clock;
-private import tango.util.MinMax;
 private import tango.util.container.more.Heap;
 private import tango.util.container.more.Stack;
+private import tango.util.Convert;
+private import tango.util.digest.Sha256;
 private import tango.util.log.Log;
+private import tango.util.MinMax;
 
+private import lib.cipher.counter;
+private import lib.cipher.hmac;
+private import lib.cipher.xor;
 public import message = lib.message;
 private import lib.protobuf;
 private import lib.pumping;
@@ -153,11 +162,15 @@ struct Counters {
     }
 }
 
+class AuthenticationFailure : Exception {
+    this(char[] msg) { super(msg); }
+}
+
 /****************************************************************************************
  * All underlying BitHorde connections run through this class. Deals with low-level
  * serialization and request-id-mapping.
  ***************************************************************************************/
-class Connection : BaseSocket
+class Connection : FilteredSocket
 {
     alias void delegate(Connection c, message.Type t, ubyte[] msg) ProcessCallback;
     static class InvalidMessage : Exception {
@@ -169,13 +182,20 @@ class Connection : BaseSocket
     Signal!(Connection) onDisconnected;
     Signal!(Connection) sigWriteClear;
 
+    /// Signal indicating other side has initiated handshake
+    Signal!(Connection) onPeerPresented;
+
+    /// Signal indicating handshake is done
+    Signal!(Connection) onAuthenticated;
+
     private ProcessCallback _messageHandler;
     ProcessCallback messageHandler(ProcessCallback h) { return _messageHandler = h; }
+
+    ubyte protoversion = 2;
 protected:
     ByteBuffer msgbuf;
     char[] _myname, _peername;
     Logger log;
-protected:
 
     /// inFlightRequests contains actual requests, and is the allocation-heap for IFR:s
     InFlightRequest[] inFlightRequests;
@@ -189,6 +209,18 @@ protected:
     LingerIdQueue lingerIds;
     /// Last resort, new-id allocation
     ushort nextid;
+
+    /// Key used for auth and encryption on this connection.
+    ubyte[] _sharedKey;
+    public ubyte[] sharedKey() { return _sharedKey; }
+
+    /// Ciphers used for sending to/recieving from connection.
+    message.CipherType _sendCipher, _recvCipher = message.CipherType.CLEARTEXT;
+    public message.CipherType sendCipher() { return _sendCipher; }
+    public message.CipherType recvCipher() { return _recvCipher; }
+
+    /// The challenge we used for authentication
+    ubyte[] _sentChallenge;
 
     /************************************************************************************
      * Allocate a requestId for given request
@@ -250,14 +282,11 @@ protected:
 public:
     /// Public statistics-module
     Counters counters;
-    /// Signal indicating handshake is done
-    Signal!(char[]) onHandshakeDone;
 
     /************************************************************************************
      * Create named connection, and perform HandShake
      ***********************************************************************************/
-    this(Pump p, Socket s)
-    {
+    this(Pump p, Socket s) {
         if (s.socket.addressFamily is AddressFamily.INET)
             s.socket.setNoDelay(true);
         this._myname = myname;
@@ -363,7 +392,6 @@ public:
 
     final char[] peername() { return _peername; }
     final char[] myname() { return _myname; }
-// TODO: Remove    final Address remoteAddress() { return socket ? socket.socket.remoteAddress : null; }
     char[] toString() {
         return peername;
     }
@@ -373,23 +401,36 @@ public:
      * operations, such as uploading new assets.
      ***********************************************************************************/
     bool isTrusted() {
-        return true;
-/+ TODO: Implement       if (closed)
+        if (closed)
             return false;
-        return socket.socket.remoteAddress.addressFamily == AddressFamily.UNIX;+/
+        return conduit.socket.remoteAddress.addressFamily == AddressFamily.UNIX;
     }
 
     /************************************************************************************
      * Initiate handshake
      ***********************************************************************************/
-    void sayHello(char[] myname) in {
+    void sayHello(char[] myname, message.CipherType cipher, ubyte[] sharedKey) in {
+        // TODO: What about CLEARTEXT && sharedKey and the other way around?
         assert(_messageHandler is &processHandShake);
-        assert(myname.length);
+        assert(myname.length, "empty/unspecified name");
+        assert(protoversion >= 2 || !(sharedKey || cipher), "sharedKey is only supported for protoversion >= 2");
     } body {
         this._myname = myname;
         scope handshake = new message.HandShake;
         handshake.name = _myname;
-        handshake.protoversion = 1;
+        handshake.protoversion = protoversion;
+
+        _sharedKey = sharedKey;
+        if (sharedKey) {
+            _sentChallenge = new ubyte[16];
+            rand.randomizeUniform!(ubyte[], false)(_sentChallenge);
+            handshake.challenge = this._sentChallenge;
+        } else {
+            _sentChallenge = null;
+        }
+
+        _sendCipher = cipher;
+
         sendMessage(handshake);
     }
 package:
@@ -420,21 +461,139 @@ package:
         ifr.req = req;
         ifr.timeout = timeouts.registerIn(timeout, &ifr.triggerTimeout);
     }
+
 protected:
+    Cipher newCipherFromIV(message.CipherType type, ubyte[] cipheriv) in {
+        assert(_sharedKey);
+        assert(type != message.CipherType.CLEARTEXT);
+    } body {
+        switch (type) {
+            case message.CipherType.XOR:
+                auto sessionKey = HMAC!(Sha256)(_sharedKey, cipheriv);
+                return new XORCipher(sessionKey);
+                break;
+            case message.CipherType.RC4:
+                auto sessionKey = HMAC!(Sha256)(_sharedKey, cipheriv);
+                auto cipher = new RC4(true, sessionKey);
+                ubyte[1536] junk;
+                cipher.update(junk, junk); // Best practice for RC4 is to discard first 6 * 256-bytes of keyStream
+                return cipher;
+            case message.CipherType.AES_CTR:
+                auto aesKey = _sharedKey.dup;
+                aesKey.length = 16;
+                return new CounterCipher!(AES)(aesKey, cipheriv);
+            default:
+                throw new AuthenticationFailure("Unexpected Cipher requested in newCipherFromIV: " ~ to!(char[])(type));
+        }
+    }
+
+    /************************************************************************************
+     * Create and send handShakeConfirmation
+     ***********************************************************************************/
+    void confirmChallenge(message.HandShake handshake) in {
+        assert(_myname && _sharedKey);
+    } body {
+        scope msg = new message.HandShakeConfirm;
+        auto confirmSource = handshake.challenge;
+
+        Cipher cipher = null;
+        if (_sendCipher != message.CipherType.CLEARTEXT) {
+            ubyte[] cipheriv;
+            switch (_sendCipher) {
+                case message.CipherType.XOR:
+                case message.CipherType.RC4:
+                    cipheriv = new ubyte[256/8];
+                    break;
+                case message.CipherType.AES_CTR:
+                    cipheriv = new ubyte[16];
+                    break;
+                default:
+                    throw new AuthenticationFailure("Unexpected sendCipher requested: " ~ to!(char[])(_sendCipher));
+            }
+            rand.randomizeUniform!(ubyte[], false)(cipheriv);
+
+            msg.cipher = _sendCipher;
+            msg.cipheriv = cipheriv;
+
+            confirmSource ~= cast(ubyte)_sendCipher ~ cipheriv;
+            cipher = newCipherFromIV(_sendCipher, cipheriv);
+        }
+        msg.authentication = HMAC!(Sha256)(_sharedKey, confirmSource);
+
+        sendMessage(msg);
+
+        if (cipher)
+            writeFilter = &cipher.update;
+    }
+
+    void handleAuthFail(AuthenticationFailure e) {
+        log.warn("Authentication failure: {}", e.msg);
+        close();
+    }
+
     /************************************************************************************
      * HandShakes are the only thing Connection handles by itself. After initialization,
      * they are illegal.
      ***********************************************************************************/
     void processHandShake(Connection c, message.Type t, ubyte[] msg) {
-        assert(t == message.Type.HandShake);
+        if (t != message.Type.HandShake)
+            throw new AssertException("Unexpected message Type: " ~ to!(char[])(t), __FILE__, __LINE__);
         scope handshake = new message.HandShake;
         handshake.decode(msg);
-        _peername = handshake.name.dup;
-        if (!_peername)
+
+        if (!handshake.name)
             throw new AssertException("Other side did not greet with handshake", __FILE__, __LINE__);
+        _peername = handshake.name.dup;
+        this.log = Log.lookup("lib.client."~_peername);
+
         if (!handshake.protoversionIsSet)
             throw new AssertException("Other side did not include protocol version in handshake.", __FILE__, __LINE__);
-        this.log = Log.lookup("lib.client."~peername);
-        onHandshakeDone(_peername);
+        protoversion = handshake.protoversion;
+
+        try {
+            onPeerPresented(this);
+
+            if (handshake.challenge) {
+                if (_sharedKey) {
+                    confirmChallenge(handshake);
+                    _messageHandler = &processHandShakeConfirmation;
+                } else {
+                    throw new AuthenticationFailure(_peername ~ " required unknown authentication.");
+                }
+            }
+            if (!_sharedKey) // No auth required
+                onAuthenticated(this);
+        } catch (AuthenticationFailure e) {
+            handleAuthFail(e);
+        }
+    }
+
+    /// Ditto
+    void processHandShakeConfirmation(Connection c, message.Type t, ubyte[] msg) in {
+        assert(_sharedKey);
+        assert(_sentChallenge);
+    } body {
+        if (t != message.Type.HandShakeConfirm)
+            throw new AuthenticationFailure(_peername ~ " did not send HandShakeConfirm, but: " ~ to!(char[])(t));
+        scope confirmation = new message.HandShakeConfirm;
+        confirmation.decode(msg);
+
+        auto confirmSource = _sentChallenge;
+        if (confirmation.cipherIsSet)
+            confirmSource ~= cast(ubyte)confirmation.cipher;
+        if (confirmation.cipherivIsSet)
+            confirmSource ~= confirmation.cipheriv;
+        if (confirmation.authentication != HMAC!(Sha256)(_sharedKey, confirmSource))
+            throw new AuthenticationFailure("Attempted authentication failed for " ~ _peername);
+
+        _recvCipher = confirmation.cipher;
+        // Peer is now validated.
+        if (_recvCipher != message.CipherType.CLEARTEXT) {
+            if (!confirmation.cipheriv.length)
+                throw new AuthenticationFailure("Remote side specified encryption without IV");
+            readFilter = &newCipherFromIV(_recvCipher, confirmation.cipheriv).update;
+        }
+
+        onAuthenticated(this);
     }
 }

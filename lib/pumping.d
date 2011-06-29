@@ -215,6 +215,23 @@ public:
         }
     }
 
+    protected void _filterRead(ubyte[]) {};
+    private void _readAndPush() {
+        int read = conduit.read(readBuf.freeSpace);
+        if (read == conduit.Eof) {
+            close();
+        } else if (read > 0) {
+            // TODO: There is currently a race-condition if filter is installed during
+            //       onData(), with encrypted data in the buffer.
+            //       Needs re-implementation of onData into multi-call signature to
+            //       handle properly.
+            _filterRead(readBuf._data[readBuf.fill..readBuf.fill+read]);
+            readBuf.fill += read;
+            auto processed = onData(readBuf.valid());
+            readBuf.pop(processed);
+        }
+    }
+
     /************************************************************************************
      * Implement IProcessor
      ***********************************************************************************/
@@ -226,19 +243,10 @@ public:
           close();
           return;
         }
-        if (cause.events & (Event.Write)) {
+        if (cause.events & (Event.Write))
             _dequeue();
-        }
-        if (cause.events & (Event.Read)) {
-            int read = conduit.read(readBuf.freeSpace);
-            if (read == conduit.Eof) {
-                close();
-            } else if (read > 0) {
-                readBuf.fill += read;
-                auto processed = onData(readBuf.valid());
-                readBuf.pop(processed);
-            }
-        }
+        if (cause.events & (Event.Read))
+            _readAndPush();
     }
 
     size_t write(ubyte[] data) in {
@@ -277,7 +285,83 @@ public:
     void processTimeouts(Time now) {}
 }
 
+/****************************************************************************************
+ * Connection-type supporting installing read and write-filters.
+ * @note: Filters must for the moment be symmetrical such that inlength = outlength.
+ *        I.E. stream-ciphers work, but compression or block ciphers don't.
+ * @note: Filters may change data in-place such that the input and output-blocks
+ *        overlap. Therefore, arguments to write() may not make the assumption that data
+ *        is intact afterwards.
+ ***************************************************************************************/
+class FilteredConnection(TYPE) : BaseConnection!(TYPE) {
+    alias size_t delegate(void[], void[]) Filter;
+    private Filter _readFilter = null, _writeFilter = null;
+
+    /************************************************************************************
+     * Instantiate the filtered connection. Note the need to install filters using
+     * set(Read|Write)Filter() after instantiation. This since both ends might want to
+     * exchange filter parameters in the clear first.
+     ***********************************************************************************/
+    this(Pump p, Socket socket, size_t bufsize) {
+        super(p, socket, bufsize);
+    }
+
+    /************************************************************************************
+     * Install filters used for the connection.
+     * @note: Implementation currently has a weakness handling data already buffered
+     *        when filters are installed. Mainly a problem in the read-buffer, where the
+     *        other side may have sent filter-parameters at the same time as first
+     *        filtered messages.
+     ***********************************************************************************/
+    void readFilter(Filter f) {
+        _readFilter = f;
+    }
+    /// Ditto
+    void writeFilter(Filter f) {
+        _writeFilter = f;
+    }
+
+    /************************************************************************************
+     * Write data, but pass it through the filter before passing it to network buffers.
+     * @note: Since data may be modified in-place, data must be mutable, and considered
+     *        wasted after this function returns.
+     ***********************************************************************************/
+    size_t write(ubyte[] data) {
+        if (_writeFilter) {
+            auto processed = _writeFilter(data, data);
+            assert(processed == data.length);
+        }
+        return super.write(data);
+    }
+
+    /************************************************************************************
+     * Override the _filterRead-hook in BaseConnection.
+     ***********************************************************************************/
+    protected void _filterRead(ubyte[] data) {
+        if (_readFilter) {
+            auto processed = _readFilter(data, data);
+            assert(processed == data.length);
+        }
+    }
+}
+
+/****************************************************************************************
+ * Base Socket-Connection declared for convenience.
+ ***************************************************************************************/
 class BaseSocket : BaseConnection!(Socket) {
+    this(Pump p, Socket socket, size_t bufsize) {
+        super(p, socket, bufsize);
+    }
+
+    Address remoteAddress() {
+        return conduit.native.remoteAddress;
+    }
+}
+
+/****************************************************************************************
+ * Base Socket-FilteredConnection declared for convenience.
+ ***************************************************************************************/
+class FilteredSocket : FilteredConnection!(Socket) {
     this(Pump p, Socket socket, size_t bufsize) {
         super(p, socket, bufsize);
     }
@@ -291,8 +375,8 @@ class BaseSocket : BaseConnection!(Socket) {
  * Implements a Server-template for Pumpable, acception connections and creating new
  * CONNECTION instances for incoming connections.
  ***************************************************************************************/
-class BaseSocketServer(T) : IProcessor {
-    abstract BaseSocket onConnection(Socket s);
+class BaseSocketServer(T,C=BaseSocket) : IProcessor {
+    abstract C onConnection(Socket s);
     void onClosed() {};
 
 private:
@@ -438,23 +522,28 @@ debug(UnitTest) {
     import tango.io.Stdout;
     import tango.net.device.LocalSocket;
 
-    class ServerTest : BaseSocketServer!(LocalServerSocket) {
+    class ServerTest : BaseSocketServer!(LocalServerSocket, FilteredSocket) {
+        FilteredSocket.Filter writeFilter, readFilter;
         this(Pump p, LocalServerSocket s) { super(p,s); }
         void delegate() whenDone;
-        BaseSocket onConnection(Socket s) {
-            return new ServerConnection(pump, s, this);
+        FilteredSocket onConnection(Socket s) {
+            auto c = new ServerConnection(pump, s, this);
+            c.readFilter = readFilter;
+            c.writeFilter = writeFilter;
+            return c;
         }
         void onClosed() {
             whenDone();
         }
     }
-    class ServerConnection : BaseSocket {
+    class ServerConnection : FilteredSocket {
         ServerTest server;
         this(Pump p, Socket s, ServerTest server) {
             super(p, s, 4096);
             this.server = server;
         }
         size_t onData(ubyte[] data) {
+            assert(data == cast(ubyte[])x"1122334455" || data == cast(ubyte[])x"66778899");
             write(data[0..3]);
             write(data[3..$]);
             return data.length;
@@ -463,12 +552,12 @@ debug(UnitTest) {
             server.close();
         }
     }
-    class ClientTest : BaseSocket {
+    class ClientTest : FilteredSocket {
         ubyte[] lastRecieved;
         this(Pump p, Socket s) { super(p, s, 4096); }
         size_t onData(ubyte[] data) {
             if (data[0..4] == cast(ubyte[])x"11223344") {
-                write(cast(ubyte[])x"66778899");
+                write(cast(ubyte[])x"66778899".dup);
                 return 4;
             } else {
                 lastRecieved = data;
@@ -491,10 +580,42 @@ debug(UnitTest) {
         auto clientSocket = new LocalSocket(SOCKET);
         auto client = new ClientTest(pump, clientSocket);
 
-        client.write(cast(ubyte[])x"1122334455");
+        client.write(cast(ubyte[])x"1122334455".dup);
 
         pump.run();
         assert(client.lastRecieved == cast(ubyte[])x"5566778899");
-        Stderr("Pumping.UnitTest: SUCCESS").newline;
+        Stderr("Pumping.UnitTest-plain: SUCCESS").newline;
     }
+
+    unittest {
+        size_t filter(void[] input_, void[] output_) {
+            auto input = cast(ubyte[])input_;
+            auto output = cast(ubyte[])output_;
+            ubyte key = 0xAA;
+            foreach (i,b; input)
+                output[i] = b ^ key;
+            return input.length;
+        }
+        const SOCKET = "/tmp/pumpingtest";
+        auto pump = new Pump;
+
+        FS.remove(SOCKET);
+        scope(exit) FS.remove(SOCKET);
+        auto serverSocket = new LocalServerSocket(SOCKET);
+        auto server = new ServerTest(pump, serverSocket);
+        server.writeFilter = server.readFilter = &filter;
+        server.whenDone = &pump.close;
+
+        auto clientSocket = new LocalSocket(SOCKET);
+        auto client = new ClientTest(pump, clientSocket);
+        client.readFilter = &filter;
+        client.writeFilter = &filter;
+
+        client.write(cast(ubyte[])x"1122334455".dup);
+
+        pump.run();
+        assert(client.lastRecieved == cast(ubyte[])x"5566778899");
+        Stderr("Pumping.UnitTest-crypto: SUCCESS").newline;
+    }
+
 }

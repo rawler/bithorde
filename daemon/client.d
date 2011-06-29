@@ -195,12 +195,12 @@ private:
     BoundAsset[] openAssets;
     Logger log;
 public:
-    this (Server server, Connection c)
-    {
+    this (Server server, Connection c) {
         this.server = server;
         this.cacheMgr = server.cacheMgr;
         this.log = Log.lookup("daemon.client");
-        super(server.name, c);
+
+        super(server.name, c, false);
     }
 
     /************************************************************************************
@@ -247,9 +247,31 @@ private:
     }
 
 protected:
-    void onConnectionHandshakeDone(char[] peername) {
-        this.log = Log.lookup("daemon.client."~peername);
-        super.onConnectionHandshakeDone(peername);
+    void _onPeerPresented(Connection c) {
+        auto config = server.config;
+        auto f = c.peername in config.friends ? config.friends[c.peername] : null;
+
+        auto peerAddress = c.remoteAddress;
+        auto peerAccepted = f !is null
+                            || config.allowanon
+                            || (peerAddress.addressFamily == AddressFamily.UNIX)
+                            || ((peerAddress.addressFamily == AddressFamily.INET)
+                                && ((cast(IPv4Address)peerAddress).addr == 0x7f000001)); // 127.0.0.1
+
+        auto cipher = f ? f.sendCipher : message.CipherType.CLEARTEXT;
+        auto sharedKey = f ? f.sharedKey : null;
+
+        if (!peerAccepted)
+            throw new AuthenticationFailure("Server does not allow anonymous connections.");
+        else if ((sharedKey || cipher) && c.protoversion < 2)
+            throw new AuthenticationFailure("Auth required from client running old protocol.");
+        else
+            super._onPeerPresented(c);
+
+        if (!c.myname)
+            c.sayHello(server.name, cipher, sharedKey);
+
+        this.log = Log.lookup("daemon.client."~c.peername);
     }
 
     void processBindRead(Connection c, ubyte[] buf)
