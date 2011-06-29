@@ -36,6 +36,7 @@ private import tango.util.MinMax;
 
 private import lib.cipher.counter;
 private import lib.cipher.hmac;
+private import lib.cipher.xor;
 public import message = lib.message;
 private import lib.protobuf;
 private import lib.pumping;
@@ -468,11 +469,12 @@ protected:
     } body {
         switch (type) {
             case message.CipherType.XOR:
-                throw new AssertException("XOR not implemented yet.", __FILE__, __LINE__);
+                auto sessionKey = HMAC!(Sha256)(_sharedKey, cipheriv);
+                return new XORCipher(sessionKey);
                 break;
             case message.CipherType.RC4:
-                auto rckey = HMAC!(Sha256)(_sharedKey, cipheriv);
-                auto cipher = new RC4(true, rckey);
+                auto sessionKey = HMAC!(Sha256)(_sharedKey, cipheriv);
+                auto cipher = new RC4(true, sessionKey);
                 ubyte[1536] junk;
                 cipher.update(junk, junk); // Best practice for RC4 is to discard first 6 * 256-bytes of keyStream
                 return cipher;
