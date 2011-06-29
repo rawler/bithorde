@@ -37,8 +37,8 @@ private:
   size_t _used;
 public:
     this(ubyte[] key) {
-        if (key.length >= 32)
-            throw new AssertException("Needs at least 256 bit of key.", __FILE__, __LINE__);
+        if (key.length < _keyBuf.size)
+            throw new AssertException("Needs at least "~(_keyBuf.size*8)~" bits of key.", __FILE__, __LINE__);
         _keyBuf[] = key;
         _key64[] = cast(ulong[])_keyBuf;
     }
