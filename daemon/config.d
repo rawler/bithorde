@@ -180,7 +180,7 @@ private:
         case "key":
             friend.sharedKey = base64.decode(value);
             break;
-        case "sendCipher":
+        case "sendcipher":
             switch (toLower(value)) {
                 case "none":
                 case "clear":
@@ -202,6 +202,7 @@ private:
                 default:
                     throw new ConfigException("Unrecognized cipher " ~ value);
             }
+            break;
         default:
             throw new ConfigException("Unknown friend option: " ~ friendName ~ "." ~ option);
         }
