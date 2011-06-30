@@ -375,7 +375,6 @@ public:
     private void _forwardedCallback(BindRead req, IServerAsset asset, message.Status sCode, message.AssetStatus s) {
         if (sCode == message.Status.SUCCESS) {
             auto metaAsset = findMetaAsset(asset.hashIds);
-            bool foundAsset = metaAsset !is null;
             if (!metaAsset && req.handleIsSet) {
                 if (_makeRoom(asset.size))
                     metaAsset = newMetaAssetWithHashIds(asset.hashIds);
@@ -384,9 +383,8 @@ public:
             }
             if (!metaAsset) {
                 req.callback(asset, sCode, s); // Just forward without caching
-            } else { // 
+            } else {
                 try {
-                    assert(cast(bool)metaAsset.assetPath.exists == foundAsset);
                     metaAsset.openCaching(asset);
                     log.trace("Responding with status {}", message.statusToString(sCode));
                     req.callback(metaAsset, sCode, s);
