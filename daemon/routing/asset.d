@@ -58,8 +58,10 @@ public:
 
     void close() {
         assert(waitingResponses == 0); // TODO: Handle terminating stale remote requests
-        foreach (asset; backingAssets)
+        foreach (asset; backingAssets) {
+            asset.detachWatcher(&onUpdatedStatus);
             asset.close();
+        }
     }
 
     /************************************************************************************
