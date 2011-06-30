@@ -241,6 +241,8 @@ public:
      * file, and then truncate it to the right size.
      ************************************************************************************/
     void assetOpen(FilePath path) {
+        if (idxPath.exists && !path.exists)
+            idxPath.remove();
         scope idxFile = new File(idxPath.toString, File.Style(File.Access.Read, File.Open.Create));
         cacheMap = new CacheMap();
         cacheMap.load(idxFile);
