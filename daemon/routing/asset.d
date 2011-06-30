@@ -62,6 +62,7 @@ public:
             asset.detachWatcher(&onUpdatedStatus);
             asset.close();
         }
+        backingAssets = null;
     }
 
     /************************************************************************************
@@ -131,6 +132,11 @@ package:
     void addBackingAsset(IAsset asset_, Status status, AssetStatus resp) {
         auto asset = cast(RemoteAsset)asset_;
         assert(asset);
+        if (!notify) { // Already reported for
+            if (status == Status.SUCCESS)
+                asset.close();
+            return;
+        }
         switch (status) {
         case Status.SUCCESS:
             assert(asset, "SUCCESS response, but no asset");
@@ -155,6 +161,7 @@ package:
         s.status = (backingAssets.length > 0) ? Status.SUCCESS : Status.NOTFOUND;
         s.availability = backingAssets.length*5;
         req.callback(this, s.status, s);
+        notify = null;
     }
 }
 
