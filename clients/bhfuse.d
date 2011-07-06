@@ -222,6 +222,10 @@ class BitHordeFilesystem : Filesystem {
             if (sCode == Status.SUCCESS) {
                 inode.openCount += 1;
                 inode.asset = cast(RemoteAsset)asset;
+                fi.direct_io = false;
+                fi.keep_cache = true;
+                fi.flush = false;
+                fi.nonseekable = false;
                 fuse_reply_open(req, fi);
             } else {
                 fuse_reply_err(req, ENOENT);

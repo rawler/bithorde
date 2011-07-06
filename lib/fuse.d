@@ -31,6 +31,14 @@ import lib.pumping;
 // Advise compiler/linker we need to be linked with libfuse
 pragma(lib, "fuse");
 
+char[] cbit(char[] name, char[] field, char[] bitnum) {
+    auto mask = "1 << " ~ bitnum;
+    char[] retval;
+    retval ~= "bool "~name~"() { return cast(bool)("~field~"& ("~mask~")); }";
+    retval ~= "bool "~name~"(bool b) { "~field~" = b ? "~field~"| ("~mask~") : "~field~" & ~("~mask~"); return true; }";
+    return retval;
+}
+
 // Needed C-declarations for libfuse.
 // See http://fuse.sourceforge.net/doxygen/fuse__lowlevel_8h.html for explanations.
 extern(C) {
@@ -71,17 +79,10 @@ extern(C) {
         ulong fh;
         ulong lock_owner;
 
-        bool direct_io() { return cast(bool)(options & (1<<0)); }
-        bool direct_io(bool b) { options |= (b<<0); return b; }
-
-        bool keep_cache() { return cast(bool)(options & (1<<1)); }
-        bool keep_cache(bool b) { options |= (b<<1); return b; }
-
-        bool flush() { return cast(bool)(options & (1<<2)); }
-        bool flush(bool b) { options |= (b<<2); return b; }
-
-        bool nonseekable() { return cast(bool)(options & (1<<3)); }
-        bool nonseekable(bool b) { options |= (b<<3); return b; }
+        mixin(cbit("direct_io", "options", "0"));
+        mixin(cbit("keep_cache", "options", "1"));
+        mixin(cbit("flush", "options", "2"));
+        mixin(cbit("nonseekable", "options", "3"));
     }
 
     struct fuse_lowlevel_ops {
