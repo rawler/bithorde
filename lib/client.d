@@ -443,8 +443,8 @@ protected:
         scope resp = new message.AssetStatus;
         resp.decode(buf);
         auto handle = resp.handle;
+        log.trace("Recieved AssetStatus {} for handle {}", message.statusToString(resp.status), handle);
         auto asset = (boundAssets.length>handle)?boundAssets[handle]:null;
-        log.trace("Recieved AssetStatus for handle {}", handle);
         if (asset)
             asset.updateStatus(resp);
     }
