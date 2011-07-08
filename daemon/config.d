@@ -22,6 +22,7 @@ private import tango.io.stream.Map;
 private import tango.net.InternetAddress;
 private import Text = tango.text.Util;
 private import tango.text.Unicode;
+private import tango.time.Time;
 private import tango.util.Convert;
 private import base64 = tango.util.encode.Base64;
 
@@ -67,6 +68,7 @@ class Config
     bool doDebug = false;
     bool usefsync = false;
     bool allowanon = true;
+    TimeSpan heartbeat = TimeSpan.fromSeconds(20);
 
     /************************************************************************************
      * Create Config object from file
@@ -126,6 +128,9 @@ private:
             break;
         case "debug":
             this.doDebug = parseBool(value);
+            break;
+        case "heartbeat":
+            this.heartbeat = TimeSpan.fromInterval(to!(float)(value));
             break;
         case "httpport":
             this.httpPort = to!(ushort)(value);

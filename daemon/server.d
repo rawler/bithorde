@@ -214,7 +214,9 @@ protected:
      * Overridable connection Factory, so tests can hook up special connections.
      ***********************************************************************************/
     Connection _createConnection(Socket s) {
-        return new Connection(pump, s);
+        auto c = new Connection(pump, s);
+        c.heartbeatInterval = config.heartbeat;
+        return c;
     }
 
     void onClientConnect(lib.client.Client _c)

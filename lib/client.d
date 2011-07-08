@@ -398,6 +398,7 @@ protected:
             case Type.ReadRequest: processReadRequest(c, msg); break;
             case Type.ReadResponse: processReadResponse(c, msg); break;
             case Type.DataSegment: processDataSegment(c, msg); break;
+            case Type.Ping: processPing(c, msg); break;
             default: throw new Connection.InvalidMessage;
             }
         } catch (Connection.InvalidMessage exc) {
@@ -457,6 +458,14 @@ protected:
             req.callback(resp.status, resp);
         } catch (Connection.InvalidResponse exc) {
             log.warn("Recieved invalid response; {}", resp);
+        }
+    }
+    synchronized void processPing(Connection c, ubyte[] buf) {
+        scope ping = new message.Ping;
+        ping.decode(buf);
+        if (ping.timeoutIsSet) {
+            ping.timeoutIsSet = false;
+            sendMessage(ping);
         }
     }
     void processBindRead(Connection c, ubyte[] buf) {

@@ -192,6 +192,9 @@ class Connection : FilteredSocket
     ProcessCallback messageHandler(ProcessCallback h) { return _messageHandler = h; }
 
     ubyte protoversion = 2;
+
+    /// Interval of silence before sending Ping.
+    TimeSpan heartbeatInterval;
 protected:
     ByteBuffer msgbuf;
     char[] _myname, _peername;
@@ -209,6 +212,9 @@ protected:
     LingerIdQueue lingerIds;
     /// Last resort, new-id allocation
     ushort nextid;
+
+    /// Id for current timeoutEvent
+    TimeoutQueue.EventId pingTimeout;
 
     /// Key used for auth and encryption on this connection.
     ubyte[] _sharedKey;
@@ -333,7 +339,38 @@ public:
         size_t processed, msgsize;
         while ((processed < data.length) && ((msgsize = processMessage(data[processed..length])) > 0))
             processed += msgsize;
+        resetPingTimeout();
         return processed;
+    }
+
+
+    /************************************************************************************
+     * Resets pingTimeout, and sets a new if heartbeatInterval is set.
+     ***********************************************************************************/
+    void resetPingTimeout() {
+        if (pingTimeout != pingTimeout.init)
+            timeouts.abort(pingTimeout);
+
+        if ((protoversion >= 2) && (heartbeatInterval != heartbeatInterval.zero))
+            pingTimeout = timeouts.registerIn(heartbeatInterval, &sendPing);
+        else
+            pingTimeout = pingTimeout.init;
+    }
+
+    /************************************************************************************
+     * Resets pingTimeout, and sets a new if heartbeatInterval is set.
+     ***********************************************************************************/
+    void sendPing(Time deadline, Time now) {
+        auto ping = new message.Ping;
+        auto timeout = (heartbeatInterval / 3);
+        ping.timeout = timeout.millis;
+        sendMessage(ping);
+        pingTimeout = timeouts.registerIn(timeout, &onNoPingResponse);
+    }
+
+    void onNoPingResponse(Time deadline, Time now) {
+        log.trace("No activity, closing");
+        close();
     }
 
     /************************************************************************************
