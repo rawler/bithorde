@@ -297,7 +297,7 @@ public:
      * Returns: The length of the block or 0, if no such block exists
      ***********************************************************************************/
     ulong zeroBlockSize() {
-        if (segments[0].start == 0)
+        if (segments.length && segments[0].start == 0)
             return segments[0].end;
         else
             return 0;

@@ -20,6 +20,7 @@ module daemon.cache.asset;
 
 private import tango.core.Exception;
 private import tango.core.Thread;
+private import tango.core.sync.Semaphore;
 private import tango.core.Signal;
 private import tango.core.WeakRef;
 private import tango.io.device.File;
@@ -149,6 +150,7 @@ public:
      * awaiting garbage collection.
      ************************************************************************************/
     void close() {
+        log.trace("Clsoing");
         super.close();
     }
 
@@ -208,6 +210,10 @@ protected:
     ulong hashedPtr;
     HashIdsListener updateHashIds;
     bool usefsync;
+
+    Thread hasherThread;
+    Semaphore hashDataAvailable;
+    bool closing = false;
 public:
     /*************************************************************************************
      * Create WriteableAsset by path and size
@@ -221,6 +227,12 @@ public:
         truncate(size);           // We resize it to right size
         _size = size;
         log = Log.lookup("daemon.cache.writeasset."~path.name[0..8]); // TODO: fix order and double-init
+
+        hasherThread = new Thread(&hasherThreadLoop);
+        hasherThread.name = "Hasher:"~path.name;
+        hashDataAvailable = new Semaphore(1);
+        hasherThread.isDaemon = true;
+        hasherThread.start();
     }
 
     /*************************************************************************************
@@ -277,15 +289,16 @@ public:
      * Add a data-segment to the asset, and update the CacheMap
      ************************************************************************************/
     void add(ulong offset, ubyte[] data) {
-        if (!cacheMap)
-            throw new IOException("Trying to write to a completed file");
         synchronized (this) {
+            if (!cacheMap)
+                throw new IOException("Trying to write to a completed file");
             auto written = pWrite(offset, data);
             if (written != data.length)
                 throw new IOException("Failed to write received segment. Disk full?");
             cacheMap.add(offset, written);
         }
-        updateHashes();
+        log.trace("Added to {}", cacheMap.zeroBlockSize);
+        hashDataAvailable.notify();
     }
 
     /*************************************************************************************
@@ -294,7 +307,7 @@ public:
      *   usefsync = control whether fsync is used, or simply flushing to filesystem is
      *              enough
      ************************************************************************************/
-    void sync() {
+    synchronized void sync() {
         scope CacheMap cmapToWrite;
         synchronized (this) {
             if (cacheMap) {
@@ -321,31 +334,52 @@ public:
             tmpPath.rename(idxPath);
         }
     }
+
+    /*************************************************************************************
+     * Override to also shutdown the hasherThread
+     ************************************************************************************/
+    void close() {
+        closing = true;
+        hashDataAvailable.notify();
+    }
 protected:
     /*************************************************************************************
-     * Check if more data is available for hashing
+     * Drive hashing of incoming data, to verify final digest.
      ************************************************************************************/
-    void updateHashes() {
-        auto zeroBlockSize = cacheMap.zeroBlockSize;
-        if (zeroBlockSize > hashedPtr) {
-            auto bufsize = zeroBlockSize - hashedPtr;
-            auto buf = tlsBuffer(bufsize);
-            auto got = pRead(hashedPtr, buf[0..bufsize]);
-            assert(got == bufsize);
-            foreach (hash; hashers) {
-                hash.update(buf[0..bufsize]);
+    void hasherThreadLoop() {
+        try {
+            while (hashedPtr < _size) {
+                hashDataAvailable.wait();
+                synchronized (this) {
+                    auto available = cacheMap.zeroBlockSize;
+                    while (available > hashedPtr) {
+                        auto bufsize = available - hashedPtr;
+                        auto buf = tlsBuffer(bufsize);
+                        auto got = pRead(hashedPtr, buf[0..bufsize]);
+                        assert(got == bufsize);
+                        foreach (hash; hashers) {
+                            hash.update(buf[0..bufsize]);
+                        }
+                        hashedPtr = available;
+                        available = cacheMap.zeroBlockSize;
+                    }
+                    if (closing)
+                        break;
+                }
             }
-            if (zeroBlockSize == _size)
+            if (hashedPtr == _size)
                 finish();
-            else
-                hashedPtr = zeroBlockSize;
+            if (closing)
+                super.close();
+        } catch (Exception e) {
+            log.error("Error in hashing thread! {}", e);
         }
     }
 
     /*************************************************************************************
      * Post-finish hooks. Finalize the digests, add to assetMap, and remove the CacheMap
      ************************************************************************************/
-    void finish() {
+    synchronized void finish() {
         assert(updateHashIds);
         assert(cacheMap);
         assert(cacheMap.segcount == 1);
@@ -470,8 +504,10 @@ private:
         }
         void callback(message.Status status, message.ReadRequest req, message.ReadResponse resp) {
             if (status == message.Status.SUCCESS && resp && resp.content.length) {
-                if (cacheMap) // May no longer be open for writing, due to stale requests
-                    add(resp.offset, resp.content);
+                synchronized (this.outer) {
+                    if (cacheMap) // May no longer be open for writing, due to stale requests
+                        add(resp.offset, resp.content);
+                }
                 tryRead();
             } else if ((status == message.Status.DISCONNECTED) && (status != lastStatus)) { // Hackish. We may have double-requested the same part of the file, so attempt to read it anyways
                 lastStatus = status;
