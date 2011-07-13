@@ -108,7 +108,7 @@ public:
 
         // Setup helper functions, routing and caching
         this.router = new Router();
-        this.cacheMgr = new CacheManager(config.cachedir, config.cacheMaxSize, config.usefsync, router);
+        this.cacheMgr = new CacheManager(config.cachedir, config.cacheMaxSize, config.usefsync, router, pump);
 
         // Setup friend connections
         foreach (f;config.friends)

@@ -22,6 +22,7 @@ public import tango.io.model.IConduit;
 public import tango.io.selector.model.ISelector;
 
 import tango.core.Exception;
+import tango.core.Thread;
 import tango.io.device.Device : IODevice = Device;
 import tango.io.selector.Selector;
 import tango.io.selector.SelectorException;
@@ -421,6 +422,8 @@ private:
     ISelector selector;
     HashSet!(IProcessor) processors;
     EventFD evfd;               /// Used for sending events breaking select
+    Thread _thread;
+    void delegate()[] callbacks, _callbacks;
     bool closed;
 public:
     /************************************************************************************
@@ -449,6 +452,13 @@ public:
                 return true;
         }
         return false;
+    }
+
+    /************************************************************************************
+     * Returns thread running the main-loop.
+     ***********************************************************************************/
+    Thread thread() {
+        return _thread;
     }
 
     /************************************************************************************
@@ -482,6 +492,7 @@ public:
      * Run until closed
      ***********************************************************************************/
     void run() {
+        _thread = Thread.getThis;
         scope(exit) cleanup;
         try while (!closed) {
             Time nextDeadline = Time.max;
@@ -496,11 +507,15 @@ public:
                     auto processor = cast(IProcessor)key.attachment;
                     if (processor)
                         processor.process(key);
+                    else if (key.conduit is evfd)
+                        evfd.clear();
                 }
             }
             auto now = Clock.now;
             foreach (p; processors)
                 p.processTimeouts(now);
+
+            flushCallbacks;
         } catch (SelectorException e) {
             // Ignore thrown SelectException during shutdown, due to Tango ticket #2025
             if (!closed)
@@ -508,10 +523,23 @@ public:
         }
     }
 
-    private void cleanup() {
+    void queueCallback(void delegate() cb) {
+        callbacks ~= cb;
+        evfd.signal();
+    }
+private:
+    void cleanup() {
         foreach (p; processors)
             p.close();
         selector.close;
+    }
+
+    void flushCallbacks() {
+        auto cbs = callbacks;
+        callbacks = _callbacks;
+        foreach (c; cbs) c();
+        cbs.length = 0;
+        _callbacks = cbs;
     }
 }
 
@@ -585,6 +613,35 @@ debug(UnitTest) {
         pump.run();
         assert(client.lastRecieved == cast(ubyte[])x"5566778899");
         Stderr("Pumping.UnitTest-plain: SUCCESS").newline;
+    }
+
+    unittest {
+        uint counter = 0;
+        auto pump = new Pump;
+        auto m = new Mutex;
+        void count() {
+            assert(Thread.getThis == pump.thread);
+            counter += 1;
+            if (counter < 5)
+                pump.queueCallback(&count);
+            else if (counter > 10)
+                pump.close();
+            else if (m)
+                m.unlock();
+        }
+        void adder() {
+            m.lock();
+            m = null;
+            while (!pump.closed)
+                pump.queueCallback(&count);
+        }
+        m.lock();
+        pump.queueCallback(&count);
+        auto thread = new Thread(&adder);
+        thread.start();
+        pump.run();
+        assert(counter > 10);
+        Stderr("Pumping.UnitTest-async: SUCCESS").newline;
     }
 
     unittest {
