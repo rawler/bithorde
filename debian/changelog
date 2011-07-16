@@ -1,3 +1,20 @@
+bithorde (0.1.99+0.2alpha1-1) natty; urgency=low
+
+  * Pre-release of 0.2
+   - 95 commits since 0.1-branch.
+  * New features:
+   - Encryption between nodes
+   - HTTP monitor port to see open connections, asset statistics etc.
+   - Ping/heartbeat to detect stale connections. Improves laptop-clients a lot.
+  * Important rewrites:
+   - Asynchronous sending, improving performance and avoiding some DOS-vectors.
+   - RefCounting resources, avoiding leaking file handles.
+   - Threaded asynchronous hashing, slightly improving write performance in cache.
+  * Lots of minor bugfixes:
+   - See git log.
+
+ -- Ulrik Mikaelsson <ulrik.mikaelsson@gmail.com>  Sat, 16 Jul 2011 23:15:13 +0200
+
 bithorde (0.1.3) maverick; urgency=low
 
   * Important bugfix
