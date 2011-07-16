@@ -150,7 +150,7 @@ class HTTPConnection : BaseSocket {
 
     void writeReply() {
         while (buf.length) {
-            auto written = this.write(buf[0..min(1024u,buf.length)]);
+            auto written = this.write(buf[0..min!(uint)(1024,buf.length)]);
             if (written)
                 buf = buf[written..$];
             else

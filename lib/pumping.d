@@ -295,7 +295,7 @@ public:
  *        is intact afterwards.
  ***************************************************************************************/
 class FilteredConnection(TYPE) : BaseConnection!(TYPE) {
-    alias size_t delegate(void[], void[]) Filter;
+    alias uint delegate(void[], void[]) Filter;
     private Filter _readFilter = null, _writeFilter = null;
 
     /************************************************************************************
