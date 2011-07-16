@@ -150,7 +150,7 @@ public:
      * awaiting garbage collection.
      ************************************************************************************/
     void close() {
-        log.trace("Clsoing");
+        log.trace("Closing");
         super.close();
     }
 
