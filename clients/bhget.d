@@ -157,7 +157,7 @@ struct RequestStats {
 
     void markBegin(ulong offset, size_t size, Time now) {
         foreach (i, ent; inFlight) {
-            if (ent == ent.init) {
+            if (ent.time == Time.init) {
                 inFlight[i] = Entry(offset, size, now);
                 return;
             }
