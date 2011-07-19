@@ -297,7 +297,6 @@ public:
                 throw new IOException("Failed to write received segment. Disk full?");
             cacheMap.add(offset, written);
         }
-        log.trace("Added to {}", cacheMap.zeroBlockSize);
         hashDataAvailable.notify();
     }
 
