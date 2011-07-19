@@ -290,14 +290,12 @@ public:
      * Add a data-segment to the asset, and update the CacheMap
      ************************************************************************************/
     void add(ulong offset, ubyte[] data) {
-        synchronized (this) {
-            if (!cacheMap)
-                throw new IOException("Trying to write to a completed file");
-            auto written = pWrite(offset, data);
-            if (written != data.length)
-                throw new IOException("Failed to write received segment. Disk full?");
-            cacheMap.add(offset, written);
-        }
+        if (!cacheMap)
+            throw new IOException("Trying to write to a completed file");
+        auto written = pWrite(offset, data);
+        if (written != data.length)
+            throw new IOException("Failed to write received segment. Disk full?");
+        synchronized (this) cacheMap.add(offset, written);
         hashDataAvailable.notify();
     }
 
@@ -351,21 +349,20 @@ protected:
         try {
             while (hashedPtr < _size) {
                 hashDataAvailable.wait();
-                synchronized (this) {
-                    auto available = cacheMap.zeroBlockSize;
-                    while (available > hashedPtr) {
-                        auto bufsize = min(available - hashedPtr, cast(ulong)buf.length);
-                        auto got = pRead(hashedPtr, buf[0..bufsize]);
-                        assert(got == bufsize);
-                        foreach (hash; hashers) {
-                            hash.update(buf[0..got]);
-                        }
-                        hashedPtr = available;
-                        available = cacheMap.zeroBlockSize;
+                ulong available;
+                synchronized (this) available = cacheMap.zeroBlockSize;
+                while (available > hashedPtr) {
+                    auto bufsize = min(available - hashedPtr, cast(ulong)buf.length);
+                    auto got = pRead(hashedPtr, buf[0..bufsize]);
+                    assert(got == bufsize);
+                    foreach (hash; hashers) {
+                        hash.update(buf[0..got]);
                     }
-                    if (closing)
-                        break;
+                    hashedPtr = available;
+                    synchronized (this) available = cacheMap.zeroBlockSize;
                 }
+                if (closing)
+                    break;
             }
             if (hashedPtr == _size)
                 finish();
