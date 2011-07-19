@@ -26,9 +26,10 @@ private import tango.core.WeakRef;
 private import tango.io.device.File;
 private import tango.io.FilePath;
 private import ascii = tango.text.Ascii;
-private import tango.util.log.Log;
 private import tango.time.Clock;
 private import tango.time.Time;
+private import tango.util.log.Log;
+private import tango.util.MinMax;
 
 private import lib.client;
 private import lib.hashes;
@@ -346,18 +347,18 @@ protected:
      * Drive hashing of incoming data, to verify final digest.
      ************************************************************************************/
     void hasherThreadLoop() {
+        ubyte[64*1024] buf;
         try {
             while (hashedPtr < _size) {
                 hashDataAvailable.wait();
                 synchronized (this) {
                     auto available = cacheMap.zeroBlockSize;
                     while (available > hashedPtr) {
-                        auto bufsize = available - hashedPtr;
-                        auto buf = tlsBuffer(bufsize);
+                        auto bufsize = min(available - hashedPtr, cast(ulong)buf.length);
                         auto got = pRead(hashedPtr, buf[0..bufsize]);
                         assert(got == bufsize);
                         foreach (hash; hashers) {
-                            hash.update(buf[0..bufsize]);
+                            hash.update(buf[0..got]);
                         }
                         hashedPtr = available;
                         available = cacheMap.zeroBlockSize;
