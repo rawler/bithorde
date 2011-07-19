@@ -64,6 +64,9 @@ class CacheManager : IAssetSource {
         mixin RefCountTarget;
 
         private BaseAsset _openAsset;
+        this() {
+            attachWatcher(&onStatusUpdate);
+        }
 
         void onStatusUpdate(IAsset asset, message.Status sCode, message.AssetStatus s) {
             if (sCode != sCode.SUCCESS)
@@ -71,14 +74,9 @@ class CacheManager : IAssetSource {
         }
 
         private BaseAsset setAsset(BaseAsset newAsset) {
-            if (_openAsset) {
-                detachWatcher(&onStatusUpdate);
-                _openAsset.close();
-            }
-            _openAsset = newAsset;
             if (_openAsset)
-                attachWatcher(&onStatusUpdate);
-            return _openAsset;
+                _openAsset.close();
+            return _openAsset = newAsset;
         }
 
         void onBackingUpdate(IAsset backing, message.Status sCode, message.AssetStatus s) {
@@ -117,9 +115,7 @@ class CacheManager : IAssetSource {
         }
 
         void close() {
-            scope(exit) _openAsset = null;
-            if (_openAsset)
-                _openAsset.close();
+            setAsset(null);
         }
 
         void sync() {
