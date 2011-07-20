@@ -274,6 +274,8 @@ public:
         pump.unregisterProcessor(this);
         conduit.close();
         conduit = null;
+        writeBuf.realloc(0);
+        readBuf.realloc(0);
         onClosed();
     }
 
