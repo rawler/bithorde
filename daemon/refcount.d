@@ -17,7 +17,7 @@
  * limitations under the License.
  ***************************************************************************************/
 
-module daemon.refcounted;
+module daemon.refcount;
 
 import tango.core.WeakRef;
 
