@@ -1,3 +1,10 @@
+bithorde (0.1.99+0.2alpha1.1) natty; urgency=low
+
+  * Fix an unbounded memory-allocation, which could crash on bhupload under certain circumstances.
+  * Slightly improve hashing by relaxed synchronization.
+
+ -- Ulrik Mikaelsson <ulrik.mikaelsson@gmail.com>  Sun, 24 Jul 2011 22:17:27 +0200
+
 bithorde (0.1.99+0.2alpha1-1) natty; urgency=low
 
   * Pre-release of 0.2
