@@ -43,6 +43,8 @@ echo "Uploading to A..."
 MAGNETURL=$("$BHUPLOAD" -u/tmp/bithorde-rta "$TESTFILE"|grep '^magnet:')
 verify_equal cachea/?????????????????????* "$TESTFILE" || exit_error "Uploaded file did not match upload source"
 verify_done cacheb/?????????????????????* || exit_error "Uploaded file still has an index, indicating not done"
+VERIFICATION=$("$BHUPLOAD" -u/tmp/bithorde-rta "$TESTFILE"|grep '^magnet:')
+[ "$MAGNETURL" == "$VERIFICATION" ] || exit_error "Re-upload with different magnet-link".
 
 echo "Getting (2 in parallel) from B..."
 "$BHGET" -u/tmp/bithorde-rtb -sy "$MAGNETURL" | verify_equal $TESTFILE || exit_error "Downloaded file did not match upload source" &

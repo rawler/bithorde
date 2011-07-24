@@ -355,10 +355,9 @@ protected:
                     auto bufsize = min(available - hashedPtr, cast(ulong)buf.length);
                     auto got = pRead(hashedPtr, buf[0..bufsize]);
                     assert(got == bufsize);
-                    foreach (hash; hashers) {
+                    foreach (hash; hashers)
                         hash.update(buf[0..got]);
-                    }
-                    hashedPtr = available;
+                    hashedPtr += got;
                     synchronized (this) available = cacheMap.zeroBlockSize;
                 }
                 if (closing)
