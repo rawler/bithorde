@@ -149,6 +149,10 @@ class Identifier : ProtoBufMessage {
     Identifier dup() {
         return new Identifier(type, id.dup);
     }
+
+    bool opEquals(Identifier other) {
+        return (this.type == other.type) && (this.id == other.id);
+    }
 }
 
 class HandShake : Message {

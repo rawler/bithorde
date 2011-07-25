@@ -38,6 +38,7 @@ private:
     daemon.client.BindRead req;
     RemoteAsset[] backingAssets;
     RequestCompleted notify;
+    Identifier[] _hashIds;
     uint reqnum;
     Logger log;
 package:
@@ -69,8 +70,7 @@ public:
      * Implement IServerAsset.hashIds
      ***********************************************************************************/
     Identifier[] hashIds() {
-        // TODO: AssetStatus should also include hashIds, which should be preffered
-        return req.ids;
+        return _hashIds;
     }
 
     /************************************************************************************
@@ -143,6 +143,17 @@ package:
             assert(asset.size > 0, "Empty asset");
             asset.attachWatcher(&onUpdatedStatus);
             backingAssets ~= asset;
+            foreach (newId; resp.ids) {
+                bool found = false;
+                foreach (oldId; _hashIds) {
+                    if (oldId == newId) {
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found)
+                _hashIds ~= newId;
+            }
             break;
         default:
             break;
@@ -160,6 +171,7 @@ package:
         scope s = new message.AssetStatus;
         s.status = (backingAssets.length > 0) ? Status.SUCCESS : Status.NOTFOUND;
         s.availability = backingAssets.length*5;
+        s.ids = hashIds;
         req.callback(this, s.status, s);
         notify = null;
     }
