@@ -159,6 +159,10 @@ class CacheManager : IAssetSource {
             return assetPath.cat(".idx");
         }
 
+        bool isComplete() {
+            return assetPath.exists && !idxPath.exists;
+        }
+
         void updateHashIds(message.Identifier[] ids) {
             this.hashIds = ids;
             pump.queueCallback(&notifyHashUpdate);
@@ -376,6 +380,15 @@ public:
      * Recieves responses for forwarded requests, and decides on caching.
      ***********************************************************************************/
     private void _forwardedCallback(BindRead req, IServerAsset asset, message.Status sCode, message.AssetStatus s) {
+        bool idsOverlap(message.Identifier[] a, message.Identifier[] b) {
+            foreach (a_; a) {
+                foreach (b_; b) {
+                    if (a_ == b_)
+                        return true;
+                }
+            }
+            return false;
+        }
         if (sCode == message.Status.SUCCESS) {
             auto metaAsset = findMetaAsset(asset.hashIds);
             if (!metaAsset && req.handleIsSet) {
@@ -384,10 +397,20 @@ public:
                 else
                     return req.callback(null, message.Status.NORESOURCES, null);
             }
+
+            if (!idsOverlap(req.ids, s.ids)) {
+                log.error("No overlapping ids between request ({}) and response ({})", formatMagnet(req.ids, 0), formatMagnet(s.ids, 0));
+                req.callback(null, message.Status.ERROR, null);
+                return;
+            }
+
             if (!metaAsset) {
                 req.callback(asset, sCode, s); // Just forward without caching
             } else {
-                try {
+                if (metaAsset.isComplete) {
+                    log.error("Trying to re-establish cache of completed file.");
+                    req.callback(null, message.Status.ERROR, null);
+                } else try {
                     metaAsset.openCaching(asset);
                     log.trace("Responding with status {}", message.statusToString(sCode));
                     req.callback(metaAsset, sCode, s);
