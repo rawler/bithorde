@@ -229,7 +229,7 @@ public:
         log = Log.lookup("daemon.cache.writeasset."~path.name[0..8]); // TODO: fix order and double-init
 
         hasherThread = new Thread(&hasherThreadLoop);
-        hasherThread.name = "Hasher:"~path.name;
+        hasherThread.name = "Hasher:"~path.name[0..min(6u,path.name.length)];
         hashDataAvailable = new Semaphore(1);
         hasherThread.isDaemon = true;
         hasherThread.start();
@@ -376,7 +376,7 @@ protected:
     /*************************************************************************************
      * Post-finish hooks. Finalize the digests, add to assetMap, and remove the CacheMap
      ************************************************************************************/
-    synchronized void finish() {
+    void finish() {
         assert(updateHashIds);
         assert(cacheMap);
         assert(cacheMap.segcount == 1);
