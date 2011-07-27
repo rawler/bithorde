@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  ***************************************************************************************/
-module tests.libbithorde;
+module tests.bithordelib;
 
 private import tango.core.Thread;
 private import tango.core.sync.Mutex;
