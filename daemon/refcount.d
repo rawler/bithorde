@@ -19,35 +19,30 @@
 
 module daemon.refcount;
 
-import tango.core.WeakRef;
-
 interface IRefCounted {
     void takeRef(Object);
     void dropRef(Object);
 }
 
 struct References {
-    private WeakRef[] refs;
+    private Object[] refs;
     bool add(Object o) {
-        foreach (r; refs) if (r() == o)
+        foreach (r; refs) if (r == o)
             return false;
-        refs ~= new WeakRef(o);
+        refs ~= o;
         return true;
     }
 
     bool remove(Object o) {
-        bool res = false;
         foreach (i,r; refs) {
-            auto holder = r();
-            if (holder is null)
-                refs = refs[0..i] ~ refs[i+1..$];
-
-            if (holder is o) {
-                refs = refs[0..i] ~ refs[i+1..$];
-                res = true;
+            if (r is o) {
+                foreach (a, ref b; refs[i..$-1])
+                    b = refs[i+1];
+                refs.length = refs.length - 1;
+                return true;
             }
         }
-        return res;
+        return false;
     }
 
     size_t length() {
