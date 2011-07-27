@@ -1,3 +1,9 @@
+bithorde (0.1.99+0.2alpha1.2-2) natty; urgency=low
+
+  * Reupload with 64-bit buildfix.
+
+ -- Ulrik Mikaelsson <ulrik.mikaelsson@gmail.com>  Wed, 27 Jul 2011 23:24:48 +0200
+
 bithorde (0.1.99+0.2alpha1.2-1) natty; urgency=low
 
   * Bugfixes:
