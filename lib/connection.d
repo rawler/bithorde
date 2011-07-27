@@ -397,7 +397,10 @@ public:
 
                 _messageHandler(this, type, decodeBuf[0..msglen]);
             } catch (Exception e) {
-                log.error("Exception ({}:{}) in handling incoming Message: {}", e.file, e.line, e.msg);
+                char[] msg;
+                void _write(char[] buf) {msg ~= buf; }
+                e.writeOut(&_write);
+                log.error("Exception ({}:{}) in handling incoming Message: {}", e.file, e.line, msg);
             }
             return totallength;
         } else {
