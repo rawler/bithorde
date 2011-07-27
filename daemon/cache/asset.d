@@ -38,6 +38,7 @@ private import lib.message;
 private import daemon.cache.metadata;
 private import daemon.cache.map;
 private import daemon.client;
+private import daemon.lib.stateless;
 
 version (Posix) {
     private import tango.stdc.posix.unistd;
@@ -71,45 +72,6 @@ interface IAssetData {
     void aSyncRead(ulong offset, uint length, BHReadCallback);
     ulong size();
     void close();
-}
-
-/*****************************************************************************************
- * Class for file with stateless read/write. I/E no need for the user to care about
- * read/write position.
- ****************************************************************************************/
-class StatelessFile : File {
-    /*************************************************************************************
-     * Reads as many bytes as possible into dst, and returns the amount.
-     ************************************************************************************/
-    ssize_t pRead(ulong pos, void[] dst) {
-        version (Posix) { // Posix has pread() for atomic seek+read
-            ssize_t got = pread(fileHandle, dst.ptr, dst.length, pos);
-            if (got is -1)
-                error;
-            else
-               if (got is 0 && dst.length > 0)
-                   return Eof;
-            return got;
-        } else synchronized (this) {
-            seek(pos);
-            return read(buf);
-        }
-    }
-
-    /*************************************************************************************
-     * Reads as many bytes as possible into buf, and returns the amount.
-     ************************************************************************************/
-    ssize_t pWrite(ulong pos, void[] src) {
-        version (Posix) { // Posix has pwrite() for atomic write+seek
-            ssize_t written = pwrite(fileHandle, src.ptr, src.length, pos);
-            if (written is -1)
-                error;
-            return written;
-        } else synchronized (this) {
-            seek(pos);
-            return write(data);
-        }
-    }
 }
 
 /*****************************************************************************************
