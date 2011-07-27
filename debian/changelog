@@ -1,3 +1,14 @@
+bithorde (0.1.99+0.2alpha1.2-1) natty; urgency=low
+
+  * Bugfixes:
+    - Prevent accidental asset overwrites or restarts.
+    - Fix two disconnection-related bugs.
+    - Don't try to handle SIGSEGV. It doesn't work.
+    - Don't reset .idx-file before loading it.
+  * Preconfigure for bhdemo
+
+ -- Ulrik Mikaelsson <ulrik.mikaelsson@gmail.com>  Wed, 27 Jul 2011 22:08:31 +0200
+
 bithorde (0.1.99+0.2alpha1.1) natty; urgency=low
 
   * Fix an unbounded memory-allocation, which could crash on bhupload under certain circumstances.
