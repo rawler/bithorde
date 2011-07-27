@@ -25,8 +25,6 @@ private import tango.core.Signal;
 private import tango.io.device.File;
 private import tango.io.FilePath;
 private import ascii = tango.text.Ascii;
-private import tango.time.Clock;
-private import tango.time.Time;
 private import tango.util.log.Log;
 private import tango.util.MinMax;
 
@@ -35,7 +33,6 @@ private import lib.hashes;
 private import lib.digest.stateful;
 private import lib.message;
 
-private import daemon.cache.metadata;
 private import daemon.cache.map;
 private import daemon.client;
 private import daemon.lib.stateless;
@@ -82,17 +79,15 @@ protected:
     FilePath path;
     FilePath idxPath;
     Logger log;
-    AssetMetaData _metadata;
     ulong _size;
 public:
     /*************************************************************************************
      * IncompleteAssetException is thrown if a not-fully-cached asset were to be Opened
      * directly as a BaseAsset
      ************************************************************************************/
-    this(FilePath path, AssetMetaData metadata) {
+    this(FilePath path) {
         this.path = path;
         this.idxPath = path.dup.suffix(".idx");
-        this._metadata = metadata;
         log = Log.lookup("daemon.cache.baseasset."~path.name[0..8]);
 
         super();
@@ -117,17 +112,6 @@ public:
     }
 
     /*************************************************************************************
-     * Implements IServerAsset.hashIds()
-     * TODO: IServerAsset perhaps should be migrated to MetaData?
-     ************************************************************************************/
-    Identifier[] hashIds() {
-        if (_metadata)
-            return _metadata.hashIds;
-        else
-            return null;
-    }
-
-    /*************************************************************************************
      * Read a single segment from the Asset
      ************************************************************************************/
     synchronized void aSyncRead(ulong offset, uint length, BHReadCallback cb) {
@@ -138,7 +122,6 @@ public:
         if (got == 0 || got == Eof) {
             resp.status = message.Status.NOTFOUND;
         } else {
-            _metadata.noteInterest(Clock.now, (cast(double)got)/cast(double)size);
             resp.status = message.Status.SUCCESS;
             resp.offset = offset;
             resp.content = buf[0..got];
@@ -180,12 +163,11 @@ public:
     /*************************************************************************************
      * Create WriteableAsset by path and size
      ************************************************************************************/
-    this(FilePath path, AssetMetaData metadata, ulong size,
-         HashIdsListener updateHashIds, bool usefsync) {
+    this(FilePath path, ulong size, HashIdsListener updateHashIds, bool usefsync) {
         resetHashes();
         this.updateHashIds = updateHashIds;
         this.usefsync = usefsync;
-        super(path, metadata); // Parent calls open()
+        super(path); // Parent calls open()
         truncate(size);           // We resize it to right size
         _size = size;
         log = Log.lookup("daemon.cache.writeasset."~path.name[0..8]); // TODO: fix order and double-init
@@ -369,18 +351,9 @@ protected:
  * Assets in the "upload"-phase.
  ****************************************************************************************/
 class UploadAsset : WriteableAsset {
-    this(FilePath path, AssetMetaData metadata, ulong size,
+    this(FilePath path, ulong size,
          HashIdsListener updateHashIds, bool usefsync) {
-        super(path, metadata, size, updateHashIds, usefsync);
-    }
-
-    /*************************************************************************************
-     * UploadAssets will have zero-rating until they are complete. When complete, set
-     * to max.
-     ************************************************************************************/
-    void finish() {
-        _metadata.setMaxRating(Clock.now);
-        super.finish();
+        super(path, size, updateHashIds, usefsync);
     }
 }
 
@@ -391,19 +364,12 @@ class UploadAsset : WriteableAsset {
 class CachingAsset : WriteableAsset {
     IServerAsset remoteAsset;
 public:
-    this (FilePath path, AssetMetaData metadata, IServerAsset remoteAsset,
+    this (FilePath path, IServerAsset remoteAsset,
           HashIdsListener updateHashIds, bool usefsync) {
         this.remoteAsset = remoteAsset;
-        remoteAsset.takeRef(this);
-        remoteAsset.attachWatcher(&metadata.onBackingUpdate);
-        super(path, metadata, remoteAsset.size, updateHashIds, usefsync); // TODO: Verify remoteAsset.size against local file
+        super(path, remoteAsset.size, updateHashIds, usefsync); // TODO: Verify remoteAsset.size against local file
         log = Log.lookup("daemon.cache.cachingasset." ~ path.name[0..8]);
         log.trace("Caching remoteAsset of size {}MB, {}MB stored.", size/(1024*1024), cacheMap.assetSize/(1024*1024));
-    }
-
-    void close() {
-        closeUpstream();
-        super.close();
     }
 
     synchronized void aSyncRead(ulong offset, uint length, BHReadCallback cb) {
@@ -420,17 +386,8 @@ protected:
     void finish() body {
         // TODO: Validate hashId:s
         super.finish();
-        closeUpstream();
     }
 private:
-    void closeUpstream() {
-        if (remoteAsset) {
-            remoteAsset.detachWatcher(&_metadata.onBackingUpdate);
-            remoteAsset.dropRef(this);
-            remoteAsset = null;
-        }
-    }
-
     void realRead(ulong offset, uint length, BHReadCallback cb) {
         super.aSyncRead(offset, length, cb);
     }

@@ -64,10 +64,12 @@ class CacheManager : IAssetSource {
         mixin RefCountTarget;
 
         private BaseAsset _openAsset;
+        private IServerAsset _remoteAsset;
 
         private BaseAsset setAsset(BaseAsset newAsset) {
             if (_openAsset)
                 _openAsset.close();
+            closeRemote();
             return _openAsset = newAsset;
         }
 
@@ -86,26 +88,38 @@ class CacheManager : IAssetSource {
             } else if (idxPath.exists) {
                 return null;
             } else {
-                setAsset(new BaseAsset(assetPath, this));
+                setAsset(new BaseAsset(assetPath));
                 return this;
             }
         }
 
         MetaData openUpload(ulong size) {
-            setAsset(new UploadAsset(assetPath, this, size, &updateHashIds, usefsync));
+            setAsset(new UploadAsset(assetPath, size, &updateHashIds, usefsync));
             return this;
         }
 
         MetaData openCaching(IServerAsset sourceAsset) {
-            setAsset(new CachingAsset(assetPath, this, sourceAsset, &updateHashIds, usefsync));
+            setAsset(new CachingAsset(assetPath, sourceAsset, &updateHashIds, usefsync));
+            _remoteAsset = sourceAsset;
+            _remoteAsset.takeRef(this);
+            _remoteAsset.attachWatcher(&onBackingUpdate);
             return this;
         }
 
         bool isOpen() {
             return _openAsset !is null;
         }
+
         bool isWritable() {
             return (cast(WriteableAsset)_openAsset) !is null;
+        }
+
+        void closeRemote() {
+            if (_remoteAsset) {
+                _remoteAsset.detachWatcher(&onBackingUpdate);
+                _remoteAsset.dropRef(this);
+                _remoteAsset = null;
+            }
         }
 
         void close() {
@@ -126,6 +140,7 @@ class CacheManager : IAssetSource {
         }
 
         void aSyncRead(ulong offset, uint length, BHReadCallback cb) {
+            noteInterest(Clock.now, (cast(double)length)/cast(double)size);
             if (_openAsset)
                 return _openAsset.aSyncRead(offset, length, cb);
             else
@@ -161,8 +176,12 @@ class CacheManager : IAssetSource {
             this.hashIds = ids;
             pump.queueCallback(&notifyHashUpdate);
         }
+
         private void notifyHashUpdate() {
             addToIdMap(this);
+            if ((cast(UploadAsset)_openAsset) !is null)
+                setMaxRating(Clock.now);
+            closeRemote();
 
             _statusSignal.call(this, message.Status.SUCCESS, null);
         }
