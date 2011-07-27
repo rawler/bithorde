@@ -22,7 +22,6 @@ private import tango.core.Exception;
 private import tango.core.Thread;
 private import tango.core.sync.Semaphore;
 private import tango.core.Signal;
-private import tango.core.WeakRef;
 private import tango.io.device.File;
 private import tango.io.FilePath;
 private import ascii = tango.text.Ascii;
@@ -305,7 +304,7 @@ public:
      *   usefsync = control whether fsync is used, or simply flushing to filesystem is
      *              enough
      ************************************************************************************/
-    synchronized void sync() {
+    void sync() {
         scope CacheMap cmapToWrite;
         synchronized (this) {
             if (cacheMap) {
@@ -321,7 +320,7 @@ public:
         if (usefsync)
             fdatasync(fileHandle);
 
-        if (cmapToWrite) {
+        if (cmapToWrite) synchronized {
             auto tmpPath = idxPath.dup.cat(".new");
             scope idxFile = new File(tmpPath.toString, File.WriteCreate);
             cmapToWrite.write(idxFile);
@@ -365,8 +364,10 @@ protected:
             }
             if (hashedPtr == _size)
                 finish();
-            if (closing)
+            if (closing) {
+                sync();
                 super.close();
+            }
         } catch (Exception e) {
             log.error("Error in hashing thread! {}", e);
         }
@@ -435,7 +436,7 @@ public:
         remoteAsset.attachWatcher(&metadata.onBackingUpdate);
         super(path, metadata, remoteAsset.size, updateHashIds, usefsync); // TODO: Verify remoteAsset.size against local file
         log = Log.lookup("daemon.cache.cachingasset." ~ path.name[0..8]);
-        log.trace("Caching remoteAsset of size {}", size);
+        log.trace("Caching remoteAsset of size {}MB, {}MB available", size/(1024*1024), cacheMap.assetSize/(1024*1024));
     }
 
     void close() {
