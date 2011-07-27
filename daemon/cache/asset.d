@@ -256,7 +256,7 @@ public:
     void assetOpen(FilePath path) {
         if (idxPath.exists && !path.exists)
             idxPath.remove();
-        scope idxFile = new File(idxPath.toString, File.Style(File.Access.Read, File.Open.Create));
+        scope idxFile = new File(idxPath.toString, File.Style(File.Access.Read, File.Open.Sedate));
         cacheMap = new CacheMap();
         cacheMap.load(idxFile);
         hashedPtr = cacheMap.header.hashedAmount;
