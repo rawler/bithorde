@@ -483,8 +483,10 @@ private:
         message.Status lastStatus;
         uint tries;
 
-        void tryRead() {
-            if (!cacheMap || cacheMap.has(offset, length)) {
+        void tryRead() { 
+            if (closing) {
+                fail();
+            } else if (!cacheMap || cacheMap.has(offset, length)) {
                 realRead(offset, length, cb);
                 delete this;
             } else if (tries++ < 4) {
@@ -501,7 +503,7 @@ private:
         void callback(message.Status status, message.ReadRequest req, message.ReadResponse resp) {
             if (status == message.Status.SUCCESS && resp && resp.content.length) {
                 synchronized (this.outer) {
-                    if (cacheMap) // May no longer be open for writing, due to stale requests
+                    if (cacheMap && !closing) // May no longer be open for writing, due to stale requests
                         add(resp.offset, resp.content);
                 }
                 tryRead();
