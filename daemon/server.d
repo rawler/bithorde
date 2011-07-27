@@ -16,9 +16,11 @@
  ***************************************************************************************/
 module daemon.server;
 
+// TraceExceptions is disabled by default since it works poorly with SIGSEGV without Stdout/Stderr.
+// private import tango.core.tools.TraceExceptions;
+
 private import tango.core.Exception;
 private import tango.core.Thread;
-private import tango.core.tools.TraceExceptions; // Disabled due to poor Tracing-performance.
 private import tango.io.FilePath;
 private import tango.net.device.Berkeley;
 private import tango.net.device.LocalSocket;
