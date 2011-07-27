@@ -59,7 +59,7 @@ public int main(char[][] _args)
     args(null).title("config").required.params(1);
     if (!args.parse(_args[1..$])) {
         Stderr(args.errors(&Stderr.layout.sprint)).newline;
-        Stderr.format("Usage: {} {-d|--debug} <config>", _args[0]).newline;
+        Stderr.format("Usage: {} {{-d|--debug} <config>", _args[0]).newline;
         return -1;
     }
 
