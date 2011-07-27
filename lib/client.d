@@ -58,7 +58,7 @@ class RemoteAsset : private IAsset {
             _callback = cb;
         }
         void callback(message.Status s, message.ReadResponse resp) {
-            if ((s == message.Status.TIMEOUT) && retries) {
+            if ((s == message.Status.TIMEOUT) && retries && client && !client.closed) {
                 retries -= 1;
                 client.sendRPCRequest(this);
             } else {
