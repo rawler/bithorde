@@ -229,7 +229,7 @@ public:
         log = Log.lookup("daemon.cache.writeasset."~path.name[0..8]); // TODO: fix order and double-init
 
         hasherThread = new Thread(&hasherThreadLoop);
-        hasherThread.name = "Hasher:"~path.name[0..min(6u,path.name.length)];
+        hasherThread.name = "Hasher:"~path.name[0..min!(uint)(6,path.name.length)];
         hashDataAvailable = new Semaphore(1);
         hasherThread.isDaemon = true;
         hasherThread.start();
