@@ -8,6 +8,8 @@ Twisted-based implementation.
 
 import socket
 import os, os.path
+from base64 import b32decode as _b32decode
+from types import MethodType
 
 import bithorde_pb2 as message
 
@@ -89,13 +91,12 @@ class Connection(protocol.Protocol):
         enc = encoder.MessageEncoder(MSG_REV_MAP[type(msg)], False, False)
         enc(self.transport.write, msg)
 
-    def close(self):
-        self.transport.loseConnection()
-
 class Client(Connection):
     '''Overrides a BitHorde-connection with Client-semantics. In particular provides
     client-handle-mappings and connection-state-logic.'''
     def connectionMade(self, userName = "python_bithorde"):
+        self.closed = False
+
         self.remoteUser = None
         self.msgHandler = self._preAuthState
         self._assets = AssetMap()
@@ -107,9 +108,25 @@ class Client(Connection):
         handshake.protoversion = 1
         self.writeMsg(handshake)
 
-    def nodeConnected(self):
+    def onConnected(self):
         '''Event triggered once a connection has been established, and authentication is done.'''
         pass
+
+    def onDisconnected(self, reason):
+        '''Event triggered if connection is terminated'''
+        pass
+
+    def onFailed(self, reason):
+        '''Event triggered if connection failed to be established.'''
+        pass
+
+    def connectionLost(self, reason):
+        return self.onDisconnected(reason)
+
+    def close(self):
+        if not self.closed:
+            self.closed = True
+            self.transport.loseConnection()
 
     def allocateHandle(self, asset):
         '''Allocates a handle for the provided implementation, and assign it a handle'''
@@ -130,16 +147,19 @@ class Client(Connection):
             id = msg.ids.add()
             id.type = t
             id.id = v
-        msg.timeout = 1000
+        msg.timeout = 10000
         self.writeMsg(msg)
 
     def _closeAsset(self, handle):
         '''Unbind an asset from this Client and notify upstream.'''
+        def _cleanupCallback(status):
+            assert status and status.status == message.NOTFOUND
+            self._assets[handle] = None
+            self._handles.deallocate(handle)
         asset = self._assets[handle]
-        self._assets[handle] = None
         if asset:
             asset.handle = None
-        self._handles.deallocate(handle)
+            asset.onStatusUpdate = _cleanupCallback
         msg = message.BindRead()
         msg.handle = handle
         self.writeMsg(msg)
@@ -152,7 +172,7 @@ class Client(Connection):
         self.remoteUser = msg.name
         self.protoversion = msg.protoversion
         self.msgHandler = self._mainState
-        self.nodeConnected()
+        self.onConnected()
 
     def _mainState(self, msg):
         '''The main msg-reaction-routine, used after handshake.'''
@@ -189,56 +209,96 @@ class Asset(object):
         '''Should probably be overridden in subclass to react to status-changes.'''
         pass
 
-class ClientFactory(protocol.ClientFactory):
-    '''!Twisted-API! Twisted-factory for creating Client-instances for new connections.
+class AssetIterator(object):
+    '''Helper to iterate some assets, trying to open them, and fire a callback for each
+       asset. See exampel in __main__ part of module.'''
+    def __init__(self, client, assets, callback, whenDone, parallel=10):
+        self.client = client
+        self.assets = assets
+        self.callback = callback
+        self.whenDone = whenDone
+        self.parallel = parallel
+        self.requestCount = 0
+        self._request()
 
-    You will most likely want to subclass and override clientConnectionFailed and
-    clientConnectionLost.
+    def _request(self):
+        while self.requestCount < self.parallel:
+            try:
+                key, hashIds = self.assets.next()
+            except StopIteration:
+                return
+
+            asset = Asset()
+            asset.key = key
+            asset.onStatusUpdate = MethodType(self._gotResponse, asset, Asset)
+            self.client.allocateHandle(asset)
+            asset.bind(hashIds)
+
+            self.requestCount += 1
+
+    def _gotResponse(self, asset, status):
+        Asset.onStatusUpdate(asset, status)
+        result = self.callback(asset, status, asset.key)
+
+        if not result:
+            asset.close()
+
+        self.requestCount -= 1
+        self._request() # Request more, if needed
+
+        if not self.requestCount:
+            self.whenDone()
+
+class ClientWrapper(protocol.ClientFactory):
+    '''!Twisted-API! Twisted-factory wrapping a pre-connected Client, and dispatching
+    connection-events to the Client.
     '''
-    def __init__(self, c):
-        self.protocol = c
+    def __init__(self, client):
+        self.client = client
+        self.protocol = lambda: client
+
+    def clientConnectionFailed(self, connector, reason):
+        self.client.onFailed(reason)
+
+def b32decode(string):
+    l = len(string)
+    string = string + "="*(7-((l-1)%8)) # Pad with = for b32decodes:s pleasure
+    return _b32decode(string, True)
+
+def connectUNIX(sock, client):
+    factory = ClientWrapper(client)
+    reactor.connectUNIX(sock, factory)
 
 if __name__ == '__main__':
-    from base64 import b32decode
     import sys
 
-    def parseTigerHash(string):
-        string = string + "="*(5-(len(string)%5)) # Pad with = for b32decodes:s pleasure
-        return b32decode(string, True)
+    class TestClient(Client):
+        def __init__(self, assets):
+            self.assets = assets
 
-    class MyAsset(Asset):
-        def onStatusUpdate(self, status):
-            print "Asset status: %s, %s" % (self.requestId, message._STATUS.values_by_number[status.status].name)
-            Asset.onStatusUpdate(self, status)
-            self.client.gotResponse(self, status)
+        def onStatusUpdate(self, asset, status, key):
+            print "Asset status: %s, %s" % (key, message._STATUS.values_by_number[status.status].name)
 
-    class MyClient(Client):
-        def nodeConnected(self):
-            print "Node (%s) connected, asking for asset(s)." % (self.remoteUser)
-            self.requestCount = len(assetIds)
-            for assetId in assetIds:
-                asset = MyAsset()
-                asset.requestId = assetId
-                self.allocateHandle(asset)
-                asset.bind({message.TREE_TIGER: parseTigerHash(assetId)})
+        def onConnected(self):
+            self.ai = AssetIterator(self, self.assets, self.onStatusUpdate, self.whenDone)
 
-        def gotResponse(self, asset, status):
-            self.requestCount -= 1
-            if not self.requestCount:
-                self.close()
+        def onDisconnected(self, reason):
+            if not self.closed:
+                print "Disconnected; '%s'" % reason
+                try: reactor.stop()
+                except: pass
 
-    class MyFactory(ClientFactory):
-        def clientConnectionFailed(self, connector, reason):
-            print "Connection failed - goodbye!"
+        def onFailed(self, reason):
+            print "Failed to connect to BitHorde; '%s'" % reason
             reactor.stop()
 
-        def clientConnectionLost(self, connector, reason):
-            print "Connection lost - goodbye!"
+        def whenDone(self):
+            self.close()
             reactor.stop()
 
     if len(sys.argv) > 1:
-        assetIds = sys.argv[1:]
-        reactor.connectUNIX("/tmp/bithorde", MyFactory(MyClient))
+        assetIds = ((asset,{message.TREE_TIGER: b32decode(asset)}) for asset in sys.argv[1:])
+        connectUNIX("/tmp/bithorde", TestClient(assetIds))
         reactor.run()
     else:
         print "Usage: %s <tiger tree hash: base32> ..." % sys.argv[0]
