@@ -91,13 +91,12 @@ class Connection(protocol.Protocol):
         enc = encoder.MessageEncoder(MSG_REV_MAP[type(msg)], False, False)
         enc(self.transport.write, msg)
 
-    def close(self):
-        self.transport.loseConnection()
-
 class Client(Connection):
     '''Overrides a BitHorde-connection with Client-semantics. In particular provides
     client-handle-mappings and connection-state-logic.'''
     def connectionMade(self, userName = "python_bithorde"):
+        self.closed = False
+
         self.remoteUser = None
         self.msgHandler = self._preAuthState
         self._assets = AssetMap()
@@ -109,9 +108,25 @@ class Client(Connection):
         handshake.protoversion = 1
         self.writeMsg(handshake)
 
-    def nodeConnected(self):
+    def onConnected(self):
         '''Event triggered once a connection has been established, and authentication is done.'''
         pass
+
+    def onDisconnected(self, reason):
+        '''Event triggered if connection is terminated'''
+        pass
+
+    def onFailed(self, reason):
+        '''Event triggered if connection failed to be established.'''
+        pass
+
+    def connectionLost(self, reason):
+        return self.onDisconnected(reason)
+
+    def close(self):
+        if not self.closed:
+            self.closed = True
+            self.transport.loseConnection()
 
     def allocateHandle(self, asset):
         '''Allocates a handle for the provided implementation, and assign it a handle'''
@@ -157,7 +172,7 @@ class Client(Connection):
         self.remoteUser = msg.name
         self.protoversion = msg.protoversion
         self.msgHandler = self._mainState
-        self.nodeConnected()
+        self.onConnected()
 
     def _mainState(self, msg):
         '''The main msg-reaction-routine, used after handshake.'''
@@ -234,51 +249,56 @@ class AssetIterator(object):
         if not self.requestCount:
             self.whenDone()
 
-class ClientFactory(protocol.ClientFactory):
-    '''!Twisted-API! Twisted-factory for creating Client-instances for new connections.
-
-    You will most likely want to subclass and override clientConnectionFailed and
-    clientConnectionLost.
+class ClientWrapper(protocol.ClientFactory):
+    '''!Twisted-API! Twisted-factory wrapping a pre-connected Client, and dispatching
+    connection-events to the Client.
     '''
-    def __init__(self, c):
-        self.protocol = c
+    def __init__(self, client):
+        self.client = client
+        self.protocol = lambda: client
+
+    def clientConnectionFailed(self, connector, reason):
+        self.client.onFailed(reason)
 
 def b32decode(string):
     l = len(string)
     string = string + "="*(7-((l-1)%8)) # Pad with = for b32decodes:s pleasure
     return _b32decode(string, True)
 
-def connectUNIX(sock, callback, failCallback, *args, **kwargs):
-    def onConnection(client):
-        Client.nodeConnected(client)
-        callback(client, *args, **kwargs)
-    def createClient():
-        client = Client()
-        client.nodeConnected = MethodType(onConnection, client, Client)
-        return client
-    factory = ClientFactory(createClient)
-    factory.clientConnectionFailed = lambda _,reason: failCallback(reason.getErrorMessage())
+def connectUNIX(sock, client):
+    factory = ClientWrapper(client)
     reactor.connectUNIX(sock, factory)
 
 if __name__ == '__main__':
     import sys
 
-    def onStatusUpdate(asset, status, key):
-        print "Asset status: %s, %s" % (key, message._STATUS.values_by_number[status.status].name)
+    class TestClient(Client):
+        def __init__(self, assets):
+            self.assets = assets
 
-    def onClientConnected(client, assetIds):
-        ai = AssetIterator(client, assetIds, onStatusUpdate, whenDone)
+        def onStatusUpdate(self, asset, status, key):
+            print "Asset status: %s, %s" % (key, message._STATUS.values_by_number[status.status].name)
 
-    def onClientFailed(reason):
-        print "Failed to connect to BitHorde; '%s'" % reason
-        reactor.stop()
+        def onConnected(self):
+            self.ai = AssetIterator(self, self.assets, self.onStatusUpdate, self.whenDone)
 
-    def whenDone():
-        reactor.stop()
+        def onDisconnected(self, reason):
+            if not self.closed:
+                print "Disconnected; '%s'" % reason
+                try: reactor.stop()
+                except: pass
+
+        def onFailed(self, reason):
+            print "Failed to connect to BitHorde; '%s'" % reason
+            reactor.stop()
+
+        def whenDone(self):
+            self.close()
+            reactor.stop()
 
     if len(sys.argv) > 1:
         assetIds = ((asset,{message.TREE_TIGER: b32decode(asset)}) for asset in sys.argv[1:])
-        connectUNIX("/tmp/bithorde", onClientConnected, onClientFailed, assetIds)
+        connectUNIX("/tmp/bithorde", TestClient(assetIds))
         reactor.run()
     else:
         print "Usage: %s <tiger tree hash: base32> ..." % sys.argv[0]
