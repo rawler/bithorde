@@ -22,6 +22,7 @@ private import tango.io.device.Array;
 private import tango.net.Uri;
 private import tango.text.convert.Format;
 private import tango.text.Util;
+private import tango.util.log.Log;
 
 public import tango.util.digest.Digest;
 
@@ -95,8 +96,12 @@ char[] formatMagnet(Identifier[] ids, ulong length, char[] name = null) {
     if (length > 0)
         append("xl={}", length);
     foreach (id; ids) {
-        auto hash = HashMap[id.type];
-        append("xt=urn:{}:{}", hash.name, hash.magnetFormatter(id.id));
+        if (id.type in HashMap) {
+            auto hash = HashMap[id.type];
+            append("xt=urn:{}:{}", hash.name, hash.magnetFormatter(id.id));
+        } else {
+            Log.lookup("hashes").warn("Error; {} is an unknown Hash-Type");
+        }
     }
     return cast(char[])array.slice;
 }
