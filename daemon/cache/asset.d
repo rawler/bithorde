@@ -436,7 +436,7 @@ public:
         remoteAsset.attachWatcher(&metadata.onBackingUpdate);
         super(path, metadata, remoteAsset.size, updateHashIds, usefsync); // TODO: Verify remoteAsset.size against local file
         log = Log.lookup("daemon.cache.cachingasset." ~ path.name[0..8]);
-        log.trace("Caching remoteAsset of size {}MB, {}MB available", size/(1024*1024), cacheMap.assetSize/(1024*1024));
+        log.trace("Caching remoteAsset of size {}MB, {}MB stored.", size/(1024*1024), cacheMap.assetSize/(1024*1024));
     }
 
     void close() {
