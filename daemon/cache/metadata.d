@@ -34,10 +34,12 @@ class AssetMetaData : ProtoBufMessage {
     mixin(PBField!(ubyte[], "localId"));        /// Local assetId
     mixin(PBField!(Identifier[], "hashIds"));   /// HashIds
     mixin(PBField!(ulong, "rating"));           /// Rating-system for determining which content to keep in cache.
+    mixin(PBField!(ulong, "size"));             /// Total size of asset
 
     mixin ProtoBufCodec!(PBMapping("localId",   1),
                          PBMapping("hashIds",   2),
-                         PBMapping("rating",    3));
+                         PBMapping("rating",    3),
+                         PBMapping("size",      4));
 
     abstract void onBackingUpdate(IAsset backing, Status sCode, AssetStatus s);
 

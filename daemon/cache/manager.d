@@ -136,17 +136,29 @@ class CacheManager : IAssetSource {
             } else if (idxPath.exists) {
                 return null;
             } else {
+                if (!sizeIsSet)
+                    size = assetPath.fileSize;
+
                 setAsset(new BaseAsset(assetPath));
                 return this;
             }
         }
 
         Asset openUpload(ulong size) {
+            assert(!sizeIsSet);
+            size = size;
             setAsset(new WriteableAsset(assetPath, size, &updateHashIds, usefsync));
             return this;
         }
 
         Asset openCaching(IServerAsset sourceAsset) {
+            if (sizeIsSet) {
+                if (size != sourceAsset.size)
+                    throw new AssertException("upstream asset of different size than the asset in cache", __FILE__, __LINE__);
+            } else {
+                size = sourceAsset.size;
+            }
+
             setAsset(new WriteableAsset(assetPath, sourceAsset.size, &updateHashIds, usefsync));
             // TODO: Print trace-status about the asset
             _remoteAsset = sourceAsset;
@@ -208,13 +220,6 @@ class CacheManager : IAssetSource {
             auto asset = cast(WriteableAsset)_openAsset;
             if (asset)
                 asset.sync();
-        }
-
-        ulong size() {
-            if (_openAsset)
-                return _openAsset.size;
-            else
-                assert(false);
         }
 
         void aSyncRead(ulong offset, uint length, BHReadCallback cb) {
