@@ -64,9 +64,9 @@ class ForwardedRead {
     BHReadCallback cb;
     message.Status lastStatus;
     int retries = 4; // TODO: Move retries into router.
-    CacheManager.MetaData asset;
+    CacheManager.Asset asset;
 
-    this(CacheManager.MetaData asset, ulong offset, uint length, BHReadCallback cb) {
+    this(CacheManager.Asset asset, ulong offset, uint length, BHReadCallback cb) {
         this.offset = offset;
         this.length = length;
         this.cb = cb;
@@ -100,7 +100,7 @@ class ForwardedRead {
  * Assets.
  ***************************************************************************************/
 class CacheManager : IAssetSource {
-    class MetaData : daemon.cache.metadata.AssetMetaData, IServerAsset {
+    class Asset : daemon.cache.metadata.AssetMetaData, IServerAsset {
         mixin IAsset.StatusSignal;
         mixin RefCountTarget;
 
@@ -130,7 +130,7 @@ class CacheManager : IAssetSource {
         /********************************************************************************
          * Throws: IOException if asset is not found
          *******************************************************************************/
-        MetaData openRead() {
+        Asset openRead() {
             if (isOpen) { // If something is already holding it open, just use it.
                 return this;
             } else if (idxPath.exists) {
@@ -141,12 +141,12 @@ class CacheManager : IAssetSource {
             }
         }
 
-        MetaData openUpload(ulong size) {
+        Asset openUpload(ulong size) {
             setAsset(new WriteableAsset(assetPath, size, &updateHashIds, usefsync));
             return this;
         }
 
-        MetaData openCaching(IServerAsset sourceAsset) {
+        Asset openCaching(IServerAsset sourceAsset) {
             setAsset(new WriteableAsset(assetPath, sourceAsset.size, &updateHashIds, usefsync));
             // TODO: Print trace-status about the asset
             _remoteAsset = sourceAsset;
@@ -308,8 +308,8 @@ class CacheManager : IAssetSource {
     /************************************************************************************
      * Create new MetaAsset with random Id
      ***********************************************************************************/
-    private MetaData newMetaAsset() {
-        auto newMeta = new MetaData();
+    private Asset newMetaAsset() {
+        auto newMeta = new Asset();
         auto localId = new ubyte[LOCALID_LENGTH];
         rand.randomizeUniform!(ubyte[],false)(localId);
         while (localId in localIdMap) {
@@ -324,7 +324,7 @@ class CacheManager : IAssetSource {
     /************************************************************************************
      * Create new MetaAsset with random Id and predetermined hashIds
      ***********************************************************************************/
-    private MetaData newMetaAssetWithHashIds(message.Identifier[] hashIds) {
+    private Asset newMetaAssetWithHashIds(message.Identifier[] hashIds) {
         auto newMeta = newMetaAsset();
         newMeta.hashIds = hashIds.dup;
         foreach (ref v; newMeta.hashIds)
@@ -334,12 +334,12 @@ class CacheManager : IAssetSource {
     }
 
 protected:
-    MetaData hashIdMap[message.HashType][ubyte[]];
+    Asset hashIdMap[message.HashType][ubyte[]];
     FilePath idMapPath;
     FilePath assetDir;
     ulong maxSize;            /// Maximum allowed storage-capacity of this cache, in MB. 0=unlimited
     Router router;
-    MetaData localIdMap[ubyte[]];
+    Asset localIdMap[ubyte[]];
     bool idMapDirty;
     Thread idMapFlusher;
     bool usefsync;
@@ -378,7 +378,7 @@ public:
     /************************************************************************************
      * Tries to find assetMetaData for specified hashIds. First match applies.
      ***********************************************************************************/
-    MetaData findMetaAsset(message.Identifier[] hashIds) {
+    Asset findMetaAsset(message.Identifier[] hashIds) {
         foreach (id; hashIds) {
             if ((id.type in hashIdMap) && (id.id in hashIdMap[id.type])) {
                 auto assetMeta = hashIdMap[id.type][id.id];
@@ -440,8 +440,8 @@ public:
         /********************************************************************************
          * Find least important asset in cache.
          *******************************************************************************/
-        MetaData pickLoser() {
-            MetaData loser;
+        Asset pickLoser() {
+            Asset loser;
             auto loserRating = long.max;
             foreach (meta; this.localIdMap) {
                 if (meta.isOpen) // Is Open
@@ -547,7 +547,7 @@ public:
     /************************************************************************************
      * Remove an asset from cache.
      ***********************************************************************************/
-    synchronized bool purgeAsset(MetaData asset) {
+    synchronized bool purgeAsset(Asset asset) {
         if (asset.hashIds.length) {
             log.info("Purging {}", formatMagnet(asset.hashIds, 0, null));
         } else {
@@ -571,7 +571,7 @@ public:
      * Implements IAssetSource.findAsset. Tries to get a hold of a certain asset.
      ***********************************************************************************/
     void findAsset(BindRead req) {
-        void fromCache(MetaData meta) {
+        void fromCache(Asset meta) {
             log.trace("serving {} from cache", hex.encode(meta.localId));
             req.callback(meta, message.Status.SUCCESS, null);
         }
@@ -582,7 +582,7 @@ public:
             req.pushCallback(&_forwardedCallback);
             router.findAsset(req);
         }
-        IServerAsset tryOpen(MetaData meta) {
+        IServerAsset tryOpen(Asset meta) {
             try { // Needs to handle IOErrors here, to not lock meta while purging.
                 return meta.openRead();
             } catch (IOException e) {
@@ -608,7 +608,7 @@ public:
     void uploadAsset(message.BindWrite req, BHAssetStatusCallback callback) {
         try {
             if (_makeRoom(req.size)) {
-                MetaData meta = newMetaAsset();
+                Asset meta = newMetaAsset();
                 auto path = meta.assetPath;
                 assert(!path.exists());
                 meta.openUpload(req.size);
@@ -641,7 +641,7 @@ private:
      * and localIds.
      ************************************************************************/
     class IdMap { // TODO: Re-work protobuf-lib so it isn't needed
-        mixin(PBField!(MetaData[], "assets"));
+        mixin(PBField!(Asset[], "assets"));
         mixin ProtoBufCodec!(PBMapping("assets",    1));
     }
 
@@ -748,7 +748,7 @@ private:
     /*************************************************************************
      * Add an asset to the id-maps
      ************************************************************************/
-    synchronized void addToIdMap(MetaData asset) {
+    synchronized void addToIdMap(Asset asset) {
         localIdMap[asset.localId] = asset;
         foreach (id; asset.hashIds) {
             if (id.type in hashIdMap) {

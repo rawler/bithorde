@@ -186,7 +186,7 @@ class Client : lib.client.Client {
             return assetSource.aSyncRead(offset, length, cb);
         }
         void addDataSegment(message.DataSegment req) {
-            auto asset = cast(CacheManager.MetaData)assetSource;
+            auto asset = cast(CacheManager.Asset)assetSource;
             if (asset && asset.isWritable)
                 asset.add(req.offset, req.content);
             else
