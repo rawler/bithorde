@@ -8,6 +8,11 @@ set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 FIND_PACKAGE(D REQUIRED)
 FIND_PACKAGE(ProtocolBuffers REQUIRED)
 
+# Read out git-version from Git.
+include(GetGitRevisionDescription)
+git_describe(GIT_DESCRIPTION)
+configure_file("${CMAKE_CURRENT_SOURCE_DIR}/gitversion.d.in" "${CMAKE_CURRENT_SOURCE_DIR}/gitversion.d" @ONLY)
+
 set(D_DEBUG_KEYS "" CACHE STRING "Special debug-keywords to build with.")
 add_d_debugs(${D_DEBUG_KEYS})
 
@@ -69,4 +74,3 @@ SET(CPACK_PACKAGE_VERSION "0.2alpha1.2")
 SET(CPACK_PACKAGE_INSTALL_DIRECTORY "bithorde-${CPACK_PACKAGE_VERSION}")
 SET(CPACK_PACKAGE_EXECUTABLES "bhfuse" "bhget" "bhupload" "bithorded")
 INCLUDE(CPack)
-

@@ -35,6 +35,7 @@ private import tango.util.log.Log;
 
 private import daemon.config;
 private import daemon.server;
+private import gitversion;
 
 Server s;
 
@@ -54,14 +55,25 @@ extern (C) void exit_handler(int sig) {
  */
 public int main(char[][] _args)
 {
-    auto args = new Arguments;
-    args("debug").aliased('d');
-    args(null).title("config").required.params(1);
-    if (!args.parse(_args[1..$])) {
-        Stderr(args.errors(&Stderr.layout.sprint)).newline;
+    int exit_usage(char[] msg) {
+        if (msg)
+            Stderr(msg).newline;
         Stderr.format("Usage: {} {{-d|--debug} <config>", _args[0]).newline;
         return -1;
     }
+
+    auto args = new Arguments;
+    args("debug").aliased('d');
+    args("version").aliased('v');
+    args(null).title("config").params(1);
+    if (!args.parse(_args[1..$]))
+        return exit_usage(args.errors(&Stderr.layout.sprint));
+
+    if (args["version"].set)
+        return gitversion.exit_version;
+
+    if (!args[null].assigned.length == 1)
+        return exit_usage("Missing config");
 
     // Hack, since Tango doesn't set MSG_NOSIGNAL on send/recieve, we have to explicitly ignore SIGPIPE
     signal(SIGPIPE, SIG_IGN);

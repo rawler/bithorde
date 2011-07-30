@@ -1,0 +1,11 @@
+
+module gitversion;
+
+import tango.io.Stdout;
+
+static char[] description = "@GIT_DESCRIPTION@";
+
+int exit_version() {
+    Stdout.format("BitHorde version {}", description).newline;
+    return 0;
+}
