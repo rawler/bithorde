@@ -42,29 +42,6 @@ enum Type : uint
 }
 
 public abstract class Message : ProtoBufMessage {
-private:
-    static Mutex listMutex;
-    static Stack!(void*, 100) _freeList;
-    static this () {
-        listMutex = new Mutex();
-    }
-    new(size_t sz) {
-        assert(sz <= 200, "Error, allocating too much");
-        synchronized (listMutex) {
-            if (_freeList.size)
-                return _freeList.pop();
-        } // Else
-        return GC.malloc(200);
-    }
-    delete(void * p) {
-        synchronized (listMutex) {
-            if (_freeList.unused)
-                return _freeList.push(p);
-        } // Else
-        GC.free(p);
-    }
-protected:
-public:
     abstract Type typeId();
 }
 

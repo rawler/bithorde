@@ -80,11 +80,13 @@ class BindRead : message.BindRead {
  ***************************************************************************************/
 class ReadRequest : message.ReadRequest {
     Client client;
+    bool answered = false;
 public:
     this(Client c) {
         client = c;
     }
     final void callback(message.Status status, message.ReadRequest remoteReq, message.ReadResponse remoteResp) {
+        assert(!answered);
         if (client && !client.closed) {
             scope resp = new message.ReadResponse;
             resp.rpcId = rpcId;
@@ -95,7 +97,7 @@ public:
             }
             client.sendNotification(resp);
         }
-        delete this;
+        answered = true;
     }
     void abort(message.Status s) {
         callback(s, null, null);
@@ -319,7 +321,6 @@ protected:
         try {
             asset = getAsset(req.handle);
         } catch (ArrayBoundsException e) {
-            delete req;
             scope resp = new message.ReadResponse;
             resp.rpcId = req.rpcId;
             resp.status = message.Status.INVALID_HANDLE;
