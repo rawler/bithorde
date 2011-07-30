@@ -108,7 +108,7 @@ protected:
 
     TimeoutQueue.EventId statusTimeout;
     void updateStatus(message.AssetStatus resp) {
-        if (statusTimeout.cb.ptr) {
+        if (statusTimeout.cb.ptr && client) {
             client.connection.timeouts.abort(statusTimeout);
             statusTimeout = statusTimeout.init;
             logRequestResponse(Clock.now - openedTime);
