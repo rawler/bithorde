@@ -94,7 +94,7 @@ class CacheManager : IAssetSource {
         }
 
         MetaData openUpload(ulong size) {
-            setAsset(new UploadAsset(assetPath, size, &updateHashIds, usefsync));
+            setAsset(new WriteableAsset(assetPath, size, &updateHashIds, usefsync));
             return this;
         }
 
@@ -179,7 +179,7 @@ class CacheManager : IAssetSource {
 
         private void notifyHashUpdate() {
             addToIdMap(this);
-            if ((cast(UploadAsset)_openAsset) !is null)
+            if (_remoteAsset is null) // This was an Upload
                 setMaxRating(Clock.now);
             closeRemote();
 

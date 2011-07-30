@@ -348,16 +348,6 @@ protected:
 }
 
 /*****************************************************************************************
- * Assets in the "upload"-phase.
- ****************************************************************************************/
-class UploadAsset : WriteableAsset {
-    this(FilePath path, ulong size,
-         HashIdsListener updateHashIds, bool usefsync) {
-        super(path, size, updateHashIds, usefsync);
-    }
-}
-
-/*****************************************************************************************
  * CachingAsset is an important workhorse in the entire system. Implements a currently
  * caching asset, still not completely locally available.
  ****************************************************************************************/
