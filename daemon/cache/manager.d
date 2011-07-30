@@ -450,6 +450,9 @@ public:
             req.callback(meta, message.Status.SUCCESS, null);
         }
         void forwardRequest() {
+            req.ids = req.ids.dup;
+            foreach (ref id; req.ids)
+                id = id.dup;
             req.pushCallback(&_forwardedCallback);
             router.findAsset(req);
         }
