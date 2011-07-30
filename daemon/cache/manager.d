@@ -54,6 +54,47 @@ const M = 1024*1024;
 
 const FLUSH_INTERVAL_SEC = 30;
 
+/*************************************************************************************
+ * Every read-operation for non-cached data results in a ForwardedRead, which tracks
+ * a forwarded ReadRequest, recieves the response, and updates the CachingAsset.
+ ************************************************************************************/
+class ForwardedRead {
+    ulong offset;
+    uint length;
+    BHReadCallback cb;
+    message.Status lastStatus;
+    int retries = 4; // TODO: Move retries into router.
+    CacheManager.MetaData asset;
+
+    this(CacheManager.MetaData asset, ulong offset, uint length, BHReadCallback cb) {
+        this.offset = offset;
+        this.length = length;
+        this.cb = cb;
+        this.asset = asset;
+    }
+
+    void fail(message.Status status) {
+        auto resp = new lib.message.ReadResponse;
+        resp.status = status;
+        cb(resp.status, null, resp);
+    }
+
+    void callback(message.Status status, message.ReadRequest req, message.ReadResponse resp) {
+        if (status == message.Status.SUCCESS && resp && resp.content.length) {
+            if (asset.isWritable)
+                asset.add(resp.offset, resp.content);
+            asset.aSyncRead(offset, length, cb, this);
+        } else if ((status == message.Status.DISCONNECTED) && (status != lastStatus)) { // Hackish. We may have double-requested the same part of the file, so attempt to read it anyways
+            lastStatus = status;
+            retries = 0;
+            asset.aSyncRead(offset, length, cb, this);
+        } else {
+            asset.outer.log.warn("Failed forwarded read, with error {}", status);
+            return fail(status);
+        }
+    }
+}
+
 /****************************************************************************************
  * Overseeing Cache-manager, keeping state of all cache-assets, and mapping from id:s to
  * Assets.
@@ -62,6 +103,13 @@ class CacheManager : IAssetSource {
     class MetaData : daemon.cache.metadata.AssetMetaData, IServerAsset {
         mixin IAsset.StatusSignal;
         mixin RefCountTarget;
+
+        enum State {
+            CLOSED,
+            UPLOADING,
+            CACHING,
+            COMPLETE,
+        }
 
         private BaseAsset _openAsset;
         private IServerAsset _remoteAsset;
@@ -99,19 +147,49 @@ class CacheManager : IAssetSource {
         }
 
         MetaData openCaching(IServerAsset sourceAsset) {
-            setAsset(new CachingAsset(assetPath, sourceAsset, &updateHashIds, usefsync));
+            setAsset(new WriteableAsset(assetPath, sourceAsset.size, &updateHashIds, usefsync));
+            // TODO: Print trace-status about the asset
             _remoteAsset = sourceAsset;
             _remoteAsset.takeRef(this);
             _remoteAsset.attachWatcher(&onBackingUpdate);
             return this;
         }
 
+        State state() {
+            if (!_openAsset)
+                return State.CLOSED;
+            else if (_remoteAsset)
+                return State.CACHING;
+            else if (cast(WriteableAsset)_openAsset)
+                return State.UPLOADING;
+            else
+                return State.COMPLETE;
+        }
+
+        bool has(ulong offset, ulong length) {
+            if (_openAsset) {
+                auto fileAsset = cast(WriteableAsset)_openAsset;
+                if (fileAsset)
+                    return fileAsset.has(offset,length);
+                else
+                    return true;
+            } else {
+                return false;
+            }
+        }
+
         bool isOpen() {
             return _openAsset !is null;
         }
 
-        bool isWritable() {
-            return (cast(WriteableAsset)_openAsset) !is null;
+        bool isWritable() { // TODO: Eliminate
+            switch (state) {
+                case State.UPLOADING:
+                case State.CACHING:
+                    return true;
+                default:
+                    return false;
+            }
         }
 
         void closeRemote() {
@@ -140,18 +218,47 @@ class CacheManager : IAssetSource {
         }
 
         void aSyncRead(ulong offset, uint length, BHReadCallback cb) {
-            noteInterest(Clock.now, (cast(double)length)/cast(double)size);
-            if (_openAsset)
+            return aSyncRead(offset, length, cb, null);
+        }
+
+        private void aSyncRead(ulong offset, uint length, BHReadCallback cb, ForwardedRead fwd) {
+            void fail(message.Status status) {
+                scope resp = new lib.message.ReadResponse;
+                resp.status = status;
+                cb(resp.status, null, resp);
+            }
+            switch (state) {
+            case State.CLOSED:
+                log.warn("Trying to read from closed asset.");
+                return fail(message.Status.INVALID_HANDLE);
+            case State.UPLOADING:
+                log.warn("Trying to read from unfinished uploading asset.");
+                return fail(message.Status.INVALID_HANDLE);
+            case State.CACHING: // Infers we have remoteAsset set
+                auto fileAsset = cast(WriteableAsset)_openAsset;
+                if (!fileAsset.has(offset, length)) {
+                    if (fwd is null)
+                        fwd = new ForwardedRead(this, offset, length, cb);
+                    if (--(fwd.retries) > 0)
+                        return _remoteAsset.aSyncRead(offset, length, &fwd.callback);
+                    else
+                        return fail(message.Status.NOTFOUND);
+                }
+                // Intentional fall-through
+            case State.COMPLETE:
+                noteInterest(Clock.now, (cast(double)length)/cast(double)size);
                 return _openAsset.aSyncRead(offset, length, cb);
-            else
-                assert(false, "Trying to read from closed asset.");
+            }
         }
 
         void add(ulong offset, ubyte[] data) {
-            if (_openAsset)
+            switch (state) {
+            case State.UPLOADING:
+            case State.CACHING:
                 return _openAsset.add(offset, data);
-            else
-                assert(false, "Trying to add to closed asset.");
+            default:
+                throw new AssertException("Trying to add to closed asset.", __FILE__, __LINE__);
+            }
         }
 
         message.Identifier[] hashIds() {

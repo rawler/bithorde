@@ -242,6 +242,13 @@ public:
         hashDataAvailable.notify();
     }
 
+    synchronized bool has(ulong offset, ulong length) {
+        if (cacheMap)
+            return cacheMap.has(offset, length);
+        else
+            return true;
+    }
+
     /*************************************************************************************
      * Make sure to synchronize asset data, and flush cachemap to disk.
      * Params:
@@ -346,86 +353,3 @@ protected:
         updateHashIds(hashIds);
     }
 }
-
-/*****************************************************************************************
- * CachingAsset is an important workhorse in the entire system. Implements a currently
- * caching asset, still not completely locally available.
- ****************************************************************************************/
-class CachingAsset : WriteableAsset {
-    IServerAsset remoteAsset;
-public:
-    this (FilePath path, IServerAsset remoteAsset,
-          HashIdsListener updateHashIds, bool usefsync) {
-        this.remoteAsset = remoteAsset;
-        super(path, remoteAsset.size, updateHashIds, usefsync); // TODO: Verify remoteAsset.size against local file
-        log = Log.lookup("daemon.cache.cachingasset." ~ path.name[0..8]);
-        log.trace("Caching remoteAsset of size {}MB, {}MB stored.", size/(1024*1024), cacheMap.assetSize/(1024*1024));
-    }
-
-    synchronized void aSyncRead(ulong offset, uint length, BHReadCallback cb) {
-        auto r = new ForwardedRead;
-        r.offset = offset;
-        r.length = length;
-        r.cb = cb;
-        r.tryRead();
-    }
-protected:
-    /*************************************************************************************
-     * Triggered when the underlying cache is complete.
-     ************************************************************************************/
-    void finish() body {
-        // TODO: Validate hashId:s
-        super.finish();
-    }
-private:
-    void realRead(ulong offset, uint length, BHReadCallback cb) {
-        super.aSyncRead(offset, length, cb);
-    }
-
-    /*************************************************************************************
-     * Every read-operation for non-cached data results in a ForwardedRead, which tracks
-     * a forwarded ReadRequest, recieves the response, and updates the CachingAsset.
-     ************************************************************************************/
-    class ForwardedRead {
-        ulong offset;
-        uint length;
-        BHReadCallback cb;
-        message.Status lastStatus;
-        uint tries;
-
-        void tryRead() { 
-            if (closing) {
-                fail();
-            } else if (!cacheMap || cacheMap.has(offset, length)) {
-                realRead(offset, length, cb);
-                delete this;
-            } else if (tries++ < 4) {
-                remoteAsset.aSyncRead(offset, length, &callback);
-            } else {
-                fail();
-            }
-        }
-        void fail() {
-            auto resp = new lib.message.ReadResponse;
-            resp.status = message.Status.NOTFOUND;
-            cb(resp.status, null, resp);
-        }
-        void callback(message.Status status, message.ReadRequest req, message.ReadResponse resp) {
-            if (status == message.Status.SUCCESS && resp && resp.content.length) {
-                synchronized (this.outer) {
-                    if (cacheMap && !closing) // May no longer be open for writing, due to stale requests
-                        add(resp.offset, resp.content);
-                }
-                tryRead();
-            } else if ((status == message.Status.DISCONNECTED) && (status != lastStatus)) { // Hackish. We may have double-requested the same part of the file, so attempt to read it anyways
-                lastStatus = status;
-                tryRead();
-            } else {
-                log.warn("Failed forwarded read, with error {}", status);
-                fail();
-            }
-            delete req;
-        }
-    }
-}
-
