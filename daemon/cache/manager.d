@@ -42,10 +42,10 @@ private import lib.httpserver;
 private import lib.protobuf;
 private import lib.pumping;
 
-private import daemon.cache.asset;
 private import daemon.cache.metadata;
 private import daemon.client;
 private import daemon.config;
+private import daemon.lib.asset;
 private import daemon.refcount;
 private import daemon.routing.router;
 
