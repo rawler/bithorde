@@ -397,10 +397,17 @@ public:
 
                 _messageHandler(this, type, decodeBuf[0..msglen]);
             } catch (Exception e) {
-                char[] msg;
-                void _write(char[] buf) {msg ~= buf; }
+                char[65536] msg;
+                size_t used = 0;
+                void _write(char[] buf) {
+                    auto newFill = used + buf.length;
+                    if (newFill <= msg.length) {
+                        msg[used..newFill] = buf;
+                        used += newFill;
+                    }
+                }
                 e.writeOut(&_write);
-                log.error("Exception ({}:{}) in handling incoming Message: {}", e.file, e.line, msg);
+                log.error("Exception ({}:{}) in handling incoming Message: {}", e.file, e.line, msg[0..used]);
             }
             return totallength;
         } else {
