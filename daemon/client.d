@@ -187,7 +187,7 @@ class Client : lib.client.Client {
         }
         void addDataSegment(message.DataSegment req) {
             auto asset = cast(CacheManager.Asset)assetSource;
-            if (asset && asset.isWritable)
+            if (asset && (asset.state == asset.State.INCOMPLETE))
                 asset.add(req.offset, req.content);
             else
                 log.warn("Client trying to write to non-writeable asset!");

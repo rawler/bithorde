@@ -84,8 +84,7 @@ class ForwardedRead {
 
     void callback(message.Status status, message.ReadRequest req, message.ReadResponse resp) {
         if (status == message.Status.SUCCESS && resp && resp.content.length) {
-            if (asset.isWritable)
-                asset.add(resp.offset, resp.content);
+            asset.add(resp.offset, resp.content);
             asset.aSyncRead(offset, length, cb, this);
         } else if ((status == message.Status.DISCONNECTED) && (status != lastStatus)) { // Hackish. We may have double-requested the same part of the file, so attempt to read it anyways
             lastStatus = status;
@@ -108,25 +107,18 @@ class CacheManager : IAssetSource {
         mixin RefCountTarget;
 
         enum State {
-            CLOSED,
-            UPLOADING,
-            CACHING,
+            UNKNOWN,
+            INCOMPLETE,
             COMPLETE,
         }
 
-        private IStoredAsset _openAsset;
+        private IStoredAsset _stored;
         private IServerAsset _remoteAsset;
-
-        private IStoredAsset setAsset(IStoredAsset newAsset) {
-            if (_openAsset)
-                _openAsset.close();
-            closeRemote();
-            return _openAsset = newAsset;
-        }
+        private State _state = State.UNKNOWN;
 
         void onBackingUpdate(IAsset backing, message.Status sCode, message.AssetStatus s) {
             if (sCode != sCode.SUCCESS)
-                setAsset(null);
+                closeRemote;
             _statusSignal.call(this, sCode, s);
         }
 
@@ -134,35 +126,38 @@ class CacheManager : IAssetSource {
          * Throws: IOException if asset is not found
          *******************************************************************************/
         Asset openRead() {
-            if (isOpen) { // If something is already holding it open, just use it.
-                return this;
-            } else if (idxPath.exists) {
-                return null;
+            if (updateState != State.COMPLETE) {
+                throw new AssertException("Tried to open INCOMPLETE stored asset", __FILE__, __LINE__);
             } else {
                 if (!sizeIsSet)
                     size = assetPath.fileSize;
 
-                setAsset(new BaseAsset(assetPath));
                 return this;
             }
         }
 
         Asset openUpload(ulong size) {
             assert(!sizeIsSet);
-            size = size;
-            setAsset(new WriteableAsset(assetPath, size, &updateHashIds, usefsync));
-            return this;
+            assert(!assetPath.exists);
+            assert(!idxPath.exists);
+            if (updateState != State.INCOMPLETE) {
+                throw new AssertException("Tried to open already COMPLETE stored asset for caching", __FILE__, __LINE__);
+            } else {
+                this.size = size;
+                return this;
+            }
         }
 
         Asset openCaching(IServerAsset sourceAsset) {
-            if (sizeIsSet) {
-                if (size != sourceAsset.size)
-                    throw new AssertException("upstream asset of different size than the asset in cache", __FILE__, __LINE__);
+            if (updateState != State.INCOMPLETE) {
+                throw new AssertException("Tried to open already COMPLETE stored asset for caching", __FILE__, __LINE__);
+            } else if (sizeIsSet) {
+                if (this.size != sourceAsset.size)
+                    throw new AssertException("Upstream asset of different size than the asset in cache", __FILE__, __LINE__);
             } else {
-                size = sourceAsset.size;
+                this.size = sourceAsset.size;
             }
 
-            setAsset(new WriteableAsset(assetPath, sourceAsset.size, &updateHashIds, usefsync));
             // TODO: Print trace-status about the asset
             _remoteAsset = sourceAsset;
             _remoteAsset.takeRef(this);
@@ -170,41 +165,33 @@ class CacheManager : IAssetSource {
             return this;
         }
 
-        State state() {
-            if (!_openAsset)
-                return State.CLOSED;
-            else if (_remoteAsset)
-                return State.CACHING;
-            else if (cast(WriteableAsset)_openAsset)
-                return State.UPLOADING;
-            else
-                return State.COMPLETE;
+        private void ensureOpen() in {
+            assert(_state != State.UNKNOWN);
+        } body {
+            if (!_stored) switch (_state) {
+                case State.COMPLETE:
+                    return _stored = new BaseAsset(assetPath);
+                case State.INCOMPLETE:
+                    return _stored = new WriteableAsset(assetPath, size, &updateHashIds, usefsync);
+            }
         }
 
-        bool has(ulong offset, ulong length) {
-            if (_openAsset) {
-                auto fileAsset = cast(WriteableAsset)_openAsset;
-                if (fileAsset)
-                    return fileAsset.has(offset,length);
-                else
-                    return true;
-            } else {
-                return false;
-            }
+        private State updateState() {
+            if (idxPath.exists || !assetPath.exists)
+                return _state = State.INCOMPLETE;
+            else
+                return _state = State.COMPLETE;
+        }
+
+        final State state() {
+            if (_state == State.UNKNOWN)
+                return updateState;
+            else
+                return _state;
         }
 
         bool isOpen() {
-            return _openAsset !is null;
-        }
-
-        bool isWritable() { // TODO: Eliminate
-            switch (state) {
-                case State.UPLOADING:
-                case State.CACHING:
-                    return true;
-                default:
-                    return false;
-            }
+            return refs.length > 0;
         }
 
         void closeRemote() {
@@ -216,11 +203,15 @@ class CacheManager : IAssetSource {
         }
 
         void close() {
-            setAsset(null);
+            if (_stored) {
+                _stored.close();
+                _stored = null;
+            }
+            closeRemote();
         }
 
         void sync() {
-            auto asset = cast(WriteableAsset)_openAsset;
+            auto asset = cast(WriteableAsset)_stored;
             if (asset)
                 asset.sync();
         }
@@ -230,11 +221,6 @@ class CacheManager : IAssetSource {
         }
 
         private void aSyncRead(ulong offset, uint _length, BHReadCallback cb, ForwardedRead fwd) {
-            ubyte[MAX_READ_CHUNK] _buf;
-            auto buf = _buf[0..min!(uint)(_length, _buf.length)];
-            ubyte[] result;
-            ulong missing;
-
             void respond(message.Status status, ubyte[] result=null) {
                 scope resp = new lib.message.ReadResponse;
                 resp.status = status;
@@ -245,43 +231,39 @@ class CacheManager : IAssetSource {
                 cb(resp.status, null, resp); // TODO: track read-request
             }
 
-            switch (state) {
-            case State.CLOSED:
-                log.warn("Trying to read from closed asset.");
-                return respond(message.Status.INVALID_HANDLE);
-            case State.UPLOADING:
-                log.warn("Trying to read from unfinished uploading asset.");
-                return respond(message.Status.INVALID_HANDLE);
-            case State.CACHING: // Infers we have remoteAsset set
-                result = _openAsset.readChunk(offset, buf, missing);
-                if (missing) {
+            ubyte[MAX_READ_CHUNK] _buf;
+            auto buf = _buf[0..min!(uint)(_length, _buf.length)];
+            ulong missing;
+            ensureOpen;
+
+            auto result = _stored.readChunk(offset, buf, missing);
+
+            if (missing) {
+                assert(state == State.INCOMPLETE);
+                if (_remoteAsset) {
                     if (fwd is null)
                         fwd = new ForwardedRead(this, offset, _length, cb);
                     if (--(fwd.retries) > 0)
                         return _remoteAsset.aSyncRead(offset, _length, &fwd.callback);
                     else
                         return respond(message.Status.NOTFOUND);
+                } else {
+                    log.warn("Trying to read from unfinished uploading asset.");
+                    return respond(message.Status.INVALID_HANDLE);
                 }
-                break;
-            case State.COMPLETE:
-                result = _openAsset.readChunk(offset, buf, missing);
-                break;
-            }
-            if (result.ptr) {
+            } else {
                 noteInterest(Clock.now, (cast(double)result.length)/cast(double)size);
                 return respond(message.Status.SUCCESS, result);
-            } else {
-                return respond(message.Status.NOTFOUND);
             }
         }
 
         void add(ulong offset, ubyte[] data) {
             switch (state) {
-            case State.UPLOADING:
-            case State.CACHING:
-                return _openAsset.writeChunk(offset, data);
-            default:
-                throw new AssertException("Trying to add to closed asset.", __FILE__, __LINE__);
+                case State.INCOMPLETE:
+                    ensureOpen;
+                    return _stored.writeChunk(offset, data);
+                case State.COMPLETE:
+                    return log.warn("Trying to add to complete asset.");
             }
         }
 
@@ -299,29 +281,28 @@ class CacheManager : IAssetSource {
             return assetPath.cat(".idx");
         }
 
-        bool isComplete() {
-            return assetPath.exists && !idxPath.exists;
-        }
-
-        void updateHashIds(message.Identifier[] ids) {
+        private void updateHashIds(message.Identifier[] ids) {
             this.hashIds = ids;
             pump.queueCallback(&notifyHashUpdate);
         }
 
         private void notifyHashUpdate() {
+            auto idx = idxPath;
+            if (idx.exists)
+                idx.remove;
+            _state = State.COMPLETE;
             addToIdMap(this);
+
             if (_remoteAsset is null) // This was an Upload
                 setMaxRating(Clock.now);
-            closeRemote();
+            else
+                closeRemote();
 
             _statusSignal.call(this, message.Status.SUCCESS, null);
         }
 
         char[] magnetLink() {
-            if (isOpen)
-                return formatMagnet(hashIds, size);
-            else
-                return formatMagnet(hashIds, 0);
+            return formatMagnet(hashIds, size);
         }
 
         char[] localIdBase32() {
@@ -551,7 +532,7 @@ public:
             if (!metaAsset) {
                 req.callback(asset, sCode, s); // Just forward without caching
             } else {
-                if (metaAsset.isComplete) {
+                if (metaAsset.state == metaAsset.State.COMPLETE) {
                     log.error("Trying to re-establish cache of completed file.");
                     req.callback(null, message.Status.ERROR, null);
                 } else try {
@@ -599,6 +580,10 @@ public:
             log.trace("serving {} from cache", hex.encode(meta.localId));
             req.callback(meta, message.Status.SUCCESS, null);
         }
+        void fromActive(Asset meta) {
+            log.trace("serving {} from active connection", hex.encode(meta.localId));
+            req.callback(meta, message.Status.SUCCESS, null);
+        }
         void forwardRequest() {
             req.ids = req.ids.dup;
             foreach (ref id; req.ids)
@@ -618,11 +603,17 @@ public:
         auto metaAsset = findMetaAsset(req.ids);
         if (!metaAsset) {
             forwardRequest();
-        } else if (tryOpen(metaAsset)) {
+        } else if (metaAsset.state == Asset.State.COMPLETE) {
+            metaAsset.openRead;
             fromCache(metaAsset);
         } else {
-            log.trace("Incomplete asset, forwarding {}", req);
-            forwardRequest();
+            assert(metaAsset.state == Asset.State.INCOMPLETE);
+            if (metaAsset._remoteAsset) {
+                fromActive(metaAsset);
+            } else {
+                log.trace("Incomplete asset, forwarding {}", req);
+                forwardRequest();
+            }
         }
     }
 
@@ -634,7 +625,6 @@ public:
             if (_makeRoom(req.size)) {
                 Asset meta = newMetaAsset();
                 auto path = meta.assetPath;
-                assert(!path.exists());
                 meta.openUpload(req.size);
                 meta.attachWatcher(callback);
                 callback(meta, message.Status.SUCCESS, null);
