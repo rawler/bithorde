@@ -403,7 +403,7 @@ public:
                     auto newFill = used + buf.length;
                     if (newFill <= msg.length) {
                         msg[used..newFill] = buf;
-                        used += newFill;
+                        used = newFill;
                     }
                 }
                 e.writeOut(&_write);
