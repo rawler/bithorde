@@ -31,6 +31,7 @@ private import tango.time.Time;
 private import tango.time.Clock;
 private import tango.util.Convert;
 private import tango.util.log.Log;
+private import tango.util.MinMax;
 
 static if ( !is(typeof(fdatasync) == function ) )
     extern (C) int fdatasync(int);
@@ -50,7 +51,9 @@ private import daemon.refcount;
 private import daemon.routing.router;
 
 const FS_MINFREE = 0.1; // Amount of filesystem that should always be kept unused.
-const M = 1024*1024;
+const K = 1024;
+const M = 1024*K;
+const MAX_READ_CHUNK = 64 * K;
 
 const FLUSH_INTERVAL_SEC = 30;
 
@@ -111,10 +114,10 @@ class CacheManager : IAssetSource {
             COMPLETE,
         }
 
-        private BaseAsset _openAsset;
+        private IStoredAsset _openAsset;
         private IServerAsset _remoteAsset;
 
-        private BaseAsset setAsset(BaseAsset newAsset) {
+        private IStoredAsset setAsset(IStoredAsset newAsset) {
             if (_openAsset)
                 _openAsset.close();
             closeRemote();
@@ -178,18 +181,6 @@ class CacheManager : IAssetSource {
                 return State.COMPLETE;
         }
 
-        bool has(ulong offset, ulong length) {
-            if (_openAsset) {
-                auto fileAsset = cast(WriteableAsset)_openAsset;
-                if (fileAsset)
-                    return fileAsset.has(offset,length);
-                else
-                    return true;
-            } else {
-                return false;
-            }
-        }
-
         bool isOpen() {
             return _openAsset !is null;
         }
@@ -226,33 +217,49 @@ class CacheManager : IAssetSource {
             return aSyncRead(offset, length, cb, null);
         }
 
-        private void aSyncRead(ulong offset, uint length, BHReadCallback cb, ForwardedRead fwd) {
-            void fail(message.Status status) {
+        private void aSyncRead(ulong offset, uint _length, BHReadCallback cb, ForwardedRead fwd) {
+            ubyte[MAX_READ_CHUNK] _buf;
+            auto buf = _buf[0..min!(uint)(_length, _buf.length)];
+            ubyte[] result;
+            ulong missing;
+
+            void respond(message.Status status, ubyte[] result=null) {
                 scope resp = new lib.message.ReadResponse;
                 resp.status = status;
-                cb(resp.status, null, resp);
+                if (result.ptr) {
+                    resp.offset = offset;
+                    resp.content = result;
+                }
+                cb(resp.status, null, resp); // TODO: track read-request
             }
+
             switch (state) {
             case State.CLOSED:
                 log.warn("Trying to read from closed asset.");
-                return fail(message.Status.INVALID_HANDLE);
+                return respond(message.Status.INVALID_HANDLE);
             case State.UPLOADING:
                 log.warn("Trying to read from unfinished uploading asset.");
-                return fail(message.Status.INVALID_HANDLE);
+                return respond(message.Status.INVALID_HANDLE);
             case State.CACHING: // Infers we have remoteAsset set
-                auto fileAsset = cast(WriteableAsset)_openAsset;
-                if (!fileAsset.has(offset, length)) {
+                result = _openAsset.readChunk(offset, buf, missing);
+                if (missing) {
                     if (fwd is null)
-                        fwd = new ForwardedRead(this, offset, length, cb);
+                        fwd = new ForwardedRead(this, offset, _length, cb);
                     if (--(fwd.retries) > 0)
-                        return _remoteAsset.aSyncRead(offset, length, &fwd.callback);
+                        return _remoteAsset.aSyncRead(offset, _length, &fwd.callback);
                     else
-                        return fail(message.Status.NOTFOUND);
+                        return respond(message.Status.NOTFOUND);
                 }
-                // Intentional fall-through
+                break;
             case State.COMPLETE:
-                noteInterest(Clock.now, (cast(double)length)/cast(double)size);
-                return _openAsset.aSyncRead(offset, length, cb);
+                result = _openAsset.readChunk(offset, buf, missing);
+                break;
+            }
+            if (result.ptr) {
+                noteInterest(Clock.now, (cast(double)result.length)/cast(double)size);
+                return respond(message.Status.SUCCESS, result);
+            } else {
+                return respond(message.Status.NOTFOUND);
             }
         }
 
@@ -260,7 +267,7 @@ class CacheManager : IAssetSource {
             switch (state) {
             case State.UPLOADING:
             case State.CACHING:
-                return _openAsset.add(offset, data);
+                return _openAsset.writeChunk(offset, data);
             default:
                 throw new AssertException("Trying to add to closed asset.", __FILE__, __LINE__);
             }

@@ -48,33 +48,19 @@ version (Posix) {
 const LOCALID_LENGTH = 32;
 const Hashers = [HashType.TREE_TIGER];
 
-private static ThreadLocal!(ubyte[]) tls_buf;
-private static this() {
-    tls_buf = new ThreadLocal!(ubyte[]);
-}
-private static ubyte[] tlsBuffer(uint size) {
-    auto buf = tls_buf.val;
-    if (buf == (ubyte[]).init) {
-        buf = new ubyte[size];
-        tls_buf.val = buf;
-    } else if (size > buf.length) {
-        buf.length = size;
-    }
-    return buf;
-}
-
 alias void delegate(Identifier[]) HashIdsListener;
 
-interface IAssetData {
-    void aSyncRead(ulong offset, uint length, BHReadCallback);
-    ulong size();
+interface IStoredAsset {
+    ubyte[] readChunk(ulong offset, ubyte[] buf, out ulong missing);
+    void writeChunk(ulong offset, ubyte[] buf);
+    bool isWritable();
     void close();
 }
 
 /*****************************************************************************************
  * Base for all kinds of cached assets. Provides basic reading functionality
  ****************************************************************************************/
-class BaseAsset : private StatelessFile, public IAssetData {
+class BaseAsset : private StatelessFile, public IStoredAsset {
 protected:
     FilePath path;
     FilePath idxPath;
@@ -114,33 +100,24 @@ public:
     /*************************************************************************************
      * Read a single segment from the Asset
      ************************************************************************************/
-    synchronized void aSyncRead(ulong offset, uint length, BHReadCallback cb) {
-        ubyte[] buf = tlsBuffer(length);
-        auto _length = length; // Avoid scope-problems for next line
-        auto got = pRead(offset, buf[0.._length]);
-        auto resp = new lib.message.ReadResponse;
-        if (got == 0 || got == Eof) {
-            resp.status = message.Status.NOTFOUND;
-        } else {
-            resp.status = message.Status.SUCCESS;
-            resp.offset = offset;
-            resp.content = buf[0..got];
-        }
-        cb(resp.status, null, resp); // TODO: should really hold reference to req
+    ubyte[] readChunk(ulong offset, ubyte[] buf, out ulong missing) {
+        missing = 0;
+        auto got = pRead(offset, buf);
+        return buf[0..got];
     }
 
     /*************************************************************************************
      * Adding segments is not supported for BaseAsset
      ************************************************************************************/
-    void add(ulong offset, ubyte[] data) {
+    void writeChunk(ulong offset, ubyte[] data) {
         throw new IOException("Trying to write to a completed file");
     }
 
     /*************************************************************************************
-     * Find the size of the asset.
+     * BaseAsset is not Writable.
      ************************************************************************************/
-    final ulong size() {
-        return _size;
+    bool isWritable() {
+        return false;
     }
 }
 
@@ -219,20 +196,22 @@ public:
     /*************************************************************************************
      * Asynchronous read, first checking the cacheMap has the block we're looking for.
      ************************************************************************************/
-    synchronized void aSyncRead(ulong offset, uint length, BHReadCallback cb) {
-        if (length == 0) {
-            cb(message.Status.SUCCESS, null, null);
-        } else if (this.cacheMap && !this.cacheMap.has(offset, length)) {
-            cb(message.Status.NOTFOUND, null, null);
+    synchronized ubyte[] readChunk(ulong offset, ubyte[] buf, out ulong missing) {
+        if (!buf.length) {
+            missing = 0;
+            return buf[0..0];
+        } else if (this.cacheMap && !this.cacheMap.has(offset, buf.length)) {
+            missing = buf.length; // TODO: really calculate how much is missing
+            return null;
         } else {
-            super.aSyncRead(offset, length, cb);
+            return super.readChunk(offset, buf, missing);
         }
     }
 
     /*************************************************************************************
      * Add a data-segment to the asset, and update the CacheMap
      ************************************************************************************/
-    void add(ulong offset, ubyte[] data) {
+    void writeChunk(ulong offset, ubyte[] data) {
         if (!cacheMap)
             throw new IOException("Trying to write to a completed file");
         auto written = pWrite(offset, data);
@@ -240,13 +219,6 @@ public:
             throw new IOException("Failed to write received segment. Disk full?");
         synchronized (this) cacheMap.add(offset, written);
         hashDataAvailable.notify();
-    }
-
-    synchronized bool has(ulong offset, ulong length) {
-        if (cacheMap)
-            return cacheMap.has(offset, length);
-        else
-            return true;
     }
 
     /*************************************************************************************
