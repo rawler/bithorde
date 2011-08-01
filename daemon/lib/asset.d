@@ -212,12 +212,14 @@ public:
      * Add a data-segment to the asset, and update the CacheMap
      ************************************************************************************/
     void writeChunk(ulong offset, ubyte[] data) {
-        if (!cacheMap)
-            throw new IOException("Trying to write to a completed file");
-        auto written = pWrite(offset, data);
-        if (written != data.length)
-            throw new IOException("Failed to write received segment. Disk full?");
-        synchronized (this) cacheMap.add(offset, written);
+        synchronized (this) {
+            if (!cacheMap)
+                throw new IOException("Trying to write to a completed file");
+            auto written = pWrite(offset, data);
+            if (written != data.length)
+                throw new IOException("Failed to write received segment. Disk full?");
+            cacheMap.add(offset, written);
+        }
         hashDataAvailable.notify();
     }
 

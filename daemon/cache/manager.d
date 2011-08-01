@@ -181,6 +181,18 @@ class CacheManager : IAssetSource {
                 return State.COMPLETE;
         }
 
+        bool has(ulong offset, ulong length) {
+            if (_openAsset) {
+                auto fileAsset = cast(WriteableAsset)_openAsset;
+                if (fileAsset)
+                    return fileAsset.has(offset,length);
+                else
+                    return true;
+            } else {
+                return false;
+            }
+        }
+
         bool isOpen() {
             return _openAsset !is null;
         }
