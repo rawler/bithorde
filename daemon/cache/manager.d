@@ -782,11 +782,10 @@ private:
      * Add an asset to the id-maps
      ************************************************************************/
     synchronized void addToIdMap(Asset asset) {
-        localIdMap[asset.localId] = asset;
         foreach (id; asset.hashIds) {
             if (id.type in hashIdMap) {
                 auto oldAsset = id.id in hashIdMap[id.type];
-                if (oldAsset) { // Asset already exist
+                if (oldAsset && oldAsset.localId != asset.localId) { // Asset already exist
                     // Remove old asset to avoid conflict with new asset.
                     // TODO: What if old asset has id-types not covered by new asset?
                     //       or possible differing values for different hashId:s?
@@ -795,6 +794,7 @@ private:
                 hashIdMap[id.type][id.id] = asset;
             }
         }
+        localIdMap[asset.localId] = asset;
         idMapDirty = true;
     }
 
