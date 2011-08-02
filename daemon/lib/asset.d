@@ -260,9 +260,14 @@ public:
     /*************************************************************************************
      * Override to also shutdown the hasherThread
      ************************************************************************************/
-    void close() {
+    synchronized void close() {
         closing = true;
-        hashDataAvailable.notify();
+        if (hasherThread) {
+            log.trace("Waiting for hasherThread to close.");
+            hashDataAvailable.notify();
+        } else {
+            super.close();
+        }
     }
 protected:
     /*************************************************************************************
@@ -287,11 +292,12 @@ protected:
                 if (closing)
                     break;
             }
-            if (hashedPtr == _size)
+            if (hashedPtr == _size) {
                 finish();
-            if (closing) {
+            } else synchronized (this) if (closing) {
                 sync();
                 super.close();
+                hasherThread = null;
             }
         } catch (Exception e) {
             log.error("Error in hashing thread! {}", e);

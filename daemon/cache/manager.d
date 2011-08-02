@@ -287,10 +287,11 @@ class CacheManager : IAssetSource {
         }
 
         private void notifyHashUpdate() {
-            auto idx = idxPath;
-            if (idx.exists)
-                idx.remove;
-            _state = State.COMPLETE;
+            close();
+            if (updateState != State.COMPLETE)
+                throw new AssertException("Asset should be complete now", __FILE__, __LINE__);
+
+            log.trace("Commiting {} to map", magnetLink);
             addToIdMap(this);
 
             if (_remoteAsset is null) // This was an Upload
@@ -590,14 +591,6 @@ public:
                 id = id.dup;
             req.pushCallback(&_forwardedCallback);
             router.findAsset(req);
-        }
-        IServerAsset tryOpen(Asset meta) {
-            try { // Needs to handle IOErrors here, to not lock meta while purging.
-                return meta.openRead();
-            } catch (IOException e) {
-                log.error("While opening asset: {}", e);
-                return null;
-            }
         }
 
         auto metaAsset = findMetaAsset(req.ids);
