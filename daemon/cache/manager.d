@@ -216,6 +216,7 @@ class CacheManager : IAssetSource {
         }
 
         void close() {
+            sync();
             if (_stored) {
                 _stored.close();
                 _stored = null;
