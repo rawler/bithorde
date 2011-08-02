@@ -263,7 +263,7 @@ protected:
                 hashDataAvailable.wait();
                 ulong available;
                 synchronized (this) available = cacheMap.zeroBlockSize;
-                while (available > hashedPtr) {
+                while ((available > hashedPtr) && ((available == _size) || !closing)) {
                     auto bufsize = min(available - hashedPtr, cast(ulong)buf.length);
                     auto got = pRead(hashedPtr, buf[0..bufsize]);
                     assert(got == bufsize);
