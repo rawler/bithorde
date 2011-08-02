@@ -169,8 +169,10 @@ class Client : lib.client.Client {
         void close() {
             log.trace("Closed asset {}", handle);
             closed = true;
-            if (assetSource)
+            if (assetSource) {
+                assetSource.detachWatcher(&onAssetStatus);
                 assetSource.dropRef(this);
+            }
             assetSource = null;
             setAsset(handle,null);
         }
