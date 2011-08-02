@@ -63,7 +63,6 @@ interface IStoredAsset {
 class BaseAsset : private StatelessFile, public IStoredAsset {
 protected:
     FilePath path;
-    FilePath idxPath;
     Logger log;
     ulong _size;
 public:
@@ -73,7 +72,6 @@ public:
      ************************************************************************************/
     this(FilePath path) {
         this.path = path;
-        this.idxPath = path.dup.suffix(".idx");
         log = Log.lookup("daemon.cache.baseasset."~path.name[0..8]);
 
         super();
@@ -140,8 +138,9 @@ public:
     /*************************************************************************************
      * Create WriteableAsset by path and size
      ************************************************************************************/
-    this(FilePath path, ulong size, HashIdsListener updateHashIds, bool usefsync) {
+    this(FilePath path, ulong size, CacheMap cacheMap, HashIdsListener updateHashIds, bool usefsync) {
         resetHashes();
+        this.cacheMap = cacheMap;
         this.updateHashIds = updateHashIds;
         this.usefsync = usefsync;
         super(path); // Parent calls open()
@@ -174,11 +173,6 @@ public:
      * file, and then truncate it to the right size.
      ************************************************************************************/
     void assetOpen(FilePath path) {
-        if (idxPath.exists && !path.exists)
-            idxPath.remove();
-        scope idxFile = new File(idxPath.toString, File.Style(File.Access.Read, File.Open.Sedate));
-        cacheMap = new CacheMap();
-        cacheMap.load(idxFile);
         hashedPtr = cacheMap.header.hashedAmount;
         foreach (type, hasher; hashers) {
             if (type in cacheMap.header.hashes) {
@@ -212,6 +206,7 @@ public:
      * Add a data-segment to the asset, and update the CacheMap
      ************************************************************************************/
     void writeChunk(ulong offset, ubyte[] data) {
+        assert(!closing);
         synchronized (this) {
             if (!cacheMap)
                 throw new IOException("Trying to write to a completed file");
@@ -232,29 +227,17 @@ public:
     void sync() {
         scope CacheMap cmapToWrite;
         synchronized (this) {
-            if (cacheMap) {
+            if (cacheMap) synchronized (cacheMap) {
                 // TODO: Refactor this
                 cacheMap.header.hashedAmount = hashedPtr;
                 foreach (type, hasher; hashers) {
                     auto buf = new ubyte[hasher.maxStateSize];
                     cacheMap.header.hashes[type] = hasher.save(buf);
                 }
-                cmapToWrite = new CacheMap(cacheMap);
             }
         }
         if (usefsync)
             fdatasync(fileHandle);
-
-        if (cmapToWrite) synchronized {
-            auto tmpPath = idxPath.dup.cat(".new");
-            scope idxFile = new File(tmpPath.toString, File.WriteCreate);
-            cmapToWrite.write(idxFile);
-            if (usefsync)
-                fdatasync(idxFile.fileHandle);
-
-            idxFile.close();
-            tmpPath.rename(idxPath);
-        }
     }
 
     /*************************************************************************************
@@ -295,7 +278,6 @@ protected:
             if (hashedPtr == _size) {
                 finish();
             } else synchronized (this) if (closing) {
-                sync();
                 super.close();
                 hasherThread = null;
             }
@@ -327,7 +309,6 @@ protected:
 
             cacheMap = null;
             sync();
-            idxPath.remove();
         }
 
         updateHashIds(hashIds);

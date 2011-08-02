@@ -43,6 +43,7 @@ private import lib.httpserver;
 private import lib.protobuf;
 private import lib.pumping;
 
+private import daemon.cache.map;
 private import daemon.cache.metadata;
 private import daemon.client;
 private import daemon.config;
@@ -114,6 +115,7 @@ class CacheManager : IAssetSource {
 
         private IStoredAsset _stored;
         private IServerAsset _remoteAsset;
+        private CacheMap _cacheMap;
         private State _state = State.UNKNOWN;
 
         void onBackingUpdate(IAsset backing, message.Status sCode, message.AssetStatus s) {
@@ -172,8 +174,19 @@ class CacheManager : IAssetSource {
                 case State.COMPLETE:
                     return _stored = new BaseAsset(assetPath);
                 case State.INCOMPLETE:
-                    return _stored = new WriteableAsset(assetPath, size, &updateHashIds, usefsync);
+                    return _stored = new WriteableAsset(assetPath, size, loadCacheMap, &updateHashIds, usefsync);
             }
+        }
+
+        private CacheMap loadCacheMap() {
+            if (!_cacheMap) {
+                if (idxPath.exists && !assetPath.exists)
+                    idxPath.remove();
+                scope idxFile = new File(idxPath.toString, File.Style(File.Access.Read, File.Open.Sedate));
+                _cacheMap = new CacheMap();
+                _cacheMap.load(idxFile);
+            }
+            return _cacheMap;
         }
 
         private State updateState() {
@@ -214,6 +227,16 @@ class CacheManager : IAssetSource {
             auto asset = cast(WriteableAsset)_stored;
             if (asset)
                 asset.sync();
+            if (_cacheMap) synchronized (this) {
+                auto tmpPath = idxPath.dup.cat(".new");
+                scope idxFile = new File(tmpPath.toString, File.WriteCreate);
+                _cacheMap.write(idxFile);
+                if (usefsync)
+                    fdatasync(idxFile.fileHandle);
+
+                idxFile.close();
+                tmpPath.rename(idxPath);
+            }
         }
 
         void aSyncRead(ulong offset, uint length, BHReadCallback cb) {
@@ -287,6 +310,9 @@ class CacheManager : IAssetSource {
         }
 
         private void notifyHashUpdate() {
+            _cacheMap = null;
+            sync();
+            idxPath.remove();
             close();
             if (updateState != State.COMPLETE)
                 throw new AssertException("Asset should be complete now", __FILE__, __LINE__);
