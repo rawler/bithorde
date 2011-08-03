@@ -318,7 +318,6 @@ class CacheManager : IAssetSource {
             if (updateState != State.COMPLETE)
                 throw new AssertException("Asset should be complete now", __FILE__, __LINE__);
 
-            log.trace("Commiting {} to map", magnetLink);
             addToIdMap(this);
 
             if (_remoteAsset is null) // This was an Upload
@@ -412,13 +411,15 @@ public:
      * Tries to find assetMetaData for specified hashIds. First match applies.
      ***********************************************************************************/
     Asset findMetaAsset(message.Identifier[] hashIds) {
+        Asset res = null;
         foreach (id; hashIds) {
             if ((id.type in hashIdMap) && (id.id in hashIdMap[id.type])) {
-                auto assetMeta = hashIdMap[id.type][id.id];
-                return assetMeta;
+                res = hashIdMap[id.type][id.id];
+                if (res.updateState == res.State.COMPLETE)
+                    break;
             }
         }
-        return null;
+        return res;
     }
 
     /************************************************************************************
@@ -783,6 +784,9 @@ private:
      * Add an asset to the id-maps
      ************************************************************************/
     synchronized void addToIdMap(Asset asset) {
+        scope buf = new char[asset.localId.length * 2];
+        log.trace("Commiting {} ({}) to map", hex.encode(asset.localId, buf), asset.magnetLink);
+
         foreach (id; asset.hashIds) {
             if (id.type in hashIdMap) {
                 auto oldAsset = id.id in hashIdMap[id.type];
