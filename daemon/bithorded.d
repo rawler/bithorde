@@ -128,7 +128,21 @@ public int main(char[][] _args)
 
     log.info("Setup done, starting server");
 
-    s.run();
+    try {
+        s.run();
+    } catch (Exception e) {
+        char[65536] msg;
+        size_t used = 0;
+        void _write(char[] buf) {
+            auto newFill = used + buf.length;
+            if (newFill <= msg.length) {
+                msg[used..newFill] = buf;
+                used = newFill;
+            }
+        }
+        e.writeOut(&_write);
+        log.fatal("Unhandled exception ({}:{}): {}", e.file, e.line, msg[0..used]);
+    }
 
     return 0;
 }
