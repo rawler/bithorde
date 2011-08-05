@@ -100,7 +100,7 @@ char[] formatMagnet(Identifier[] ids, ulong length, char[] name = null) {
             auto hash = HashMap[id.type];
             append("xt=urn:{}:{}", hash.name, hash.magnetFormatter(id.id));
         } else {
-            Log.lookup("hashes").warn("Error; {} is an unknown Hash-Type");
+            Log.lookup("hashes").warn("Error; {} is an unknown Hash-Type", id.type);
         }
     }
     return cast(char[])array.slice;
