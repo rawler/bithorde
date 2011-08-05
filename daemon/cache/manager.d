@@ -58,6 +58,8 @@ const MAX_READ_CHUNK = 64 * K;
 
 const FLUSH_INTERVAL_SEC = 30;
 
+const ADVICE_CONCURRENT_READ = 6;
+
 /*************************************************************************************
  * Every read-operation for non-cached data results in a ForwardedRead, which tracks
  * a forwarded ReadRequest, recieves the response, and updates the CachingAsset.
@@ -138,6 +140,17 @@ class CacheManager : IAssetSource {
             }
         }
 
+        void rehash() {
+            if (updateState != State.COMPLETE) {
+                throw new AssertException("Tried to rehash INCOMPLETE stored asset", __FILE__, __LINE__);
+            } else {
+                if (!sizeIsSet)
+                    size = assetPath.fileSize;
+                log.trace("Running rehash on {}", hex.encode(localId));
+                _stored = new RehashingAsset(assetPath, size, &updateHashIds);
+            }
+        }
+
         Asset openUpload(ulong size) {
             assert(!sizeIsSet);
             assert(!assetPath.exists);
@@ -204,7 +217,7 @@ class CacheManager : IAssetSource {
         }
 
         bool isOpen() {
-            return refs.length > 0;
+            return _stored || _remoteAsset || refs.length > 0;
         }
 
         void closeRemote() {
@@ -326,14 +339,11 @@ class CacheManager : IAssetSource {
                 closeRemote();
 
             _statusSignal.call(this, message.Status.SUCCESS, null);
+            checkRehashQueue;
         }
 
         char[] magnetLink() {
             return formatMagnet(hashIds, size);
-        }
-
-        char[] localIdBase32() {
-            return base32.encode(localId);
         }
     }
 
@@ -394,16 +404,20 @@ public:
         this.router = router;
         this.pump = pump;
 
+        hashIdMap[message.HashType.SHA1] = null;
+        hashIdMap[message.HashType.SHA256] = null;
+        hashIdMap[message.HashType.TREE_TIGER] = null;
+        hashIdMap[message.HashType.ED2K] = null;
+
         idMapPath = this.assetDir.dup.append("index.protobuf");
         if (idMapPath.exists) {
-            loadIdMap();
+            try {
+                loadIdMap();
+            } catch (DecodeException) {
+                log.fatal("Failed to load the old idMap. Will try to rebuild from existing assets. This will take a while.");
+            }
             garbageCollect();
             _makeRoom(0); // Make sure the cache is in good order.
-        } else {
-            hashIdMap[message.HashType.SHA1] = null;
-            hashIdMap[message.HashType.SHA256] = null;
-            hashIdMap[message.HashType.TREE_TIGER] = null;
-            hashIdMap[message.HashType.ED2K] = null;
         }
     }
 
@@ -411,6 +425,7 @@ public:
      * Tries to find assetMetaData for specified hashIds. First match applies.
      ***********************************************************************************/
     Asset findMetaAsset(message.Identifier[] hashIds) {
+        log.trace("Looking for {}", formatMagnet(hashIds, 0));
         Asset res = null;
         foreach (id; hashIds) {
             if ((id.type in hashIdMap) && (id.id in hashIdMap[id.type])) {
@@ -581,7 +596,8 @@ public:
     /************************************************************************************
      * Remove an asset from cache.
      ***********************************************************************************/
-    synchronized bool purgeAsset(Asset asset) {
+    synchronized long purgeAsset(Asset asset) {
+        long res = -1;
         if (asset.hashIds.length) {
             log.info("Purging {}", formatMagnet(asset.hashIds, 0, null));
         } else {
@@ -591,14 +607,22 @@ public:
         if (asset.localId in localIdMap)
             localIdMap.remove(asset.localId);
         foreach (hashId; asset.hashIds) {
-            if ((hashId.type in hashIdMap) && (hashId.id in hashIdMap[hashId.type]))
+            if ((hashId.type in hashIdMap) &&
+                (hashId.id in hashIdMap[hashId.type]) &&
+                (hashIdMap[hashId.type][hashId.id] == asset))
                 hashIdMap[hashId.type].remove(hashId.id);
         }
         auto aPath = asset.assetPath;
-        if (aPath.exists) aPath.remove();
+        if (aPath.exists) {
+            res += aPath.fileSize;
+            aPath.remove();
+        }
         auto iPath = asset.idxPath;
-        if (iPath.exists) iPath.remove();
-        return true;
+        if (iPath.exists) {
+            res += iPath.fileSize;
+            iPath.remove();
+        }
+        return res;
     }
 
     /************************************************************************************
@@ -666,7 +690,7 @@ public:
         foreach (asset; localIdMap) {
             auto assetOpen = asset.isOpen ? "open" : "closed";
             auto desc = assetOpen ~ ", " ~ asset.magnetLink;
-            res ~= MgmtEntry(asset.localIdBase32, desc);
+            res ~= MgmtEntry(hex.encode(asset.localId), desc);
         }
         return res;
     }
@@ -715,47 +739,77 @@ private:
 
         log.info("Beginning garbage collection");
 
+        ulong bytesFreed;
         /* remove redundant and faulty assets from localIdMap */ {
-            scope ubyte[][] staleAssets;
+            scope Asset[] staleAssets;
             foreach (asset; localIdMap) {
                 if (!asset.assetPath.exists) {
-                    foreach (id; asset.hashIds) if (id.type in hashIdMap) {
-                        auto map = hashIdMap[id.type];
-                        if ((id.id in map) &&
-                            (map[id.id] == asset))
-                            map.remove(id.id);
+                    staleAssets ~= asset;
+                } else if (asset.hashIds.length) {
+                    auto valid = false;
+                    foreach (id; asset.hashIds) {
+                        if ((id.type in hashIdMap)
+                              && (id.id in hashIdMap[id.type])
+                              && (hashIdMap[id.type][id.id] == asset))
+                            valid = true;
                     }
-                    staleAssets ~= asset.localId;
-                } else foreach (id; asset.hashIds) {
-                    if ((id.type in hashIdMap) &&
-                        (id.id in hashIdMap[id.type]) &&
-                        (hashIdMap[id.type][id.id] != asset))
-                    staleAssets ~= asset.localId;
+                    if (!valid)
+                        staleAssets ~= asset;
                 }
             }
-            foreach (id; staleAssets) {
-                localIdMap.remove(id);
+            foreach (asset; staleAssets) {
+                auto res = purgeAsset(asset);
+                if (res >= 0)
+                    bytesFreed += res;
             }
         }
 
-        ulong bytesFreed;
         /* Clear out files not referenced by localIdMap */ {
             ubyte[LOCALID_LENGTH] idbuf;
             auto path = assetDir.dup.append("dummy");
             foreach (fileInfo; assetDir) {
-                char[] name, suffix;
-                name = head(fileInfo.name, ".", suffix);
-                if (name.length==(idbuf.length*2) && (suffix=="idx" || suffix=="")) {
-                    auto id = hex.decode(name, idbuf);
+                path.file = fileInfo.name;
+                if (path.name.length==(idbuf.length*2) && (path.suffix=="idx" || path.suffix=="")) {
+                    auto id = hex.decode(path.name, idbuf);
                     if (!(id in localIdMap)) {
-                        path.name = fileInfo.name;
-                        path.remove();
-                        bytesFreed += fileInfo.bytes;
+                        if (path.suffix("idx").exists) {
+                            log.info("Purging leftovers for asset {}", path.name);
+                            bytesFreed += path.fileSize;
+                            path.remove();
+                            if (path.suffix("").exists) {
+                                bytesFreed += path.fileSize;
+                                path.remove();
+                            }
+                        } else {
+                            log.info("Queing asset {} for recovery", path.name);
+                            auto asset = new Asset;
+                            asset.localId = idbuf.dup;
+                            localIdMap[asset.localId] = asset;
+                        }
                     }
                 }
             }
         }
+
+        checkRehashQueue;
+
         log.info("Garbage collection done. {} KB freed", (bytesFreed + 512) / 1024);
+    }
+
+    void checkRehashQueue() {
+        auto count = 0;
+        foreach (id, asset; localIdMap) {
+            if (asset.isOpen)
+                count ++;
+        }
+        while ((count++) < ADVICE_CONCURRENT_READ) {
+            foreach (id, asset; localIdMap) {
+                if (!(asset.hashIds.length || asset.isOpen)) {
+                    asset.rehash();
+                    break;
+                }
+            }
+        }
     }
 
     /*************************************************************************
@@ -794,7 +848,7 @@ private:
                     // Remove old asset to avoid conflict with new asset.
                     // TODO: What if old asset has id-types not covered by new asset?
                     //       or possible differing values for different hashId:s?
-                    localIdMap.remove(oldAsset.localId);
+                    purgeAsset(*oldAsset);
                 }
                 hashIdMap[id.type][id.id] = asset;
             }
