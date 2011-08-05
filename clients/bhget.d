@@ -78,6 +78,11 @@ public:
         if (!ids)
             throw new IllegalArgumentException("Failed to parse Uri. Supported asset-specs are magnet-links, or a symlink with a filename being a magnet-link.");
 
+        if (name) {
+            char[] _;
+            name = tail(name, "/", _);
+        }
+
         stdout = getAutoBool("stdout", delegate bool() {
             return !name;
         });
