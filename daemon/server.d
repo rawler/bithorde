@@ -37,7 +37,7 @@ private import tango.util.container.more.Stack;
 private import tango.util.Convert;
 private import tango.util.log.Log;
 
-private import daemon.cache.manager;
+private import daemon.store.cache.manager;
 private import daemon.client;
 private import daemon.config;
 private import daemon.routing.friend;

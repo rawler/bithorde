@@ -23,7 +23,7 @@ private import tango.time.Time;
 private import tango.util.log.Log;
 
 import daemon.server;
-import daemon.cache.manager;
+import daemon.store.cache.manager;
 import daemon.refcount;
 
 import lib.asset;

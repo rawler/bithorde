@@ -15,7 +15,7 @@
  * limitations under the License.
  ***************************************************************************************/
 
-module daemon.cache.manager;
+module daemon.store.cache.manager;
 
 private import tango.core.Exception;
 private import tango.core.Thread;
@@ -43,11 +43,11 @@ private import lib.httpserver;
 private import lib.protobuf;
 private import lib.pumping;
 
-private import daemon.cache.map;
-private import daemon.cache.metadata;
+private import daemon.store.asset;
+private import daemon.store.map;
+private import daemon.store.storedasset;
 private import daemon.client;
 private import daemon.config;
-private import daemon.lib.asset;
 private import daemon.refcount;
 private import daemon.routing.router;
 
@@ -105,7 +105,7 @@ class ForwardedRead {
  * Assets.
  ***************************************************************************************/
 class CacheManager : IAssetSource {
-    class Asset : daemon.cache.metadata.AssetMetaData, IServerAsset {
+    class Asset : daemon.store.asset.BaseAsset, IServerAsset {
         mixin IAsset.StatusSignal;
         mixin RefCountTarget;
 
@@ -185,9 +185,9 @@ class CacheManager : IAssetSource {
         } body {
             if (!_stored) switch (_state) {
                 case State.COMPLETE:
-                    return _stored = new BaseAsset(assetPath);
+                    return _stored = new CompleteAsset(assetPath);
                 case State.INCOMPLETE:
-                    return _stored = new WriteableAsset(assetPath, size, loadCacheMap, &updateHashIds, usefsync);
+                    return _stored = new IncompleteAsset(assetPath, size, loadCacheMap, &updateHashIds, usefsync);
             }
         }
 
@@ -238,7 +238,7 @@ class CacheManager : IAssetSource {
         }
 
         void sync() {
-            auto asset = cast(WriteableAsset)_stored;
+            auto asset = cast(IncompleteAsset)_stored;
             if (asset)
                 asset.sync();
             if (_cacheMap) synchronized (this) {

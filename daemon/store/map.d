@@ -15,7 +15,7 @@
  * limitations under the License.
  ***************************************************************************************/
 
-module daemon.cache.map;
+module daemon.store.map;
 
 private import tango.io.device.Array;
 private import tango.io.model.IConduit;

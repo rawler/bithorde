@@ -16,7 +16,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  ***************************************************************************************/
-module daemon.cache.metadata;
+module daemon.store.asset;
 
 private import tango.time.Time;
 private import tango.util.Convert;
@@ -28,9 +28,9 @@ private import lib.message;
 private import lib.protobuf;
 
 /****************************************************************************************
- * AssetMetaData holds the mapping between the different ids of an asset
+ * BaseAsset forms the base for extending a stored file with rating and hashIds.
  ***************************************************************************************/
-class AssetMetaData : ProtoBufMessage {
+class BaseAsset : ProtoBufMessage {
     mixin(PBField!(ubyte[], "localId"));        /// Local assetId
     mixin(PBField!(Identifier[], "hashIds"));   /// HashIds
     mixin(PBField!(ulong, "rating"));           /// Rating-system for determining which content to keep in cache.

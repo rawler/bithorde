@@ -16,7 +16,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  ***************************************************************************************/
-module daemon.lib.asset;
+module daemon.store.storedasset;
 
 private import tango.core.Exception;
 private import tango.core.Thread;
@@ -33,7 +33,7 @@ private import lib.hashes;
 private import lib.digest.stateful;
 private import lib.message;
 
-private import daemon.cache.map;
+private import daemon.store.map;
 private import daemon.client;
 private import daemon.lib.stateless;
 
@@ -60,7 +60,7 @@ interface IStoredAsset {
 /*****************************************************************************************
  * Base for all kinds of cached assets. Provides basic reading functionality
  ****************************************************************************************/
-class BaseAsset : private StatelessFile, public IStoredAsset {
+class CompleteAsset : private StatelessFile, public IStoredAsset {
 protected:
     FilePath path;
     Logger log;
@@ -68,11 +68,11 @@ protected:
 public:
     /*************************************************************************************
      * IncompleteAssetException is thrown if a not-fully-cached asset were to be Opened
-     * directly as a BaseAsset
+     * directly as a CompleteAsset
      ************************************************************************************/
     this(FilePath path) {
         this.path = path;
-        log = Log.lookup("daemon.cache.baseasset."~path.name[0..8]);
+        log = Log.lookup("daemon.lib.complete."~path.name[0..8]);
 
         super();
         assetOpen(path);
@@ -105,14 +105,14 @@ public:
     }
 
     /*************************************************************************************
-     * Adding segments is not supported for BaseAsset
+     * Adding segments is not supported for CompleteAsset
      ************************************************************************************/
     void writeChunk(ulong offset, ubyte[] data) {
         throw new IOException("Trying to write to a completed file");
     }
 
     /*************************************************************************************
-     * BaseAsset is not Writable.
+     * Complete is not Writable.
      ************************************************************************************/
     bool isWritable() {
         return false;
@@ -120,10 +120,9 @@ public:
 }
 
 /*****************************************************************************************
- * WriteableAsset implements uploading to Assets, and forms a base for CachingAsset and
- * UploadAsset
+ * IncompleteAsset represents assets that still may have "holes" in them.
  ****************************************************************************************/
-class WriteableAsset : BaseAsset {
+class IncompleteAsset : CompleteAsset {
 protected:
     CacheMap cacheMap;
     IStatefulDigest[HashType] hashers;
@@ -136,7 +135,7 @@ protected:
     bool closing = false;
 public:
     /*************************************************************************************
-     * Create WriteableAsset by path and size
+     * Create IncompleteAsset by path and size
      ************************************************************************************/
     this(FilePath path, ulong size, CacheMap cacheMap, HashIdsListener updateHashIds, bool usefsync) {
         resetHashes();
@@ -147,7 +146,7 @@ public:
         if (this.length != size)
             truncate(size);           // We resize it to right size
         _size = size;
-        log = Log.lookup("daemon.cache.writeasset."~path.name[0..8]); // TODO: fix order and double-init
+        log = Log.lookup("daemon.lib.incomplete."~path.name[0..8]); // TODO: fix order and double-init
 
         hasherThread = new Thread(&hasherThreadLoop);
         hasherThread.name = "Hasher:"~path.name[0..min!(uint)(6,path.name.length)];
@@ -324,7 +323,7 @@ protected:
     }
 }
 
-class RehashingAsset : WriteableAsset {
+class RehashingAsset : IncompleteAsset {
     this(FilePath path, ulong size, HashIdsListener updateHashIds) {
         auto cacheMap = new CacheMap;
         cacheMap.add(0, size);
@@ -336,4 +335,6 @@ class RehashingAsset : WriteableAsset {
     }
 
     void waitForData() {}
+
+    bool isWritable() { return false; }
 }
