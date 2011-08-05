@@ -245,7 +245,7 @@ public:
     /************************************************************************************
      * Add a segment into the cachemap
      ***********************************************************************************/
-    void add(ulong start, uint length) {
+    void add(ulong start, ulong length) {
         // Just skip 0-length segments
         if (!length) return;
 

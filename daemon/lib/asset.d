@@ -144,7 +144,8 @@ public:
         this.updateHashIds = updateHashIds;
         this.usefsync = usefsync;
         super(path); // Parent calls open()
-        truncate(size);           // We resize it to right size
+        if (this.length != size)
+            truncate(size);           // We resize it to right size
         _size = size;
         log = Log.lookup("daemon.cache.writeasset."~path.name[0..8]); // TODO: fix order and double-init
 
@@ -172,7 +173,7 @@ public:
      * Create and open a WriteableAsset. Make sure to create cacheMap first, create the
      * file, and then truncate it to the right size.
      ************************************************************************************/
-    void assetOpen(FilePath path) {
+    void assetOpen(FilePath path, File.Style style) {
         hashedPtr = cacheMap.header.hashedAmount;
         foreach (type, hasher; hashers) {
             if (type in cacheMap.header.hashes) {
@@ -184,7 +185,11 @@ public:
                 break;
             }
         }
-        File.open(path.toString, File.Style(File.Access.ReadWrite, File.Open.Sedate));
+        File.open(path.toString, style);
+    }
+    /// ditto
+    void assetOpen(FilePath path) {
+        assetOpen(path, File.Style(File.Access.ReadWrite, File.Open.Sedate));
     }
 
     /*************************************************************************************
@@ -257,13 +262,13 @@ protected:
      * Drive hashing of incoming data, to verify final digest.
      ************************************************************************************/
     void hasherThreadLoop() {
-        ubyte[64*1024] buf;
+        ubyte[1024*1024] buf;
         try {
             while (hashedPtr < _size) {
-                hashDataAvailable.wait();
+                waitForData;
                 ulong available;
                 synchronized (this) available = cacheMap.zeroBlockSize;
-                while ((available > hashedPtr) && ((available == _size) || !closing)) {
+                while ((available > hashedPtr) && ((!closing) || (available == _size))) {
                     auto bufsize = min(available - hashedPtr, cast(ulong)buf.length);
                     auto got = pRead(hashedPtr, buf[0..bufsize]);
                     assert(got == bufsize);
@@ -284,6 +289,10 @@ protected:
         } catch (Exception e) {
             log.error("Error in hashing thread! {}", e);
         }
+    }
+
+    protected void waitForData() {
+        hashDataAvailable.wait();
     }
 
     /*************************************************************************************
@@ -313,4 +322,18 @@ protected:
 
         updateHashIds(hashIds);
     }
+}
+
+class RehashingAsset : WriteableAsset {
+    this(FilePath path, ulong size, HashIdsListener updateHashIds) {
+        auto cacheMap = new CacheMap;
+        cacheMap.add(0, size);
+        super(path, size, cacheMap, updateHashIds, false);
+    }
+
+    void assetOpen(FilePath path) {
+        super.assetOpen(path, File.Style(File.Access.Read, File.Open.Exists));
+    }
+
+    void waitForData() {}
 }
