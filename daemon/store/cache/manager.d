@@ -631,11 +631,8 @@ public:
      ***********************************************************************************/
     synchronized long purgeAsset(Asset asset) {
         long res = -1;
-        if (asset.hashIds.length) {
-            log.info("Purging {}", formatMagnet(asset.hashIds, 0, null));
-        } else {
-            log.info("Purging <unknown asset>");
-        }
+        char[1024] buf;
+        log.info("Purging {} ({})", hex.encode(asset.localId, buf), formatMagnet(asset.hashIds, 0, null));
 
         if (asset.localId in localIdMap)
             localIdMap.remove(asset.localId);
@@ -781,6 +778,7 @@ private:
             scope Asset[] staleAssets;
             foreach (asset; localIdMap) {
                 if (!asset.assetPath.exists) {
+                    log.trace("Asset file has disappeared.");
                     staleAssets ~= asset;
                 } else if (asset.hashIds.length) {
                     auto valid = false;
@@ -790,8 +788,10 @@ private:
                               && (hashIdMap[id.type][id.id] == asset))
                             valid = true;
                     }
-                    if (!valid)
+                    if (!valid) {
+                        log.trace("Found no valid hashId-references to asset.");
                         staleAssets ~= asset;
+                    }
                 }
             }
             foreach (asset; staleAssets) {
