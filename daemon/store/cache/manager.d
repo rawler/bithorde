@@ -364,6 +364,8 @@ class CacheManager : IAssetSource {
             if (updateState != State.COMPLETE)
                 throw new AssertException("Asset should be complete now", __FILE__, __LINE__);
 
+            log.trace("Hash verified");
+
             addToIdMap(this);
 
             if (_remoteAsset is null) // This was an Upload
@@ -884,7 +886,7 @@ private:
      ************************************************************************/
     synchronized void addToIdMap(Asset asset) {
         scope buf = new char[asset.localId.length * 2];
-        log.trace("Commiting {} ({}) to map", hex.encode(asset.localId, buf), asset.magnetLink);
+        log.trace("Committing {} ({}) to map", hex.encode(asset.localId, buf), asset.magnetLink);
 
         foreach (id; asset.hashIds) {
             if (id.type in hashIdMap) {
