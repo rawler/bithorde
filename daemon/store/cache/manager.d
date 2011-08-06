@@ -773,7 +773,7 @@ private:
             scope(exit) { log.trace("Asset-GC took {}ms",(Clock.now-started).millis); }
         }
 
-        log.info("Beginning garbage collection");
+        log.trace("Beginning garbage collection");
 
         ulong bytesFreed;
         /* remove redundant and faulty assets from localIdMap */ {
@@ -835,7 +835,10 @@ private:
 
         checkRehashQueue;
 
-        log.info("Garbage collection done. {} KB freed", (bytesFreed + 512) / 1024);
+        if (bytesFreed)
+            log.info("Garbage collection done. {} KB freed", (bytesFreed + 512) / 1024);
+        else
+            log.trace("Garbage collection done. {} KB freed", (bytesFreed + 512) / 1024);
     }
 
     void checkRehashQueue() {
