@@ -835,10 +835,18 @@ private:
 
     void checkRehashQueue() {
         auto count = 0;
+        auto waiting = 0;
         foreach (id, asset; localIdMap) {
-            if (asset.isOpen)
+            if (asset.isOpen) {
                 count ++;
+            } else if (!asset.hashIds.length) {
+                waiting ++;
+            }
         }
+
+        if (waiting)
+            log.info("{} assets still waiting for rehashing.", waiting);
+
         while ((count++) < ADVICE_CONCURRENT_READ) {
             foreach (id, asset; localIdMap) {
                 if (!(asset.hashIds.length || asset.isOpen)) {
