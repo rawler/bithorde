@@ -360,9 +360,9 @@ class CacheManager : IAssetSource {
             _cacheMap = null;
             sync();
             idxPath.remove();
-            close();
             if (updateState != State.COMPLETE)
                 throw new AssertException("Asset should be complete now", __FILE__, __LINE__);
+            close();
 
             log.trace("Hash verified");
 
@@ -794,6 +794,9 @@ private:
                         log.trace("Found no valid hashId-references to asset.");
                         staleAssets ~= asset;
                     }
+                } else if (asset.state == asset.State.INCOMPLETE
+                           && !asset.isOpen) {
+                    staleAssets ~= asset;
                 }
             }
             foreach (asset; staleAssets) {
