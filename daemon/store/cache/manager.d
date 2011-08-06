@@ -839,7 +839,7 @@ private:
         foreach (id, asset; localIdMap) {
             if (asset.isOpen) {
                 count ++;
-            } else if (!asset.hashIds.length) {
+            } else if (!(asset.hashIds.length || asset.state == asset.state.INCOMPLETE)) {
                 waiting ++;
             }
         }
@@ -849,7 +849,7 @@ private:
 
         while ((count++) < ADVICE_CONCURRENT_READ) {
             foreach (id, asset; localIdMap) {
-                if (!(asset.hashIds.length || asset.isOpen)) {
+                if (!(asset.hashIds.length || asset.isOpen || asset.state == asset.state.INCOMPLETE)) {
                     asset.rehash();
                     break;
                 }
