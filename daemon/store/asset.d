@@ -30,42 +30,7 @@ private import lib.protobuf;
 /****************************************************************************************
  * BaseAsset forms the base for extending a stored file with rating and hashIds.
  ***************************************************************************************/
-class BaseAsset : ProtoBufMessage {
-    mixin(PBField!(ubyte[], "localId"));        /// Local assetId
+class BaseAsset {
     mixin(PBField!(Identifier[], "hashIds"));   /// HashIds
-    mixin(PBField!(ulong, "rating"));           /// Rating-system for determining which content to keep in cache.
     mixin(PBField!(ulong, "size"));             /// Total size of asset
-
-    mixin ProtoBufCodec!(PBMapping("localId",   1),
-                         PBMapping("hashIds",   2),
-                         PBMapping("rating",    3),
-                         PBMapping("size",      4));
-
-    abstract void onBackingUpdate(IAsset backing, Status sCode, AssetStatus s);
-
-    /************************************************************************************
-     * Increase the rating by noting interest in this asset.
-     ***********************************************************************************/
-    void noteInterest(Time clock, double weight) in {
-        assert(clock >= Time.epoch1970);
-        assert(weight > 0);
-    } body {
-        rating = rating + cast(ulong)((clock.unix.millis - rating) * weight);
-    }
-
-    void setMaxRating(Time clock) in {
-        assert(clock >= Time.epoch1970);
-    } body {
-        rating = clock.unix.millis;
-    }
-
-    char[] toString() {
-        char[] retval = "AssetMetaData {\n";
-        retval ~= "     localId: " ~ hex.encode(localId) ~ "\n";
-        retval ~= "     rating: " ~ to!(char[])(rating) ~ "\n";
-        foreach (hash; hashIds) {
-            retval ~= "     " ~ HashMap[hash.type].name ~ ": " ~ hex.encode(hash.id) ~ "\n";
-        }
-        return retval ~ "}";
-    }
 }

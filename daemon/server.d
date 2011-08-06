@@ -38,6 +38,7 @@ private import tango.util.Convert;
 private import tango.util.log.Log;
 
 private import daemon.store.cache.manager;
+private import daemon.store.repository;
 private import daemon.client;
 private import daemon.config;
 private import daemon.routing.friend;
@@ -58,6 +59,7 @@ class Server : IAssetSource
     }
 package:
     CacheManager cacheMgr;
+    Repository[] linkRepos;
     Router router;
     Friend[char[]] offlineFriends;
     Thread serverThread;
@@ -112,6 +114,9 @@ public:
         this.router = new Router();
         this.cacheMgr = new CacheManager(config.cachedir, config.cacheMaxSize, config.usefsync, router, pump);
 
+        foreach (root; config.linkroots)
+            linkRepos ~= new Repository(pump, root, config.usefsync);
+
         // Setup friend connections
         foreach (f;config.friends)
             this.offlineFriends[f.name] = f;
@@ -121,6 +126,8 @@ public:
 
     void run() {
         cacheMgr.start();
+        foreach (repo; linkRepos)
+            repo.start();
         serverThread = Thread.getThis;
         scope(exit) { cleanup(); } // Make sure to clean up
         reconnectThread = new Thread(&reconnectLoop);
@@ -154,12 +161,32 @@ public:
         }
     }
 
-    void findAsset(BindRead req) {
+    bool findAsset(BindRead req) {
+        foreach (repo; linkRepos) {
+            if (repo.findAsset(req))
+                return true;
+        }
         return cacheMgr.findAsset(req);
     }
 
     void uploadAsset(message.BindWrite req, BHAssetStatusCallback cb) {
-        cacheMgr.uploadAsset(req, cb);
+        if (req.sizeIsSet) {
+            cacheMgr.uploadAsset(req, cb);
+        } else if (req.pathIsSet) {
+            auto basePath = req.path;
+            auto _ = Text.tail(basePath, "/", basePath);
+            while (basePath) {
+                foreach (repo; linkRepos) {
+                    if (repo.root == basePath)
+                        return repo.uploadAsset(req.path[basePath.length+1..$], cb);
+                }
+                _ = Text.tail(basePath, "/", basePath);
+            }
+            log.error("BindWrite with link '{}' did not match any repository.", req.path);
+            cb(null, message.Status.NOTFOUND, null);
+        } else {
+            log.error("Invalid BindWrite with neither size nor path");
+        }
     }
 
 protected:

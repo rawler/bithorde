@@ -17,7 +17,7 @@
 module lib.client;
 
 private import tango.core.Exception;
-private import tango.io.selector.Selector;
+private import tango.io.FilePath;
 private import tango.math.random.Random;
 private import tango.net.device.Socket;
 private import tango.text.convert.Format;
@@ -330,6 +330,19 @@ public:
     void beginUpload(ulong size, BHAssetStatusCallback cb, bool singleShotStatus = false) {
         auto req = new message.BindWrite;
         req.size = size;
+        auto asset = new RemoteAsset(this, req, cb, singleShotStatus);
+        sendBindRequest(req, asset, TimeSpan.fromMillis(10000));
+    }
+
+    /*************************************************************************************
+     * Register a linked asset in BitHorde.
+     ************************************************************************************/
+    void registerLink(FilePath path, BHAssetStatusCallback cb, bool singleShotStatus=false) in {
+        assert(path);
+        assert(path.isAbsolute, "registerLink requires absolute path");
+    } body {
+        auto req = new message.BindWrite;
+        req.path = path.toString;
         auto asset = new RemoteAsset(this, req, cb, singleShotStatus);
         sendBindRequest(req, asset, TimeSpan.fromMillis(10000));
     }

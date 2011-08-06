@@ -46,8 +46,16 @@ interface IServerAsset : IAsset {
     void takeRef(Object o);
     void dropRef(Object o);
 }
+
 interface IAssetSource {
-    void findAsset(daemon.client.BindRead req);
+    /*************************************************************************************
+     * Tries to lookup a specified asset and serve it.
+     * Returns: Whether this IAssetSource handled the request or not. Please not that 
+     *          "handling" is not the same as finding. I.E. an AssetSource can handle the
+     *          request by replying NOTFOUND. On the other hand, not handling means
+     *          another asset-source might be tried.
+     ************************************************************************************/
+    bool findAsset(daemon.client.BindRead req);
 }
 
 /****************************************************************************************

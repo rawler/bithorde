@@ -46,11 +46,12 @@ public:
      * Implements IAssetSource.find. Unless request is already under forwarding, forward
      * to all connected friends.
      ***********************************************************************************/
-    void findAsset(daemon.client.BindRead req) {
+    bool findAsset(daemon.client.BindRead req) {
         if (req.uuid in openRequests)
             req.callback(null, Status.WOULD_LOOP, null);
         else
-            return forwardBindRead(req);
+            forwardBindRead(req);
+        return true;
     }
 
     /************************************************************************************

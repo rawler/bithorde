@@ -105,9 +105,42 @@ class ForwardedRead {
  * Assets.
  ***************************************************************************************/
 class CacheManager : IAssetSource {
-    class Asset : daemon.store.asset.BaseAsset, IServerAsset {
+    class Asset : daemon.store.asset.BaseAsset, IServerAsset, ProtoBufMessage {
         mixin IAsset.StatusSignal;
         mixin RefCountTarget;
+
+        mixin(PBField!(ubyte[], "localId"));        /// Local assetId
+        mixin(PBField!(ulong, "rating"));           /// Rating-system for determining which content to keep in cache.
+        mixin ProtoBufCodec!(PBMapping("localId",   1),
+                            PBMapping("hashIds",   2),
+                            PBMapping("rating",    3),
+                            PBMapping("size",      4));
+
+        /************************************************************************************
+        * Increase the rating by noting interest in this asset.
+        ***********************************************************************************/
+        void noteInterest(Time clock, double weight) in {
+            assert(clock >= Time.epoch1970);
+            assert(weight > 0);
+        } body {
+            rating = rating + cast(ulong)((clock.unix.millis - rating) * weight);
+        }
+
+        void setMaxRating(Time clock) in {
+            assert(clock >= Time.epoch1970);
+        } body {
+            rating = clock.unix.millis;
+        }
+
+        char[] toString() {
+            char[] retval = "AssetMetaData {\n";
+            retval ~= "     localId: " ~ hex.encode(localId) ~ "\n";
+            retval ~= "     rating: " ~ to!(char[])(rating) ~ "\n";
+            foreach (hash; hashIds) {
+                retval ~= "     " ~ HashMap[hash.type].name ~ ": " ~ hex.encode(hash.id) ~ "\n";
+            }
+            return retval ~ "}";
+        }
 
         enum State {
             UNKNOWN,
@@ -628,7 +661,7 @@ public:
     /************************************************************************************
      * Implements IAssetSource.findAsset. Tries to get a hold of a certain asset.
      ***********************************************************************************/
-    void findAsset(BindRead req) {
+    bool findAsset(BindRead req) {
         void fromCache(Asset meta) {
             log.trace("serving {} from cache", hex.encode(meta.localId));
             req.callback(meta, message.Status.SUCCESS, null);
@@ -660,6 +693,7 @@ public:
                 forwardRequest();
             }
         }
+        return true;
     }
 
     /************************************************************************************
@@ -720,9 +754,12 @@ private:
                             asset.rating, ascii.toLower(hex.encode(asset.localId)));
                 asset.setMaxRating(now);
             }
+            asset.localId = asset.localId.dup;
             localIdMap[asset.localId] = asset;
-            foreach (id; asset.hashIds)
+            foreach (id; asset.hashIds) {
+                id.id = id.id.dup;
                 hashIdMap[id.type][id.id] = asset;
+            }
         }
         idMapDirty = false;
     }
