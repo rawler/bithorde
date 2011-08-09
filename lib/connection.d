@@ -419,7 +419,21 @@ public:
      * Process waiting timeouts expected to fire up until now.
      ***********************************************************************************/
     void processTimeouts(Time now) {
-        timeouts.emit(now);
+        try {
+            timeouts.emit(now);
+        } catch (Exception e) {
+            char[65536] msg;
+            size_t used = 0;
+            void _write(char[] buf) {
+                auto newFill = used + buf.length;
+                if (newFill <= msg.length) {
+                    msg[used..newFill] = buf;
+                    used = newFill;
+                }
+            }
+            e.writeOut(&_write);
+            log.error("Exception ({}:{}) in processing timeout: {}", e.file, e.line, msg[0..used]);
+        }
     }
 
     /************************************************************************************

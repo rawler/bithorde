@@ -15,7 +15,7 @@
  * limitations under the License.
  ***************************************************************************************/
 
-module daemon.cache.manager;
+module daemon.store.cache.manager;
 
 private import tango.core.Exception;
 private import tango.core.Thread;
@@ -31,6 +31,7 @@ private import tango.time.Time;
 private import tango.time.Clock;
 private import tango.util.Convert;
 private import tango.util.log.Log;
+private import tango.util.MinMax;
 
 static if ( !is(typeof(fdatasync) == function ) )
     extern (C) int fdatasync(int);
@@ -42,101 +43,298 @@ private import lib.httpserver;
 private import lib.protobuf;
 private import lib.pumping;
 
-private import daemon.cache.asset;
-private import daemon.cache.metadata;
+private import daemon.store.asset;
+private import daemon.store.map;
+private import daemon.store.storedasset;
 private import daemon.client;
 private import daemon.config;
 private import daemon.refcount;
 private import daemon.routing.router;
 
 const FS_MINFREE = 0.1; // Amount of filesystem that should always be kept unused.
-const M = 1024*1024;
+const K = 1024;
+const M = 1024*K;
+const MAX_READ_CHUNK = 64 * K;
 
 const FLUSH_INTERVAL_SEC = 30;
+
+const ADVICE_CONCURRENT_READ = 6;
+
+/*************************************************************************************
+ * Every read-operation for non-cached data results in a ForwardedRead, which tracks
+ * a forwarded ReadRequest, recieves the response, and updates the CachingAsset.
+ ************************************************************************************/
+class ForwardedRead {
+    ulong offset;
+    uint length;
+    BHReadCallback cb;
+    message.Status lastStatus;
+    int retries = 4; // TODO: Move retries into router.
+    CacheManager.Asset asset;
+
+    this(CacheManager.Asset asset, ulong offset, uint length, BHReadCallback cb) {
+        this.offset = offset;
+        this.length = length;
+        this.cb = cb;
+        this.asset = asset;
+    }
+
+    void fail(message.Status status) {
+        auto resp = new lib.message.ReadResponse;
+        resp.status = status;
+        cb(resp.status, null, resp);
+    }
+
+    void callback(message.Status status, message.ReadRequest req, message.ReadResponse resp) {
+        if (status == message.Status.SUCCESS && resp && resp.content.length) {
+            asset.add(resp.offset, resp.content);
+            asset.aSyncRead(offset, length, cb, this);
+        } else if ((status == message.Status.DISCONNECTED) && (status != lastStatus)) { // Hackish. We may have double-requested the same part of the file, so attempt to read it anyways
+            lastStatus = status;
+            retries = 0;
+            asset.aSyncRead(offset, length, cb, this);
+        } else {
+            asset.outer.log.warn("Failed forwarded read, with error {}", status);
+            return fail(status);
+        }
+    }
+}
 
 /****************************************************************************************
  * Overseeing Cache-manager, keeping state of all cache-assets, and mapping from id:s to
  * Assets.
  ***************************************************************************************/
 class CacheManager : IAssetSource {
-    class MetaData : daemon.cache.metadata.AssetMetaData, IServerAsset {
+    class Asset : daemon.store.asset.BaseAsset, IServerAsset, ProtoBufMessage {
         mixin IAsset.StatusSignal;
         mixin RefCountTarget;
 
-        private BaseAsset _openAsset;
+        mixin(PBField!(ubyte[], "localId"));        /// Local assetId
+        mixin(PBField!(ulong, "rating"));           /// Rating-system for determining which content to keep in cache.
+        mixin ProtoBufCodec!(PBMapping("localId",   1),
+                            PBMapping("hashIds",   2),
+                            PBMapping("rating",    3),
+                            PBMapping("size",      4));
 
-        private BaseAsset setAsset(BaseAsset newAsset) {
-            if (_openAsset)
-                _openAsset.close();
-            return _openAsset = newAsset;
+        /************************************************************************************
+        * Increase the rating by noting interest in this asset.
+        ***********************************************************************************/
+        void noteInterest(Time clock, double weight) in {
+            assert(clock >= Time.epoch1970);
+            assert(weight > 0);
+        } body {
+            rating = rating + cast(ulong)((clock.unix.millis - rating) * weight);
         }
+
+        void setMaxRating(Time clock) in {
+            assert(clock >= Time.epoch1970);
+        } body {
+            rating = clock.unix.millis;
+        }
+
+        char[] toString() {
+            char[] retval = "AssetMetaData {\n";
+            retval ~= "     localId: " ~ hex.encode(localId) ~ "\n";
+            retval ~= "     rating: " ~ to!(char[])(rating) ~ "\n";
+            foreach (hash; hashIds) {
+                retval ~= "     " ~ HashMap[hash.type].name ~ ": " ~ hex.encode(hash.id) ~ "\n";
+            }
+            return retval ~ "}";
+        }
+
+        enum State {
+            UNKNOWN,
+            INCOMPLETE,
+            COMPLETE,
+        }
+
+        private IStoredAsset _stored;
+        private IServerAsset _remoteAsset;
+        private CacheMap _cacheMap;
+        private State _state = State.UNKNOWN;
 
         void onBackingUpdate(IAsset backing, message.Status sCode, message.AssetStatus s) {
             if (sCode != sCode.SUCCESS)
-                setAsset(null);
+                closeRemote;
             _statusSignal.call(this, sCode, s);
         }
 
         /********************************************************************************
          * Throws: IOException if asset is not found
          *******************************************************************************/
-        MetaData openRead() {
-            if (isOpen) { // If something is already holding it open, just use it.
-                return this;
-            } else if (idxPath.exists) {
-                return null;
+        Asset openRead() {
+            if (updateState != State.COMPLETE) {
+                throw new AssertException("Tried to open INCOMPLETE stored asset", __FILE__, __LINE__);
             } else {
-                setAsset(new BaseAsset(assetPath, this));
+                if (!sizeIsSet)
+                    size = assetPath.fileSize;
+
                 return this;
             }
         }
 
-        MetaData openUpload(ulong size) {
-            setAsset(new UploadAsset(assetPath, this, size, &updateHashIds, usefsync));
+        void rehash() {
+            if (updateState != State.COMPLETE) {
+                throw new AssertException("Tried to rehash INCOMPLETE stored asset", __FILE__, __LINE__);
+            } else {
+                if (!sizeIsSet)
+                    size = assetPath.fileSize;
+                log.trace("Running rehash on {}", hex.encode(localId));
+                _stored = new RehashingAsset(assetPath, size, &updateHashIds);
+            }
+        }
+
+        Asset openUpload(ulong size) {
+            assert(!sizeIsSet);
+            assert(!assetPath.exists);
+            assert(!idxPath.exists);
+            if (updateState != State.INCOMPLETE) {
+                throw new AssertException("Tried to open already COMPLETE stored asset for caching", __FILE__, __LINE__);
+            } else {
+                this.size = size;
+                return this;
+            }
+        }
+
+        Asset openCaching(IServerAsset sourceAsset) {
+            if (updateState != State.INCOMPLETE) {
+                throw new AssertException("Tried to open already COMPLETE stored asset for caching", __FILE__, __LINE__);
+            } else if (sizeIsSet) {
+                if (this.size != sourceAsset.size)
+                    throw new AssertException("Upstream asset of different size than the asset in cache", __FILE__, __LINE__);
+            } else {
+                this.size = sourceAsset.size;
+            }
+
+            // TODO: Print trace-status about the asset
+            _remoteAsset = sourceAsset;
+            _remoteAsset.takeRef(this);
+            _remoteAsset.attachWatcher(&onBackingUpdate);
             return this;
         }
 
-        MetaData openCaching(IServerAsset sourceAsset) {
-            setAsset(new CachingAsset(assetPath, this, sourceAsset, &updateHashIds, usefsync));
-            return this;
+        private void ensureOpen() in {
+            assert(_state != State.UNKNOWN);
+        } body {
+            if (!_stored) switch (_state) {
+                case State.COMPLETE:
+                    return _stored = new CompleteAsset(assetPath);
+                case State.INCOMPLETE:
+                    return _stored = new IncompleteAsset(assetPath, size, loadCacheMap, &updateHashIds, usefsync);
+            }
+        }
+
+        private CacheMap loadCacheMap() {
+            if (!_cacheMap) {
+                if (idxPath.exists && !assetPath.exists)
+                    idxPath.remove();
+                scope idxFile = new File(idxPath.toString, File.Style(File.Access.Read, File.Open.Sedate));
+                _cacheMap = new CacheMap();
+                _cacheMap.load(idxFile);
+            }
+            return _cacheMap;
+        }
+
+        private State updateState() {
+            if (idxPath.exists || !assetPath.exists)
+                return _state = State.INCOMPLETE;
+            else
+                return _state = State.COMPLETE;
+        }
+
+        final State state() {
+            if (_state == State.UNKNOWN)
+                return updateState;
+            else
+                return _state;
         }
 
         bool isOpen() {
-            return _openAsset !is null;
+            return _stored || _remoteAsset || refs.length > 0;
         }
-        bool isWritable() {
-            return (cast(WriteableAsset)_openAsset) !is null;
+
+        void closeRemote() {
+            if (_remoteAsset) {
+                _remoteAsset.detachWatcher(&onBackingUpdate);
+                _remoteAsset.dropRef(this);
+                _remoteAsset = null;
+            }
         }
 
         void close() {
-            setAsset(null);
+            sync();
+            if (_stored) {
+                _stored.close();
+                _stored = null;
+            }
+            closeRemote();
         }
 
         void sync() {
-            auto asset = cast(WriteableAsset)_openAsset;
+            auto asset = cast(IncompleteAsset)_stored;
             if (asset)
                 asset.sync();
-        }
+            if (_cacheMap) synchronized (this) {
+                auto tmpPath = idxPath.dup.cat(".new");
+                scope idxFile = new File(tmpPath.toString, File.WriteCreate);
+                _cacheMap.write(idxFile);
+                if (usefsync)
+                    fdatasync(idxFile.fileHandle);
 
-        ulong size() {
-            if (_openAsset)
-                return _openAsset.size;
-            else
-                assert(false);
+                idxFile.close();
+                tmpPath.rename(idxPath);
+            }
         }
 
         void aSyncRead(ulong offset, uint length, BHReadCallback cb) {
-            if (_openAsset)
-                return _openAsset.aSyncRead(offset, length, cb);
-            else
-                assert(false, "Trying to read from closed asset.");
+            return aSyncRead(offset, length, cb, null);
+        }
+
+        private void aSyncRead(ulong offset, uint _length, BHReadCallback cb, ForwardedRead fwd) {
+            void respond(message.Status status, ubyte[] result=null) {
+                scope resp = new lib.message.ReadResponse;
+                resp.status = status;
+                if (result.ptr) {
+                    resp.offset = offset;
+                    resp.content = result;
+                }
+                cb(resp.status, null, resp); // TODO: track read-request
+            }
+
+            ubyte[MAX_READ_CHUNK] _buf;
+            auto buf = _buf[0..min!(uint)(_length, _buf.length)];
+            ulong missing;
+            ensureOpen;
+
+            auto result = _stored.readChunk(offset, buf, missing);
+
+            if (missing) {
+                assert(state == State.INCOMPLETE);
+                if (_remoteAsset) {
+                    if (fwd is null)
+                        fwd = new ForwardedRead(this, offset, _length, cb);
+                    if (--(fwd.retries) > 0)
+                        return _remoteAsset.aSyncRead(offset, _length, &fwd.callback);
+                    else
+                        return respond(message.Status.NOTFOUND);
+                } else {
+                    log.warn("Trying to read from unfinished uploading asset.");
+                    return respond(message.Status.INVALID_HANDLE);
+                }
+            } else {
+                noteInterest(Clock.now, (cast(double)result.length)/cast(double)size);
+                return respond(message.Status.SUCCESS, result);
+            }
         }
 
         void add(ulong offset, ubyte[] data) {
-            if (_openAsset)
-                return _openAsset.add(offset, data);
-            else
-                assert(false, "Trying to add to closed asset.");
+            switch (state) {
+                case State.INCOMPLETE:
+                    ensureOpen;
+                    return _stored.writeChunk(offset, data);
+                case State.COMPLETE:
+                    return log.warn("Trying to add to complete asset.");
+            }
         }
 
         message.Identifier[] hashIds() {
@@ -153,37 +351,42 @@ class CacheManager : IAssetSource {
             return assetPath.cat(".idx");
         }
 
-        bool isComplete() {
-            return assetPath.exists && !idxPath.exists;
-        }
-
-        void updateHashIds(message.Identifier[] ids) {
+        private void updateHashIds(message.Identifier[] ids) {
             this.hashIds = ids;
             pump.queueCallback(&notifyHashUpdate);
         }
+
         private void notifyHashUpdate() {
+            _cacheMap = null;
+            sync();
+            idxPath.remove();
+            if (updateState != State.COMPLETE)
+                throw new AssertException("Asset should be complete now", __FILE__, __LINE__);
+            close();
+
+            log.trace("Hash verified");
+
             addToIdMap(this);
 
+            if (_remoteAsset is null) // This was an Upload
+                setMaxRating(Clock.now);
+            else
+                closeRemote();
+
             _statusSignal.call(this, message.Status.SUCCESS, null);
+            checkRehashQueue;
         }
 
         char[] magnetLink() {
-            if (isOpen)
-                return formatMagnet(hashIds, size);
-            else
-                return formatMagnet(hashIds, 0);
-        }
-
-        char[] localIdBase32() {
-            return base32.encode(localId);
+            return formatMagnet(hashIds, size);
         }
     }
 
     /************************************************************************************
      * Create new MetaAsset with random Id
      ***********************************************************************************/
-    private MetaData newMetaAsset() {
-        auto newMeta = new MetaData();
+    private Asset newMetaAsset() {
+        auto newMeta = new Asset();
         auto localId = new ubyte[LOCALID_LENGTH];
         rand.randomizeUniform!(ubyte[],false)(localId);
         while (localId in localIdMap) {
@@ -198,7 +401,7 @@ class CacheManager : IAssetSource {
     /************************************************************************************
      * Create new MetaAsset with random Id and predetermined hashIds
      ***********************************************************************************/
-    private MetaData newMetaAssetWithHashIds(message.Identifier[] hashIds) {
+    private Asset newMetaAssetWithHashIds(message.Identifier[] hashIds) {
         auto newMeta = newMetaAsset();
         newMeta.hashIds = hashIds.dup;
         foreach (ref v; newMeta.hashIds)
@@ -208,12 +411,12 @@ class CacheManager : IAssetSource {
     }
 
 protected:
-    MetaData hashIdMap[message.HashType][ubyte[]];
+    Asset hashIdMap[message.HashType][ubyte[]];
     FilePath idMapPath;
     FilePath assetDir;
     ulong maxSize;            /// Maximum allowed storage-capacity of this cache, in MB. 0=unlimited
     Router router;
-    MetaData localIdMap[ubyte[]];
+    Asset localIdMap[ubyte[]];
     bool idMapDirty;
     Thread idMapFlusher;
     bool usefsync;
@@ -236,30 +439,37 @@ public:
         this.router = router;
         this.pump = pump;
 
+        hashIdMap[message.HashType.SHA1] = null;
+        hashIdMap[message.HashType.SHA256] = null;
+        hashIdMap[message.HashType.TREE_TIGER] = null;
+        hashIdMap[message.HashType.ED2K] = null;
+
         idMapPath = this.assetDir.dup.append("index.protobuf");
         if (idMapPath.exists) {
-            loadIdMap();
+            try {
+                loadIdMap();
+            } catch (DecodeException) {
+                log.fatal("Failed to load the old idMap. Will try to rebuild from existing assets. This will take a while.");
+            }
             garbageCollect();
             _makeRoom(0); // Make sure the cache is in good order.
-        } else {
-            hashIdMap[message.HashType.SHA1] = null;
-            hashIdMap[message.HashType.SHA256] = null;
-            hashIdMap[message.HashType.TREE_TIGER] = null;
-            hashIdMap[message.HashType.ED2K] = null;
         }
     }
 
     /************************************************************************************
      * Tries to find assetMetaData for specified hashIds. First match applies.
      ***********************************************************************************/
-    MetaData findMetaAsset(message.Identifier[] hashIds) {
+    Asset findMetaAsset(message.Identifier[] hashIds) {
+        log.trace("Looking for {}", formatMagnet(hashIds, 0));
+        Asset res = null;
         foreach (id; hashIds) {
             if ((id.type in hashIdMap) && (id.id in hashIdMap[id.type])) {
-                auto assetMeta = hashIdMap[id.type][id.id];
-                return assetMeta;
+                res = hashIdMap[id.type][id.id];
+                if (res.updateState == res.State.COMPLETE)
+                    break;
             }
         }
-        return null;
+        return res;
     }
 
     /************************************************************************************
@@ -314,8 +524,8 @@ public:
         /********************************************************************************
          * Find least important asset in cache.
          *******************************************************************************/
-        MetaData pickLoser() {
-            MetaData loser;
+        Asset pickLoser() {
+            Asset loser;
             auto loserRating = long.max;
             foreach (meta; this.localIdMap) {
                 if (meta.isOpen) // Is Open
@@ -401,7 +611,7 @@ public:
             if (!metaAsset) {
                 req.callback(asset, sCode, s); // Just forward without caching
             } else {
-                if (metaAsset.isComplete) {
+                if (metaAsset.state == metaAsset.State.COMPLETE) {
                     log.error("Trying to re-establish cache of completed file.");
                     req.callback(null, message.Status.ERROR, null);
                 } else try {
@@ -421,32 +631,42 @@ public:
     /************************************************************************************
      * Remove an asset from cache.
      ***********************************************************************************/
-    synchronized bool purgeAsset(MetaData asset) {
-        if (asset.hashIds.length) {
-            log.info("Purging {}", formatMagnet(asset.hashIds, 0, null));
-        } else {
-            log.info("Purging <unknown asset>");
-        }
+    synchronized long purgeAsset(Asset asset) {
+        long res = -1;
+        char[1024] buf;
+        log.info("Purging {} ({})", hex.encode(asset.localId, buf), formatMagnet(asset.hashIds, 0, null));
 
         if (asset.localId in localIdMap)
             localIdMap.remove(asset.localId);
         foreach (hashId; asset.hashIds) {
-            if ((hashId.type in hashIdMap) && (hashId.id in hashIdMap[hashId.type]))
+            if ((hashId.type in hashIdMap) &&
+                (hashId.id in hashIdMap[hashId.type]) &&
+                (hashIdMap[hashId.type][hashId.id] == asset))
                 hashIdMap[hashId.type].remove(hashId.id);
         }
         auto aPath = asset.assetPath;
-        if (aPath.exists) aPath.remove();
+        if (aPath.exists) {
+            res += aPath.fileSize;
+            aPath.remove();
+        }
         auto iPath = asset.idxPath;
-        if (iPath.exists) iPath.remove();
-        return true;
+        if (iPath.exists) {
+            res += iPath.fileSize;
+            iPath.remove();
+        }
+        return res;
     }
 
     /************************************************************************************
      * Implements IAssetSource.findAsset. Tries to get a hold of a certain asset.
      ***********************************************************************************/
-    void findAsset(BindRead req) {
-        void fromCache(MetaData meta) {
+    bool findAsset(BindRead req) {
+        void fromCache(Asset meta) {
             log.trace("serving {} from cache", hex.encode(meta.localId));
+            req.callback(meta, message.Status.SUCCESS, null);
+        }
+        void fromActive(Asset meta) {
+            log.trace("serving {} from active connection", hex.encode(meta.localId));
             req.callback(meta, message.Status.SUCCESS, null);
         }
         void forwardRequest() {
@@ -456,24 +676,23 @@ public:
             req.pushCallback(&_forwardedCallback);
             router.findAsset(req);
         }
-        IServerAsset tryOpen(MetaData meta) {
-            try { // Needs to handle IOErrors here, to not lock meta while purging.
-                return meta.openRead();
-            } catch (IOException e) {
-                log.error("While opening asset: {}", e);
-                return null;
-            }
-        }
 
         auto metaAsset = findMetaAsset(req.ids);
         if (!metaAsset) {
             forwardRequest();
-        } else if (tryOpen(metaAsset)) {
+        } else if (metaAsset.state == Asset.State.COMPLETE) {
+            metaAsset.openRead;
             fromCache(metaAsset);
         } else {
-            log.trace("Incomplete asset, forwarding {}", req);
-            forwardRequest();
+            assert(metaAsset.state == Asset.State.INCOMPLETE);
+            if (metaAsset._remoteAsset) {
+                fromActive(metaAsset);
+            } else {
+                log.trace("Incomplete asset, forwarding {}", req);
+                forwardRequest();
+            }
         }
+        return true;
     }
 
     /************************************************************************************
@@ -482,9 +701,8 @@ public:
     void uploadAsset(message.BindWrite req, BHAssetStatusCallback callback) {
         try {
             if (_makeRoom(req.size)) {
-                MetaData meta = newMetaAsset();
+                Asset meta = newMetaAsset();
                 auto path = meta.assetPath;
-                assert(!path.exists());
                 meta.openUpload(req.size);
                 meta.attachWatcher(callback);
                 callback(meta, message.Status.SUCCESS, null);
@@ -505,7 +723,7 @@ public:
         foreach (asset; localIdMap) {
             auto assetOpen = asset.isOpen ? "open" : "closed";
             auto desc = assetOpen ~ ", " ~ asset.magnetLink;
-            res ~= MgmtEntry(asset.localIdBase32, desc);
+            res ~= MgmtEntry(hex.encode(asset.localId), desc);
         }
         return res;
     }
@@ -515,7 +733,7 @@ private:
      * and localIds.
      ************************************************************************/
     class IdMap { // TODO: Re-work protobuf-lib so it isn't needed
-        mixin(PBField!(MetaData[], "assets"));
+        mixin(PBField!(Asset[], "assets"));
         mixin ProtoBufCodec!(PBMapping("assets",    1));
     }
 
@@ -535,9 +753,12 @@ private:
                             asset.rating, ascii.toLower(hex.encode(asset.localId)));
                 asset.setMaxRating(now);
             }
+            asset.localId = asset.localId.dup;
             localIdMap[asset.localId] = asset;
-            foreach (id; asset.hashIds)
+            foreach (id; asset.hashIds) {
+                id.id = id.id.dup;
                 hashIdMap[id.type][id.id] = asset;
+            }
         }
         idMapDirty = false;
     }
@@ -552,49 +773,96 @@ private:
             scope(exit) { log.trace("Asset-GC took {}ms",(Clock.now-started).millis); }
         }
 
-        log.info("Beginning garbage collection");
+        log.trace("Beginning garbage collection");
 
+        ulong bytesFreed;
         /* remove redundant and faulty assets from localIdMap */ {
-            scope ubyte[][] staleAssets;
+            scope Asset[] staleAssets;
             foreach (asset; localIdMap) {
                 if (!asset.assetPath.exists) {
-                    foreach (id; asset.hashIds) if (id.type in hashIdMap) {
-                        auto map = hashIdMap[id.type];
-                        if ((id.id in map) &&
-                            (map[id.id] == asset))
-                            map.remove(id.id);
+                    log.trace("Asset file has disappeared.");
+                    staleAssets ~= asset;
+                } else if (asset.hashIds.length) {
+                    auto valid = false;
+                    foreach (id; asset.hashIds) {
+                        if ((id.type in hashIdMap)
+                              && (id.id in hashIdMap[id.type])
+                              && (hashIdMap[id.type][id.id] == asset))
+                            valid = true;
                     }
-                    staleAssets ~= asset.localId;
-                } else foreach (id; asset.hashIds) {
-                    if ((id.type in hashIdMap) &&
-                        (id.id in hashIdMap[id.type]) &&
-                        (hashIdMap[id.type][id.id] != asset))
-                    staleAssets ~= asset.localId;
+                    if (!valid) {
+                        log.trace("Found no valid hashId-references to asset.");
+                        staleAssets ~= asset;
+                    }
+                } else if (asset.state == asset.State.INCOMPLETE
+                           && !asset.isOpen) {
+                    staleAssets ~= asset;
                 }
             }
-            foreach (id; staleAssets) {
-                localIdMap.remove(id);
+            foreach (asset; staleAssets) {
+                auto res = purgeAsset(asset);
+                if (res >= 0)
+                    bytesFreed += res;
             }
         }
 
-        ulong bytesFreed;
         /* Clear out files not referenced by localIdMap */ {
             ubyte[LOCALID_LENGTH] idbuf;
             auto path = assetDir.dup.append("dummy");
             foreach (fileInfo; assetDir) {
-                char[] name, suffix;
-                name = head(fileInfo.name, ".", suffix);
-                if (name.length==(idbuf.length*2) && (suffix=="idx" || suffix=="")) {
-                    auto id = hex.decode(name, idbuf);
+                path.file = fileInfo.name;
+                if (path.name.length==(idbuf.length*2) && (path.suffix=="idx" || path.suffix=="")) {
+                    auto id = hex.decode(path.name, idbuf);
                     if (!(id in localIdMap)) {
-                        path.name = fileInfo.name;
-                        path.remove();
-                        bytesFreed += fileInfo.bytes;
+                        if (path.suffix("idx").exists) {
+                            log.info("Purging leftovers for asset {}", path.name);
+                            bytesFreed += path.fileSize;
+                            path.remove();
+                            if (path.suffix("").exists) {
+                                bytesFreed += path.fileSize;
+                                path.remove();
+                            }
+                        } else {
+                            log.info("Queing asset {} for recovery", path.name);
+                            auto asset = new Asset;
+                            asset.localId = idbuf.dup;
+                            localIdMap[asset.localId] = asset;
+                        }
                     }
                 }
             }
         }
-        log.info("Garbage collection done. {} KB freed", (bytesFreed + 512) / 1024);
+
+        checkRehashQueue;
+
+        if (bytesFreed)
+            log.info("Garbage collection done. {} KB freed", (bytesFreed + 512) / 1024);
+        else
+            log.trace("Garbage collection done. {} KB freed", (bytesFreed + 512) / 1024);
+    }
+
+    void checkRehashQueue() {
+        auto count = 0;
+        auto waiting = 0;
+        foreach (id, asset; localIdMap) {
+            if (asset.isOpen) {
+                count ++;
+            } else if (!(asset.hashIds.length || asset.state == asset.state.INCOMPLETE)) {
+                waiting ++;
+            }
+        }
+
+        if (waiting)
+            log.info("{} assets still waiting for rehashing.", waiting);
+
+        while ((count++) < ADVICE_CONCURRENT_READ) {
+            foreach (id, asset; localIdMap) {
+                if (!(asset.hashIds.length || asset.isOpen || asset.state == asset.state.INCOMPLETE)) {
+                    asset.rehash();
+                    break;
+                }
+            }
+        }
     }
 
     /*************************************************************************
@@ -622,20 +890,23 @@ private:
     /*************************************************************************
      * Add an asset to the id-maps
      ************************************************************************/
-    synchronized void addToIdMap(MetaData asset) {
-        localIdMap[asset.localId] = asset;
+    synchronized void addToIdMap(Asset asset) {
+        scope buf = new char[asset.localId.length * 2];
+        log.trace("Committing {} ({}) to map", hex.encode(asset.localId, buf), asset.magnetLink);
+
         foreach (id; asset.hashIds) {
             if (id.type in hashIdMap) {
                 auto oldAsset = id.id in hashIdMap[id.type];
-                if (oldAsset) { // Asset already exist
+                if (oldAsset && oldAsset.localId != asset.localId) { // Asset already exist
                     // Remove old asset to avoid conflict with new asset.
                     // TODO: What if old asset has id-types not covered by new asset?
                     //       or possible differing values for different hashId:s?
-                    localIdMap.remove(oldAsset.localId);
+                    purgeAsset(*oldAsset);
                 }
                 hashIdMap[id.type][id.id] = asset;
             }
         }
+        localIdMap[asset.localId] = asset;
         idMapDirty = true;
     }
 

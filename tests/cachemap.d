@@ -25,7 +25,7 @@ import tango.util.log.Log;
 
 import lib.message;
 
-import daemon.cache.map;
+import daemon.store.map;
 
 /// Log for all the tests
 static Logger LOG;

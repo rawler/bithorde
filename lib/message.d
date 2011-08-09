@@ -177,9 +177,10 @@ class BindRead : BindRequest {
 
 class BindWrite : BindRequest {
     mixin(PBField!(ulong, "size"));        // Size of opened asset
+    mixin(PBField!(char[], "path"));       // Local path of linked asset
     mixin ProtoBufCodec!(PBMapping("handle",   1),
                          PBMapping("size",     2),
-                         PBMapping("timeout",  3));
+                         PBMapping("path",     3));
 
     Type typeId() { return Type.BindWrite; }
 }

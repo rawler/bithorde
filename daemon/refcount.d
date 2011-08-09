@@ -25,7 +25,7 @@ interface IRefCounted {
 }
 
 struct References {
-    private Object[] refs;
+    Object[] refs;
     bool add(Object o) {
         foreach (r; refs) if (r == o)
             return false;

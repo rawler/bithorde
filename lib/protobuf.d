@@ -21,6 +21,7 @@ module lib.protobuf;
 
 import tango.core.Exception;
 import tango.core.Traits;
+import tango.stdc.posix.stdlib;
 import tango.util.MinMax;
 
 /****************************************************************************************
@@ -33,8 +34,11 @@ private:
     T[] buf;
 public:
     this(uint size = 16) {
-        buf = new T[size];
+        buf = (cast(T*)malloc(size*T.sizeof))[0..size];
         pos = size;
+    }
+    ~this() {
+        free(buf.ptr);
     }
     T[] data() {
         return buf[pos .. length];
@@ -42,10 +46,11 @@ public:
     T[] alloc(uint size) {
         int newpos = pos - size;
         if (newpos < 0) {
-            auto newbuf = new T[buf.length + size];
+            auto newSize = buf.length + (size * 3);
+            auto newbuf = (cast(T*)malloc(newSize*T.sizeof))[0..newSize];
             auto resize = newbuf.length - buf.length;
-            newbuf[length-(buf.length-pos)..length] = buf[pos..length];
-            delete buf;
+            newbuf[$-(buf.length-pos)..$] = buf[pos..$];
+            free(buf.ptr);
             newpos += resize;
             pos += resize;
             buf = newbuf;

@@ -63,6 +63,7 @@ class Config
     char[] setuid, setgid;
     FilePath cachedir;
     ulong cacheMaxSize;                        /// Maximum cacheSize, in MB
+    FilePath[] linkroots;
     FilePath logfile;
     Friend[char[]] friends;
     bool doDebug = false;
@@ -158,6 +159,15 @@ private:
             break;
         case "usefsync":
             this.usefsync = parseBool(value);
+            break;
+        case "linkroots":
+            foreach (root; Text.split(value.dup, ";")) {
+                auto path = new FilePath(root);
+                if (path.exists && path.isFolder)
+                    linkroots ~= path;
+                else
+                    throw new ConfigException("Linkroot '"~root~"' is not an existing directory.");
+            }
             break;
         default:
             throw new ConfigException("Unknown server option "~option);

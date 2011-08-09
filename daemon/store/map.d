@@ -15,7 +15,7 @@
  * limitations under the License.
  ***************************************************************************************/
 
-module daemon.cache.map;
+module daemon.store.map;
 
 private import tango.io.device.Array;
 private import tango.io.model.IConduit;
@@ -245,7 +245,7 @@ public:
     /************************************************************************************
      * Add a segment into the cachemap
      ***********************************************************************************/
-    void add(ulong start, uint length) {
+    void add(ulong start, ulong length) {
         // Just skip 0-length segments
         if (!length) return;
 

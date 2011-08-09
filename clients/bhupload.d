@@ -29,6 +29,7 @@ import tango.util.container.SortedMap;
 import tango.util.Convert;
 import tango.text.convert.Format;
 import tango.stdc.posix.unistd;
+import tango.sys.Environment;
 
 import lib.client;
 import lib.hashes;
@@ -47,6 +48,7 @@ private:
     FilePath file;
     bool verbose;
     bool progressBar;
+    bool link = false;
 public:
     /************************************************************************************
      * Setup and configure underlying parser.
@@ -55,6 +57,7 @@ public:
         this["verbose"].aliased('v').smush;
         this["progressBar"].aliased('p').params(1).restrict(autoBool).smush.defaults("auto");
         this["unixsocket"].aliased('u').params(1).smush.defaults("/tmp/bithorde");
+        this["link"].aliased('l').smush;
         this[null].title("file").required.params(1);
     }
 
@@ -71,8 +74,10 @@ public:
         if (!file.isFile)
             throw new IllegalArgumentException("File is not a regular file");
 
+        link = this["link"].set;
+
         progressBar = getAutoBool("progressBar", delegate bool() {
-            return isatty(2) == 1;
+            return isatty(2) == 1 && !link;
         });
         verbose = this["verbose"].set;
         sockPath = this["unixsocket"].assigned[0];
@@ -104,11 +109,14 @@ public:
         Address addr = new LocalAddress(args.sockPath);
         client = new SimpleClient(addr, "bhupload");
 
-        file = new File(args.file.toString);
+        if (args.link) {
+            client.registerLink(args.file.absolute(Environment.cwd), &onStatusUpdate);
+        } else {
+            file = new File(args.file.toString);
 
-        client.beginUpload(file.length, &onStatusUpdate);
-
-        client.sigWriteClear.attach(&fillQueue);
+            client.beginUpload(file.length, &onStatusUpdate);
+            client.sigWriteClear.attach(&fillQueue);
+        }
     }
     ~this(){
         if (asset)
@@ -146,7 +154,9 @@ private:
             } else {
                 // Re-register this handle to recieve status updates
                 asset.attachWatcher(&onStatusUpdate);
-                return sendFile(asset);
+                if (file)
+                    sendFile(asset);
+                return;
             }
         default:
             if (resp)
@@ -224,7 +234,7 @@ int main(char[][] args)
     } catch (IllegalArgumentException e) {
         if (e.msg)
             Stderr(e.msg).newline;
-        Stderr.format("Usage: {} [--verbose|-v] [{{--progressBar|-p}}=yes/no] [--unixsocket|u=/tmp/bithorde] <uri>", args[0]).newline;
+        Stderr.format("Usage: {} [--verbose|-v] [{{--link|-l}] [{{--progressBar|-p}}=yes/no] [--unixsocket|u=/tmp/bithorde] <uri>", args[0]).newline;
         return -1;
     }
     scope auto b = new BHUpload(arguments);
