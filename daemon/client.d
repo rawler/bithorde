@@ -1,5 +1,5 @@
 /****************************************************************************************
- *   Copyright: Copyright (C) 2009-2010 Ulrik Mikaelsson. All rights reserved
+ *   Copyright: Copyright (C) 2009-2011 Ulrik Mikaelsson. All rights reserved
  *
  *   License:
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -160,9 +160,9 @@ class Client : lib.client.Client {
                 scope resp = new message.AssetStatus;
                 resp.handle = handle;
                 resp.status = sCode;
-                if (assetSource) {
-                    resp.size = size;
-                    resp.ids = hashIds;
+                if (assetSource && sCode == message.Status.SUCCESS) {
+                    resp.size = assetSource.size;
+                    resp.ids = assetSource.hashIds;
                 }
                 if (s) {
                     resp.availability = s.availability;
