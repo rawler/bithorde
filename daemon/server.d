@@ -1,5 +1,5 @@
 /****************************************************************************************
- *   Copyright: Copyright (C) 2009-2010 Ulrik Mikaelsson. All rights reserved
+ *   Copyright: Copyright (C) 2009-2011 Ulrik Mikaelsson. All rights reserved
  *
  *   License:
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -112,7 +112,8 @@ public:
 
         // Setup helper functions, routing and caching
         this.router = new Router();
-        this.cacheMgr = new CacheManager(config.cachedir, config.cacheMaxSize, config.usefsync, router, pump);
+        if (config.cachedir)
+            this.cacheMgr = new CacheManager(config.cachedir, config.cacheMaxSize, config.usefsync, router, pump);
 
         foreach (root; config.linkroots)
             linkRepos ~= new Repository(pump, root, config.usefsync);
@@ -125,7 +126,8 @@ public:
     }
 
     void run() {
-        cacheMgr.start();
+        if (cacheMgr)
+            cacheMgr.start();
         foreach (repo; linkRepos)
             repo.start();
         serverThread = Thread.getThis;
@@ -153,7 +155,8 @@ public:
     private void cleanup() {
         running = false;
         try {
-            cacheMgr.shutdown();
+            if (cacheMgr)
+                cacheMgr.shutdown();
         } catch (Exception e) {
             log.error("Error in cleanup {}", e);
         } finally {
@@ -166,12 +169,21 @@ public:
             if (repo.findAsset(req))
                 return true;
         }
-        return cacheMgr.findAsset(req);
+
+        if (cacheMgr)
+            return cacheMgr.findAsset(req);
+        else
+            return router.findAsset(req);
     }
 
     void uploadAsset(message.BindWrite req, BHAssetStatusCallback cb) {
         if (req.sizeIsSet) {
-            cacheMgr.uploadAsset(req, cb);
+            if (cacheMgr) {
+                cacheMgr.uploadAsset(req, cb);
+            } else {
+                log.error("Tried to upload data without configured cachedir");
+                cb(null, message.Status.NORESOURCES, null);
+            }
         } else if (req.pathIsSet) {
             auto basePath = req.path;
             auto _ = Text.tail(basePath, "/", basePath);
@@ -197,19 +209,23 @@ protected:
         if (path.length > 0) switch (path[0]) {
             case "friends":
                 return router.onManagementRequest(path[1..$]);
-            case "cache":
-                return cacheMgr.onManagementRequest(path[1..$]);
             case "connections":
                 return clientManagement(path[1..$]);
+            case "cache":
+                if (cacheMgr)
+                    return cacheMgr.onManagementRequest(path[1..$]);
             default:
                 throw new HTTPMgmtProxy.Error(404, "Not found");
         } else {
-            auto cacheStats = to!(char[])(cacheMgr.assetCount) ~ ": " ~ to!(char[])(cacheMgr.size / (1024.0*1024*1024)) ~ "GB";
-            return [
+            auto list = [
                 MgmtEntry.link("friends", to!(char[])(router.friendCount)),
-                MgmtEntry.link("cache", cacheStats),
                 MgmtEntry.link("connections", to!(char[])(connectedClients.length))
-            ];
+            ].dup;
+            if (cacheMgr) {
+                auto cacheStats = to!(char[])(cacheMgr.assetCount) ~ ": " ~ to!(char[])(cacheMgr.size / (1024.0*1024*1024)) ~ "GB";
+                list ~= MgmtEntry.link("cache", cacheStats);
+            }
+            return list;
         }
     }
 
