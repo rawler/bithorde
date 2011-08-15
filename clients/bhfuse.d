@@ -1,5 +1,5 @@
 /****************************************************************************************
- *   Copyright: Copyright (C) 2009-2010 Ulrik Mikaelsson. All rights reserved
+ *   Copyright: Copyright (C) 2009-2011 Ulrik Mikaelsson. All rights reserved
  *
  *   License:
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -26,6 +26,7 @@ private import tango.io.Stdout;
 private import tango.net.device.Berkeley : Address, SocketType, ProtocolType;
 private import tango.net.device.LocalSocket;
 private import tango.net.device.Socket : Socket;
+private import tango.net.InternetAddress;
 private import tango.stdc.errno;
 private import tango.stdc.posix.fcntl;
 private import tango.stdc.posix.grp;
@@ -37,6 +38,7 @@ private import tango.stdc.posix.unistd;
 private import tango.stdc.posix.utime;
 private import tango.stdc.string;
 private import tango.time.Clock;
+private import tango.text.Util;
 private import tango.util.Convert;
 private import tango.util.container.more.Heap;
 private import tango.util.log.AppendConsole;
@@ -46,7 +48,7 @@ version(Windows)
 {
     import tango.sys.win32.UserGdi;
     extern(Windows) HWND GetConsoleWindow();
-} 
+}
 
 private import lib.arguments;
 private import lib.cachedalloc;
@@ -421,7 +423,7 @@ extern (D):
  ***************************************************************************************/
 class FUSEArguments : protected Arguments {
 private:
-    char[] sockPath;
+    char[] socketUri;
     char[] mountpoint;
     TimeSpan lookupTimeout;
     bool do_debug;
@@ -431,7 +433,7 @@ public:
      ***********************************************************************************/
     this() {
         this["debug"].aliased('d').smush;
-        this["unixsocket"].aliased('u').params(1).smush.defaults("/tmp/bithorde");
+        this["socketuri"].aliased('u').params(1).smush.defaults("/tmp/bithorde");
         this["lookuptimeout"].aliased('t').params(1).smush.defaults("10000");
         this[null].title("mountpoint").required.params(1);
     }
@@ -444,7 +446,7 @@ public:
             throw new IllegalArgumentException("Failed to parse arguments:\n" ~ errors(&stderr.layout.sprint));
 
         do_debug = this["debug"].set;
-        sockPath = this["unixsocket"].assigned[0];
+        socketUri = this["socketuri"].assigned[0];
         lookupTimeout = TimeSpan.fromMillis(to!(uint)(this["lookuptimeout"].assigned[0]));
         mountpoint = this[null].assigned[0];
 
@@ -463,7 +465,7 @@ int main(char[][] args)
     } catch (IllegalArgumentException e) {
         if (e.msg)
             Stderr(e.msg).newline;
-        Stderr.format("Usage: {} [--debug|-d] [--unixsocket|u=/tmp/bithorde] [--lookuptimeout|-t=<msec>] <mount-point>", args[0]).newline;
+        Stderr.format("Usage: {} [--debug|-d] [--socketuri|u=/tmp/bithorde] [--lookuptimeout|-t=<msec>] <mount-point>", args[0]).newline;
         return -1;
     }
 
@@ -476,7 +478,14 @@ int main(char[][] args)
     static Pump pump;
     pump = new Pump([], 2);
 
-    auto addr = new LocalAddress(arguments.sockPath);
+    Address addr;
+    if (arguments.socketUri[0] == '/') {
+        addr = new LocalAddress(arguments.socketUri);
+    } else {
+        auto addrSpec = split(arguments.socketUri, ":");
+        assert(addrSpec.length == 2);
+        addr = new InternetAddress(addrSpec[0], to!(int)(addrSpec[1]));
+    }
     auto socket = new Socket(addr.addressFamily, SocketType.STREAM, ProtocolType.IP);
     socket.connect(addr);
     auto client = new Client("bhfuse", new Connection(pump, socket));
