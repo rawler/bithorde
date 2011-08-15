@@ -1,5 +1,5 @@
 /****************************************************************************************
- *   Copyright: Copyright (C) 2009-2010 Ulrik Mikaelsson. All rights reserved
+ *   Copyright: Copyright (C) 2009-2011 Ulrik Mikaelsson. All rights reserved
  *
  *   License:
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -301,6 +301,9 @@ class CacheManager : IAssetSource {
                 cb(resp.status, null, resp); // TODO: track read-request
             }
 
+            if (offset > size)
+                return respond(message.Status.SUCCESS, null);
+
             ubyte[MAX_READ_CHUNK] _buf;
             auto buf = _buf[0..min!(uint)(_length, _buf.length)];
             ulong missing;
@@ -322,7 +325,8 @@ class CacheManager : IAssetSource {
                     return respond(message.Status.INVALID_HANDLE);
                 }
             } else {
-                noteInterest(Clock.now, (cast(double)result.length)/cast(double)size);
+                if (result.length > 0)
+                    noteInterest(Clock.now, (cast(double)result.length)/cast(double)size);
                 return respond(message.Status.SUCCESS, result);
             }
         }

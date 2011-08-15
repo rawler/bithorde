@@ -2,7 +2,7 @@
  * D template-based implementation of Protocol Buffers. Built for efficency and high
  * performance rather than flexibility or completeness.
  *
- *   Copyright: Copyright (C) 2009-2010 Ulrik Mikaelsson. All rights reserved
+ *   Copyright: Copyright (C) 2009-2011 Ulrik Mikaelsson. All rights reserved
  *
  *   License:
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -47,7 +47,9 @@ public:
         int newpos = pos - size;
         if (newpos < 0) {
             auto newSize = buf.length + (size * 3);
-            auto newbuf = (cast(T*)malloc(newSize*T.sizeof))[0..newSize];
+            auto newBufPtr = cast(T*)malloc(newSize*T.sizeof);
+            assert(newBufPtr);
+            auto newbuf = newBufPtr[0..newSize];
             auto resize = newbuf.length - buf.length;
             newbuf[$-(buf.length-pos)..$] = buf[pos..$];
             free(buf.ptr);

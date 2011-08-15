@@ -1,7 +1,7 @@
 /****************************************************************************************
  * All the different variants of Cache-Assets
  *
- *   Copyright: Copyright (C) 2009-2010 Ulrik Mikaelsson. All rights reserved
+ *   Copyright: Copyright (C) 2009-2011 Ulrik Mikaelsson. All rights reserved
  *
  *   License:
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -101,7 +101,10 @@ public:
     ubyte[] readChunk(ulong offset, ubyte[] buf, out ulong missing) {
         missing = 0;
         auto got = pRead(offset, buf);
-        return buf[0..got];
+        if (got == File.Eof)
+            return null;
+        else
+            return buf[0..got];
     }
 
     /*************************************************************************************
