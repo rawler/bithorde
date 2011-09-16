@@ -1,3 +1,16 @@
+bithorde (0.1.99+0.2beta1-1) natty; urgency=low
+
+  * New Python-Client
+  * Remove custom memory-optimisations to avoid some bugs.
+  * Rewrite of the cache.
+  * Linking assets from the normal filesystem is now possible.
+  * Implement re-hashing of assets found on disk but not in idx.
+  * Fix 64-bit optimised build.
+  * BHFuse can now mount a remote bithorded.
+  * BitHorde can be used cache-less for disk-constrained systems.
+
+ -- Ulrik Mikaelsson <ulrik.mikaelsson@gmail.com>  Fri, 16 Sep 2011 17:45:21 +0200
+
 bithorde (0.1.99+0.2alpha1.2-2) natty; urgency=low
 
   * Reupload with 64-bit buildfix.
