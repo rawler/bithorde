@@ -25,7 +25,7 @@ add_d_program(bhupload clients/bhupload.d)
 add_d_program(bhfuse clients/bhfuse.d LIBS fuse)
 
 # Install specifications
-INSTALL(FILES
+INSTALL(PROGRAMS
   ${CMAKE_CURRENT_BINARY_DIR}/bin/bithorded
   ${CMAKE_CURRENT_BINARY_DIR}/bin/bhget
   ${CMAKE_CURRENT_BINARY_DIR}/bin/bhupload
