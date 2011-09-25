@@ -455,8 +455,6 @@ public:
             } catch (DecodeException) {
                 log.fatal("Failed to load the old idMap. Will try to rebuild from existing assets. This will take a while.");
             }
-            garbageCollect();
-            _makeRoom(0); // Make sure the cache is in good order.
         }
     }
 
@@ -507,6 +505,9 @@ public:
      * Final startup preparation
      ***********************************************************************************/
     void start() {
+        garbageCollect();
+        _makeRoom(0); // Make sure the cache is in good order.
+
         idMapFlusher = new Thread(&IdMapFlusher);
         idMapFlusher.isDaemon = true;
         idMapFlusher.start;
