@@ -49,7 +49,6 @@ private import daemon.store.storedasset;
 private import daemon.client;
 private import daemon.config;
 private import daemon.refcount;
-private import daemon.routing.router;
 
 const FS_MINFREE = 0.1; // Amount of filesystem that should always be kept unused.
 const K = 1024;
@@ -419,7 +418,7 @@ protected:
     FilePath idMapPath;
     FilePath assetDir;
     ulong maxSize;            /// Maximum allowed storage-capacity of this cache, in MB. 0=unlimited
-    Router router;
+    IAssetSource router;
     Asset localIdMap[ubyte[]];
     bool idMapDirty;
     Thread idMapFlusher;
@@ -434,7 +433,7 @@ public:
     /************************************************************************************
      * Create a CacheManager with a given asset-directory and underlying Router-instance
      ***********************************************************************************/
-    this(FilePath assetDir, ulong maxSize, bool usefsync, Router router, Pump pump) {
+    this(FilePath assetDir, ulong maxSize, bool usefsync, IAssetSource router, Pump pump) {
         if (!(assetDir.exists && assetDir.isFolder && assetDir.isWritable))
             throw new ConfigException(assetDir.toString ~ " must be an existing writable directory");
         this.assetDir = assetDir;
