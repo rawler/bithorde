@@ -10,3 +10,9 @@
 
 # Releases-dir
 /releases
+
+# TMP QMake build-stuff.
+/*-build-*
+Makefile
+*.pb.cc
+*.pb.h
