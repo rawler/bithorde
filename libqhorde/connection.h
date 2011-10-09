@@ -3,6 +3,7 @@
 
 #include <QtCore/QByteArray>
 #include <QtCore/QIODevice>
+#include <QtCore/QQueue>
 
 #include <QtNetwork/QLocalSocket>
 #include <QtNetwork/QTcpSocket>
@@ -38,10 +39,11 @@ signals:
     void connected();
     void disconnected();
     void message(Connection::MessageType type, const ::google::protobuf::Message & msg);
+    void sent();
 
 public slots:
     void onData();
-    void sendMessage(MessageType type, const ::google::protobuf::Message & msg);
+    bool sendMessage(MessageType type, const ::google::protobuf::Message & msg);
 
 protected:
     virtual int socketDescriptor() = 0;
@@ -51,6 +53,8 @@ private:
 
     QIODevice * _socket;
     QByteArray _buf;
+
+    QQueue<QByteArray> _sendQueue;
 
     template <class T> bool dequeue(MessageType type, ::google::protobuf::io::CodedInputStream &stream);
 };

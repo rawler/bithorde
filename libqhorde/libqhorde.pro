@@ -19,13 +19,15 @@ DEFINES += LIBQHORDE_LIBRARY
 SOURCES += proto/bithorde.pb.cc \
     asset.cpp \
     client.cpp \
-    connection.cpp
+    connection.cpp \
+    hashes.cpp
 
 HEADERS += libqhorde.h\
         libqhorde_global.h \
     asset.h \
     client.h \
-    connection.h
+    connection.h \
+    hashes.h
 
 unix:LIBS += -lprotobuf
 

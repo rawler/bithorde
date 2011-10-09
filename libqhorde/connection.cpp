@@ -7,11 +7,14 @@
 #include <google/protobuf/io/coded_stream.h>
 #include <google/protobuf/io/zero_copy_stream_impl.h>
 
+#define MAX_QUEUE 20
+
 Connection::Connection(QIODevice & socket, QObject *parent) :
     QObject(parent),
     _socket(&socket)
 {
     QObject::connect(_socket, SIGNAL(connected()), this, SIGNAL(connected()));
+    QObject::connect(_socket, SIGNAL(bytesWritten(qint64)), this, SIGNAL(sent()));
     QObject::connect(_socket, SIGNAL(readyRead()), this, SLOT(onData()));
     _state = AwaitingConnection;
 }
@@ -84,13 +87,28 @@ bool Connection::dequeue(MessageType type, ::google::protobuf::io::CodedInputStr
     }
 }
 
-void Connection::sendMessage(Connection::MessageType type, const::google::protobuf::Message &msg)
-{
-    ::google::protobuf::io::FileOutputStream of(socketDescriptor());
+bool encode(std::string* target, Connection::MessageType type, const::google::protobuf::Message &msg) {
+    ::google::protobuf::io::StringOutputStream of(target);
     ::google::protobuf::io::CodedOutputStream stream(&of);
     stream.WriteTag(::google::protobuf::internal::WireFormatLite::MakeTag(type, ::google::protobuf::internal::WireFormatLite::WIRETYPE_LENGTH_DELIMITED));
     stream.WriteVarint32(msg.ByteSize());
-    msg.SerializeToCodedStream(&stream);
+    return msg.SerializeToCodedStream(&stream);
+}
+
+bool Connection::sendMessage(Connection::MessageType type, const::google::protobuf::Message &msg)
+{
+    if (_socket->bytesToWrite() > 512*1024)
+        return false;
+
+    std::string buf;
+    bool success = encode(&buf, type, msg);
+    Q_ASSERT(success);
+
+    qint64 written = 0;
+    written = _socket->write(buf.data(), buf.length());
+    Q_ASSERT(written == buf.length());
+
+    return true;
 }
 
 TCPConnection::TCPConnection(QTcpSocket & socket) :

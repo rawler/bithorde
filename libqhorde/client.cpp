@@ -13,9 +13,16 @@ Client::Client(Connection & connection, QString myName, QObject *parent) :
     _protoVersion(0)
 {
     connect(_connection, SIGNAL(connected()), SLOT(onConnected()));
-    connect(_connection, SIGNAL(message(Connection::MessageType,const::google::protobuf::Message&)), SLOT(onMessage(Connection::MessageType,const::google::protobuf::Message&)));
+    connect(_connection, SIGNAL(message(Connection::MessageType,const::google::protobuf::Message&)), SLOT(onMessage(Connection::MessageType, const::google::protobuf::Message&)));
+    connect(_connection, SIGNAL(sent()), SIGNAL(sent()));
     if (connection.isConnected())
         onConnected();
+}
+
+bool Client::sendMessage(Connection::MessageType type, const::google::protobuf::Message &msg)
+{
+    Q_ASSERT(_connection && _connection->isConnected());
+    return _connection->sendMessage(type, msg);
 }
 
 void Client::onConnected() {
@@ -24,11 +31,8 @@ void Client::onConnected() {
     QByteArray nameBytes =_myName.toUtf8();
     h.set_name(nameBytes.data(), nameBytes.length());
 
-    _connection->sendMessage(Connection::HandShake, h);
-
-    QTextStream(stderr) << "Was here\n";
+    sendMessage(Connection::HandShake, h);
 }
-
 
 void Client::onMessage(Connection::MessageType type, const ::google::protobuf::Message & _msg)
 {
@@ -85,7 +89,7 @@ void Client::onMessage(const bithorde::Ping & msg) {}
 
 void Client::bindWrite(UploadAsset & asset)
 {
-    Q_ASSERT(asset.parent() == this);
+    Q_ASSERT(asset._client == this);
     Q_ASSERT(asset.size() > 0);
     asset._handle = _handleAllocator.allocate();
     _assetMap[asset._handle] = &asset;

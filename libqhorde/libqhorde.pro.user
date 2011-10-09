@@ -63,7 +63,7 @@
     <value key="ProjectExplorer.ProjectConfiguration.DefaultDisplayName" type="QString">Qt in PATH Release</value>
     <value key="ProjectExplorer.ProjectConfiguration.DisplayName" type="QString"></value>
     <value key="ProjectExplorer.ProjectConfiguration.Id" type="QString">Qt4ProjectManager.Qt4BuildConfiguration</value>
-    <value key="Qt4ProjectManager.Qt4BuildConfiguration.BuildConfiguration" type="int">0</value>
+    <value key="Qt4ProjectManager.Qt4BuildConfiguration.BuildConfiguration" type="int">2</value>
     <value key="Qt4ProjectManager.Qt4BuildConfiguration.BuildDirectory" type="QString">/home/ulrik/programming/bithorde/libqhorde-build-desktop</value>
     <value key="Qt4ProjectManager.Qt4BuildConfiguration.QtVersionId" type="int">2</value>
     <value key="Qt4ProjectManager.Qt4BuildConfiguration.ToolChain" type="int">0</value>

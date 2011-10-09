@@ -54,11 +54,14 @@ public:
     void bindRead(ReadAsset & asset);
     void bindWrite(UploadAsset & asset);
 
+    bool sendMessage(Connection::MessageType type, const ::google::protobuf::Message & msg);
 signals:
     void authenticated(QString remote);
+    void sent();
+
 private slots:
     void onConnected();
-    void onMessage(Connection::MessageType type, const ::google::protobuf::Message & _msg);
+    void onMessage(Connection::MessageType type, const ::google::protobuf::Message & msg);
 
 protected:
     void onMessage(const bithorde::HandShake & msg);
