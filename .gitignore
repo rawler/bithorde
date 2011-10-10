@@ -11,8 +11,9 @@
 # Releases-dir
 /releases
 
-# TMP QMake build-stuff.
-/*-build-*
+# TMP QMake / QtCreator stuff.
+*-build-*
+*.pro.user
 Makefile
 *.pb.cc
 *.pb.h
