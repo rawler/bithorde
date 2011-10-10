@@ -20,14 +20,16 @@ SOURCES += proto/bithorde.pb.cc \
     asset.cpp \
     client.cpp \
     connection.cpp \
-    hashes.cpp
+    hashes.cpp \
+    cliprogressbar.cpp
 
 HEADERS += libqhorde.h\
         libqhorde_global.h \
     asset.h \
     client.h \
     connection.h \
-    hashes.h
+    hashes.h \
+    cliprogressbar.h
 
 unix:LIBS += -lprotobuf
 
