@@ -23,28 +23,41 @@ int main(int argc, char *argv[])
     sock.connectToServer("/tmp/bithorde");
     LocalConnection conn(sock);
 
-    Client client(conn, "testclient");
-
-    BHUpload u(&client, a.arguments()[1]);
-
-    return a.exec();
+    BHUpload u(a.arguments()[1]);
+    if (u.isOpen()) {
+        u.setClient(new Client(conn, "testclient"));
+        return a.exec();
+    } else {
+        return -1;
+    }
 }
 
 static QTextStream qerr(stderr);
 
-BHUpload::BHUpload(Client *parent, QString fileName) :
-    QObject(parent),
-    client(parent),
+BHUpload::BHUpload(QString fileName) :
     src(fileName),
     offset(0),
     progressBar(NULL)
 {
-    src.open(QIODevice::ReadOnly);
-    src.waitForReadyRead(10000);
-    nextBlock = src.read(BLOCKSIZE);
+    if (src.open(QIODevice::ReadOnly)) {
+        nextBlock = src.read(BLOCKSIZE);
+    } else {
+        qerr << "open(" << src.fileName() << ") error: " << src.errorString() << "\n";
+    }
+}
+
+bool BHUpload::isOpen()
+{
+    return src.isOpen();
+}
+
+void BHUpload::setClient(Client *client)
+{
+    this->client = client;
 
     connect(client, SIGNAL(authenticated(QString)), SLOT(onAuthenticated(QString)));
 }
+
 
 void BHUpload::onAuthenticated(QString remoteName)
 {
@@ -83,7 +96,6 @@ void BHUpload::onUploadResponse(const bithorde::AssetStatus &msg)
 void BHUpload::tryWriteMore() {
     while ((!nextBlock.isEmpty()) && upload->tryWrite(offset, nextBlock)) {
         offset += nextBlock.length();
-        src.waitForReadyRead(10000);
         nextBlock = src.read(BLOCKSIZE);
     }
     if (nextBlock.isEmpty()) {

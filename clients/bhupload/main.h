@@ -19,7 +19,9 @@ class BHUpload : public QObject {
     CLIProgressBar * progressBar;
 
 public:
-    explicit BHUpload(Client *parent, QString fileName);
+    explicit BHUpload(QString fileName);
+    bool isOpen();
+    void setClient(Client * client);
 
 public slots:
     void onAuthenticated(QString remoteName);
