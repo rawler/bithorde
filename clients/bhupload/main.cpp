@@ -1,4 +1,3 @@
-
 #include <QtCore/QCoreApplication>
 #include <QtCore/QStringList>
 #include <QtCore/QTextStream>
@@ -7,9 +6,6 @@
 #include <QtNetwork/QTcpSocket>
 
 #include <libqhorde.h>
-
-#include <crypto++/filters.h>
-#include <crypto++/base32.h>
 
 #include "main.h"
 
@@ -78,7 +74,8 @@ void BHUpload::onUploadResponse(const bithorde::AssetStatus &msg)
             const::std::string id = msg.ids(0).id();
             std::string base32id;
             CryptoPP::StringSource((const byte*)id.data(), id.length(), true,
-                getBase32Encoder(base32id));
+                new RFC4648Base32Encoder(
+                    new CryptoPP::StringSink(base32id)));
 
             qout << "magnet:?xl=" << msg.size() << "&xt=urn:tree:tiger:" << base32id.c_str() << "\n";
             QCoreApplication::exit();
