@@ -17,14 +17,14 @@ TEMPLATE = app
 unix:LIBS += -lprotobuf -lcrypto++
 
 SOURCES += main.cpp
+HEADERS += \
+    main.h
 
-win32:CONFIG(release, debug|release): LIBS += -L$$PWD/../../libqhorde-build-desktop/ -lqhorde
-else:win32:CONFIG(debug, debug|release): LIBS += -L$$PWD/../../libqhorde-build-desktop/ -lqhorde
-else:symbian: LIBS += -llibqhorde
-else:unix: LIBS += -L$$PWD/../../libqhorde-build-desktop/ -lqhorde
+
+win32:CONFIG(release, debug|release): LIBS += -L$$OUT_PWD/../../libqhorde/release/ -lqhorde
+else:win32:CONFIG(debug, debug|release): LIBS += -L$$OUT_PWD/../../libqhorde/debug/ -lqhorde
+else:symbian: LIBS += -lqhorde
+else:unix: LIBS += -L$$OUT_PWD/../../libqhorde/ -lqhorde
 
 INCLUDEPATH += $$PWD/../../libqhorde
 DEPENDPATH += $$PWD/../../libqhorde
-
-HEADERS += \
-    main.h
