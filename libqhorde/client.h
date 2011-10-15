@@ -19,7 +19,9 @@ class Client : public QObject
     QString _peerName;
 
     QMap<Asset::Handle, Asset*> _assetMap;
+    QMap<int, Asset::Handle> _requestIdMap;
     CachedAllocator<Asset::Handle> _handleAllocator;
+    CachedAllocator<int> _rpcIdAllocator;
 
     quint8 _protoVersion;
 public:
@@ -49,9 +51,12 @@ protected:
     void onMessage(const bithorde::Ping & msg);
 
 private:
-
     friend class Asset;
+    friend class ReadAsset;
     void release(Asset & a);
+
+    int allocRPCRequest(Asset::Handle asset);
+    void releaseRPCRequest(int reqId);
 };
 
 #endif // CLIENT_H

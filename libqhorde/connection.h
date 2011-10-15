@@ -18,18 +18,18 @@ public:
         HandShake = 1,
         BindRead = 2,
         AssetStatus = 3,
-        ReadRequest = 4,
-        ReadResponse = 5,
+        ReadRequest = 5,
+        ReadResponse = 6,
         BindWrite = 7,
         DataSegment = 8,
         HandShakeConfirmed = 9,
-        Ping = 10,
+        Ping = 10
     };
     enum State {
         AwaitingConnection,
         Connected,
         AwaitingAuth,
-        Authenticated,
+        Authenticated
     };
 
     explicit Connection(QIODevice & socket, QObject *parent = 0);

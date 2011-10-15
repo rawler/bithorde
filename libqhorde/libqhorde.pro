@@ -32,7 +32,7 @@ HEADERS += libqhorde.h\
     cliprogressbar.h \
     allocator.h
 
-unix:LIBS += -lprotobuf
+unix:LIBS += -lprotobuf -lcrypto++
 
 symbian {
     #Symbian specific definitions

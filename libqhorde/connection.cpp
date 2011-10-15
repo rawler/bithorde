@@ -26,11 +26,13 @@ void Connection::onData()
         buf = _buf + buf;
 
     ::google::protobuf::io::CodedInputStream stream((::google::protobuf::uint8*)buf.data(), buf.length());
-    quint32 tag;
     bool res = true;
-    size_t remains = 0;
-
-    while (res && ((tag = stream.ReadTag()) != 0)) {
+    size_t remains;
+    while (res) {
+        remains = stream.BytesUntilLimit();
+        quint32 tag = stream.ReadTag();
+        if (tag == 0)
+            break;
         switch (::google::protobuf::internal::WireFormatLite::GetTagFieldNumber(tag)) {
         case HandShake:
             if (_state == Connected) goto proto_error;
@@ -63,7 +65,7 @@ void Connection::onData()
             res = ::google::protobuf::internal::WireFormatLite::SkipMessage(&stream);
         }
     }
-    remains = stream.BytesUntilLimit();
+
     if (remains) {
         _buf = buf.right(remains);
     } else {

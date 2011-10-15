@@ -5,11 +5,18 @@
 
 #include <QtCore/QTextStream>
 
+#define DEFAULT_ASSET_TIMEOUT 4000
+
+quint64 rand64() {
+    return (((quint64)qrand()) << 32) | qrand();
+}
+
 Client::Client(Connection & connection, QString myName, QObject *parent) :
     QObject(parent),
     _connection(&connection),
     _myName(myName),
     _handleAllocator(1),
+    _rpcIdAllocator(1),
     _protoVersion(0)
 {
     connect(_connection, SIGNAL(connected()), SLOT(onConnected()));
@@ -81,15 +88,43 @@ void Client::onMessage(const bithorde::AssetStatus & msg) {
     }
 }
 void Client::onMessage(const bithorde::Read::Request & msg) {}
-void Client::onMessage(const bithorde::Read::Response & msg) {}
+void Client::onMessage(const bithorde::Read::Response & msg) {
+    Asset::Handle assetHandle = _requestIdMap[msg.reqid()];
+    if (_assetMap.contains(assetHandle)) {
+        Asset* a = _assetMap[assetHandle];
+        a->handleMessage(msg);
+    } else {
+        QTextStream(stderr) << "WARNING: AssetStatus for unmapped handle\n";
+        // TODO: Log error
+    }
+}
 void Client::onMessage(const bithorde::BindWrite & msg) {}
 void Client::onMessage(const bithorde::DataSegment & msg) {}
 void Client::onMessage(const bithorde::HandShakeConfirmed & msg) {}
 void Client::onMessage(const bithorde::Ping & msg) {}
 
+void Client::bindRead(ReadAsset &asset) {
+    Q_ASSERT(asset._client == this);
+    Q_ASSERT(asset._handle < 0);
+    Q_ASSERT(!asset.requestIds().isEmpty());
+    asset._handle = _handleAllocator.allocate();
+    _assetMap[asset._handle] = &asset;
+    bithorde::BindRead msg;
+    msg.set_handle(asset._handle);
+    foreach (ReadAsset::Identifier id, asset.requestIds()) {
+        bithorde::Identifier * bhId = msg.add_ids();
+        bhId->set_type(id.first);
+        bhId->set_id(id.second.data(), id.second.length());
+    }
+    msg.set_timeout(DEFAULT_ASSET_TIMEOUT);
+    msg.set_uuid(rand64());
+    _connection->sendMessage(Connection::BindRead, msg);
+}
+
 void Client::bindWrite(UploadAsset & asset)
 {
     Q_ASSERT(asset._client == this);
+    Q_ASSERT(asset._handle < 0);
     Q_ASSERT(asset.size() > 0);
     asset._handle = _handleAllocator.allocate();
     _assetMap[asset._handle] = &asset;
@@ -104,11 +139,27 @@ void Client::release(Asset & asset)
     Q_ASSERT(asset.isBound());
     bithorde::BindRead msg;
     msg.set_handle(asset._handle);
-    msg.set_timeout(4000);
-    msg.set_uuid(12736871236);
+    msg.set_timeout(DEFAULT_ASSET_TIMEOUT);
+    msg.set_uuid(rand64());
 
     _assetMap.remove(asset._handle);
     _handleAllocator.free(asset._handle);
+    asset._handle = -1;
+
+    _connection->sendMessage(Connection::BindRead, msg);
+}
+
+int Client::allocRPCRequest(Asset::Handle asset)
+{
+    int res = _rpcIdAllocator.allocate();
+    _requestIdMap.insert(res, asset);
+    return res;
+}
+
+void Client::releaseRPCRequest(int reqId)
+{
+    _requestIdMap.remove(reqId);
+    _rpcIdAllocator.free(reqId);
 }
 
 
