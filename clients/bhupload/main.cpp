@@ -15,6 +15,9 @@
 
 #define BLOCKSIZE (64*1024)
 
+static QTextStream qerr(stderr);
+static QTextStream qout(stdout);
+
 int main(int argc, char *argv[])
 {
     QCoreApplication a(argc, argv);
@@ -31,8 +34,6 @@ int main(int argc, char *argv[])
         return -1;
     }
 }
-
-static QTextStream qerr(stderr);
 
 BHUpload::BHUpload(QString fileName) :
     src(fileName),
@@ -61,7 +62,7 @@ void BHUpload::setClient(Client *client)
 
 void BHUpload::onAuthenticated(QString remoteName)
 {
-    QTextStream(stdout) << "Uploading " << src.fileName() << " (" << src.size()/1024 << "KB) to " << remoteName << "\n";
+    qout << "Uploading " << src.fileName() << " (" << src.size()/1024 << "KB) to " << remoteName << "\n";
 
     Client * client = (Client*)sender();
     upload = new UploadAsset(client, this);
@@ -79,7 +80,7 @@ void BHUpload::onUploadResponse(const bithorde::AssetStatus &msg)
             CryptoPP::StringSource((const byte*)id.data(), id.length(), true,
                 getBase32Encoder(base32id));
 
-            QTextStream(stdout) << "magnet:?xl=" << msg.size() << "&xt=urn:tree:tiger:" << base32id.c_str() << "\n";
+            qout << "magnet:?xl=" << msg.size() << "&xt=urn:tree:tiger:" << base32id.c_str() << "\n";
             QCoreApplication::exit();
         } else {
             progressBar = new CLIProgressBar(&qerr, this);
@@ -88,7 +89,7 @@ void BHUpload::onUploadResponse(const bithorde::AssetStatus &msg)
             tryWriteMore();
         }
     } else {
-        QTextStream(stdout) << "Failure, got " << bithorde::Status_Name(msg.status()).c_str() << "\n";
+        qout << "Failure, got " << bithorde::Status_Name(msg.status()).c_str() << "\n";
         QCoreApplication::exit(-1);
     }
 }
