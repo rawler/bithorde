@@ -122,7 +122,7 @@ message DataSegment {
  * seconds) or be considered disconnected.
  ***************************************************************************************/
 message Ping {
-  required uint32 timeout = 1;
+  optional uint32 timeout = 1;
 }
 
 // Dummy message to document the stream message-ids itself.

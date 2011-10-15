@@ -101,7 +101,10 @@ void Client::onMessage(const bithorde::Read::Response & msg) {
 void Client::onMessage(const bithorde::BindWrite & msg) {}
 void Client::onMessage(const bithorde::DataSegment & msg) {}
 void Client::onMessage(const bithorde::HandShakeConfirmed & msg) {}
-void Client::onMessage(const bithorde::Ping & msg) {}
+void Client::onMessage(const bithorde::Ping & msg) {
+    bithorde::Ping reply;
+    _connection->sendMessage(Connection::Ping, reply);
+}
 
 void Client::bindRead(ReadAsset &asset) {
     Q_ASSERT(asset._client == this);
