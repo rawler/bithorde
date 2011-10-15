@@ -29,7 +29,8 @@ HEADERS += libqhorde.h\
     client.h \
     connection.h \
     hashes.h \
-    cliprogressbar.h
+    cliprogressbar.h \
+    allocator.h
 
 unix:LIBS += -lprotobuf
 
