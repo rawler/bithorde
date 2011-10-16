@@ -45,8 +45,10 @@ struct OutQueue {
     }
 
     void _flush(QByteArray & data) {
-        fwrite(data.data(), data.length(), 1, stdout);
-        position += data.length();
+        if (write(1, data.data(), data.length()) == data.length())
+            position += data.length();
+        else
+            (qerr << "Error: failed to write block\n").flush();
     }
 
     void send(quint64 offset, QByteArray & data) {

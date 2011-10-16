@@ -51,7 +51,7 @@ void ReadAsset::handleMessage(const bithorde::AssetStatus &msg)
 void ReadAsset::handleMessage(const bithorde::Read::Response &msg) {
     if (msg.status() == bithorde::SUCCESS) {
         const std::string & content = msg.content();
-        QByteArray payload(content.data(), content.length());
+        QByteArray payload = QByteArray::fromRawData(content.data(), content.length());
         emit dataArrived(msg.offset(), payload, msg.reqid());
     } else {
         // TODO
