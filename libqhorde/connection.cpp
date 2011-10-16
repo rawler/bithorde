@@ -81,13 +81,21 @@ proto_error:
 
 template <class T>
 bool Connection::dequeue(MessageType type, ::google::protobuf::io::CodedInputStream &stream) {
+    bool res;
     T msg;
-    if (::google::protobuf::internal::WireFormatLite::ReadMessageNoVirtual(&stream, &msg)) {
+
+    quint32 length;
+    if (!stream.ReadVarint32(&length)) return false;
+
+    quint32 bytesLeft = stream.BytesUntilLimit();
+    if (length > bytesLeft) return false;
+
+    ::google::protobuf::io::CodedInputStream::Limit limit = stream.PushLimit(length);
+    if ((res = msg.MergePartialFromCodedStream(&stream)))
         emit message(type, msg);
-        return true;
-    } else {
-        return false;
-    }
+    stream.PopLimit(limit);
+
+    return res;
 }
 
 bool encode(std::string* target, Connection::MessageType type, const::google::protobuf::Message &msg) {
