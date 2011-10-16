@@ -87,6 +87,7 @@ void Client::onMessage(const bithorde::AssetStatus & msg) {
         // TODO: Log error
     }
 }
+
 void Client::onMessage(const bithorde::Read::Request & msg) {}
 void Client::onMessage(const bithorde::Read::Response & msg) {
     Asset::Handle assetHandle = _requestIdMap[msg.reqid()];
@@ -94,10 +95,11 @@ void Client::onMessage(const bithorde::Read::Response & msg) {
         Asset* a = _assetMap[assetHandle];
         a->handleMessage(msg);
     } else {
-        QTextStream(stderr) << "WARNING: AssetStatus for unmapped handle\n";
+        QTextStream(stderr) << "WARNING: ReadResponse " << msg.reqid() << msg.has_reqid() << " for unmapped handle\n";
         // TODO: Log error
     }
 }
+
 void Client::onMessage(const bithorde::BindWrite & msg) {}
 void Client::onMessage(const bithorde::DataSegment & msg) {}
 void Client::onMessage(const bithorde::HandShakeConfirmed & msg) {}

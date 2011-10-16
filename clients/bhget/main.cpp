@@ -190,6 +190,9 @@ void BHGet::requestMore()
 void BHGet::onDataChunk(quint64 offset, QByteArray data, int tag)
 {
     _outQueue->send(offset, data);
+    if ((data.length() < BLOCK_SIZE) && ((offset+data.length()) < _asset->size())) {
+        (qerr << "Error: got unexpectedly small data-block.\n").flush();
+    }
     if (_outQueue->position < _asset->size()) {
         requestMore();
     } else {

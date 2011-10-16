@@ -62,6 +62,7 @@ void Connection::onData()
             if (_state == Authenticated) goto proto_error;
             res = dequeue<bithorde::Ping>(Ping, stream); break;
         default:
+            QTextStream(stderr) << "unknown message tag\n";
             res = ::google::protobuf::internal::WireFormatLite::SkipMessage(&stream);
         }
     }
@@ -110,7 +111,7 @@ bool Connection::sendMessage(Connection::MessageType type, const::google::protob
     written = _socket->write(buf.data(), buf.length());
     Q_ASSERT(written == buf.length());
 
-    return true;
+    return success && written;
 }
 
 TCPConnection::TCPConnection(QTcpSocket & socket) :
