@@ -3,4 +3,5 @@ TEMPLATE = subdirs
 SUBDIRS += \
     libqhorde \
     clients/bhget \
-    clients/bhupload
+    clients/bhupload \
+    clients/bhfuse
