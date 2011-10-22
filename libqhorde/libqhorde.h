@@ -5,5 +5,6 @@
 #include "client.h"
 #include "hashes.h"
 #include "libqhorde_global.h"
+#include "magneturi.h"
 
 #endif // LIBQHORDE_H

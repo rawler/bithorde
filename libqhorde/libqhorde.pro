@@ -21,7 +21,8 @@ SOURCES += proto/bithorde.pb.cc \
     client.cpp \
     connection.cpp \
     hashes.cpp \
-    cliprogressbar.cpp
+    cliprogressbar.cpp \
+    magneturi.cpp
 
 HEADERS += libqhorde.h\
         libqhorde_global.h \
@@ -30,7 +31,8 @@ HEADERS += libqhorde.h\
     connection.h \
     hashes.h \
     cliprogressbar.h \
-    allocator.h
+    allocator.h \
+    magneturi.h
 
 unix:LIBS += -lprotobuf -lcrypto++
 

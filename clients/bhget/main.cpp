@@ -91,15 +91,15 @@ BHGet::BHGet(QString myName) :
 
 bool BHGet::queueAsset(QString _uri)
 {
-    QUrl uri(_uri);
-    if (uri.scheme() != "magnet") {
+    MagnetURI uri;
+    if (!uri.parse(_uri)) {
         qerr << "Only magnet-links supported, not '" << _uri << "'\n";
         return false;
     }
+
     bool found_id = false;
-    typedef QPair<QString, QString> query_item;
-    foreach (query_item item, uri.queryItems()) {
-        if ((item.first == "xt") && item.second.startsWith("urn:tree:tiger:")) {
+    foreach (ExactIdentifier id, uri.xtIds) {
+        if (id.type == "urn:tree:tiger") {
             found_id = true;
             break;
         }
@@ -121,7 +121,6 @@ void BHGet::attach(QLocalSocket &sock)
     connect(_client, SIGNAL(authenticated(QString)), SLOT(onAuthenticated(QString)));
 }
 
-
 void BHGet::nextAsset()
 {
     if (_asset) {
@@ -130,26 +129,21 @@ void BHGet::nextAsset()
         _asset = NULL;
     }
 
-    QString hashId;
-    while (hashId.isEmpty() && !_assets.isEmpty()) {
-        QUrl nextUri = _assets.takeFirst();
-        typedef QPair<QString, QString> query_item;
-        foreach (query_item item, nextUri.queryItems()) {
-            if ((item.first == "xt") && item.second.startsWith("urn:tree:tiger:")) {
-                hashId = item.second.mid(14);
+    QByteArray tigerId;
+    while (tigerId.isEmpty() && !_assets.isEmpty()) {
+        MagnetURI nextUri = _assets.takeFirst();
+        foreach (ExactIdentifier id, nextUri.xtIds) {
+            if (id.type == "urn:tree:tiger") {
+                tigerId = id.id;
                 break;
             }
         }
     }
-    if (hashId.isEmpty())
+    if (tigerId.isEmpty())
         QCoreApplication::quit();
 
-    std::string assetid;
-    CryptoPP::StringSource(hashId.toStdString(), true,
-        new RFC4648Base32Decoder(
-            new CryptoPP::StringSink(assetid)));
     ReadAsset::IdList ids;
-    ids.append(ReadAsset::Identifier(bithorde::TREE_TIGER, QByteArray(assetid.data(), assetid.length())));
+    ids.append(ReadAsset::Identifier(bithorde::TREE_TIGER, tigerId));
     _asset = new ReadAsset(_client, ids);
     connect(_asset, SIGNAL(statusUpdate(bithorde::AssetStatus)), SLOT(onStatusUpdate(bithorde::AssetStatus)));
     connect(_asset, SIGNAL(dataArrived(quint64,QByteArray,int)), SLOT(onDataChunk(quint64,QByteArray,int)));

@@ -8,6 +8,7 @@
 #include <QtNetwork/QTcpSocket>
 
 #include <client.h>
+#include <magneturi.h>
 
 struct OutQueue;
 
@@ -15,7 +16,7 @@ class BHGet : public QObject {
     Q_OBJECT
 
     QString _myName;
-    QList<QUrl> _assets;
+    QList<MagnetURI> _assets;
     Connection * _connection;
     Client * _client;
     ReadAsset * _asset;
