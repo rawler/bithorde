@@ -17,7 +17,7 @@ public:
     BHFuse(QString mountPoint, QVector<QString> args, QObject * parent=NULL);
 
     virtual int fuse_lookup(fuse_req_t req, fuse_ino_t parent, const char *name);
-    virtual int fuse_forget(fuse_ino_t ino, ulong nlookup);
+    virtual void fuse_forget(fuse_req_t req, fuse_ino_t ino, ulong nlookup);
     virtual int fuse_getattr(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi);
     virtual int fuse_open(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi);
     virtual int fuse_release(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi);
@@ -28,6 +28,8 @@ public slots:
     FUSEAsset * registerAsset(ReadAsset * asset);
 
 private:
+    bool unrefInode(fuse_ino_t ino, int count);
+
     Client * client;
 
     QMap<fuse_ino_t, INode *> inode_cache;

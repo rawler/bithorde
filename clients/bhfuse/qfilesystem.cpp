@@ -16,9 +16,8 @@ extern "C" {
             fuse_reply_err(req, res);
     }
     static void _op_forget(fuse_req_t req, fuse_ino_t ino, ulong nlookup) {
-        int res = ((QFileSystem*)fuse_req_userdata(req))->fuse_forget(ino, nlookup);
-        if (res)
-            fuse_reply_err(req, res);
+        ((QFileSystem*)fuse_req_userdata(req))->fuse_forget(req, ino, nlookup);
+        fuse_reply_none(req);
     }
     static void _op_getattr(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi) {
         int res = ((QFileSystem*)fuse_req_userdata(req))->fuse_getattr(req, ino, fi);
