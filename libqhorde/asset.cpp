@@ -8,6 +8,11 @@ Asset::Asset(Client * client, QObject * parent) :
     _size(-1)
 {}
 
+Asset::~Asset() {
+    if (isBound())
+        close();
+}
+
 bool Asset::isBound()
 {
     return _handle >= 0;
@@ -17,6 +22,7 @@ void Asset::close()
 {
     Q_ASSERT(_client && isBound());
     _client->release(*this);
+    _handle = -1;
 }
 
 quint64 Asset::size()

@@ -14,6 +14,7 @@ class Asset : public QObject
 public:
     typedef int Handle;
     explicit Asset(Client * client, QObject * parent);
+    virtual ~Asset();
 
     bool isBound();
     quint64 size();
@@ -42,6 +43,7 @@ public:
     typedef QList<Identifier> IdList;
 
     explicit ReadAsset(Client * client, IdList requestIds, QObject * parent=0);
+
     int aSyncRead(quint64 offset, ssize_t size);
     IdList & requestIds();
 
