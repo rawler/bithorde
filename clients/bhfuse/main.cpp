@@ -59,15 +59,14 @@ int BHFuse::fuse_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
     MagnetURI uri;
     if (uri.parse(name)) {
         Lookup * lookup = new Lookup(this, req, uri);
-        lookup->request(client);
+        lookup->perform(client);
         return 0;
     } else {
         return ENOENT;
     }
 }
 
-void BHFuse::fuse_forget(fuse_req_t req, fuse_ino_t ino, ulong nlookup) {
-    (qErr << "Forgetting " << ino << " with " << nlookup << "references\n").flush();
+void BHFuse::fuse_forget(fuse_ino_t ino, ulong nlookup) {
     unrefInode(ino, nlookup);
 }
 
@@ -89,24 +88,25 @@ int BHFuse::fuse_getattr(fuse_req_t req, fuse_ino_t ino, fuse_file_info *) {
 }
 
 int BHFuse::fuse_open(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi) {
-    INode* i = inode_cache[ino];
-    if (i) {
-        i->takeRef();
-        fi->keep_cache = true;
-        fuse_reply_open(req, fi);
+    FUSEAsset* a = qobject_cast<FUSEAsset*>(inode_cache[ino]);
+    if (a) {
+        a->fuse_dispatch_open(req, fi);
+        return 0;
     } else {
         return ENOENT;
     }
 }
 
-int BHFuse::fuse_release(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi) {
-    if (unrefInode(ino, 1))
-        fuse_reply_err(req, 0);
-    else
+int BHFuse::fuse_release(fuse_req_t req, fuse_ino_t ino, fuse_file_info * fi) {
+    if (FUSEAsset * a = qobject_cast<FUSEAsset*>(inode_cache[ino])) {
+        a->fuse_dispatch_close(req, fi);
+        return 0;
+    } else {
         return EBADF;
+    }
 }
 
-int BHFuse::fuse_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, fuse_file_info *fi)
+int BHFuse::fuse_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, fuse_file_info *)
 {
     FUSEAsset* a = qobject_cast<FUSEAsset*>(inode_cache[ino]);
     if (a) {
@@ -131,15 +131,12 @@ bool BHFuse::unrefInode(fuse_ino_t ino, int count)
     INode * i = inode_cache[ino];
     if (i) {
         if (!i->dropRefs(count)) {
-            (qErr << "closing " << ino << "\n").flush();
             inode_cache.remove(ino);
             delete i;
         } else {
-            (qErr << "unRef ino " << ino << ", " << (int)i->refCount << "left\n").flush();
         }
         return true;
     } else {
-        (qErr << "unrefing unknown " << ino << "\n").flush();
         return false;
     }
 }
