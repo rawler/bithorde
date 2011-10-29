@@ -235,10 +235,17 @@ class CacheManager : IAssetSource {
         }
 
         private State updateState() {
-            if (idxPath.exists || !assetPath.exists)
-                return _state = State.INCOMPLETE;
-            else
-                return _state = State.COMPLETE;
+            if (idxPath.exists) {
+                if (_cacheMap && (_cacheMap.zeroBlockSize == this.size))
+                    return _state = State.COMPLETE;
+                else
+                    return _state = State.INCOMPLETE;
+            } else {
+                if (assetPath.exists)
+                    return _state = State.COMPLETE;
+                else
+                    return _state = State.INCOMPLETE;
+            }
         }
 
         final State state() {
@@ -266,6 +273,7 @@ class CacheManager : IAssetSource {
                 _stored.close();
                 _stored = null;
             }
+            log.trace("Was here");
             closeRemote();
         }
 
@@ -386,9 +394,9 @@ class CacheManager : IAssetSource {
     }
 
     /************************************************************************************
-     * Create new MetaAsset with random Id
+     * Internal generation of new MetaAsset with random Id
      ***********************************************************************************/
-    private Asset newMetaAsset() {
+    private Asset _newMetaAsset() {
         auto newMeta = new Asset();
         auto localId = new ubyte[LOCALID_LENGTH];
         rand.randomizeUniform!(ubyte[],false)(localId);
@@ -397,6 +405,14 @@ class CacheManager : IAssetSource {
             rand.randomizeUniform!(ubyte[],false)(localId);
         }
         newMeta.localId = localId;
+        return newMeta;
+    }
+
+    /************************************************************************************
+     * Create new MetaAsset with random Id
+     ***********************************************************************************/
+    private Asset newMetaAsset() {
+        auto newMeta = _newMetaAsset();
         addToIdMap(newMeta);
         return newMeta;
     }
@@ -405,7 +421,7 @@ class CacheManager : IAssetSource {
      * Create new MetaAsset with random Id and predetermined hashIds
      ***********************************************************************************/
     private Asset newMetaAssetWithHashIds(message.Identifier[] hashIds) {
-        auto newMeta = newMetaAsset();
+        auto newMeta = _newMetaAsset();
         newMeta.hashIds = hashIds.dup;
         foreach (ref v; newMeta.hashIds)
             v = v.dup;
@@ -692,7 +708,7 @@ public:
         auto metaAsset = findMetaAsset(req.ids);
         if (!metaAsset) {
             forwardRequest();
-        } else if (metaAsset.state == Asset.State.COMPLETE) {
+        } else if (metaAsset.updateState == Asset.State.COMPLETE) {
             metaAsset.openRead;
             fromCache(metaAsset);
         } else {

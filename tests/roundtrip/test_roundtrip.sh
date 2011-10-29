@@ -48,7 +48,7 @@ VERIFICATION=$("$BHUPLOAD" -u/tmp/bithorde-rta "$TESTFILE"|grep '^magnet:')
 
 echo "Getting (2 in parallel) from B..."
 "$BHGET" -u/tmp/bithorde-rtb -sy "$MAGNETURL" | verify_equal $TESTFILE || exit_error "Downloaded file did not match upload source" &
-wait_until_found "a.log" 'serving [0-9A-Fa-f]* from cache'
+wait_until_found "b.log" 'Committing .*magnet:?xt=urn:tree:tiger.* to map'
 "$BHGET" -u/tmp/bithorde-rtb -sy "$MAGNETURL" | verify_equal $TESTFILE || exit_error "Downloaded file did not match upload source"
 wait $!
 wait_until_found "b.log" 'Hash verified'
