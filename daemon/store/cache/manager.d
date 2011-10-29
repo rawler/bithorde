@@ -433,7 +433,7 @@ public:
     /************************************************************************************
      * Create a CacheManager with a given asset-directory and underlying Router-instance
      ***********************************************************************************/
-    this(FilePath assetDir, ulong maxSize, bool usefsync, IAssetSource router, Pump pump) {
+    this(FilePath assetDir, ulong maxSize, bool usefsync, bool prune, IAssetSource router, Pump pump) {
         if (!(assetDir.exists && assetDir.isFolder && assetDir.isWritable))
             throw new ConfigException(assetDir.toString ~ " must be an existing writable directory");
         this.assetDir = assetDir;
@@ -441,6 +441,10 @@ public:
         this.usefsync = usefsync;
         this.router = router;
         this.pump = pump;
+
+        if ((this.size > (getMaxSize)) && (!prune)) {
+            throw new ConfigException(assetDir.toString ~ "has more data than the configured limit. Start with --prune, if you really want to prune excess data.");
+        }
 
         hashIdMap[message.HashType.SHA1] = null;
         hashIdMap[message.HashType.SHA256] = null;
@@ -520,6 +524,29 @@ public:
         saveIdMap();
     }
 
+    private ulong getMaxSize() {
+        /********************************************************************************
+         * Calculate how large the Cache can be according to FS-limits.
+         *******************************************************************************/
+        ulong constrainToFs(ulong wanted, ulong cacheSize) {
+            auto dir = assetDir.toString;
+            auto fsBufferSpace = cast(long)(FileSystem.totalSpace(dir) * FS_MINFREE);
+            auto fsFreeSpace = cast(long)FileSystem.freeSpace(dir) - fsBufferSpace;
+            auto fsAllowed = cast(long)(this.size)+fsFreeSpace;
+            if (wanted > fsAllowed) {
+                if (this.maxSize != 0) // Don't warn when user have specified unlimited cache
+                    log.warn("FileSystem-space smaller than specified cache maxSize. Constraining cache to {}% of FileSystem.", cast(uint)((1.0-FS_MINFREE)*100));
+                return fsAllowed;
+            } else {
+                return wanted;
+            }
+        }
+        auto maxSize = this.maxSize * M;
+        if (maxSize == 0)
+            maxSize = maxSize.max;
+        return constrainToFs(maxSize, this.size);
+    }
+
     /************************************************************************************
      * Makes room in cache for new asset of given size. May fail, in which case it
      * returns false.
@@ -542,33 +569,14 @@ public:
             }
             return loser;
         }
-        /********************************************************************************
-         * Calculate how large the Cache can be according to FS-limits.
-         *******************************************************************************/
-        ulong constrainToFs(ulong wanted, ulong cacheSize) {
-            auto dir = assetDir.toString;
-            auto fsBufferSpace = cast(long)(FileSystem.totalSpace(dir) * FS_MINFREE);
-            auto fsFreeSpace = cast(long)FileSystem.freeSpace(dir) - fsBufferSpace;
-            auto fsAllowed = cast(long)(this.size)+fsFreeSpace;
-            if (wanted > fsAllowed) {
-                if (this.maxSize != 0) // Don't warn when user have specified unlimited cache
-                    log.warn("FileSystem-space smaller than specified cache maxSize. Constraining cache to {}% of FileSystem.", cast(uint)((1.0-FS_MINFREE)*100));
-                return fsAllowed;
-            } else {
-                return wanted;
-            }
-        }
 
         debug (Performance) {
             Time started = Clock.now;
             scope(exit) { log.trace("MakeRoom took {}ms",(Clock.now-started).millis); }
         }
 
-        log.trace("Making room for new asset of {}MB. MaxSize is {}MB", size/M, this.maxSize);
-        auto maxSize = this.maxSize * M;
-        if (maxSize == 0)
-            maxSize = maxSize.max;
-        maxSize = constrainToFs(maxSize, this.size);
+        auto maxSize = getMaxSize();
+        log.trace("Making room for new asset of {}MB. MaxSize is {}MB", size/M, maxSize);
 
         if (size > (maxSize / 2))
             return false; // Will not cache individual assets larger than half the cacheSize

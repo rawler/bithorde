@@ -32,6 +32,7 @@ private import tango.stdc.signal;
 private import unistd = tango.stdc.posix.unistd;
 private import Text = tango.text.Util;
 private import tango.sys.Common;
+private import tango.text.Arguments;
 private import tango.time.Clock;
 private import tango.util.container.more.Stack;
 private import tango.util.Convert;
@@ -80,7 +81,7 @@ package:
 public:
     char[] name;
     Config config;
-    this(Config config)
+    this(Config config, Arguments args)
     {
         // Setup basics
         this.config = config;
@@ -113,7 +114,7 @@ public:
         // Setup helper functions, routing and caching
         this.router = new Router();
         if (config.cachedir)
-            this.cacheMgr = new CacheManager(config.cachedir, config.cacheMaxSize, config.usefsync, router, pump);
+            this.cacheMgr = new CacheManager(config.cachedir, config.cacheMaxSize, config.usefsync, args["prune"].set, router, pump);
 
         foreach (root; config.linkroots)
             linkRepos ~= new Repository(pump, root, config.usefsync);

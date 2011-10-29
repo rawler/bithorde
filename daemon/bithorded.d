@@ -65,6 +65,7 @@ public int main(char[][] _args)
     auto args = new Arguments;
     args("debug").aliased('d');
     args("version").aliased('v');
+    args("prune");
     args(null).title("config").params(1);
     if (!args.parse(_args[1..$]))
         return exit_usage(args.errors(&Stderr.layout.sprint));
@@ -94,7 +95,7 @@ public int main(char[][] _args)
         Log.root.add(new AppendFile(config.logfile.toString, new LayoutDate));
 
     // Try to setup server instance
-    s = new Server(config);
+    s = new Server(config, args);
     // Daemonize
     if (!doDebug) {
         Cin.input.close();

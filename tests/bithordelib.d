@@ -27,6 +27,7 @@ private import tango.io.Stdout;
 private import tango.net.device.LocalSocket;
 private import tango.net.device.Socket;
 private import tango.net.InternetAddress;
+private import tango.text.Arguments;
 private import tango.text.convert.Integer;
 private import tango.time.Clock;
 private import tango.util.log.AppendConsole;
@@ -108,7 +109,7 @@ class SteppingServer : Server {
         m = new Mutex(this);
         sem = new Semaphore();
 
-        super(c);
+        super(c, new Arguments);
     }
 
     /************************************************************************************
