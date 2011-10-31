@@ -1,3 +1,10 @@
+bithorde (0.1.99+0.2rc1-1) natty; urgency=low
+
+  * Minor bugfixes
+  * Prevent accidentally destroying cache through config. Require --prune manual argument to reduce cache-size on startup.
+
+ -- Ulrik Mikaelsson <ulrik.mikaelsson@gmail.com>  Mon, 31 Oct 2011 20:52:26 +0100
+
 bithorde (0.1.99+0.2beta1-1) natty; urgency=low
 
   * New Python-Client
