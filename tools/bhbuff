@@ -1,0 +1,42 @@
+#!/bin/bash
+DELAY=20
+RUN=0
+function USAGE {
+	echo -e "Usage: $0 [FLAGS]... [BITHORDE LINK FILE]\n\n  -h, --help     Shows this help.\n  -p, --play     Opens file with xdg-open after delay. (DEFAULT: No)\n  -d, --delay    Wait [SECONDS] before open with xdg-open. (DEFAULT: 20)\n"
+}
+if [ "$1" = "" ]; then
+        echo "bhbuff requires exatly one argument."
+	USAGE
+        exit 1
+fi
+while [ $# -gt 0 ]; do 
+  case "$1" in
+    -h|--help)
+	      USAGE
+	      exit 0
+	      ;;
+    -r|--run)
+              export RUN=1
+              ;;
+    -d|--delay)
+              export DELAY="$2"
+              if ! [[ "$DELAY" =~ ^[0-9]+$ ]]; then
+                echo "Delay needs to be a number..."
+		USAGE
+                exit 1
+              fi
+              ;;
+    *)
+              export FILE=${!#}
+	      ;;
+  esac
+  shift
+done
+
+exec bhget -sy -pn "$FILE" > /dev/null &
+BHGETPID=$!
+trap "echo -e '\nKilling script and its childs...';kill -9 $BHGETPID; exit 130" SIGINT SIGTERM
+if [ "$RUN" = 1 ]; then
+	sleep $DELAY
+	xdg-open "$FILE" > /dev/null 2> /dev/null
+fi
