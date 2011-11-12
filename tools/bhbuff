@@ -9,12 +9,14 @@ Usage: $0 [FLAGS]... [BITHORDE LINK FILE]\n
   -r, --run         Open asset with xdg-open after preload. (DEFAULT: No)\n
   Example: $0 -p 20 -r MyBithordeLink.avi\n"
 }
-LOCKFILE=$(tempfile)
 
-function wait_for_buff() {
-  dd of=/dev/null bs=512 count=$PIECETOLOAD
-  rm "$LOCKFILE"
-  if [ ! "$PERCENT" = "100" ]; then dd of=/dev/null bs=512 count=$DDSTAT; fi
+function wait_for_threshold() {
+  # Arguments:
+  #  $1 : # of 4096-byte blocks to wait for
+  #  $2 : file to remove to signal completion
+  dd of=/dev/null bs=4096 count=$1
+  rm "$2"
+  dd of=/dev/null bs=4096
 }
 
 if [ "$1" = "" ]; then
@@ -57,11 +59,13 @@ while [ $# -gt 0 ]; do
   esac
   shift
 done
-STAT=$(stat -L -c%s "$FILE")
-PIECETOLOAD="$(($(($STAT/512/100))*$PERCENT))"
-DDSTAT="$(($STAT/512))"
-bhget -sy -py "$FILE" | wait_for_buff &
-trap "echo -e '\nKilling script and buffering functions...'; kill $(pidof bhget) $(pidof dd); exit 130" SIGINT SIGTERM
+
+SIZE=$(stat -L -c%s "$FILE")
+PIECETOLOAD_KB=$(( ($SIZE*$PERCENT) / (100*4096) ))
+LOCKFILE=$(tempfile)
+bhget -sy -py "$FILE" | wait_for_threshold $PIECETOLOAD_KB $LOCKFILE &
+trap "echo -e '\nKilling script and buffering functions...'; kill %1; exit 130" SIGINT SIGTERM
+
 while [ -f "$LOCKFILE" ]; do 
 	sleep 0.1
 done
