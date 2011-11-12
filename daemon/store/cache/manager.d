@@ -592,10 +592,13 @@ public:
         }
 
         auto maxSize = getMaxSize();
-        log.trace("Making room for new asset of {}MB. MaxSize is {}MB", size/M, maxSize);
+        log.trace("Making room for new asset of {}MB. MaxSize is {}MB", size/M, maxSize/M);
 
-        if (size > (maxSize / 2))
-            return false; // Will not cache individual assets larger than half the cacheSize
+        if (size > (maxSize / 2)) {
+            log.warn("Will not cache individual assets larger than half the allowed cacheSize");
+            return false;
+        }
+
         auto targetSize = maxSize - size;
         log.trace("This cache is {}MB, roof is {}MB for upload", this.size/M, targetSize / M);
         garbageCollect();
