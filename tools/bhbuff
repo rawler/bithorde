@@ -1,19 +1,28 @@
 #!/bin/bash
-PERCENT=10
+PERCENT=100
 RUN=0
 function USAGE {
 	echo -e "
 Usage: $0 [FLAGS]... [BITHORDE LINK FILE]\n
   -h, --help        Shows this help.
-  -p, --percent     Load asset [NUM] percent before xdg-open, if requires -r flag. (DEFAULT WITH -r: 10, WITOUT -r: 100)
+  -p, --percent     Load asset [NUM] percent before evetual xdg-open, (DEFAULT: 100)
   -r, --run         Open asset with xdg-open after preload. (DEFAULT: No)\n
   Example: $0 -p 20 -r MyBithordeLink.avi\n"
 }
+LOCKFILE=$(tempfile)
+
+function wait_for_buff() {
+  dd of=/dev/null bs=512 count=$PIECETOLOAD
+  rm "$LOCKFILE"
+  if [ ! "$PERCENT" = "100" ]; then dd of=/dev/null bs=512 count=$DDSTAT; fi
+}
+
 if [ "$1" = "" ]; then
         echo "bhbuff needs a bithorde link to handle..."
 	USAGE
         exit 1
 fi
+
 while [ $# -gt 0 ]; do 
   case "$1" in
     -h|--help)
@@ -26,7 +35,7 @@ while [ $# -gt 0 ]; do
     -p|--percent)
               PERCENT="$2"
               if [[ "$PERCENT" =~ ^[0-9]+$ ]]; then
-			if [ "$PERCENT" -ge 100 ]; then
+			if [ "$PERCENT" -gt 100 ]; then
 				PERCENT=100
 			fi
 		else
@@ -34,6 +43,7 @@ while [ $# -gt 0 ]; do
 			USAGE
                 	exit 1
               fi
+	
               ;;
     *)
               FILE=${!#}
@@ -47,12 +57,14 @@ while [ $# -gt 0 ]; do
   esac
   shift
 done
-if [ "$RUN" = 0 ]; then
-	bhget -sy -py "$FILE" > /dev/null
-else
-	echo -e 'For progress, type: kill -USR1 $(pidof dd)\nin another terminal.'
-	PIECETOLOAD="$(($(($(($(stat -L -c%s "$FILE")/100))*$PERCENT))/512))"
-	dd if="$FILE" of=/dev/null bs=512 count=$PIECETOLOAD
+STAT=$(stat -L -c%s "$FILE")
+PIECETOLOAD="$(($(($STAT/512/100))*$PERCENT))"
+DDSTAT="$(($STAT/512))"
+bhget -sy -py "$FILE" | wait_for_buff &
+trap "echo -e '\nKilling script and buffering functions...'; kill $(pidof bhget) $(pidof dd); exit 130" SIGINT SIGTERM
+while [ -f "$LOCKFILE" ]; do 
+	sleep 0.1
+done
+if [ "$RUN" = 1 ]; then
 	xdg-open "$FILE" > /dev/null 2> /dev/null
-	dd if="$FILE" of=/dev/null bs=512 skip=$PIECETOLOAD
 fi
