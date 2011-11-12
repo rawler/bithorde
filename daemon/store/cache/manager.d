@@ -22,6 +22,8 @@ private import tango.core.Thread;
 private import tango.io.device.File;
 private import tango.io.FilePath;
 private import tango.io.FileSystem;
+private import tango.io.model.IFile;
+private import tango.io.Path;
 private import tango.math.random.Random;
 version (Posix) import tango.stdc.posix.sys.stat;
 private import tango.text.Ascii;
@@ -273,7 +275,6 @@ class CacheManager : IAssetSource {
                 _stored.close();
                 _stored = null;
             }
-            log.trace("Was here");
             closeRemote();
         }
 
@@ -342,6 +343,7 @@ class CacheManager : IAssetSource {
             switch (state) {
                 case State.INCOMPLETE:
                     ensureOpen;
+                    idMapDirty = true;
                     return _stored.writeChunk(offset, data);
                 case State.COMPLETE:
                     return log.warn("Trying to add to complete asset.");
@@ -436,6 +438,7 @@ protected:
     ulong maxSize;            /// Maximum allowed storage-capacity of this cache, in MB. 0=unlimited
     IAssetSource router;
     Asset localIdMap[ubyte[]];
+    long _size;
     bool idMapDirty;
     Thread idMapFlusher;
     bool usefsync;
@@ -458,7 +461,7 @@ public:
         this.router = router;
         this.pump = pump;
 
-        if ((this.size > (getMaxSize)) && (!prune)) {
+        if ((this._size > (getMaxSize)) && (!prune)) {
             throw new ConfigException(assetDir.toString ~ "has more data than the configured limit. Start with --prune, if you really want to prune excess data.");
         }
 
@@ -494,23 +497,29 @@ public:
     }
 
     /************************************************************************************
-     * Gets the size this cache is occupying, in bytes.
+     * Gets the cached size from previous garbageCollect(full=true)
      ***********************************************************************************/
-    ulong size() {
-        ulong retval;
-        foreach (fileInfo; assetDir) {
-            version (Posix) {
-                stat_t s;
-                char[256] filepath = void;
-                auto statres = stat(Format.sprint(filepath, "{}/{}\0", fileInfo.path, fileInfo.name).ptr, &s);
-                assert(statres == 0); // TODO: Should always check return value
-                version (linux) retval += s.st_blocks * 512;
-                else static assert(0, "Needs to port block-size for non-Linux POSIX.");
-            } else {
-                retval += fileInfo.bytes;
-            }
+    final long size() {
+        return this._size;
+    }
+
+    /************************************************************************************
+     * Calculates actual on-disk size for given file
+     ***********************************************************************************/
+    long realFileSize(char[] path) {
+        version (Posix) {
+            stat_t s;
+            char[1024] buf = void;
+            auto statres = stat(FS.strz(path, buf).ptr, &s);
+            version (linux) {
+                if (statres == 0)
+                    return s.st_blocks * 512;
+                else
+                    return statres;
+            } else static assert(0, "Needs to port block-size for non-Linux POSIX.");
+        } else {
+            return FS.fileSize(path);
         }
-        return retval;
     }
 
     /************************************************************************************
@@ -524,7 +533,7 @@ public:
      * Final startup preparation
      ***********************************************************************************/
     void start() {
-        garbageCollect();
+        garbageCollect(true);
         _makeRoom(0); // Make sure the cache is in good order.
 
         idMapFlusher = new Thread(&IdMapFlusher);
@@ -544,11 +553,11 @@ public:
         /********************************************************************************
          * Calculate how large the Cache can be according to FS-limits.
          *******************************************************************************/
-        ulong constrainToFs(ulong wanted, ulong cacheSize) {
+        ulong constrainToFs(ulong wanted, long cacheSize) {
             auto dir = assetDir.toString;
             auto fsBufferSpace = cast(long)(FileSystem.totalSpace(dir) * FS_MINFREE);
-            auto fsFreeSpace = cast(long)FileSystem.freeSpace(dir) - fsBufferSpace;
-            auto fsAllowed = cast(long)(this.size)+fsFreeSpace;
+            auto fsFreeSpace = (cast(long)FileSystem.freeSpace(dir)) - fsBufferSpace;
+            auto fsAllowed = cacheSize+fsFreeSpace;
             if (wanted > fsAllowed) {
                 if (this.maxSize != 0) // Don't warn when user have specified unlimited cache
                     log.warn("FileSystem-space smaller than specified cache maxSize. Constraining cache to {}% of FileSystem.", cast(uint)((1.0-FS_MINFREE)*100));
@@ -560,7 +569,7 @@ public:
         auto maxSize = this.maxSize * M;
         if (maxSize == 0)
             maxSize = maxSize.max;
-        return constrainToFs(maxSize, this.size);
+        return constrainToFs(maxSize, this._size);
     }
 
     /************************************************************************************
@@ -601,8 +610,8 @@ public:
 
         auto targetSize = maxSize - size;
         log.trace("This cache is {}MB, roof is {}MB for upload", this.size/M, targetSize / M);
-        garbageCollect();
-        while (this.size > targetSize) {
+        garbageCollect(false);
+        while (this._size > targetSize) {
             auto loser = pickLoser;
             if (!loser)
                 return false;
@@ -677,14 +686,15 @@ public:
         }
         auto aPath = asset.assetPath;
         if (aPath.exists) {
-            res += aPath.fileSize;
+            res += realFileSize(aPath.toString);
             aPath.remove();
         }
         auto iPath = asset.idxPath;
         if (iPath.exists) {
-            res += iPath.fileSize;
+            res += realFileSize(iPath.toString);
             iPath.remove();
         }
+        this._size -= res;
         return res;
     }
 
@@ -798,7 +808,7 @@ private:
      * Walks through assets in dir, purging those not referenced by the idmap then walks
      * through the localIdMap, purging those ids not found in the asset directory.
      ***********************************************************************************/
-    synchronized void garbageCollect() {
+    synchronized void garbageCollect(bool fullCollect) {
         debug (Performance) {
             Time started = Clock.now;
             scope(exit) { log.trace("Asset-GC took {}ms",(Clock.now-started).millis); }
@@ -810,7 +820,7 @@ private:
         /* remove redundant and faulty assets from localIdMap */ {
             scope Asset[] staleAssets;
             foreach (asset; localIdMap) {
-                if (!asset.assetPath.exists) {
+                if (fullCollect && !asset.assetPath.exists) {
                     log.trace("Asset file has disappeared.");
                     staleAssets ~= asset;
                 } else if (asset.hashIds.length) {
@@ -832,13 +842,15 @@ private:
             }
             foreach (asset; staleAssets) {
                 auto res = purgeAsset(asset);
-                if (res >= 0)
+                if (res > 0)
                     bytesFreed += res;
             }
         }
 
-        /* Clear out files not referenced by localIdMap */ {
+        /* Clear out files not referenced by localIdMap, and update size with size of */
+        if (fullCollect) {
             ubyte[LOCALID_LENGTH] idbuf;
+            ulong size = 0;
             auto path = assetDir.dup.append("dummy");
             foreach (fileInfo; assetDir) {
                 path.file = fileInfo.name;
@@ -859,9 +871,13 @@ private:
                             asset.localId = idbuf.dup;
                             localIdMap[asset.localId] = asset;
                         }
+                    } else {
+                        char[1024] filepath = void;
+                        size += realFileSize(Format.sprint(filepath, "{}/{}\0", fileInfo.path, fileInfo.name));
                     }
                 }
             }
+            this._size = size;
         }
 
         checkRehashQueue;
@@ -947,7 +963,7 @@ private:
     void IdMapFlusher() {
         while (idMapFlusher) {
             try if (idMapDirty) {
-                garbageCollect();
+                garbageCollect(true);
                 saveIdMap();
             } catch (Exception e) {
                 log.error("Failed flushing IdMap with {}", e);
