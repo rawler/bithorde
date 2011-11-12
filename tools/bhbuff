@@ -1,0 +1,74 @@
+#!/bin/bash
+PERCENT=100
+RUN=0
+function USAGE {
+	echo -e "
+Usage: $0 [FLAGS]... [BITHORDE LINK FILE]\n
+  -h, --help        Shows this help.
+  -p, --percent     Load asset [NUM] percent before evetual xdg-open, (DEFAULT: 100)
+  -r, --run         Open asset with xdg-open after preload. (DEFAULT: No)\n
+  Example: $0 -p 20 -r MyBithordeLink.avi\n"
+}
+
+function wait_for_threshold() {
+  # Arguments:
+  #  $1 : # of 4096-byte blocks to wait for
+  #  $2 : file to remove to signal completion
+  dd of=/dev/null bs=4096 count=$1
+  rm "$2"
+  dd of=/dev/null bs=4096
+}
+
+if [ "$1" = "" ]; then
+        echo "bhbuff needs a bithorde link to handle..."
+	USAGE
+        exit 1
+fi
+
+while [ $# -gt 0 ]; do 
+  case "$1" in
+    -h|--help)
+	      USAGE
+	      exit 0
+	      ;;
+    -r|--run)
+              RUN=1
+              ;;
+    -p|--percent)
+              PERCENT="$2"
+              if [[ "$PERCENT" =~ ^[0-9]+$ ]]; then
+			if [ "$PERCENT" -gt 100 ]; then
+				PERCENT=100
+			fi
+		else
+                	echo "Procent needs to be a number between 1 - 100..."
+			USAGE
+                	exit 1
+              fi
+	
+              ;;
+    *)
+              FILE=${!#}
+	      if ! [[ $(readlink "$FILE") == *magnet* ]]; then
+		echo "File not a bithorde symlink..."
+		USAGE
+		exit 1
+	      fi
+		
+	      ;;
+  esac
+  shift
+done
+
+SIZE=$(stat -L -c%s "$FILE")
+PIECETOLOAD_KB=$(( ($SIZE*$PERCENT) / (100*4096) ))
+LOCKFILE=$(tempfile)
+bhget -sy -py "$FILE" | wait_for_threshold $PIECETOLOAD_KB $LOCKFILE &
+trap "echo -e '\nKilling script and buffering functions...'; kill %1; exit 130" SIGINT SIGTERM
+
+while [ -f "$LOCKFILE" ]; do 
+	sleep 0.1
+done
+if [ "$RUN" = 1 ]; then
+	xdg-open "$FILE" > /dev/null 2> /dev/null
+fi
