@@ -30,7 +30,7 @@ INSTALL(PROGRAMS
   ${CMAKE_CURRENT_BINARY_DIR}/bin/bhget
   ${CMAKE_CURRENT_BINARY_DIR}/bin/bhupload
   ${CMAKE_CURRENT_BINARY_DIR}/bin/bhfuse
-  ${CMAKE_CURRENT_BINARY_DIR}/tools/bhbuff
+  ${CMAKE_CURRENT_SOURCE_DIR}/tools/bhbuff
   DESTINATION bin
 )
 
