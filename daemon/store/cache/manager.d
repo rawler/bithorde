@@ -363,7 +363,8 @@ class CacheManager : IAssetSource {
         }
 
         private void updateHashIds(message.Identifier[] ids) {
-            this.hashIds = ids;
+            synchronized (this.outer)
+                this.hashIds = ids;
             pump.queueCallback(&notifyHashUpdate);
         }
 
