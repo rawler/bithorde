@@ -360,7 +360,7 @@ public:
             log.trace("Stats: {}", connection.counters);
     }
 protected:
-    synchronized size_t sendMessage(message.Message msg) {
+    size_t sendMessage(message.Message msg) {
         return connection.sendMessage(msg);
     }
 
@@ -376,7 +376,7 @@ protected:
             return 0;
         }
     }
-    synchronized void sendRPCRequest(message.RPCRequest req,
+    void sendRPCRequest(message.RPCRequest req,
                                   TimeSpan timeout=TimeSpan.fromMillis(4000)) {
         connection.sendRPCRequest(req, timeout);
     }
@@ -385,7 +385,7 @@ protected:
      * Handles sending a bind-request for an asset, and setting up the asset for status-
      * updates and timeouts.
      ***********************************************************************************/
-    synchronized void sendBindRequest(message.BindRequest req, RemoteAsset asset,
+    void sendBindRequest(message.BindRequest req, RemoteAsset asset,
                                       TimeSpan timeout) {
         req.handle = asset.handle;
         req.timeout = timeout.millis;
@@ -453,7 +453,7 @@ protected:
         }
     }
 
-    synchronized void processAssetStatus(Connection c, ubyte[] buf) {
+    void processAssetStatus(Connection c, ubyte[] buf) {
         scope resp = new message.AssetStatus;
         resp.decode(buf);
         auto handle = resp.handle;
@@ -462,7 +462,7 @@ protected:
         if (asset)
             asset.updateStatus(resp);
     }
-    synchronized void processReadResponse(Connection c, ubyte[] buf) {
+    void processReadResponse(Connection c, ubyte[] buf) {
         scope resp = new message.ReadResponse;
         resp.decode(buf);
         try {
@@ -473,7 +473,7 @@ protected:
             log.warn("Recieved invalid response; {}", resp);
         }
     }
-    synchronized void processPing(Connection c, ubyte[] buf) {
+    void processPing(Connection c, ubyte[] buf) {
         scope ping = new message.Ping;
         ping.decode(buf);
         if (ping.timeoutIsSet) {

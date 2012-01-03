@@ -231,7 +231,7 @@ protected:
     /************************************************************************************
      * Allocate a requestId for given request
      ***********************************************************************************/
-    ushort allocRequest(message.RPCRequest target) {
+    synchronized ushort allocRequest(message.RPCRequest target) {
         if (_freeIds.size) {
             target.rpcId = _freeIds.pop();
         } else if (lingerIds.size && (lingerIds.peek.time < Clock.now)) {
@@ -257,7 +257,7 @@ protected:
     /************************************************************************************
      * Release the requestId for given request, after completion. Throws
      ***********************************************************************************/
-    public message.RPCRequest releaseRequest(message.RPCResponse msg) {
+    synchronized public message.RPCRequest releaseRequest(message.RPCResponse msg) {
         if (msg.rpcId >= inFlightRequests.length)
             throw new InvalidResponse;
         auto ifr = &inFlightRequests[msg.rpcId];
@@ -277,7 +277,7 @@ protected:
     /************************************************************************************
      * Force-release the requestId for given request, and put it in the linger-queue;
      ***********************************************************************************/
-    void lingerRequest(message.RPCRequest req, Time now) {
+    synchronized void lingerRequest(message.RPCRequest req, Time now) {
         counters.submitRequest(now - req.sendTime);
         LingerId li;
         li.rpcId = req.rpcId;
