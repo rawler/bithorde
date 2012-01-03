@@ -53,9 +53,6 @@ public:
         this.notify = notify;
         this.log = Log.lookup("router.asset");
     }
-    ~this() {
-        close();
-    }
 
     void close() {
         assert(waitingResponses == 0); // TODO: Handle terminating stale remote requests
