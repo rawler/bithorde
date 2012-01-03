@@ -1,77 +1,97 @@
-############################# BitHorde CMake Definitions #############################
-cmake_minimum_required(VERSION 2.6)
+PROJECT (BitHorde)
 
-project (BitHorde)
+CMAKE_MINIMUM_REQUIRED(VERSION 2.8)
 
-# Init D-stuff
+SET (EXECUTABLE_OUTPUT_PATH ${PROJECT_BINARY_DIR}/bin CACHE PATH
+   "Single output directory for building all executables.")
+
+#-----------------------------------------------------------------------------
+# Let's use the highest warning level.
+#-----------------------------------------------------------------------------
+IF(CMAKE_BUILD_TOOL MATCHES "(msdev|devenv|nmake)")
+  # Use the highest warning level for visual studio.
+  IF(CMAKE_CXX_FLAGS MATCHES "/W[0-4]")
+    STRING(REGEX REPLACE "/W[0-4]" "/W4" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+  ELSE(CMAKE_CXX_FLAGS MATCHES "/W[0-4]")
+    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /W4")
+  ENDIF(CMAKE_CXX_FLAGS MATCHES "/W[0-4]")
+  IF(CMAKE_C_FLAGS MATCHES "/W[0-4]")
+    STRING(REGEX REPLACE "/W[0-4]" "/W4" CMAKE_C_FLAGS "${CMAKE_C_FLAGS}")
+  ELSE(CMAKE_C_FLAGS MATCHES "/W[0-4]")
+    SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /W4")
+  ENDIF(CMAKE_C_FLAGS MATCHES "/W[0-4]")
+  # Disable deprecation warnings for standard C functions in VS2005 and later
+  IF(CMAKE_COMPILER_2005)
+    ADD_DEFINITIONS(-D_CRT_SECURE_NO_DEPRECATE -D_CRT_NONSTDC_NO_DEPRECATE)
+  ENDIF(CMAKE_COMPILER_2005)
+ENDIF(CMAKE_BUILD_TOOL MATCHES "(msdev|devenv|nmake)")
+IF(CMAKE_BUILD_TOOL MATCHES "make")
+  IF(NOT CMAKE_CXX_FLAGS MATCHES "-Wall")
+    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
+  ENDIF(NOT CMAKE_CXX_FLAGS MATCHES "-Wall")
+  IF(NOT CMAKE_C_FLAGS MATCHES "-Wall")
+    SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
+  ENDIF(NOT CMAKE_C_FLAGS MATCHES "-Wall")
+ENDIF(CMAKE_BUILD_TOOL MATCHES "make")
+
 set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
-FIND_PACKAGE(D REQUIRED)
-FIND_PACKAGE(ProtocolBuffers REQUIRED)
 
-# Read out git-version from Git.
-include(GetGitRevisionDescription)
-git_describe(GIT_DESCRIPTION)
-configure_file("${CMAKE_CURRENT_SOURCE_DIR}/gitversion.d.in" "${CMAKE_CURRENT_SOURCE_DIR}/gitversion.d" @ONLY)
+# Link up POCO
+SET(Poco_DIR ${PROJECT_SOURCE_DIR})
+FIND_PACKAGE(Poco REQUIRED)
+IF(${Poco_FOUND})
+  INCLUDE_DIRECTORIES(${Poco_INCLUDE_DIRS})
+  LINK_DIRECTORIES(${Poco_LIBRARY_DIRS})
+ENDIF(${Poco_FOUND})
 
-set(D_DEBUG_KEYS "" CACHE STRING "Special debug-keywords to build with.")
-add_d_debugs(${D_DEBUG_KEYS})
+ADD_SUBDIRECTORY(lib)
+ADD_SUBDIRECTORY(clients)
 
-# The Bithorde daemon itself
-add_d_program(bithorded daemon/bithorded.d)
+# Copy the DLLS to where the executable is.
+# Only do this if you haven't set your path to the Poco DLLs.
+IF(WIN32)
+ SET ( DLL_FILES_DEBUG
+   ${Poco_BINARY_DIRS}/CppUnitd.dll
+   ${Poco_BINARY_DIRS}/PocoFoundationd.dll
+   ${Poco_BINARY_DIRS}/PocoNetd.dll
+   ${Poco_BINARY_DIRS}/PocoUtild.dll
+   ${Poco_BINARY_DIRS}/PocoXMLd.dll
+  )
 
-# The client apps
-add_d_program(bhget clients/bhget.d)
-add_d_program(bhupload clients/bhupload.d)
-add_d_program(bhfuse clients/bhfuse.d LIBS fuse)
+  SET ( DLL_FILES_RELEASE
+   ${Poco_BINARY_DIRS}/CppUnit.dll
+   ${Poco_BINARY_DIRS}/PocoFoundation.dll
+   ${Poco_BINARY_DIRS}/PocoNet.dll
+   ${Poco_BINARY_DIRS}/PocoUtil.dll
+   ${Poco_BINARY_DIRS}/PocoXML.dll
+  )
 
-# Install specifications
-INSTALL(PROGRAMS
-  ${CMAKE_CURRENT_BINARY_DIR}/bin/bithorded
-  ${CMAKE_CURRENT_BINARY_DIR}/bin/bhget
-  ${CMAKE_CURRENT_BINARY_DIR}/bin/bhupload
-  ${CMAKE_CURRENT_BINARY_DIR}/bin/bhfuse
-  ${CMAKE_CURRENT_SOURCE_DIR}/tools/bhbuff
-  DESTINATION bin
-)
+  # Copy these files to the build tree.
+  ADD_CUSTOM_TARGET(CopyDll ALL echo "Copying dlls ...")
 
-set(CONF_INSTALL_DIR etc CACHE PATH "Where should config-template be installed?")
+  FOREACH(file ${DLL_FILES_DEBUG})
+    GET_FILENAME_COMPONENT(fn ${file} NAME)
+    SET(tgt ${EXECUTABLE_OUTPUT_PATH}/Debug/${fn})
+    SET(src ${file})
+    ADD_CUSTOM_COMMAND(
+      TARGET CopyDll
+      COMMAND ${CMAKE_COMMAND}
+      ARGS -E copy_if_different ${src} ${tgt}
+      COMMENT "Source copy of dlls"
+    )
+  ENDFOREACH(file)
 
-INSTALL(FILES template.config
-  DESTINATION ${CONF_INSTALL_DIR}
-  RENAME bithorde.conf
-)
+  FOREACH(file ${DLL_FILES_RELEASE})
+    GET_FILENAME_COMPONENT(fn ${file} NAME)
+    SET(tgt ${EXECUTABLE_OUTPUT_PATH}/Release/${fn})
+    SET(src ${file})
+    ADD_CUSTOM_COMMAND(
+      TARGET CopyDll
+      COMMAND ${CMAKE_COMMAND}
+      ARGS -E copy_if_different ${src} ${tgt}
+      COMMENT "Source copy of dlls"
+    )
+  ENDFOREACH(file)
 
-# PyBitHorde
-set(PyHorde_INSTALL_DIR python CACHE PATH "Where should the Python client-library be installed?")
+ENDIF(WIN32)
 
-WRAP_PROTO_PYTHON(BITHORDE_PROTO ${CMAKE_SOURCE_DIR}/bithorde.proto)
-ADD_CUSTOM_TARGET(PyHorde ALL DEPENDS ${BITHORDE_PROTO})
-INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/python/bithorde.py ${BITHORDE_PROTO}
-  DESTINATION ${PyHorde_INSTALL_DIR}
-)
-
-# Tests
-add_d_program(bithordelib tests/bithordelib.d OUTPUT_PATH ${CMAKE_CURRENT_BINARY_DIR}/tests)
-add_d_program(protobuf tests/protobuf.d OUTPUT_PATH ${CMAKE_CURRENT_BINARY_DIR}/tests)
-add_d_program(cachemap tests/cachemap.d OUTPUT_PATH ${CMAKE_CURRENT_BINARY_DIR}/tests)
-
-ENABLE_TESTING()
-ADD_TEST(RoundtripTest ${CMAKE_SOURCE_DIR}/tests/roundtrip/test_roundtrip.sh)
-SET_TESTS_PROPERTIES(RoundtripTest PROPERTIES TIMEOUT 60 ENVIRONMENT "BH_BINDIR=${CMAKE_CURRENT_BINARY_DIR}/bin")
-
-ADD_TEST(BithordeLibTest ${CMAKE_CURRENT_BINARY_DIR}/tests/bithordelib)
-SET_TESTS_PROPERTIES(BithordeLibTest PROPERTIES TIMEOUT 60)
-
-ADD_TEST(ProtoBuf ${CMAKE_CURRENT_BINARY_DIR}/tests/protobuf)
-ADD_TEST(CacheMap ${CMAKE_CURRENT_BINARY_DIR}/tests/cachemap)
-
-# CPack packaging
-INCLUDE(InstallRequiredSystemLibraries)
-SET(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Caching friend2friend oriented content-distribution.")
-SET(CPACK_PACKAGE_VENDOR "bithorde.org")
-SET(CPACK_PACKAGE_DESCRIPTION_FILE "${CMAKE_CURRENT_SOURCE_DIR}/README")
-SET(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
-SET(CPACK_PACKAGE_VERSION "0.2rc1")
-SET(CPACK_PACKAGE_INSTALL_DIRECTORY "bithorde-${CPACK_PACKAGE_VERSION}")
-SET(CPACK_PACKAGE_EXECUTABLES "bhfuse" "bhget" "bhupload" "bithorded")
-INCLUDE(CPack)

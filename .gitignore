@@ -1,12 +1,9 @@
 *~
-*.o
 *.pyc
+/*.kdev*
 
 # Built executables
 /build
-
-# Intermediate git-version-file
-/gitversion.d
 
 # Releases-dir
 /releases
