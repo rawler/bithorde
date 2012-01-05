@@ -1,3 +1,10 @@
+bithorde (0.1.99+0.2rc2-2) natty; urgency=low
+
+  * Fixed a rare deadlock, and prevent some theoretical future locking problems.
+  * Significantly improved index-query performance, through eliminating needless stat() disk-activity.
+
+ -- Ulrik Mikaelsson <ulrik.mikaelsson@gmail.com>  Thu, 05 Jan 2012 19:42:28 +0100
+
 bithorde (0.1.99+0.2rc1-1) natty; urgency=low
 
   * Minor bugfixes
