@@ -6,7 +6,7 @@
 /build
 
 # Intermediate git-version-file
-/gitversion.d
+/buildconf.d
 
 # Releases-dir
 /releases

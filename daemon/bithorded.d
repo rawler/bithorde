@@ -35,7 +35,7 @@ private import tango.util.log.Log;
 
 private import daemon.config;
 private import daemon.server;
-private import gitversion;
+private import buildconf;
 
 Server s;
 
@@ -71,7 +71,7 @@ public int main(char[][] _args)
         return exit_usage(args.errors(&Stderr.layout.sprint));
 
     if (args["version"].set)
-        return gitversion.exit_version;
+        return buildconf.exit_version;
 
     if (!args[null].assigned.length == 1)
         return exit_usage("Missing config");

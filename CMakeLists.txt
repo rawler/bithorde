@@ -2,6 +2,7 @@
 cmake_minimum_required(VERSION 2.6)
 
 project (BitHorde)
+set(RELEASE_VERSION "0.2rc1")
 
 # Init D-stuff
 set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
@@ -10,8 +11,11 @@ FIND_PACKAGE(ProtocolBuffers REQUIRED)
 
 # Read out git-version from Git.
 include(GetGitRevisionDescription)
-git_describe(GIT_DESCRIPTION)
-configure_file("${CMAKE_CURRENT_SOURCE_DIR}/gitversion.d.in" "${CMAKE_CURRENT_SOURCE_DIR}/gitversion.d" @ONLY)
+git_describe(BUILD_VERSION --dirty=-modified)
+if(NOT DEFINED BUILD_VERSION)
+  set(BUILD_VERSION RELEASE_VERSION)
+endif(NOT DEFINED BUILD_VERSION)
+configure_file("${CMAKE_CURRENT_SOURCE_DIR}/buildconf.d.in" "${CMAKE_CURRENT_SOURCE_DIR}/buildconf.d" @ONLY)
 
 set(D_DEBUG_KEYS "" CACHE STRING "Special debug-keywords to build with.")
 add_d_debugs(${D_DEBUG_KEYS})
@@ -71,7 +75,7 @@ SET(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Caching friend2friend oriented content-di
 SET(CPACK_PACKAGE_VENDOR "bithorde.org")
 SET(CPACK_PACKAGE_DESCRIPTION_FILE "${CMAKE_CURRENT_SOURCE_DIR}/README")
 SET(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
-SET(CPACK_PACKAGE_VERSION "0.2rc1")
+SET(CPACK_PACKAGE_VERSION "${BUILD_VERSION}")
 SET(CPACK_PACKAGE_INSTALL_DIRECTORY "bithorde-${CPACK_PACKAGE_VERSION}")
 SET(CPACK_PACKAGE_EXECUTABLES "bhfuse" "bhget" "bhupload" "bithorded")
 INCLUDE(CPack)

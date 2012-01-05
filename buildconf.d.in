@@ -1,0 +1,11 @@
+
+module buildconf;
+
+import tango.io.Stdout;
+
+static char[] build_version = "@BUILD_VERSION@";
+
+int exit_version() {
+    Stdout.format("BitHorde version {}", build_version).newline;
+    return 0;
+}
