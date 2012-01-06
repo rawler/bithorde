@@ -7,3 +7,10 @@
 
 # Releases-dir
 /releases
+
+# TMP QMake / QtCreator stuff.
+*-build-*
+*.pro.user
+Makefile
+*.pb.cc
+*.pb.h

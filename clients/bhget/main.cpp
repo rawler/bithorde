@@ -1,0 +1,197 @@
+#include <QtCore/QByteArray>
+#include <QtCore/QCoreApplication>
+#include <QtCore/QPair>
+#include <QtCore/QStringList>
+#include <QtCore/QTextStream>
+#include <QtNetwork/QHostAddress>
+#include <QtNetwork/QLocalSocket>
+#include <QtNetwork/QTcpSocket>
+
+#include <libqhorde.h>
+
+#include "main.h"
+
+static QTextStream qerr(stderr);
+static QTextStream qout(stdout);
+
+#define BLOCK_SIZE (64*1024)
+
+struct OutQueue {
+    typedef QPair<quint64, QByteArray> Chunk;
+    quint64 position;
+    QList<Chunk> _stored;
+
+    OutQueue() :
+        position(0)
+    {}
+
+    void _queue(quint64 offset, QByteArray & data) {
+        int pos = 0;
+        while ((pos < _stored.length()) && (_stored[pos].first < offset))
+            pos += 1;
+        _stored.insert(pos, Chunk(offset, data));
+    }
+
+    void _dequeue() {
+        while (_stored.length()) {
+            Chunk first = _stored.first();
+            if (first.first > position) {
+                break;
+            } else {
+                Q_ASSERT(first.first == position);
+                _flush(first.second);
+            }
+        }
+    }
+
+    void _flush(QByteArray & data) {
+        if (write(1, data.data(), data.length()) == data.length())
+            position += data.length();
+        else
+            (qerr << "Error: failed to write block\n").flush();
+    }
+
+    void send(quint64 offset, QByteArray & data) {
+        if (offset <= position) {
+            Q_ASSERT(offset == position);
+
+            _flush(data);
+            _dequeue();
+        } else {
+            _queue(offset, data);
+        }
+    }
+};
+
+int main(int argc, char *argv[])
+{
+    QCoreApplication a(argc, argv);
+
+    BHGet get("bhget");
+
+    foreach (QString arg, a.arguments().mid(1)) {
+        if (!get.queueAsset(arg)) {
+            return -1;
+        }
+    }
+
+    QLocalSocket sock;
+    get.attach(sock);
+    sock.connectToServer("/tmp/bithorde");
+
+    return a.exec();
+}
+
+BHGet::BHGet(QString myName) :
+    _myName(myName),
+    _asset(NULL),
+    _currentOffset(0)
+{
+}
+
+bool BHGet::queueAsset(QString _uri)
+{
+    MagnetURI uri;
+    if (!uri.parse(_uri)) {
+        qerr << "Only magnet-links supported, not '" << _uri << "'\n";
+        return false;
+    }
+
+    bool found_id = false;
+    foreach (ExactIdentifier id, uri.xtIds) {
+        if (id.type == "urn:tree:tiger") {
+            found_id = true;
+            break;
+        }
+    }
+
+    if (found_id) {
+        _assets.append(uri);
+        return true;
+    } else {
+        qerr << "No hash-Identifier in '" << _uri << "'\n";
+        return false;
+    }
+}
+
+void BHGet::attach(QLocalSocket &sock)
+{
+    _connection = new LocalConnection(sock);
+    _client = new Client(*_connection, _myName, this);
+    connect(_client, SIGNAL(authenticated(QString)), SLOT(onAuthenticated(QString)));
+}
+
+void BHGet::nextAsset()
+{
+    if (_asset) {
+        _asset->close();
+        delete _asset;
+        _asset = NULL;
+    }
+
+    QByteArray tigerId;
+    while (tigerId.isEmpty() && !_assets.isEmpty()) {
+        MagnetURI nextUri = _assets.takeFirst();
+        foreach (ExactIdentifier id, nextUri.xtIds) {
+            if (id.type == "urn:tree:tiger") {
+                tigerId = id.id;
+                break;
+            }
+        }
+    }
+    if (tigerId.isEmpty())
+        QCoreApplication::quit();
+
+    ReadAsset::IdList ids;
+    ids.append(ReadAsset::Identifier(bithorde::TREE_TIGER, tigerId));
+    _asset = new ReadAsset(_client, ids);
+    connect(_asset, SIGNAL(statusUpdate(bithorde::AssetStatus)), SLOT(onStatusUpdate(bithorde::AssetStatus)));
+    connect(_asset, SIGNAL(dataArrived(quint64,QByteArray,int)), SLOT(onDataChunk(quint64,QByteArray,int)));
+    _client->bindRead(*_asset);
+
+    _outQueue = new OutQueue();
+}
+
+void BHGet::onAuthenticated(QString)
+{
+    nextAsset();
+}
+
+void BHGet::onStatusUpdate(bithorde::AssetStatus status)
+{
+    if (sender() != _asset)
+        return;
+    switch (status.status()) {
+    case bithorde::SUCCESS:
+        qerr << "Downloading ..." << "\n";
+        requestMore();
+        break;
+    default:
+        qerr << "Failed ..." << "\n";
+        nextAsset();
+        break;
+    }
+    qerr.flush();
+}
+
+void BHGet::requestMore()
+{
+    while (_currentOffset < (_outQueue->position + (BLOCK_SIZE*10)) &&
+           _currentOffset < _asset->size()) {
+        _asset->aSyncRead(_currentOffset, BLOCK_SIZE);
+        _currentOffset += BLOCK_SIZE;
+    }
+}
+
+void BHGet::onDataChunk(quint64 offset, QByteArray data, int tag)
+{
+    _outQueue->send(offset, data);
+    if ((data.length() < BLOCK_SIZE) && ((offset+data.length()) < _asset->size())) {
+        (qerr << "Error: got unexpectedly small data-block.\n").flush();
+    }
+    if (_outQueue->position < _asset->size()) {
+        requestMore();
+    } else {
+        nextAsset();
+    }
+}

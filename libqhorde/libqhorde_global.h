@@ -1,0 +1,12 @@
+#ifndef LIBQHORDE_GLOBAL_H
+#define LIBQHORDE_GLOBAL_H
+
+#include <QtCore/qglobal.h>
+
+#if defined(LIBQHORDE_LIBRARY)
+#  define LIBQHORDESHARED_EXPORT Q_DECL_EXPORT
+#else
+#  define LIBQHORDESHARED_EXPORT Q_DECL_IMPORT
+#endif
+
+#endif // LIBQHORDE_GLOBAL_H
