@@ -327,16 +327,15 @@ protected:
     {
         auto req = new ReadRequest(this);
         req.decode(buf);
-        IAsset asset;
-        try {
-            asset = getAsset(req.handle);
-        } catch (ArrayBoundsException e) {
+        if (IAsset asset = getAsset(req.handle)) {
+            asset.aSyncRead(req.offset, req.size, &req.callback);
+        } else {
+            log.error("ReadRequest for unknown asset ", req.handle);
             scope resp = new message.ReadResponse;
             resp.rpcId = req.rpcId;
             resp.status = message.Status.INVALID_HANDLE;
-            return sendNotification(resp);
+            sendNotification(resp);
         }
-        asset.aSyncRead(req.offset, req.size, &req.callback);
     }
 
     void processDataSegment(Connection c, ubyte[] buf) {
