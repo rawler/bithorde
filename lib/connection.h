@@ -1,35 +1,77 @@
-/*
-    Copyright 2011 <Ulrik Mikaelsson> <ulrik.mikaelsson@gmail.com>
-
-    Licensed under the Apache License, Version 2.0 (the "License");
-    you may not use this file except in compliance with the License.
-    You may obtain a copy of the License at
-
-        http://www.apache.org/licenses/LICENSE-2.0
-
-    Unless required by applicable law or agreed to in writing, software
-    distributed under the License is distributed on an "AS IS" BASIS,
-    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-    See the License for the specific language governing permissions and
-    limitations under the License.
-*/
-
-
 #ifndef CONNECTION_H
 #define CONNECTION_H
 
-#include <Poco/Net/Socket.h>
-#include <string>
+#include <queue>
+
+#include <Poco/BasicEvent.h>
+#include <Poco/EventArgs.h>
+#include <Poco/Net/StreamSocket.h>
+#include <Poco/Net/SocketNotification.h>
+#include <Poco/Net/SocketReactor.h>
+#include <Poco/Logger.h>
+
+#include "bithorde.pb.h"
+#include "types.h"
 
 class Connection
 {
-  using Poco::Net::Socket;
-  using std::string;
+public:
+	enum MessageType {
+		HandShake = 1,
+		BindRead = 2,
+		AssetStatus = 3,
+		ReadRequest = 5,
+		ReadResponse = 6,
+		BindWrite = 7,
+		DataSegment = 8,
+		HandShakeConfirmed = 9,
+		Ping = 10,
+	};
+	enum State {
+		Connecting,
+		Connected,
+		AwaitingAuth,
+		Authenticated,
+	};
+
+	Connection();
+	Connection(Poco::Net::StreamSocket & socket, Poco::Net::SocketReactor& reactor);
+	~Connection();
+
+	struct Message {
+		Connection::MessageType type;
+		const ::google::protobuf::Message & content;
+		Message(Connection::MessageType type, const google::protobuf::Message & content) :
+			type(type),
+			content(content)
+		{}
+	};
+	Poco::BasicEvent<Poco::EventArgs> disconnected;
+	Poco::BasicEvent<Message> message;
+	Poco::BasicEvent<Poco::EventArgs> sent;
+
+public:
+	// TODO: Support "prioritized" messages, I.E. Binding changes.
+	bool sendMessage(MessageType type, const ::google::protobuf::Message & msg);
+
+protected:
+	void onError(const Poco::AutoPtr<Poco::Net::ErrorNotification>& pNf);
+	void onReadable(const Poco::AutoPtr<Poco::Net::ReadableNotification>& pNf);
+	void onWritable(const Poco::AutoPtr<Poco::Net::WritableNotification>& pNf);
+
+	bool encode(Connection::MessageType type, const::google::protobuf::Message &msg);
+	void trySend();
 private:
-  Socket s;
-  string name;
-public: 
-  Connection (Socket s, string name);
+	State _state;
+	Poco::Logger& _logger;
+
+	Poco::Net::StreamSocket _socket;
+	Poco::Net::SocketReactor& _reactor; 
+
+	Buffer _rcvBuf;
+	Buffer _sendBuf;
+
+	template <class T> bool dequeue(MessageType type, ::google::protobuf::io::CodedInputStream &stream);
 };
 
 #endif // CONNECTION_H

@@ -1,6 +1,6 @@
 *~
 *.pyc
-/*.kdev*
+*.kdev*
 
 # Built executables
 /build
