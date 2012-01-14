@@ -261,6 +261,10 @@ class CacheManager : IAssetSource {
             return _stored || _remoteAsset || refs.length > 0;
         }
 
+        bool isHashing() {
+            return _stored && cast(IncompleteAsset)_stored;
+        }
+
         void closeRemote() {
             if (_remoteAsset) {
                 _remoteAsset.detachWatcher(&onBackingUpdate);
@@ -893,7 +897,7 @@ private:
         auto count = 0;
         auto waiting = 0;
         foreach (id, asset; localIdMap) {
-            if (asset.isOpen) {
+            if (asset.isHashing) {
                 count ++;
             } else if (!(asset.hashIds.length || asset.state == asset.state.INCOMPLETE)) {
                 waiting ++;

@@ -19,7 +19,26 @@ module daemon.lib.stateless;
 
 private import tango.io.device.File;
 
-version (Posix) import tango.stdc.posix.unistd;
+version (Posix) {
+    import tango.stdc.posix.unistd;
+
+    extern (C) int posix_fadvise(int fd, off_t offset, off_t len, int advise);
+    version (linux) {
+        const int POSIX_FADV_NORMAL     = 0; /* No further special treatment.  */
+        const int POSIX_FADV_RANDOM     = 1; /* Expect random page references.  */
+        const int POSIX_FADV_SEQUENTIAL = 2; /* Expect sequential page references.  */
+        const int POSIX_FADV_WILLNEED   = 3; /* Will need these pages.  */
+        version (X86) { // Needs to be verified per-platform
+            const int POSIX_FADV_DONTNEED   = 4; /* Don't need these pages.  */
+            const int POSIX_FADV_NOREUSE    = 5; /* Data will be accessed once.  */
+        }
+        version (X86_64) {
+            const int POSIX_FADV_DONTNEED   = 4; /* Don't need these pages.  */
+            const int POSIX_FADV_NOREUSE    = 5; /* Data will be accessed once.  */
+        }
+    }
+}
+
 
 /*****************************************************************************************
  * Class for file with stateless read/write. I/E no need for the user to care about
@@ -57,5 +76,9 @@ class StatelessFile : File {
             seek(pos);
             return write(data);
         }
+    }
+
+    int fadvise(off_t offset, off_t len, int advice) {
+        return posix_fadvise(fileHandle, offset, len, advice);
     }
 }

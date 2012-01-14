@@ -335,6 +335,9 @@ class RehashingAsset : IncompleteAsset {
 
     void assetOpen(FilePath path) {
         super.assetOpen(path, File.Style(File.Access.Read, File.Open.Exists));
+        // Optimize file access-patterns.
+        fadvise(0, 0, POSIX_FADV_SEQUENTIAL);
+        fadvise(0, 0, POSIX_FADV_NOREUSE);
     }
 
     void waitForData() {}
