@@ -161,13 +161,15 @@ protected:
     ISelectable.Handle selectHandle;
     TYPE conduit;
     Buffer writeBuf, readBuf;
+    size_t bufsize;
 public:
     this(Pump p, TYPE conduit, size_t bufsize) {
         pump = p;
         _setupHandle(conduit);
         selectHandle = conduit.fileHandle;
         this.conduit = conduit;
-        writeBuf.realloc(bufsize);
+        this.bufsize = bufsize;
+        writeBuf.realloc(cast(size_t)(bufsize*1.5)); // Last third is reserved for prioritized requests
         readBuf.realloc(bufsize);
         pump.registerProcessor(this);
     }
@@ -250,14 +252,21 @@ public:
             _readAndPush();
     }
 
-    bool canWrite(size_t amount) {
-        return writeBuf.hasRoom(amount);
+   bool canWrite(size_t amount, bool prioritized) {
+        size_t newbuffill = writeBuf.fill+amount;
+        if (newbuffill > bufsize) {
+            if (newbuffill > writeBuf._data.length)
+                return false;
+            if (!prioritized)
+                return false;
+        }
+        return true;
     }
 
-    size_t write(ubyte[] data) in {
+    size_t write(ubyte[] data, bool prioritized) in {
         assert(data.length > 0);
     } body {
-        if (!canWrite(data.length))
+        if (!canWrite(data.length, prioritized))
             return 0;
         if (writeBuf.fill) {
             writeBuf.queue(data);
@@ -333,14 +342,14 @@ class FilteredConnection(TYPE) : BaseConnection!(TYPE) {
      * @note: Since data may be modified in-place, data must be mutable, and considered
      *        wasted after this function returns.
      ***********************************************************************************/
-    size_t write(ubyte[] data) {
-        if (!canWrite(data.length))
+    size_t write(ubyte[] data, bool prioritized) {
+        if (!canWrite(data.length, prioritized))
             return 0;
         if (_writeFilter) {
             auto processed = _writeFilter(data, data);
             assert(processed == data.length);
         }
-        return super.write(data);
+        return super.write(data, prioritized);
     }
 
     /************************************************************************************

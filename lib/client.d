@@ -360,8 +360,8 @@ public:
             log.trace("Stats: {}", connection.counters);
     }
 protected:
-    size_t sendMessage(message.Message msg) {
-        return connection.sendMessage(msg);
+    size_t sendMessage(message.Message msg, bool prioritized) {
+        return connection.sendMessage(msg, prioritized);
     }
 
     /************************************************************************************
@@ -370,7 +370,7 @@ protected:
      ***********************************************************************************/
     size_t sendNotification(message.Message msg) {
         try {
-            return sendMessage(msg);
+            return sendMessage(msg, false);
         } catch (IOException e) {
             log.trace("Ignored exception: {}", e);
             return 0;
@@ -391,7 +391,7 @@ protected:
         req.timeout = timeout.millis;
         boundAssets[asset.handle] = asset;
         asset.openedTime = Clock.now;
-        sendMessage(req);
+        sendMessage(req, true);
         asset.statusTimeout = connection.timeouts.registerIn(timeout, &asset.triggerTimeout);
     }
 
@@ -478,7 +478,7 @@ protected:
         ping.decode(buf);
         if (ping.timeoutIsSet) {
             ping.timeoutIsSet = false;
-            sendMessage(ping);
+            sendMessage(ping, false);
         }
     }
     void processBindRead(Connection c, ubyte[] buf) {

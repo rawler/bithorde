@@ -364,7 +364,7 @@ public:
         auto ping = new message.Ping;
         auto timeout = (heartbeatInterval / 3);
         ping.timeout = timeout.millis;
-        sendMessage(ping);
+        sendMessage(ping, false);
         pingTimeout = timeouts.registerIn(timeout, &onNoPingResponse);
     }
 
@@ -492,13 +492,13 @@ public:
 
         _sendCipher = cipher;
 
-        sendMessage(handshake);
+        sendMessage(handshake, true);
     }
 package:
     /************************************************************************************
      * Send any kind of message, just serialize and push
      ***********************************************************************************/
-    synchronized size_t sendMessage(message.Message m) {
+    synchronized size_t sendMessage(message.Message m, bool prioritized) {
         if (closed)
             throw new IOException("Connection closed");
         msgbuf.reset();
@@ -507,7 +507,7 @@ package:
         encode_val!(ushort)((m.typeId << 3) | 0b0000_0010, msgbuf);
         auto buf = msgbuf.data;
         counters.addSentPacket(buf.length);
-        return write(buf);
+        return write(buf, prioritized);
     }
 
     /************************************************************************************
@@ -517,7 +517,7 @@ package:
         auto rpcId = allocRequest(req);
         req.timeout = timeout.millis;
         req.sendTime = Clock.now;
-        sendMessage(req);
+        sendMessage(req, false);
         InFlightRequest* ifr = &inFlightRequests[rpcId];
         ifr.req = req;
         ifr.timeout = timeouts.registerIn(timeout, &ifr.triggerTimeout);
@@ -581,7 +581,7 @@ protected:
         }
         msg.authentication = HMAC!(Sha256)(_sharedKey, confirmSource);
 
-        sendMessage(msg);
+        sendMessage(msg, true);
 
         if (cipher)
             writeFilter = &cipher.update;
