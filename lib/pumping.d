@@ -250,10 +250,14 @@ public:
             _readAndPush();
     }
 
+    bool canWrite(size_t amount) {
+        return writeBuf.hasRoom(amount);
+    }
+
     size_t write(ubyte[] data) in {
         assert(data.length > 0);
     } body {
-        if (!writeBuf.hasRoom(data.length))
+        if (!canWrite(data.length))
             return 0;
         if (writeBuf.fill) {
             writeBuf.queue(data);
@@ -330,6 +334,8 @@ class FilteredConnection(TYPE) : BaseConnection!(TYPE) {
      *        wasted after this function returns.
      ***********************************************************************************/
     size_t write(ubyte[] data) {
+        if (!canWrite(data.length))
+            return 0;
         if (_writeFilter) {
             auto processed = _writeFilter(data, data);
             assert(processed == data.length);
