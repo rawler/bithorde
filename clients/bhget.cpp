@@ -3,10 +3,12 @@
 
 #include <iostream>
 #include <list>
+#include <sstream>
 #include <utility>
 
 #include <Poco/Delegate.h>
 #include <Poco/Net/DNS.h>
+#include <Poco/Util/HelpFormatter.h>
 
 using namespace std;
 using namespace Poco;
@@ -65,27 +67,76 @@ private:
 };
 
 BHGet::BHGet() :
-	_myName("bhget"),
+	optHelp(false),
+	optMyName("bhget"),
+	optQuiet(false),
+	optHost("localhost"),
+	optPort(1337),
 	_asset(NULL)
 {}
 
-void BHGet::defineOptions() {
+void BHGet::defineOptions(OptionSet & options) {
+	options.addOption(Option("help", "h")
+		.description("Show help")
+	);
+	options.addOption(Option("name", "n")
+		.description("Bithorde-name of this client")
+		.argument("name")
+	);
+	options.addOption(Option("quiet", "q")
+		.description("Don't show progressbar")
+	);
+	options.addOption(Option("url", "u")
+		.description("Where to connect to bithorde. Either host:port, or /path/socket")
+		.argument("url")
+	);
+}
+
+void BHGet::handleOption(const std::string & name, const std::string & value) {
+	if (name == "help") {
+		optHelp = true;
+	} else if (name == "name") {
+		optMyName = value;
+	} else if (name == "quiet") {
+		optQuiet = true;
+	} else if (name == "url") {
+		std::size_t sepPos = value.rfind(':');
+		if (sepPos == value.length()) {
+			optHost = value;
+		} else {
+			optHost = value.substr(0, sepPos);
+			istringstream iss(value.substr(sepPos+1));
+			iss >> optPort;
+		}
+	}
+}
+
+int BHGet::exitHelp() {
+	HelpFormatter helpFormatter(options());
+	helpFormatter.setCommand(commandName());
+	helpFormatter.setUsage("OPTIONS <magnet-link1> ...");
+	helpFormatter.setHeader(
+		"Simple BitHorde asset-fetcher fetching one or more concatenated assets and "
+		"streaming to stdout."
+	);
+	helpFormatter.format(std::cerr);
+	return EXIT_USAGE;
 }
 
 int BHGet::main(const std::vector<std::string>& args) {
-	if (args.empty())
-		return EXIT_USAGE;
+	if (args.empty() || optHelp)
+		return exitHelp();
 	std::vector<std::string>::const_iterator iter;
 	for (iter = args.begin(); iter != args.end(); iter++) {
 		if (!queueAsset(*iter))
-			return EXIT_USAGE;
+			return exitHelp();
 	}
 
 	SocketAddress addr(DNS::resolveOne("localhost"), 1338);
 	StreamSocket sock;
 	sock.connect(addr);
 	Connection * c = new Connection(sock, _reactor);
-	_client = new Client(*c, _myName);
+	_client = new Client(*c, optMyName);
 	_client->authenticated += delegate(this, &BHGet::onAuthenticated);
 
 	_reactor.run();

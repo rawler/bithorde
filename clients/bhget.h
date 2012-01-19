@@ -13,7 +13,14 @@
 struct OutQueue;
 
 class BHGet : public Poco::Util::Application {
-	std::string _myName;
+	// Options
+	bool optHelp;
+	std::string optMyName;
+	bool optQuiet;
+	std::string optHost;
+	uint16_t optPort;
+
+	// Internal items
 	std::list<MagnetURI> _assets;
 	Client * _client;
 	Poco::Net::SocketReactor _reactor;
@@ -24,7 +31,9 @@ public:
 	BHGet();
 	bool queueAsset(const std::string& uri);
 
-	void defineOptions();
+	virtual void defineOptions(Poco::Util::OptionSet & options);
+	virtual void handleOption(const std::string & name, const std::string & value);
+	int exitHelp();
 
 	int main(const std::vector<std::string>& args);
 private:
