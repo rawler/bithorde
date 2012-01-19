@@ -96,25 +96,15 @@ int BHGet::main(const std::vector<std::string>& args) {
 bool BHGet::queueAsset(const std::string& _uri) {
 	MagnetURI uri;
 	if (!uri.parse(_uri)) {
-		cerr << "Only magnet-links supported, not '" << _uri << "'" << endl;
+		logger().error("Only magnet-links supported, not '" + _uri + "'");
 		return false;
 	}
 
-	bool found_id = false;
-
-	std::vector<ExactIdentifier>::iterator iter;
-	for (iter = uri.xtIds.begin(); iter != uri.xtIds.end(); iter++) {
-		if (iter->type == "urn:tree:tiger") {
-			found_id = true;
-			break;
-		}
-	}
-
-	if (found_id) {
+	if (uri.xtIds.size()) {
 		_assets.push_back(uri);
 		return true;
 	} else {
-		cerr << "No hash-Identifier in '" << _uri << "'" << endl;
+		logger().error("No hash-Identifiers in '" + _uri + "'");
 		return false;
 	}
 }
@@ -126,24 +116,15 @@ void BHGet::nextAsset() {
 		_asset = NULL;
 	}
 
-	ByteArray tigerId;
-	while (tigerId.empty() && !_assets.empty()) {
+	ReadAsset::IdList ids;
+	while (ids.empty() && !_assets.empty()) {
 		MagnetURI nextUri = _assets.front();
 		_assets.pop_front();
-
-		vector<ExactIdentifier>::iterator iter;
-		for (iter=nextUri.xtIds.begin(); iter != nextUri.xtIds.end(); iter++) {
-			if (iter->type == "urn:tree:tiger") {
-				tigerId = ByteArray(iter->id.begin(), iter->id.end());
-				break;
-			}
-		}
+		ids = nextUri.toIdList();
 	}
-	if (tigerId.empty())
+	if (ids.empty())
 		_reactor.stop();
 
-	ReadAsset::IdList ids;
-	ids.push_back(ReadAsset::Identifier(bithorde::TREE_TIGER, tigerId));
 	_asset = new ReadAsset(_client, ids);
 	_asset->statusUpdate += delegate(this, &BHGet::onStatusUpdate);
 	_asset->dataArrived += delegate(this, &BHGet::onDataChunk);
@@ -158,19 +139,18 @@ void BHGet::onStatusUpdate(const bithorde::AssetStatus& status)
 	switch (status.status()) {
 	case bithorde::SUCCESS:
 		if (status.size() > 0 ) {
-			cerr << "Downloading ..." << endl;
+			logger().notice("Downloading ...");
 			requestMore();
 		} else {
-			cerr << "Zero-sized asset, skipping ..." << endl;
+			logger().warning("Zero-sized asset, skipping ...");
 			nextAsset();
 		}
 		break;
 	default:
-		cerr << "Failed ..." << endl;
+		logger().error("Failed ...");
 		nextAsset();
 		break;
 	}
-	cerr.flush();
 }
 
 void BHGet::requestMore()
@@ -186,7 +166,7 @@ void BHGet::onDataChunk(const ReadAsset::Segment& s)
 {
 	_outQueue->send(s.offset, s.data);
 	if ((s.data.size() < BLOCK_SIZE) && ((s.offset+s.data.size()) < _asset->size())) {
-		(cerr << "Error: got unexpectedly small data-block" << endl).flush();
+		logger().error("Error: got unexpectedly small data-block");
 	}
 	if (_outQueue->position < _asset->size()) {
 		requestMore();

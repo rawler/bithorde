@@ -5,23 +5,26 @@
 #include <string>
 #include <vector>
 
+#include "asset.h"
 #include "types.h"
 
 struct ExactIdentifier {
-    std::string type;
-    std::string id;
+	std::string type;
+	std::string id;
 
-    static ExactIdentifier fromUrlEnc(std::string enc);
+	static ExactIdentifier fromUrlEnc(std::string enc);
 
-    std::string base32id();
+	std::string base32id();
 };
 
 struct MagnetURI
 {
-    bool parse(const std::string& uri);
+	bool parse(const std::string& uri);
 
-    std::vector<ExactIdentifier> xtIds;
-    uint64_t size;
+	std::vector<ExactIdentifier> xtIds;
+	uint64_t size;
+
+	ReadAsset::IdList toIdList();
 };
 
 #endif // MAGNETURI_H

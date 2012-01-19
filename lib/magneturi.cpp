@@ -33,8 +33,6 @@ std::string ExactIdentifier::base32id()
 	return res;
 }
 
-#include <iostream>
-
 bool MagnetURI::parse(const string& uri_)
 {
 	if (uri_.compare(0, MAGNET_PREFIX.size(), MAGNET_PREFIX))
@@ -55,4 +53,18 @@ bool MagnetURI::parse(const string& uri_)
 			xtIds.push_back(ExactIdentifier::fromUrlEnc(value));
 	}
 	return true;
+}
+
+ReadAsset::IdList MagnetURI::toIdList ()
+{
+	ReadAsset::IdList ids;
+
+	vector<ExactIdentifier>::iterator iter;
+	for (iter=xtIds.begin(); iter != xtIds.end(); iter++) {
+		ByteArray hashId(iter->id.begin(), iter->id.end());
+		if (iter->type == "urn:tree:tiger")
+			ids.push_back(ReadAsset::Identifier(bithorde::TREE_TIGER, hashId));
+	}
+
+	return ids;
 }
