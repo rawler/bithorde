@@ -11,6 +11,22 @@ const static std::string MAGNET_PREFIX = "magnet:?";
 using namespace std;
 using namespace Poco;
 
+ExactIdentifier::ExactIdentifier()
+{}
+
+ExactIdentifier::ExactIdentifier(const bithorde::Identifier& id)
+{
+	switch (id.type()) {
+		case bithorde::TREE_TIGER: type = "tree:tiger"; break;
+		case bithorde::SHA1:       type = "sha1"; break;
+		case bithorde::SHA256:     type = "sha256"; break;
+		default:                   type = "unkown"; break;
+	}
+	CryptoPP::StringSource(id.id(), true,
+		new RFC4648Base32Encoder(
+			new CryptoPP::StringSink(this->id)));
+}
+
 ExactIdentifier ExactIdentifier::fromUrlEnc(string enc)
 {
 	ExactIdentifier res;
@@ -24,13 +40,24 @@ ExactIdentifier ExactIdentifier::fromUrlEnc(string enc)
 	return res;
 }
 
-std::string ExactIdentifier::base32id()
+std::string ExactIdentifier::base32id() const
 {
 	std::string res;
 	CryptoPP::StringSource((const byte*)id.data(), id.size(), true,
 		new RFC4648Base32Encoder(
 			new CryptoPP::StringSink(res)));
 	return res;
+}
+
+MagnetURI::MagnetURI()
+{}
+
+MagnetURI::MagnetURI(const bithorde::AssetStatus& s)
+{
+	size = s.size();
+
+	for (int i = 0; i < s.ids_size(); i++)
+		xtIds.push_back(ExactIdentifier(s.ids(i)));
 }
 
 bool MagnetURI::parse(const string& uri_)
@@ -68,3 +95,18 @@ ReadAsset::IdList MagnetURI::toIdList ()
 
 	return ids;
 }
+
+std::ostream& operator<<(std::ostream& str,const MagnetURI& uri) {
+	str << "magnet:?";
+
+	vector<ExactIdentifier>::const_iterator iter;
+	for (iter=uri.xtIds.begin(); iter != uri.xtIds.end(); iter++) {
+		str << "xt=" << iter->type << ':' << iter->base32id() << '&';
+	}
+
+	if (uri.size)
+		str << "xl=" << uri.size;
+
+	return str;
+}
+
