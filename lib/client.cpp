@@ -119,7 +119,7 @@ void Client::onMessage(const bithorde::Ping & msg) {
 	_connection->sendMessage(Connection::Ping, reply);
 }
 
-void Client::bindRead(ReadAsset &asset) {
+bool Client::bind(ReadAsset &asset) {
 	poco_assert(asset._client == this);
 	poco_assert(asset._handle < 0);
 	poco_assert(asset.requestIds().size() > 0);
@@ -137,10 +137,10 @@ void Client::bindRead(ReadAsset &asset) {
 	}
 	msg.set_timeout(DEFAULT_ASSET_TIMEOUT);
 	msg.set_uuid(rand64());
-	_connection->sendMessage(Connection::BindRead, msg);
+	return _connection->sendMessage(Connection::BindRead, msg);
 }
 
-void Client::bindWrite(UploadAsset & asset)
+bool Client::bind(UploadAsset & asset)
 {
 	poco_assert(asset._client == this);
 	poco_assert(asset._handle < 0);
@@ -150,7 +150,7 @@ void Client::bindWrite(UploadAsset & asset)
 	bithorde::BindWrite msg;
 	msg.set_handle(asset._handle);
 	msg.set_size(asset.size());
-	_connection->sendMessage(Connection::BindWrite, msg);
+	return _connection->sendMessage(Connection::BindWrite, msg);
 }
 
 void Client::release(Asset & asset)

@@ -179,7 +179,7 @@ void BHGet::nextAsset() {
 	_asset = new ReadAsset(_client, ids);
 	_asset->statusUpdate += delegate(this, &BHGet::onStatusUpdate);
 	_asset->dataArrived += delegate(this, &BHGet::onDataChunk);
-	_client->bindRead(*_asset);
+	_client->bind(*_asset);
 
 	_outQueue = new OutQueue();
 	_currentOffset = 0;

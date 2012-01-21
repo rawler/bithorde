@@ -28,8 +28,8 @@ public:
 	explicit Client(Connection & conn, std::string myName);
 	~Client();
 
-	void bindRead(ReadAsset & asset);
-	void bindWrite(UploadAsset & asset);
+	bool bind(ReadAsset & asset);
+	bool bind(UploadAsset & asset);
 
 	bool sendMessage(Connection::MessageType type, const ::google::protobuf::Message & msg);
 
