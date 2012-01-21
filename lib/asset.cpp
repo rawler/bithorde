@@ -89,23 +89,19 @@ int ReadAsset::aSyncRead(uint64_t offset, ssize_t size)
 	return reqId;
 }
 
-UploadAsset::UploadAsset(Client * client) :
+UploadAsset::UploadAsset(Client * client, uint64_t size) :
 	Asset(client)
-{}
-
-void UploadAsset::setSize(uint64_t size)
 {
-	poco_assert(!isBound());
 	_size = size;
 }
 
-bool UploadAsset::tryWrite(uint64_t offset, ByteArray data)
+bool UploadAsset::tryWrite(uint64_t offset, byte* data, size_t amount)
 {
 	poco_assert(isBound());
 	bithorde::DataSegment msg;
 	msg.set_handle(_handle);
 	msg.set_offset(offset);
-	msg.set_content(data.data(), data.size());
+	msg.set_content(data, amount);
 	return _client->sendMessage(Connection::DataSegment, msg);
 }
 

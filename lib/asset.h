@@ -70,10 +70,9 @@ private:
 class UploadAsset : public Asset
 {
 public:
-    explicit UploadAsset(Client * client);
-    void setSize(uint64_t size);
+    explicit UploadAsset(Client * client, uint64_t size);
 
-    bool tryWrite(uint64_t offset, ByteArray data);
+    bool tryWrite(uint64_t offset, byte* data, size_t amount);
 
 protected:
     virtual void handleMessage(const bithorde::Read::Response &msg);
