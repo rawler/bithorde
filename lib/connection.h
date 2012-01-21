@@ -48,11 +48,11 @@ public:
 	};
 	Poco::BasicEvent<Poco::EventArgs> disconnected;
 	Poco::BasicEvent<Message> message;
-	Poco::BasicEvent<Poco::EventArgs> sent;
+	Poco::BasicEvent<Poco::EventArgs> writable;
 
 public:
 	// TODO: Support "prioritized" messages, I.E. Binding changes.
-	bool sendMessage(MessageType type, const ::google::protobuf::Message & msg);
+	bool sendMessage(MessageType type, const ::google::protobuf::Message & msg, bool prioritized=false);
 
 protected:
 	void onError(const Poco::AutoPtr<Poco::Net::ErrorNotification>& pNf);

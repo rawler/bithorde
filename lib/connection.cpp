@@ -14,12 +14,13 @@
 const size_t READ_BLOCK = 65536;
 const size_t MAX_MSG = 256*1024;
 const size_t SEND_BUF = 1024*1024;
+const size_t SEND_BUF_EMERGENCY = 2*SEND_BUF;
+const size_t SEND_BUF_LOW_WATER_MARK = MAX_MSG;
 
 using namespace std;
 using namespace Poco;
 using namespace Poco::Net;
 using namespace Poco::Util;
-
 
 Connection::Connection(StreamSocket & socket, SocketReactor& reactor) :
 	_state(Connected),
@@ -131,8 +132,8 @@ void Connection::onError(AutoPtr<Poco::Net::ErrorNotification> const& pNf) {
 }
 
 bool Connection::encode(Connection::MessageType type, const google::protobuf::Message &msg) {
-	byte* buf = _sendBuf.allocate(512*1024);
-	::google::protobuf::io::ArrayOutputStream of(buf, 512*1024);
+	byte* buf = _sendBuf.allocate(MAX_MSG);
+	::google::protobuf::io::ArrayOutputStream of(buf, MAX_MSG);
 	::google::protobuf::io::CodedOutputStream stream(&of);
 	stream.WriteTag(::google::protobuf::internal::WireFormatLite::MakeTag(type, ::google::protobuf::internal::WireFormatLite::WIRETYPE_LENGTH_DELIMITED));
 	stream.WriteVarint32(msg.ByteSize());
@@ -142,9 +143,10 @@ bool Connection::encode(Connection::MessageType type, const google::protobuf::Me
 	return res;
 }
 
-bool Connection::sendMessage(Connection::MessageType type, const::google::protobuf::Message &msg)
+bool Connection::sendMessage(Connection::MessageType type, const::google::protobuf::Message &msg, bool prioritized)
 {
-	if (_sendBuf.size > 1024*1024)
+	size_t bufLimit = prioritized ? SEND_BUF_EMERGENCY : SEND_BUF;
+	if (_sendBuf.size > bufLimit)
 		return false;
 
 	bool queued = encode(type, msg);
@@ -165,6 +167,8 @@ void Connection::trySend() {
 			_reactor.addEventHandler(_socket, NObserver<Connection, WritableNotification>(*this, &Connection::onWritable));
 		else // TODO: Handle onWritable and unregister smarter
 			_reactor.removeEventHandler(_socket, NObserver<Connection, WritableNotification>(*this, &Connection::onWritable));
+		if (_sendBuf.size < SEND_BUF_LOW_WATER_MARK)
+			writable.notify(this, NO_ARGS);
 	} else {
 		_logger.error("Failed to write. Disconnecting...");
 		delete this;

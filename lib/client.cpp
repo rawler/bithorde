@@ -24,14 +24,14 @@ Client::Client(Connection & connection, std::string myName) :
 	_protoVersion(0)
 {
 	_connection->message += delegate(this, &Client::onIncomingMessage);
-	_connection->sent += delegate(this, &Client::onSent);
+	_connection->writable += delegate(this, &Client::onWritable);
 
 	sayHello();
 }
 
 Client::~Client() {
 	_connection->message += delegate(this, &Client::onIncomingMessage);
-	_connection->sent += delegate(this, &Client::onSent);
+	_connection->writable += delegate(this, &Client::onWritable);
 }
 
 bool Client::sendMessage(Connection::MessageType type, const::google::protobuf::Message &msg)
@@ -48,8 +48,8 @@ void Client::sayHello() {
 	sendMessage(Connection::HandShake, h);
 }
 
-void Client::onSent (Poco::EventArgs&) {
-	sent.notify(this, NO_ARGS);
+void Client::onWritable (Poco::EventArgs&) {
+	writable.notify(this, NO_ARGS);
 }
 
 void Client::onIncomingMessage(Connection::Message &msg)
@@ -153,7 +153,7 @@ bool Client::bind(UploadAsset & asset)
 	return _connection->sendMessage(Connection::BindWrite, msg);
 }
 
-void Client::release(Asset & asset)
+bool Client::release(Asset & asset)
 {
 	poco_assert(asset.isBound());
 	bithorde::BindRead msg;
@@ -165,7 +165,7 @@ void Client::release(Asset & asset)
 	_handleAllocator.free(asset._handle);
 	asset._handle = -1;
 
-	_connection->sendMessage(Connection::BindRead, msg);
+	return _connection->sendMessage(Connection::BindRead, msg);
 }
 
 int Client::allocRPCRequest(Asset::Handle asset)

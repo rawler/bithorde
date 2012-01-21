@@ -34,14 +34,14 @@ public:
 	bool sendMessage(Connection::MessageType type, const ::google::protobuf::Message & msg);
 
 	Poco::BasicEvent<std::string> authenticated;
-	Poco::BasicEvent<Poco::EventArgs> sent;
+	Poco::BasicEvent<Poco::EventArgs> writable;
 
 protected:
 	void sayHello();
 
 	void onDisconnected(Poco::EventArgs&);
 	void onIncomingMessage(Connection::Message&);
-	void onSent(Poco::EventArgs&);
+	void onWritable(Poco::EventArgs&);
 
 	void onMessage(const bithorde::HandShake & msg);
 	void onMessage(const bithorde::BindRead & msg);
@@ -56,7 +56,7 @@ protected:
 private:
 	friend class Asset;
 	friend class ReadAsset;
-	void release(Asset & a);
+	bool release(Asset & a);
 
 	int allocRPCRequest(Asset::Handle asset);
 	void releaseRPCRequest(int reqId);
