@@ -131,6 +131,12 @@ protected:
                 close();
         }
     }
+    void failedToOpen() {
+        scope sig = _statusSignal; // Store away sig for call
+        if (singleShotStatus)
+            _statusSignal = _statusSignal.init;
+        sig.call(this, message.Status.NORESOURCES, null);
+    }
     void triggerTimeout(Time deadline, Time now) {
         statusTimeout = statusTimeout.init;
         logRequestResponse(now-openedTime);
@@ -389,10 +395,13 @@ protected:
                                       TimeSpan timeout) {
         req.handle = asset.handle;
         req.timeout = timeout.millis;
-        boundAssets[asset.handle] = asset;
         asset.openedTime = Clock.now;
-        sendMessage(req, true);
-        asset.statusTimeout = connection.timeouts.registerIn(timeout, &asset.triggerTimeout);
+        if (sendMessage(req, true)) {
+            boundAssets[asset.handle] = asset;
+            asset.statusTimeout = connection.timeouts.registerIn(timeout, &asset.triggerTimeout);
+        } else {
+            asset.failedToOpen();
+        }
     }
 
     bool closed() {
