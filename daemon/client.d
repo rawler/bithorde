@@ -341,10 +341,10 @@ protected:
     void processDataSegment(Connection c, ubyte[] buf) {
         scope req = new message.DataSegment();
         req.decode(buf);
-        try {
-            auto asset = getAsset(req.handle);
+        auto asset = getAsset(req.handle);
+        if (asset) {
             asset.addDataSegment(req);
-        } catch (ArrayBoundsException e) {
+        } else {
             log.error("DataSegment to invalid handle");
         }
     }
