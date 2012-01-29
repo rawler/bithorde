@@ -823,26 +823,23 @@ private:
 
         ulong bytesFreed;
         /* remove redundant and faulty assets from localIdMap */ {
+            bool validHashIds(Asset a) {
+                foreach (id; a.hashIds) {
+                    if ((id.type in hashIdMap)
+                          && (id.id in hashIdMap[id.type])
+                          && (hashIdMap[id.type][id.id] == a))
+                        return true;
+                }
+                return false;
+            }
+
             scope Asset[] staleAssets;
             foreach (asset; localIdMap) {
-                if (fullCollect && !asset.assetPath.exists) {
-                    log.trace("Asset file has disappeared.");
-                    staleAssets ~= asset;
-                } else if (asset.hashIds.length) {
-                    auto valid = false;
-                    foreach (id; asset.hashIds) {
-                        if ((id.type in hashIdMap)
-                              && (id.id in hashIdMap[id.type])
-                              && (hashIdMap[id.type][id.id] == asset))
-                            valid = true;
-                    }
-                    if (!valid) {
+                if (!validHashIds(asset) && !asset.isOpen) {
+                    if (asset.updateState != Asset.State.COMPLETE) { // Will be queued for rehash below if it is already complete
                         log.trace("Found no valid hashId-references to asset.");
                         staleAssets ~= asset;
                     }
-                } else if (asset.state == asset.State.INCOMPLETE
-                           && !asset.isOpen) {
-                    staleAssets ~= asset;
                 }
             }
             foreach (asset; staleAssets) {
