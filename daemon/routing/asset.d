@@ -77,6 +77,8 @@ public:
         auto score = uint.max;
         RemoteAsset target;
         foreach (asset; backingAssets) { // Find client with least load
+            if (!asset.client)
+                continue;
             auto currentScore = asset.client.getLoad();
             if (currentScore < score) {
                 score = currentScore;
