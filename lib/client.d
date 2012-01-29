@@ -96,8 +96,7 @@ protected:
         this.singleShotStatus = singleShotStatus;
     }
     ~this() {
-        if (!closed)
-            close();
+        assert(closed);
     }
 
     private void logRequestResponse(TimeSpan responseTime) {
