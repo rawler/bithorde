@@ -110,6 +110,9 @@ public:
         client = new SimpleClient(addr, "bhupload");
 
         if (args.link) {
+            auto path = args.file.absolute(Environment.cwd);
+            if (args.verbose)
+                Stderr.format("Linking path {}...", path).newline;
             client.registerLink(args.file.absolute(Environment.cwd), &onStatusUpdate);
         } else {
             file = new File(args.file.toString);
