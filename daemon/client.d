@@ -261,17 +261,17 @@ private:
 protected:
     void _onPeerPresented(Connection c) {
         auto config = server.config;
-        auto f = c.peername in config.friends ? config.friends[c.peername] : null;
+        auto keyInfo = config.findConnectionParams(c.peername);
 
         auto peerAddress = c.remoteAddress;
-        auto peerAccepted = f !is null
+        auto peerAccepted = keyInfo !is null
                             || config.allowanon
                             || (peerAddress.addressFamily == AddressFamily.UNIX)
                             || ((peerAddress.addressFamily == AddressFamily.INET)
                                 && ((cast(IPv4Address)peerAddress).addr == 0x7f000001)); // 127.0.0.1
 
-        auto cipher = f ? f.sendCipher : message.CipherType.CLEARTEXT;
-        auto sharedKey = f ? f.sharedKey : null;
+        auto cipher = keyInfo ? keyInfo.sendCipher : message.CipherType.CLEARTEXT;
+        auto sharedKey = keyInfo ? keyInfo.sharedKey : null;
 
         if (!peerAccepted)
             throw new AuthenticationFailure("Server does not allow anonymous connections.");

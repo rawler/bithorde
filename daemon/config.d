@@ -51,6 +51,12 @@ bool parseBool(char[] value) {
     }
 }
 
+class Client : ConfiguredConnection {
+    this(char[] name) {
+        super(name);
+    }
+}
+
 /****************************************************************************************
  * Parses the BitHorded Config File
  ***************************************************************************************/
@@ -66,6 +72,7 @@ class Config
     FilePath[] linkroots;
     FilePath logfile;
     Friend[char[]] friends;
+    Client[char[]] clients;
     bool doDebug = false;
     bool usefsync = false;
     bool allowanon = true;
@@ -90,6 +97,9 @@ class Config
             case "friend":
                 parseFriendOption(option, value);
                 break;
+            case "client":
+                parseClientOption(option, value);
+                break;
             default:
                 throw new ConfigException("Unknown config section");
             }
@@ -111,6 +121,14 @@ class Config
             if (!friend.addr)
                 throw new ConfigException("Missing address for " ~ name);
         }
+    }
+
+    ConfiguredConnection findConnectionParams(char[] name) {
+        if (name in friends)
+            return friends[name];
+        if (name in clients)
+            return clients[name];
+        return null;
     }
 private:
     /**************************************************************************
@@ -174,6 +192,26 @@ private:
         }
     }
 
+    private CipherType mapCipher(char[] text) {
+        switch (toLower(text)) {
+            case "none":
+            case "clear":
+            case "cleartext":
+                return CipherType.CLEARTEXT;
+            case "xor":
+                return CipherType.XOR;
+            case "rc4":
+            case "arc4":
+            case "arcfour":
+                return CipherType.RC4;
+            case "aes":
+            case "aes_ctr":
+                return CipherType.AES_CTR;
+            default:
+                throw new ConfigException("Unrecognized cipher " ~ text);
+        }
+    }
+
     /************************************************************************************
      * Parse friend.* - options
      ***********************************************************************************/
@@ -196,30 +234,30 @@ private:
             friend.sharedKey = base64.decode(value);
             break;
         case "sendcipher":
-            switch (toLower(value)) {
-                case "none":
-                case "clear":
-                case "cleartext":
-                    friend.sendCipher = CipherType.CLEARTEXT;
-                    break;
-                case "xor":
-                    friend.sendCipher = CipherType.XOR;
-                    break;
-                case "rc4":
-                case "arc4":
-                case "arcfour":
-                    friend.sendCipher = CipherType.RC4;
-                    break;
-                case "aes":
-                case "aes_ctr":
-                    friend.sendCipher = CipherType.AES_CTR;
-                    break;
-                default:
-                    throw new ConfigException("Unrecognized cipher " ~ value);
-            }
+            friend.sendCipher = mapCipher(value);
             break;
         default:
             throw new ConfigException("Unknown friend option: " ~ friendName ~ "." ~ option);
+        }
+    }
+
+    void parseClientOption(char[] option, char[] value) {
+        auto clientName = Text.head(option, ".", option);
+        if (!option)
+            throw new ConfigException("Missing client option for " ~ clientName);
+        if (!(clientName in clients))
+            clients[clientName] = new Client(clientName);
+        auto client = clients[clientName];
+
+        switch (option) {
+        case "key":
+            client.sharedKey = base64.decode(value);
+            break;
+        case "sendcipher":
+            client.sendCipher = mapCipher(value);
+            break;
+        default:
+            throw new ConfigException("Unknown client option: " ~ clientName ~ "." ~ option);
         }
     }
 }

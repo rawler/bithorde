@@ -41,7 +41,7 @@ private import tango.util.log.Log;
 private import daemon.store.cache.manager;
 private import daemon.store.repository;
 private import daemon.client;
-private import daemon.config;
+private import daemon.config : Config;
 private import daemon.routing.friend;
 private import daemon.routing.router;
 private import lib.asset;
