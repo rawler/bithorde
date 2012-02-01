@@ -73,7 +73,7 @@ public:
     this(FilePath path) {
         this.path = path;
         auto fname = path.file;
-        log = Log.lookup("daemon.lib.complete."~fname[0..min(8u,fname.length)]);
+        log = Log.lookup("daemon.lib.complete."~fname[0..min!(uint)(8u,fname.length)]);
 
         super();
         assetOpen(path);
@@ -151,7 +151,7 @@ public:
             truncate(size);           // We resize it to right size
         _size = size;
         auto fname = path.file;
-        log = Log.lookup("daemon.lib.incomplete."~fname[0..min(8u,fname.length)]); // TODO: fix order and double-init
+        log = Log.lookup("daemon.lib.incomplete."~fname[0..min!(uint)(8u,fname.length)]); // TODO: fix order and double-init
 
         hasherThread = new Thread(&hasherThreadLoop);
         hasherThread.name = "Hasher:"~path.name[0..min!(uint)(6,path.name.length)];
