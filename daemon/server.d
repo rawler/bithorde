@@ -321,7 +321,7 @@ protected:
             Friend[] tmpOfflineFriends;
             synchronized (this) tmpOfflineFriends = this.offlineFriends.values;
             foreach (friend; tmpOfflineFriends) {
-                if ((!friend.isConnected) && tryConnectFriend(friend, socket))
+                if ((!friend.isConnected) && friend.addr && tryConnectFriend(friend, socket))
                     socket = new Socket();
                     // Friend may have connected while trying to connect others
                     continue;

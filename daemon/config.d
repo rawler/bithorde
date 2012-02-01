@@ -117,10 +117,6 @@ class Config
     void validate() {
         if (!name)
             throw new ConfigException("Missing server.name");
-        foreach (name, friend; friends) {
-            if (!friend.addr)
-                throw new ConfigException("Missing address for " ~ name);
-        }
     }
 
     ConfiguredConnection findConnectionParams(char[] name) {
