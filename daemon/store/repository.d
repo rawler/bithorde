@@ -421,7 +421,7 @@ private:
      * Add an asset to the id-maps
      ************************************************************************/
     synchronized void addToIdMap(Asset asset) {
-        log.trace("Commiting {} ({}) to map", asset.assetPath.toString, asset.magnetLink);
+        log.trace("Committing {} ({}) to map", asset.assetPath.toString, asset.magnetLink);
 
         foreach (id; asset.hashIds) {
             if (id.type in hashIdMap) {
