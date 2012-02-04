@@ -205,7 +205,6 @@ public:
                 log.fatal("Failed to load the old idMap. Assets will need to be re-added.");
             }
         }
-        scanForChanges();
     }
 
     /************************************************************************************
@@ -243,6 +242,8 @@ public:
      * Final startup preparation
      ***********************************************************************************/
     void start() {
+        scanForChanges();
+
         idMapFlusher = new Thread(&IdMapFlusher);
         idMapFlusher.isDaemon = true;
         idMapFlusher.start;
