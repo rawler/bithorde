@@ -12,3 +12,13 @@ TARGET_LINK_LIBRARIES ( bhget
 
 	bithorde
 )
+
+ADD_EXECUTABLE(bhupload
+	bhupload.cpp bhupload.h
+)
+TARGET_LINK_LIBRARIES ( bhupload
+	"optimized" PocoFoundation PocoUtil PocoNet
+	"debug" PocoFoundationd PocoUtild PocoNetd
+
+	bithorde
+)
