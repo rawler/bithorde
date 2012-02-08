@@ -135,6 +135,8 @@ protected:
         if (singleShotStatus)
             _statusSignal = _statusSignal.init;
         sig.call(this, message.Status.NORESOURCES, null);
+        closed = true;
+        confirmedClose();
     }
     void triggerTimeout(Time deadline, Time now) {
         statusTimeout = statusTimeout.init;
@@ -198,7 +200,7 @@ public:
         if (client && !client.closed) {
             // Sending null-bind closes the asset
             scope req = new message.BindRead;
-            client.sendBindRequest(req, this, TimeSpan.fromSeconds(5));
+            client.sendBindRequest(req, this, TimeSpan.fromSeconds(5), true);
         }
     }
 }
@@ -391,11 +393,11 @@ protected:
      * updates and timeouts.
      ***********************************************************************************/
     void sendBindRequest(message.BindRequest req, RemoteAsset asset,
-                                      TimeSpan timeout) {
+                                      TimeSpan timeout, bool prioritized=false) {
         req.handle = asset.handle;
         req.timeout = timeout.millis;
         asset.openedTime = Clock.now;
-        if (sendMessage(req, true)) {
+        if (sendMessage(req, prioritized)) {
             boundAssets[asset.handle] = asset;
             asset.statusTimeout = connection.timeouts.registerIn(timeout, &asset.triggerTimeout);
         } else {
