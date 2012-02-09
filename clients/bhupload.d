@@ -99,7 +99,7 @@ private:
     File file;            /// File to read from
     ulong pos;            /// Send-position, for progressBar
 
-    ProgressBar pBar;     /// ProgressBar, if desired
+    ProgressBar pBar=null; /// ProgressBar, if desired
 public:
     /************************************************************************************
      * Setup from Args, create BitHorde-asset, and begin sending the file
@@ -207,7 +207,7 @@ private:
      * Print these, and exit
      ***********************************************************************************/
     void onComplete(IAsset asset, Status status, Identifier[] ids) {
-        if (args.progressBar) {
+        if (pBar) {
             if (exitStatus == 0) // Successful finish
                 pBar.finish(pos);
             else
