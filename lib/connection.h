@@ -3,19 +3,18 @@
 
 #include <queue>
 
-#include <Poco/BasicEvent.h>
-#include <Poco/EventArgs.h>
-#include <Poco/Net/StreamSocket.h>
-#include <Poco/Net/SocketNotification.h>
-#include <Poco/Net/SocketReactor.h>
-#include <Poco/Logger.h>
+#include <boost/asio.hpp>
+#include <boost/signal.hpp>
 
 #include "bithorde.pb.h"
 #include "types.h"
 
 class Connection
+	: public boost::enable_shared_from_this<Connection>
 {
 public:
+	typedef boost::shared_ptr<Connection> Pointer;
+
 	enum MessageType {
 		HandShake = 1,
 		BindRead = 2,
@@ -34,39 +33,35 @@ public:
 		Authenticated,
 	};
 
-	Connection();
-	Connection(Poco::Net::StreamSocket & socket, Poco::Net::SocketReactor& reactor);
+	static Pointer create(boost::asio::io_service& ioSvc, const boost::asio::local::stream_protocol::endpoint& addr) {
+		Pointer c(new Connection(ioSvc, addr));
+		c->tryRead();
+		return c;
+	}
 	~Connection();
 
-	struct Message {
-		Connection::MessageType type;
-		const ::google::protobuf::Message & content;
-		Message(Connection::MessageType type, const google::protobuf::Message & content) :
-			type(type),
-			content(content)
-		{}
-	};
-	Poco::BasicEvent<Poco::EventArgs> disconnected;
-	Poco::BasicEvent<Message> message;
-	Poco::BasicEvent<Poco::EventArgs> writable;
+	boost::signal<void ()> disconnected;
+	boost::signal<void (MessageType, ::google::protobuf::Message&)> message;
+	boost::signal<void ()> writable;
 
 public:
-	// TODO: Support "prioritized" messages, I.E. Binding changes.
 	bool sendMessage(MessageType type, const ::google::protobuf::Message & msg, bool prioritized=false);
 
 protected:
-	void onError(const Poco::AutoPtr<Poco::Net::ErrorNotification>& pNf);
-	void onReadable(const Poco::AutoPtr<Poco::Net::ReadableNotification>& pNf);
-	void onWritable(const Poco::AutoPtr<Poco::Net::WritableNotification>& pNf);
+	Connection(boost::asio::io_service& ioSvc, const boost::asio::local::stream_protocol::endpoint& addr);
+
+	void tryRead();
+	
+	void onRead(const boost::system::error_code& err, size_t count);
+	void onWritten(const boost::system::error_code& err, size_t count);
 
 	bool encode(Connection::MessageType type, const::google::protobuf::Message &msg);
 	void trySend();
 private:
 	State _state;
-	Poco::Logger& _logger;
 
-	Poco::Net::StreamSocket _socket;
-	Poco::Net::SocketReactor& _reactor; 
+	boost::asio::local::stream_protocol::socket _socket;
+	boost::asio::io_service& _ioSvc;
 
 	Buffer _rcvBuf;
 	Buffer _sendBuf;

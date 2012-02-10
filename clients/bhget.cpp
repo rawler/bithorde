@@ -6,14 +6,9 @@
 #include <sstream>
 #include <utility>
 
-#include <Poco/Delegate.h>
-#include <Poco/Net/DNS.h>
-#include <Poco/Util/HelpFormatter.h>
-
+namespace asio = boost::asio;
+namespace po = boost::program_options;
 using namespace std;
-using namespace Poco;
-using namespace Poco::Net;
-using namespace Poco::Util;
 
 const static size_t BLOCK_SIZE = (64*1024);
 
@@ -28,7 +23,7 @@ struct OutQueue {
 
 	void send(uint64_t offset, const ByteArray & data) {
 		if (offset <= position) {
-			poco_assert(offset == position);
+			BOOST_ASSERT(offset == position);
 			_flush(data);
 			_dequeue();
 		} else {
@@ -50,7 +45,7 @@ private:
 			if (first.first > position) {
 				break;
 			} else {
-				poco_assert(first.first == position);
+				BOOST_ASSERT(first.first == position);
 				_flush(first.second);
 				_stored.pop_front();
 			}
@@ -66,88 +61,36 @@ private:
 	}
 };
 
-BHGet::BHGet() :
-	optHelp(false),
-	optMyName("bhget"),
-	optQuiet(false),
-	optHost("localhost"),
-	optPort(1337),
+BHGet::BHGet(po::variables_map& args) :
+	optMyName(args["name"].as<string>()),
+	optQuiet(args.count("quiet")),
+	optConnectUrl(args["url"].as<string>()),
+	_ioSvc(),
 	_asset(NULL)
-{}
-
-void BHGet::defineOptions(OptionSet & options) {
-	options.addOption(Option("help", "h")
-		.description("Show help")
-	);
-	options.addOption(Option("name", "n")
-		.description("Bithorde-name of this client")
-		.argument("name")
-	);
-	options.addOption(Option("quiet", "q")
-		.description("Don't show progressbar")
-	);
-	options.addOption(Option("url", "u")
-		.description("Where to connect to bithorde. Either host:port, or /path/socket")
-		.argument("url")
-	);
-}
-
-void BHGet::handleOption(const std::string & name, const std::string & value) {
-	if (name == "help") {
-		optHelp = true;
-	} else if (name == "name") {
-		optMyName = value;
-	} else if (name == "quiet") {
-		optQuiet = true;
-	} else if (name == "url") {
-		std::size_t sepPos = value.rfind(':');
-		if (sepPos == value.length()) {
-			optHost = value;
-		} else {
-			optHost = value.substr(0, sepPos);
-			istringstream iss(value.substr(sepPos+1));
-			iss >> optPort;
-		}
-	}
-}
-
-int BHGet::exitHelp() {
-	HelpFormatter helpFormatter(options());
-	helpFormatter.setCommand(commandName());
-	helpFormatter.setUsage("OPTIONS <magnet-link1> ...");
-	helpFormatter.setHeader(
-		"Simple BitHorde asset-fetcher fetching one or more concatenated assets and "
-		"streaming to stdout."
-	);
-	helpFormatter.format(std::cerr);
-	return EXIT_USAGE;
+{
 }
 
 int BHGet::main(const std::vector<std::string>& args) {
-	if (args.empty() || optHelp)
-		return exitHelp();
 	std::vector<std::string>::const_iterator iter;
 	for (iter = args.begin(); iter != args.end(); iter++) {
 		if (!queueAsset(*iter))
-			return exitHelp();
+			return 1;
 	}
 
-	SocketAddress addr(DNS::resolveOne("localhost"), 1338);
-	StreamSocket sock;
-	sock.connect(addr);
-	Connection * c = new Connection(sock, _reactor);
-	_client = new Client(*c, optMyName);
-	_client->authenticated += delegate(this, &BHGet::onAuthenticated);
+	asio::local::stream_protocol::endpoint ep(optConnectUrl);
+	Connection::Pointer c = Connection::create(_ioSvc, ep);
+	_client = Client::create(c, optMyName);
+	_client->authenticated.connect(boost::bind(&BHGet::onAuthenticated, this, _1));
 
-	_reactor.run();
+	_ioSvc.run();
 
-	return EXIT_OK;
+	return 0;
 }
 
 bool BHGet::queueAsset(const std::string& _uri) {
 	MagnetURI uri;
 	if (!uri.parse(_uri)) {
-		logger().error("Only magnet-links supported, not '" + _uri + "'");
+		cerr << "Only magnet-links supported, not '" << _uri << "'" << endl;
 		return false;
 	}
 
@@ -155,7 +98,7 @@ bool BHGet::queueAsset(const std::string& _uri) {
 		_assets.push_back(uri);
 		return true;
 	} else {
-		logger().error("No hash-Identifiers in '" + _uri + "'");
+		cerr << "No hash-Identifiers in '" << _uri << "'" << endl;
 		return false;
 	}
 }
@@ -173,12 +116,14 @@ void BHGet::nextAsset() {
 		_assets.pop_front();
 		ids = nextUri.toIdList();
 	}
-	if (ids.empty())
-		_reactor.stop();
+	if (ids.empty()) {
+		_ioSvc.stop();
+		return;
+	}
 
 	_asset = new ReadAsset(_client, ids);
-	_asset->statusUpdate += delegate(this, &BHGet::onStatusUpdate);
-	_asset->dataArrived += delegate(this, &BHGet::onDataChunk);
+	_asset->statusUpdate.connect(boost::bind(&BHGet::onStatusUpdate, this, _1));
+	_asset->dataArrived.connect(boost::bind(&BHGet::onDataChunk, this, _1, _2, _3));
 	_client->bind(*_asset);
 
 	_outQueue = new OutQueue();
@@ -190,15 +135,15 @@ void BHGet::onStatusUpdate(const bithorde::AssetStatus& status)
 	switch (status.status()) {
 	case bithorde::SUCCESS:
 		if (status.size() > 0 ) {
-			logger().notice("Downloading ...");
+			cerr << "Downloading ..." << endl;
 			requestMore();
 		} else {
-			logger().warning("Zero-sized asset, skipping ...");
+			cerr << "Zero-sized asset, skipping ..." << endl;
 			nextAsset();
 		}
 		break;
 	default:
-		logger().error("Failed ...");
+		cerr << "Failed ..." << endl;
 		nextAsset();
 		break;
 	}
@@ -213,11 +158,11 @@ void BHGet::requestMore()
 	}
 }
 
-void BHGet::onDataChunk(const ReadAsset::Segment& s)
+void BHGet::onDataChunk(uint64_t offset, ByteArray& data, int tag)
 {
-	_outQueue->send(s.offset, s.data);
-	if ((s.data.size() < BLOCK_SIZE) && ((s.offset+s.data.size()) < _asset->size())) {
-		logger().error("Error: got unexpectedly small data-block");
+	_outQueue->send(offset, data);
+	if ((data.size() < BLOCK_SIZE) && ((offset+data.size()) < _asset->size())) {
+		 cerr << "Error: got unexpectedly small data-block" << endl;
 	}
 	if (_outQueue->position < _asset->size()) {
 		requestMore();
@@ -227,15 +172,42 @@ void BHGet::onDataChunk(const ReadAsset::Segment& s)
 }
 
 void BHGet::onAuthenticated(string& peerName) {
-	logger().notice("Connected to "+peerName);
+	cerr << "Connected to "+peerName << endl;
+	cerr.flush();
 	nextAsset();
 }
 
 int main(int argc, char *argv[]) {
-	BHGet app;
-	app.init(argc, argv);
+	po::options_description desc("Supported options");
+	desc.add_options()
+		("help,h",
+			"Show help")
+		("name,n", po::value< string >()->default_value("bhget"),
+			"Bithorde-name of this client")
+		("quiet,q",
+			"Don't show progressbar")
+		("url,u", po::value< string >()->default_value("/tmp/bithorde"),
+			"Where to connect to bithorde. Either host:port, or /path/socket")
+		("magnet-url", po::value< vector<string> >(), "magnet url(s) to fetch")
+	;
+	po::positional_options_description p;
+	p.add("magnet-url", -1);
 
-	int res = app.run();
+	po::command_line_parser parser(argc, argv);
+	parser.options(desc).positional(p);
+
+	po::variables_map vm;
+	po::store(parser.run(), vm);
+	po::notify(vm);
+
+	if (vm.count("help") || !vm.count("magnet-url")) {
+		cerr << desc << endl;
+		return 1;
+	}
+
+	BHGet app(vm);
+
+	int res = app.main(vm["magnet-url"].as< vector<string> >());
 	cerr.flush();
 	return res;
 }

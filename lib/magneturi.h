@@ -12,7 +12,7 @@
 struct ExactIdentifier {
 	ExactIdentifier();
 	ExactIdentifier(const bithorde::Identifier&);
-	
+
 	std::string type;
 	std::string id;
 

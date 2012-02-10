@@ -2,60 +2,54 @@
 
 #include <iostream>
 
+#include <boost/bind.hpp>
+
 #include <google/protobuf/wire_format_lite.h>
 #include <google/protobuf/wire_format_lite_inl.h>
 #include <google/protobuf/io/coded_stream.h>
 #include <google/protobuf/io/zero_copy_stream_impl.h>
 
-#include <Poco/Net/SocketNotification.h>
-#include <Poco/NObserver.h>
-#include <Poco/Util/Application.h>
-
-const size_t READ_BLOCK = 65536;
-const size_t MAX_MSG = 256*1024;
+const size_t MAX_MSG = 64*1024;
+const size_t READ_BLOCK = MAX_MSG*2;
 const size_t SEND_BUF = 1024*1024;
 const size_t SEND_BUF_EMERGENCY = 2*SEND_BUF;
 const size_t SEND_BUF_LOW_WATER_MARK = MAX_MSG;
 
+namespace asio = boost::asio;
 using namespace std;
-using namespace Poco;
-using namespace Poco::Net;
-using namespace Poco::Util;
 
-Connection::Connection(StreamSocket & socket, SocketReactor& reactor) :
+Connection::Connection(boost::asio::io_service& ioSvc, const boost::asio::local::stream_protocol::endpoint& addr) :
 	_state(Connected),
-	_logger(Application::instance().logger()),
-	_socket(socket),
-	_reactor(reactor)
+	_socket(ioSvc),
+	_ioSvc(ioSvc)
 {
-	Application& app = Application::instance();
-	app.logger().information("Connection from " + socket.peerAddress().toString());
+	_socket.connect(addr);
 
-	_reactor.addEventHandler(_socket, NObserver<Connection, ReadableNotification>(*this, &Connection::onReadable));
-	_reactor.addEventHandler(_socket, NObserver<Connection, ErrorNotification>(*this, &Connection::onError));
+	_sendBuf.allocate(SEND_BUF_EMERGENCY); // Prepare so we don't have to move it later during async send.
 }
 
 Connection::~Connection() {
-	disconnected.notify(this, NO_ARGS);
-	_reactor.removeEventHandler(_socket, NObserver<Connection, ReadableNotification>(*this, &Connection::onReadable));
-	_reactor.removeEventHandler(_socket, NObserver<Connection, ErrorNotification>(*this, &Connection::onError));
+// 	disconnected();
 }
 
-void Connection::onReadable(const AutoPtr<ReadableNotification>& pNf)
+void Connection::tryRead() {
+	_socket.async_read_some(asio::buffer(_rcvBuf.allocate(MAX_MSG), MAX_MSG),
+		boost::bind(&Connection::onRead, shared_from_this(),
+			asio::placeholders::error, asio::placeholders::bytes_transferred
+		)
+	);
+}
+
+void Connection::onRead(const boost::system::error_code& err, size_t count)
 {
-	byte* buf = _rcvBuf.allocate(READ_BLOCK);
-	size_t read = _socket.receiveBytes(buf, READ_BLOCK);
-	if (read >= 0) {
-		_rcvBuf.charge(read);
-	} else if (read == 0) {
-		_logger.information("Closing connection from " + _socket.peerAddress().toString());
-		delete this;
+	if (err || count == 0) {
+		// TODO: Close and signal closed to upstream. This, with it's socket, will be deleted when all references are cleared
+		return;
 	} else {
-		_logger.error("Error on " + _socket.peerAddress().toString());
-		delete this;
+		_rcvBuf.charge(count);
 	}
 
-	::google::protobuf::io::CodedInputStream stream((::google::protobuf::uint8*)_rcvBuf.ptr, _rcvBuf.size);
+	google::protobuf::io::CodedInputStream stream((::google::protobuf::uint8*)_rcvBuf.ptr, _rcvBuf.size);
 	bool res = true;
 	size_t remains;
 	while (res) {
@@ -92,17 +86,18 @@ void Connection::onReadable(const AutoPtr<ReadableNotification>& pNf)
 			if (_state == Authenticated) goto proto_error;
 			res = dequeue<bithorde::Ping>(Ping, stream); break;
 		default:
-			_logger.warning("unknown message tag");
+			// TODO: _logger.warning("unknown message tag");
 			res = ::google::protobuf::internal::WireFormatLite::SkipMessage(&stream);
 		}
 	}
 
 	_rcvBuf.pop(_rcvBuf.size-remains);
 
+	tryRead();
 	return;
 proto_error:
-	_logger.error("ERROR: BitHorde Protocol Error, Disconnecting");
-	delete this;
+	// TODO: _logger.error("ERROR: BitHorde Protocol Error, Disconnecting");
+	return;
 }
 
 template <class T>
@@ -118,17 +113,11 @@ bool Connection::dequeue(MessageType type, ::google::protobuf::io::CodedInputStr
 
 	::google::protobuf::io::CodedInputStream::Limit limit = stream.PushLimit(length);
 	if ((res = msg.MergePartialFromCodedStream(&stream))) {
-		Message msg_(type, msg);
-		message.notify(this, msg_);
+		message(type, msg);
 	}
 	stream.PopLimit(limit);
 
 	return res;
-}
-
-void Connection::onError(AutoPtr<Poco::Net::ErrorNotification> const& pNf) {
-	_logger.error("Error on connection");
-	delete this;
 }
 
 bool Connection::encode(Connection::MessageType type, const google::protobuf::Message &msg) {
@@ -148,33 +137,37 @@ bool Connection::sendMessage(Connection::MessageType type, const::google::protob
 	size_t bufLimit = prioritized ? SEND_BUF_EMERGENCY : SEND_BUF;
 	if (_sendBuf.size > bufLimit)
 		return false;
+	bool prevQueued = _sendBuf.size;
 
 	bool queued = encode(type, msg);
 	if (queued) {
-		trySend();
+		if (!prevQueued)
+			trySend();
 		return true;
 	} else {
-		_logger.error("Failed to serialize Message.");
+		// TODO: _logger.error("Failed to serialize Message.");
 		return false;
 	}
 }
 
 void Connection::trySend() {
-	int written = _socket.sendBytes(_sendBuf.ptr, _sendBuf.size);
-	if (written >= 0) {
-		_sendBuf.pop(written);
-		if (_sendBuf.size)
-			_reactor.addEventHandler(_socket, NObserver<Connection, WritableNotification>(*this, &Connection::onWritable));
-		else // TODO: Handle onWritable and unregister smarter
-			_reactor.removeEventHandler(_socket, NObserver<Connection, WritableNotification>(*this, &Connection::onWritable));
-		if (_sendBuf.size < SEND_BUF_LOW_WATER_MARK)
-			writable.notify(this, NO_ARGS);
-	} else {
-		_logger.error("Failed to write. Disconnecting...");
-		delete this;
+	cerr.flush();
+
+	if (_sendBuf.size) {
+		_socket.async_write_some(asio::buffer(_sendBuf.ptr, _sendBuf.size),
+			boost::bind(&Connection::onWritten, shared_from_this(),
+						asio::placeholders::error, asio::placeholders::bytes_transferred)
+		);
 	}
 }
 
-void Connection::onWritable(AutoPtr<WritableNotification> const& pNf) {
-	trySend();
+void Connection::onWritten(const boost::system::error_code& err, size_t written) {
+	if (written >= 0) {
+		_sendBuf.pop(written);
+		trySend();
+		if (_sendBuf.size < SEND_BUF_LOW_WATER_MARK)
+			writable();
+	} else {
+		// TODO: _logger.error("Failed to write. Disconnecting...");
+	}
 }

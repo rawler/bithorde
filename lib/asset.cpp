@@ -1,14 +1,9 @@
 #include "asset.h"
 #include "client.h"
 
-#include <Poco/Debugger.h>
-#include <Poco/Util/Application.h>
-
 using namespace std;
-using namespace Poco;
-using namespace Poco::Util;
 
-Asset::Asset(Client * client) :
+Asset::Asset(ClientPointer client) :
 	_client(client),
 	_handle(-1),
 	_size(-1)
@@ -26,7 +21,7 @@ bool Asset::isBound()
 
 void Asset::close()
 {
-	poco_assert(_client && isBound());
+	BOOST_ASSERT(_client && isBound());
 	_client->release(*this);
 	_handle = -1;
 }
@@ -38,10 +33,10 @@ uint64_t Asset::size()
 
 void Asset::handleMessage(const bithorde::AssetStatus & msg)
 {
-	statusUpdate.notify(this, msg);;
+	statusUpdate(msg);;
 }
 
-ReadAsset::ReadAsset(Client * client, IdList requestIds) :
+ReadAsset::ReadAsset(ClientPointer client, IdList requestIds) :
 	Asset(client),
 	_requestIds(requestIds)
 {}
@@ -57,7 +52,7 @@ void ReadAsset::handleMessage(const bithorde::AssetStatus &msg)
 		if (_size < 0) {
 			_size = msg.size();
 		} else if (_size != msg.size()) {
-			Application::instance().logger().warning("Peer tried to change asset-size.");
+			// TODO: Application::instance().logger().warning("Peer tried to change asset-size.");
 		}
 	}
 	Asset::handleMessage(msg);
@@ -66,8 +61,8 @@ void ReadAsset::handleMessage(const bithorde::AssetStatus &msg)
 void ReadAsset::handleMessage(const bithorde::Read::Response &msg) {
 	if (msg.status() == bithorde::SUCCESS) {
 		const std::string & content = msg.content();
-		Segment s(msg.offset(), ByteArray(content.begin(), content.end()), msg.reqid());
-		dataArrived.notify(this, s);
+		ByteArray data(content.begin(), content.end());
+		dataArrived(msg.offset(), data, msg.reqid());
 	} else {
 		// TODO
 	}
@@ -89,7 +84,7 @@ int ReadAsset::aSyncRead(uint64_t offset, ssize_t size)
 	return reqId;
 }
 
-UploadAsset::UploadAsset(Client * client, uint64_t size) :
+UploadAsset::UploadAsset(ClientPointer client, uint64_t size) :
 	Asset(client)
 {
 	_size = size;
@@ -97,7 +92,7 @@ UploadAsset::UploadAsset(Client * client, uint64_t size) :
 
 bool UploadAsset::tryWrite(uint64_t offset, byte* data, size_t amount)
 {
-	poco_assert(isBound());
+	BOOST_ASSERT(isBound());
 	bithorde::DataSegment msg;
 	msg.set_handle(_handle);
 	msg.set_offset(offset);
@@ -106,5 +101,5 @@ bool UploadAsset::tryWrite(uint64_t offset, byte* data, size_t amount)
 }
 
 void UploadAsset::handleMessage(const bithorde::Read::Response&) {
-	poco_assert(false);
+	BOOST_ASSERT(false);
 }

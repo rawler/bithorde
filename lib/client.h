@@ -4,16 +4,18 @@
 #include <map>
 #include <string>
 
-#include <Poco/BasicEvent.h>
-#include <Poco/EventArgs.h>
+#include <boost/bind.hpp>
+#include <boost/make_shared.hpp>
+#include <boost/signals.hpp>
 
 #include "asset.h"
 #include "connection.h"
 #include "allocator.h"
 
 class Client
+	: public boost::signals::trackable, public boost::enable_shared_from_this<Client>
 {
-	Connection * _connection;
+	Connection::Pointer _connection;
 
 	std::string _myName;
 	std::string _peerName;
@@ -25,23 +27,27 @@ class Client
 
 	uint8_t _protoVersion;
 public:
-	explicit Client(Connection & conn, std::string myName);
-	~Client();
+	typedef boost::shared_ptr<Client> Pointer;
+
+	static Pointer create(Connection::Pointer conn, std::string myName) {
+		return Pointer(new Client(conn, myName));
+	}
 
 	bool bind(ReadAsset & asset);
 	bool bind(UploadAsset & asset);
 
 	bool sendMessage(Connection::MessageType type, const ::google::protobuf::Message & msg);
 
-	Poco::BasicEvent<std::string> authenticated;
-	Poco::BasicEvent<Poco::EventArgs> writable;
+	boost::signal<void (std::string&)> authenticated;
+	boost::signal<void ()> writable;
 
 protected:
+	Client(Connection::Pointer conn, std::string myName);
+
 	void sayHello();
 
-	void onDisconnected(Poco::EventArgs&);
-	void onIncomingMessage(Connection::Message&);
-	void onWritable(Poco::EventArgs&);
+	void onDisconnected();
+	void onIncomingMessage(Connection::MessageType type, ::google::protobuf::Message& msg);
 
 	void onMessage(const bithorde::HandShake & msg);
 	void onMessage(const bithorde::BindRead & msg);

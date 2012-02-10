@@ -6,8 +6,6 @@
 #include <string.h>
 #include <vector>
 
-#include <Poco/EventArgs.h>
-
 typedef unsigned char byte;
 typedef std::vector<byte> ByteArray;
 
@@ -68,7 +66,5 @@ struct Buffer {
 		size -= amount;
 	}
 };
-
-extern Poco::EventArgs NO_ARGS;
 
 #endif // TYPES_H

@@ -5,41 +5,35 @@
 #include <list>
 #include <string>
 
-#include <Poco/Foundation.h>
-#include <Poco/Util/Application.h>
+#include <boost/asio.hpp>
+#include <boost/program_options.hpp>
 
 #include "lib/bithorde.h"
 
 struct OutQueue;
 
-class BHGet : public Poco::Util::Application {
+class BHGet {
 	// Options
-	bool optHelp;
 	std::string optMyName;
 	bool optQuiet;
-	std::string optHost;
-	uint16_t optPort;
+	std::string optConnectUrl;
 
 	// Internal items
 	std::list<MagnetURI> _assets;
-	Client * _client;
-	Poco::Net::SocketReactor _reactor;
+	Client::Pointer _client;
+	boost::asio::io_service _ioSvc;
 	ReadAsset * _asset;
 	uint64_t _currentOffset;
 	OutQueue * _outQueue;
 public:
-	BHGet();
+	BHGet(boost::program_options::variables_map &map);
 	bool queueAsset(const std::string& uri);
-
-	virtual void defineOptions(Poco::Util::OptionSet & options);
-	virtual void handleOption(const std::string & name, const std::string & value);
-	int exitHelp();
 
 	int main(const std::vector<std::string>& args);
 private:
 	void onAuthenticated(std::string& peerName);
 	void onStatusUpdate(const bithorde::AssetStatus&);
-	void onDataChunk(const ReadAsset::Segment&);
+	void onDataChunk(uint64_t offset, ByteArray& data, int tag);
 
 	void nextAsset();
 	void requestMore();

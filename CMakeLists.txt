@@ -36,19 +36,17 @@ ENDIF(CMAKE_BUILD_TOOL MATCHES "make")
 
 SET(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 
-# Link up POCO
-SET(Poco_DIR ${PROJECT_SOURCE_DIR})
-FIND_PACKAGE(Poco REQUIRED)
-IF(${Poco_FOUND})
-	INCLUDE_DIRECTORIES(${Poco_INCLUDE_DIRS})
-	LINK_DIRECTORIES(${Poco_LIBRARY_DIRS})
-ENDIF(${Poco_FOUND})
+set(Boost_USE_STATIC_LIBS        ON)
+set(Boost_USE_MULTITHREADED      ON)
+set(Boost_USE_STATIC_RUNTIME    OFF)
+find_package( Boost COMPONENTS signals program_options system )
+if(Boost_FOUND)
+	include_directories(${Boost_INCLUDE_DIRS})
+endif()
 
 # Generate Protocol-buffer sources
 SET(PROTOBUF_REQUIRE_CPP TRUE)
 FIND_PACKAGE(ProtocolBuffers REQUIRED)
-
-SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --std=c++0x")
 
 ADD_SUBDIRECTORY(lib)
 ADD_SUBDIRECTORY(clients)

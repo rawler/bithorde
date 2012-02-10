@@ -18,6 +18,7 @@ ADD_LIBRARY(bithorde
 
 TARGET_LINK_LIBRARIES(bithorde
 	${PROTOBUF_LIBRARY}
+
 	pthread
 	crypto++
 )

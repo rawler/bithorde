@@ -5,8 +5,8 @@
 #include <utility>
 #include <vector>
 
-#include <Poco/BasicEvent.h>
-#include <Poco/EventArgs.h>
+#include <boost/signals.hpp>
+#include <boost/shared_ptr.hpp>
 
 #include "bithorde.pb.h"
 #include "types.h"
@@ -16,19 +16,21 @@ class Client;
 class Asset
 {
 public:
+	typedef boost::shared_ptr<Client> ClientPointer;
 	typedef int Handle;
-	explicit Asset(Client * client);
+
+	explicit Asset(ClientPointer client);
 	virtual ~Asset();
 
 	bool isBound();
 	uint64_t size();
 
-	Poco::BasicEvent<Poco::EventArgs> closed();
-	Poco::BasicEvent<const bithorde::AssetStatus> statusUpdate;
+	boost::signal<void ()> closed;
+	boost::signal<void (const bithorde::AssetStatus&)> statusUpdate;
 
 	void close();
 protected:
-	Client * _client;
+	ClientPointer _client;
 	Handle _handle;
 	int64_t _size;
 
@@ -43,21 +45,12 @@ public:
 	typedef std::pair<bithorde::HashType, ByteArray> Identifier;
 	typedef std::vector<Identifier> IdList;
 
-	explicit ReadAsset(Client * client, IdList requestIds);
+	explicit ReadAsset(ClientPointer client, ReadAsset::IdList requestIds);
 
 	int aSyncRead(uint64_t offset, ssize_t size);
 	IdList & requestIds();
 
-	struct Segment {
-		uint64_t offset;
-		ByteArray data;
-		int tag;
-		Segment(uint64_t offset, ByteArray data, int tag) :
-			offset(offset),
-			data(data),
-			tag(tag) {}
-	};
-	Poco::BasicEvent<const Segment> dataArrived;
+	boost::signal<void (uint64_t offset, ByteArray& data, int tag)> dataArrived;
 
 protected:
 	virtual void handleMessage(const bithorde::AssetStatus &msg);
@@ -70,7 +63,7 @@ private:
 class UploadAsset : public Asset
 {
 public:
-    explicit UploadAsset(Client * client, uint64_t size);
+    explicit UploadAsset(ClientPointer client, uint64_t size);
 
     bool tryWrite(uint64_t offset, byte* data, size_t amount);
 

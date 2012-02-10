@@ -3,10 +3,7 @@
 
 #include <iostream>
 
-#include <Poco/AbstractDelegate.h>
-#include <Poco/Util/TimerTask.h>
-
-class CLIProgressBar : Poco::Util::TimerTask
+class CLIProgressBar
 {
     std::ostream & _out;
     float _progress;

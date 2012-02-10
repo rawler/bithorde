@@ -3,13 +3,11 @@
 #include "hashes.h"
 
 #include <sstream>
-
-#include <Poco/StringTokenizer.h>
+#include <boost/algorithm/string.hpp>
 
 const static std::string MAGNET_PREFIX = "magnet:?";
 
 using namespace std;
-using namespace Poco;
 
 ExactIdentifier::ExactIdentifier()
 {}
@@ -65,9 +63,10 @@ bool MagnetURI::parse(const string& uri_)
 	if (uri_.compare(0, MAGNET_PREFIX.size(), MAGNET_PREFIX))
 		return false;
 	string uri(uri_, MAGNET_PREFIX.length());
-	
-	StringTokenizer tokenizer(uri, "&", StringTokenizer::TOK_IGNORE_EMPTY | StringTokenizer::TOK_TRIM);
-	for (StringTokenizer::Iterator iter = tokenizer.begin(); iter != tokenizer.end(); iter++) {
+
+	vector<string> attributes;
+	boost::algorithm::split(attributes, uri_, boost::algorithm::is_any_of("&"), boost::algorithm::token_compress_on);
+	for (vector<string>::iterator iter = attributes.begin(); iter != attributes.end(); iter++) {
 		string option = *iter;
 		size_t splitPos = option.find('=');
 		if (splitPos == option.size()) // TODO: Error handling

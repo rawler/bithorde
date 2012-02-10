@@ -6,9 +6,9 @@ LINK_DIRECTORIES (${BitHorde_BINARY_DIR}/lib)
 ADD_EXECUTABLE(bhget
 	bhget.cpp bhget.h
 )
+message(STATUS APA ${Boost_LIBRARIES})
 TARGET_LINK_LIBRARIES ( bhget
-	"optimized" PocoFoundation PocoUtil PocoNet
-	"debug" PocoFoundationd PocoUtild PocoNetd
+	${Boost_LIBRARIES}
 
 	bithorde
 )
@@ -17,8 +17,7 @@ ADD_EXECUTABLE(bhupload
 	bhupload.cpp bhupload.h
 )
 TARGET_LINK_LIBRARIES ( bhupload
-	"optimized" PocoFoundation PocoUtil PocoNet
-	"debug" PocoFoundationd PocoUtild PocoNetd
+	${Boost_LIBRARIES}
 
 	bithorde
 )
