@@ -15,14 +15,12 @@ ExactIdentifier::ExactIdentifier()
 ExactIdentifier::ExactIdentifier(const bithorde::Identifier& id)
 {
 	switch (id.type()) {
-		case bithorde::TREE_TIGER: type = "tree:tiger"; break;
-		case bithorde::SHA1:       type = "sha1"; break;
-		case bithorde::SHA256:     type = "sha256"; break;
+		case bithorde::TREE_TIGER: type = "urn:tree:tiger"; break;
+		case bithorde::SHA1:       type = "urn:sha1"; break;
+		case bithorde::SHA256:     type = "urn:sha256"; break;
 		default:                   type = "unkown"; break;
 	}
-	CryptoPP::StringSource(id.id(), true,
-		new RFC4648Base32Encoder(
-			new CryptoPP::StringSink(this->id)));
+	this->id = id.id();
 }
 
 ExactIdentifier ExactIdentifier::fromUrlEnc(string enc)
@@ -64,8 +62,13 @@ bool MagnetURI::parse(const string& uri_)
 		return false;
 	string uri(uri_, MAGNET_PREFIX.length());
 
+	size_t query_start = uri_.find('?');
+	if (query_start == string::npos)
+		return false;
+
+	string query = uri_.substr(query_start+1);
 	vector<string> attributes;
-	boost::algorithm::split(attributes, uri_, boost::algorithm::is_any_of("&"), boost::algorithm::token_compress_on);
+	boost::algorithm::split(attributes, query, boost::algorithm::is_any_of("&"), boost::algorithm::token_compress_on);
 	for (vector<string>::iterator iter = attributes.begin(); iter != attributes.end(); iter++) {
 		string option = *iter;
 		size_t splitPos = option.find('=');
@@ -74,7 +77,7 @@ bool MagnetURI::parse(const string& uri_)
 		string key = option.substr(0, splitPos);
 		string value = option.substr(splitPos+1);
 		if (key == "xl")
-			stringstream(value) >> size;
+			istringstream(value) >> size;
 		else if (key == "xt")
 			xtIds.push_back(ExactIdentifier::fromUrlEnc(value));
 	}

@@ -6,111 +6,51 @@
 #include <sstream>
 #include <utility>
 
-#include <Poco/Delegate.h>
-#include <Poco/Net/DNS.h>
-#include <Poco/Util/HelpFormatter.h>
-
+namespace asio = boost::asio;
+namespace po = boost::program_options;
+namespace fs = boost::filesystem;
 using namespace std;
-using namespace Poco;
-using namespace Poco::Net;
-using namespace Poco::Util;
 
 const static size_t BLOCK_SIZE = (64*1024);
 
-BHUpload::BHUpload() :
-	optHelp(false),
-	optMyName("bhupload"),
-	optQuiet(false),
-	optHost("localhost"),
-	optPort(1337),
+BHUpload::BHUpload(boost::program_options::variables_map &args) :
+	optMyName(args["name"].as<string>()),
+	optQuiet(args.count("quiet")),
+	optConnectUrl(args["url"].as<string>()),
 	_currentAsset(NULL)
-{}
-
-void BHUpload::defineOptions(OptionSet & options) {
-	options.addOption(Option("help", "h")
-		.description("Show help")
-	);
-	options.addOption(Option("name", "n")
-		.description("Bithorde-name of this client")
-		.argument("name")
-	);
-	options.addOption(Option("quiet", "q")
-		.description("Don't show progressbar")
-	);
-	options.addOption(Option("url", "u")
-		.description("Where to connect to bithorde. Either host:port, or /path/socket")
-		.argument("url")
-	);
-}
-
-void BHUpload::handleOption(const std::string & name, const std::string & value) {
-	if (name == "help") {
-		optHelp = true;
-	} else if (name == "name") {
-		optMyName = value;
-	} else if (name == "quiet") {
-		optQuiet = true;
-	} else if (name == "url") {
-		std::size_t sepPos = value.rfind(':');
-		if (sepPos == value.length()) {
-			optHost = value;
-		} else {
-			optHost = value.substr(0, sepPos);
-			istringstream iss(value.substr(sepPos+1));
-			iss >> optPort;
-		}
-	}
-}
-
-int BHUpload::exitHelp() {
-	HelpFormatter helpFormatter(options());
-	helpFormatter.setCommand(commandName());
-	helpFormatter.setUsage("OPTIONS <filePath> ...");
-	helpFormatter.setHeader(
-		"Simple BitHorde uploader, sending one or more concatenated assets and "
-		"logging the resulting magnet-link on stdout."
-	);
-	helpFormatter.format(std::cerr);
-	return EXIT_USAGE;
+{
+	_readBuf.allocate(BLOCK_SIZE);
 }
 
 int BHUpload::main(const std::vector<std::string>& args) {
-	if (args.empty() || optHelp)
-		return exitHelp();
 	std::vector<std::string>::const_iterator iter;
 	for (iter = args.begin(); iter != args.end(); iter++) {
 		if (!queueFile(*iter))
-			return exitHelp();
+			return -1;
 	}
 
-	SocketAddress addr(DNS::resolveOne("localhost"), 1338);
-	StreamSocket sock;
-	sock.connect(addr);
-	Connection * c = new Connection(sock, _reactor);
-	_client = new Client(*c, optMyName);
-	_client->authenticated += delegate(this, &BHUpload::onAuthenticated);
+	asio::local::stream_protocol::endpoint ep(optConnectUrl);
+	Connection::Pointer c = Connection::create(_ioSvc, ep);
+	_client = Client::create(c, optMyName);
+	_client->authenticated.connect(boost::bind(&BHUpload::onAuthenticated, this, _1));
 
-	_reactor.run();
+	_ioSvc.run();
 
-	return EXIT_OK;
+	return 0;
 }
 
 bool BHUpload::queueFile(const std::string& path) {
-	File file(path);
-	if (!file.exists()) {
-		logger().error("Non-existing file '" + path + "'");
+	fs::path p(path);
+	if (!fs::exists(p)) {
+		cerr << "Non-existing file '" << path << "'" << endl;
 		return false;
 	}
-	if (!(file.isFile() || file.isLink())) {
-		logger().error("Path is not regular file '" + path + "'");
-		return false;
-	}
-	if (!file.canRead()) {
-		logger().error("File is not readable '" + path + "'");
+	if (!(fs::is_regular_file(p) || fs::is_symlink(p))) {
+		cerr <<  "Path is not regular file '" << path << "'" << endl;
 		return false;
 	}
 
-	_files.push_back(file);
+	_files.push_back(path);
 	return true;
 }
 
@@ -124,11 +64,12 @@ void BHUpload::nextAsset() {
 		_currentFile.close();
 
 	if (_files.empty()) {
-		_reactor.stop();
+		_ioSvc.stop();
 	} else {
-		_currentFile.open(_files.front().path(), ifstream::in | ifstream::binary);
-		_currentAsset = new UploadAsset(_client, _files.front().getSize());
-		_currentAsset->statusUpdate += delegate(this, &BHUpload::onStatusUpdate);
+		fs::path& p = _files.front();
+		_currentFile.open(p.c_str(), ifstream::in | ifstream::binary);
+		_currentAsset = new UploadAsset(_client, fs::file_size(p));
+		_currentAsset->statusUpdate.connect(boost::bind(&BHUpload::onStatusUpdate, this, _1));
 		_client->bind(*_currentAsset);
 
 		_currentOffset = 0;
@@ -144,50 +85,84 @@ void BHUpload::onStatusUpdate(const bithorde::AssetStatus& status)
 			cout << MagnetURI(status) << endl;
 			nextAsset();
 		} else {
-			logger().notice("Uploading ...");
-			_client->writable += delegate(this, &BHUpload::onWritable);
-			onWritable(NO_ARGS);
+			cerr << "Uploading ..." << endl;
+			_writeConnection = _client->writable.connect(boost::bind(&BHUpload::onWritable, this));
+			onWritable();
 		}
 		break;
 	default:
-		logger().error("Failed ...");
+		cerr << "Failed ..." << endl;
 		break;
 	}
 }
 
-void BHUpload::onWritable(Poco::EventArgs&)
+void BHUpload::onWritable()
 {
 	while (tryWrite());
 }
 
+ssize_t BHUpload::readNext()
+{
+	_currentFile.read((char*)_readBuf.ptr, _readBuf.capacity);
+	streamsize read = _currentFile.gcount();
+	_readBuf.charge(read);
+	return read;
+}
+
 bool BHUpload::tryWrite() {
-	byte buf[BLOCK_SIZE];
-	_currentFile.read((char*)buf, BLOCK_SIZE);
-	size_t read = _currentFile.gcount();
-	if (read > 0) {
-		if (_currentAsset->tryWrite(_currentOffset, buf, read)) {
-			_currentOffset += read;
-			return true;
-		} else {
-			return false;
-		}
-	} else {
+	if (!_readBuf.size && !readNext()) {
+		cerr << "Done, awaiting asset-ids..." << endl;
 		// File reading done. Don't try to write before next is ready for upload.
-		_client->writable -= delegate(this, &BHUpload::onWritable);
+		_writeConnection.disconnect();
+		return false;
+	}
+
+	if (_currentAsset->tryWrite(_currentOffset, _readBuf.ptr, _readBuf.size)) {
+		_currentOffset += _readBuf.size;
+		// TODO: Update progressbar
+		_readBuf.pop(_readBuf.size);
+		return true;
+	} else {
 		return false;
 	}
 }
 
 void BHUpload::onAuthenticated(string& peerName) {
-	logger().notice("Connected to "+peerName);
+	cerr << "Connected to " << peerName << endl;
 	nextAsset();
 }
 
 int main(int argc, char *argv[]) {
-	BHUpload app;
-	app.init(argc, argv);
+	po::options_description desc("Supported options");
+	desc.add_options()
+		("help,h",
+			"Show help")
+		("name,n", po::value< string >()->default_value("bhupload"),
+			"Bithorde-name of this client")
+		("quiet,q",
+			"Don't show progressbar")
+		("url,u", po::value< string >()->default_value("/tmp/bithorde"),
+			"Where to connect to bithorde. Either host:port, or /path/socket")
+		("file", po::value< vector<string> >(), "file(s) to upload or request link for")
+	;
+	po::positional_options_description p;
+	p.add("file", -1);
 
-	int res = app.run();
+	po::command_line_parser parser(argc, argv);
+	parser.options(desc).positional(p);
+
+	po::variables_map vm;
+	po::store(parser.run(), vm);
+	po::notify(vm);
+
+	if (vm.count("help") || !vm.count("file")) {
+		cerr << desc << endl;
+		return 1;
+	}
+
+	BHUpload app(vm);
+
+	int res = app.main(vm["file"].as< vector<string> >());
 	cerr.flush();
 	return res;
 }

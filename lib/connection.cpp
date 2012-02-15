@@ -9,7 +9,7 @@
 #include <google/protobuf/io/coded_stream.h>
 #include <google/protobuf/io/zero_copy_stream_impl.h>
 
-const size_t MAX_MSG = 64*1024;
+const size_t MAX_MSG = 256*1024;
 const size_t READ_BLOCK = MAX_MSG*2;
 const size_t SEND_BUF = 1024*1024;
 const size_t SEND_BUF_EMERGENCY = 2*SEND_BUF;
@@ -145,14 +145,12 @@ bool Connection::sendMessage(Connection::MessageType type, const::google::protob
 			trySend();
 		return true;
 	} else {
-		// TODO: _logger.error("Failed to serialize Message.");
+		cerr << "Failed to serialize Message." << endl;
 		return false;
 	}
 }
 
 void Connection::trySend() {
-	cerr.flush();
-
 	if (_sendBuf.size) {
 		_socket.async_write_some(asio::buffer(_sendBuf.ptr, _sendBuf.size),
 			boost::bind(&Connection::onWritten, shared_from_this(),
@@ -168,6 +166,6 @@ void Connection::onWritten(const boost::system::error_code& err, size_t written)
 		if (_sendBuf.size < SEND_BUF_LOW_WATER_MARK)
 			writable();
 	} else {
-		// TODO: _logger.error("Failed to write. Disconnecting...");
+		cerr << "Failed to write. Disconnecting..." << endl;
 	}
 }

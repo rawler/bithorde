@@ -9,7 +9,6 @@ ADD_EXECUTABLE(bhget
 message(STATUS APA ${Boost_LIBRARIES})
 TARGET_LINK_LIBRARIES ( bhget
 	${Boost_LIBRARIES}
-
 	bithorde
 )
 
@@ -18,6 +17,5 @@ ADD_EXECUTABLE(bhupload
 )
 TARGET_LINK_LIBRARIES ( bhupload
 	${Boost_LIBRARIES}
-
 	bithorde
 )

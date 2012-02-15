@@ -6,40 +6,40 @@
 #include <string>
 #include <fstream>
 
-#include <Poco/File.h>
-#include <Poco/Foundation.h>
-#include <Poco/Util/Application.h>
+#define BOOST_FILESYSTEM_VERSION 3
+
+#include <boost/asio.hpp>
+#include <boost/filesystem.hpp>
+#include <boost/program_options.hpp>
 
 #include "lib/bithorde.h"
 
-class BHUpload : public Poco::Util::Application {
+class BHUpload {
 	// Options
-	bool optHelp;
 	std::string optMyName;
 	bool optQuiet;
-	std::string optHost;
-	uint16_t optPort;
+	std::string optConnectUrl;
 
 	// Internal items
-	Poco::Net::SocketReactor _reactor;
-	std::list<Poco::File> _files;
-	Client * _client;
+	boost::asio::io_service _ioSvc;
+	boost::signals::connection _writeConnection;
+	std::list<boost::filesystem::path> _files;
+	Client::Pointer _client;
 	UploadAsset * _currentAsset;
 	std::ifstream _currentFile;
 	uint64_t _currentOffset;
+	Buffer _readBuf;
 public:
-	BHUpload();
+	BHUpload(boost::program_options::variables_map &map);
 	bool queueFile(const std::string& path);
-
-	virtual void defineOptions(Poco::Util::OptionSet & options);
-	virtual void handleOption(const std::string & name, const std::string & value);
-	int exitHelp();
 
 	int main(const std::vector<std::string>& args);
 private:
 	void onAuthenticated(std::string& peerName);
 	void onStatusUpdate(const bithorde::AssetStatus&);
-	void onWritable(Poco::EventArgs&);
+	void onWritable();
+
+	ssize_t readNext();
 	bool tryWrite();
 
 	void nextAsset();
