@@ -1,39 +1,37 @@
 #ifndef MAIN_H
 #define MAIN_H
 
-#include <QtCore/QObject>
-#include <QtCore/QMap>
+#include <boost/asio.hpp>
 
-#include <allocator.h>
-#include <libqhorde.h>
+#include <lib/bithorde.h>
 
-#include "qfilesystem.h"
+#include "fuse++.hpp"
 #include "inode.h"
 #include "lookup.h"
 
-class BHFuse : public QFileSystem {
-    Q_OBJECT
+class BHFuse : public BoostAsioFilesystem {
 public:
-    BHFuse(QString mountPoint, QVector<QString> args, QObject * parent=NULL);
+	BHFuse(boost::asio::io_service& ioSvc, std::string mountPoint, std::vector<std::string> args);
 
-    virtual int fuse_lookup(fuse_req_t req, fuse_ino_t parent, const char *name);
-    virtual void fuse_forget(fuse_ino_t ino, ulong nlookup);
-    virtual int fuse_getattr(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi);
-    virtual int fuse_open(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi);
-    virtual int fuse_release(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi);
-    virtual int fuse_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, fuse_file_info *fi);
+	virtual int fuse_lookup(fuse_req_t req, fuse_ino_t parent, const char *name);
+	virtual void fuse_forget(fuse_ino_t ino, ulong nlookup);
+	virtual int fuse_getattr(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi);
+	virtual int fuse_open(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi);
+	virtual int fuse_release(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi);
+	virtual int fuse_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, fuse_file_info *fi);
 
-    Client * client;
+	Client::Pointer client;
+	boost::asio::io_service& ioSvc;
 
-public slots:
-    void onConnected(QString remoteName);
-    FUSEAsset * registerAsset(ReadAsset * asset);
+public:
+	void onConnected(std::string remoteName);
+	FUSEAsset * registerAsset(ReadAsset * asset);
 
 private:
-    bool unrefInode(fuse_ino_t ino, int count);
+	bool unrefInode(fuse_ino_t ino, int count);
 
-    QMap<fuse_ino_t, INode *> inode_cache;
-    CachedAllocator<fuse_ino_t> ino_allocator;
+	std::map<fuse_ino_t, INode *> inode_cache;
+	CachedAllocator<fuse_ino_t> ino_allocator;
 };
 
 #endif // MAIN_H

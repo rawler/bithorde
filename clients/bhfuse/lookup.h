@@ -1,19 +1,15 @@
 #ifndef LOOKUP_H
 #define LOOKUP_H
 
-#include <QObject>
-
 #include <fuse_lowlevel.h>
 
-#include <libqhorde.h>
+#include <lib/bithorde.h>
 
 class BHFuse;
 class FUSEAsset;
 
-class Lookup : public QObject
+class Lookup
 {
-    Q_OBJECT
-
     BHFuse * fs;
     fuse_req_t req;
     fuse_file_info * fi;   // Set if came from fuse_open()
@@ -23,9 +19,9 @@ public:
     explicit Lookup(BHFuse * fs, fuse_req_t req, MagnetURI & uri);
     explicit Lookup(BHFuse * fs, FUSEAsset * asset, fuse_req_t req, fuse_file_info * fi);
 
-    void perform(Client * c);
+    void perform(Client::Pointer& c);
 
-private slots:
+private:
     void onStatusUpdate(const bithorde::AssetStatus & msg);
 };
 

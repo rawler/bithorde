@@ -18,7 +18,7 @@ ExactIdentifier::ExactIdentifier(const bithorde::Identifier& id)
 		case bithorde::TREE_TIGER: type = "urn:tree:tiger"; break;
 		case bithorde::SHA1:       type = "urn:sha1"; break;
 		case bithorde::SHA256:     type = "urn:sha256"; break;
-		default:                   type = "unkown"; break;
+		default:                   type = "unknown"; break;
 	}
 	this->id = id.id();
 }

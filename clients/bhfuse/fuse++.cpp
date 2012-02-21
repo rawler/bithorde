@@ -1,0 +1,109 @@
+#include "fuse++.hpp"
+
+#include <alloca.h>
+#include <errno.h>
+#include <iostream>
+
+#include <boost/assert.hpp>
+#include <boost/bind.hpp>
+
+#include <fuse_lowlevel.h>
+
+using namespace std;
+namespace asio = boost::asio;
+
+extern "C" {
+    // D-wrappers to map fuse_userdata to a specific FileSystem. Also ensures fuse gets
+    // an error if an Exception aborts control.
+    static void _op_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
+        int res = ((BoostAsioFilesystem*)fuse_req_userdata(req))->fuse_lookup(req, parent, name);
+        if (res)
+            fuse_reply_err(req, res);
+    }
+    static void _op_forget(fuse_req_t req, fuse_ino_t ino, ulong nlookup) {
+        ((BoostAsioFilesystem*)fuse_req_userdata(req))->fuse_forget(ino, nlookup);
+        fuse_reply_none(req);
+    }
+    static void _op_getattr(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi) {
+        int res = ((BoostAsioFilesystem*)fuse_req_userdata(req))->fuse_getattr(req, ino, fi);
+        if (res)
+            fuse_reply_err(req, res);
+    }
+    static void _op_open(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi) {
+        int res = ((BoostAsioFilesystem*)fuse_req_userdata(req))->fuse_open(req, ino, fi);
+        if (res)
+            fuse_reply_err(req, res);
+    }
+    static void _op_release(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi) {
+        int res = ((BoostAsioFilesystem*)fuse_req_userdata(req))->fuse_release(req, ino, fi);
+        if (res)
+            fuse_reply_err(req, res);
+    }
+    static void _op_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, fuse_file_info *fi) {
+        int res = ((BoostAsioFilesystem*)fuse_req_userdata(req))->fuse_read(req, ino, size, off, fi);
+        if (res)
+            fuse_reply_err(req, res);
+    }
+}
+
+BoostAsioFilesystem::BoostAsioFilesystem(asio::io_service& ioSvc, string& mountpoint, vector<string>& args)
+	: _channel(ioSvc), _mountpoint(mountpoint), _fuse_chan(0), _fuse_session(0)
+{
+	uint16_t argc = args.size();
+	char** argv = (char**)alloca(argc * sizeof(char*));
+	for (int i=0; i < argc; i++)
+		argv[i] = strdup(args[i].c_str());
+
+	fuse_args f_args = FUSE_ARGS_INIT(argc, argv);
+
+	_fuse_chan = fuse_mount(_mountpoint.c_str(), &f_args);
+	BOOST_ASSERT(_fuse_chan);
+	// scope(failure) fuse_unmount(_mountpoint, _fuse_chan);
+
+	_channel.assign(fuse_chan_fd(_fuse_chan));
+
+	/************************************************************************************
+	* FUSE_lowlevel_ops struct, pointing to the C++-class-wrappers.
+	***********************************************************************************/
+	static fuse_lowlevel_ops qfs_ops;
+	bzero(&qfs_ops, sizeof(qfs_ops));
+	qfs_ops.lookup =  _op_lookup;
+	qfs_ops.forget =  _op_forget;
+	qfs_ops.getattr = _op_getattr;
+	qfs_ops.open =    _op_open;
+	qfs_ops.read =    _op_read;
+	qfs_ops.release = _op_release;
+
+	_fuse_session = fuse_lowlevel_new(&f_args, &qfs_ops, sizeof(qfs_ops), this);
+	// scope(failure)fuse_session_destroy(s);
+
+	fuse_session_add_chan(_fuse_session, _fuse_chan);
+
+	_receive_buf.allocate(fuse_chan_bufsize(_fuse_chan));
+	readNext();
+}
+
+BoostAsioFilesystem::~BoostAsioFilesystem() {
+    if (_fuse_chan)
+        fuse_unmount(_mountpoint.c_str(), _fuse_chan);
+    if (_fuse_session)
+        fuse_session_destroy(_fuse_session);
+}
+
+void BoostAsioFilesystem::dispatch_waiting(const boost::system::error_code& error, size_t count) {
+	if (error) {
+		cerr << "ERROR: error" << endl;
+	} else {
+		fuse_session_process(_fuse_session, (const char*)_receive_buf.ptr, count, _fuse_chan);
+		readNext();
+	}
+}
+
+void BoostAsioFilesystem::readNext()
+{
+	_channel.async_read_some(
+		asio::buffer(_receive_buf.ptr, _receive_buf.capacity),
+		boost::bind(&BoostAsioFilesystem::dispatch_waiting, this, asio::placeholders::error(), asio::placeholders::bytes_transferred())
+	);
+}
+
