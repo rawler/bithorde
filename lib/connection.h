@@ -3,7 +3,8 @@
 
 #include <queue>
 
-#include <boost/asio.hpp>
+#include <boost/asio/io_service.hpp>
+#include <boost/asio/local/stream_protocol.hpp>
 #include <boost/signal.hpp>
 
 #include "bithorde.pb.h"

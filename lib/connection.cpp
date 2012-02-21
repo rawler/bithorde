@@ -2,6 +2,7 @@
 
 #include <iostream>
 
+#include <boost/asio.hpp>
 #include <boost/bind.hpp>
 
 #include <google/protobuf/wire_format_lite.h>

@@ -3,8 +3,6 @@
 
 #include <queue>
 
-#include <iostream>
-
 template <typename T>
 struct CachedAllocator {
 private:

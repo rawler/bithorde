@@ -1,7 +1,6 @@
 #ifndef MAGNETURI_H
 #define MAGNETURI_H
 
-#include <inttypes.h>
 #include <iostream>
 #include <string>
 #include <vector>

@@ -5,7 +5,7 @@
 #include <utility>
 #include <vector>
 
-#include <boost/signals.hpp>
+#include <boost/signal.hpp>
 #include <boost/shared_ptr.hpp>
 
 #include "bithorde.pb.h"

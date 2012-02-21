@@ -6,7 +6,7 @@
 
 #include <boost/bind.hpp>
 #include <boost/make_shared.hpp>
-#include <boost/signals.hpp>
+#include <boost/signal.hpp>
 
 #include "asset.h"
 #include "connection.h"

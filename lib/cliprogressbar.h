@@ -1,7 +1,7 @@
 #ifndef CLIPROGRESSBAR_H
 #define CLIPROGRESSBAR_H
 
-#include <iostream>
+#include <ostream>
 
 class CLIProgressBar
 {

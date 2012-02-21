@@ -2,7 +2,6 @@
 #define LIBQHORDE_H
 
 #include "asset.h"
-#include "connection.h"
 #include "client.h"
 #include "hashes.h"
 #include "magneturi.h"
