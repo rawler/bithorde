@@ -57,8 +57,8 @@ BoostAsioFilesystem::BoostAsioFilesystem(asio::io_service& ioSvc, string& mountp
 	fuse_args f_args = FUSE_ARGS_INIT(argc, argv);
 
 	_fuse_chan = fuse_mount(_mountpoint.c_str(), &f_args);
-	BOOST_ASSERT(_fuse_chan);
-	// scope(failure) fuse_unmount(_mountpoint, _fuse_chan);
+	if (!_fuse_chan)
+		throw string("Failed to mount");
 
 	_channel.assign(fuse_chan_fd(_fuse_chan));
 
@@ -84,10 +84,10 @@ BoostAsioFilesystem::BoostAsioFilesystem(asio::io_service& ioSvc, string& mountp
 }
 
 BoostAsioFilesystem::~BoostAsioFilesystem() {
-    if (_fuse_chan)
-        fuse_unmount(_mountpoint.c_str(), _fuse_chan);
-    if (_fuse_session)
-        fuse_session_destroy(_fuse_session);
+	if (_fuse_chan)
+		fuse_unmount(_mountpoint.c_str(), _fuse_chan);
+	if (_fuse_session)
+		fuse_session_destroy(_fuse_session);
 }
 
 void BoostAsioFilesystem::dispatch_waiting(const boost::system::error_code& error, size_t count) {

@@ -1,6 +1,8 @@
 #ifndef LOOKUP_H
 #define LOOKUP_H
 
+#include <boost/signals/trackable.hpp>
+
 #include <fuse_lowlevel.h>
 
 #include <lib/bithorde.h>
@@ -8,7 +10,7 @@
 class BHFuse;
 class FUSEAsset;
 
-class Lookup
+class Lookup : public boost::signals::trackable
 {
     BHFuse * fs;
     fuse_req_t req;

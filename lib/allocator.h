@@ -3,28 +3,31 @@
 
 #include <queue>
 
+#include <iostream>
+
 template <typename T>
 struct CachedAllocator {
 private:
-    std::queue<T> _freed;
-    T _next;
+	std::queue<T> _freed;
+	T _next;
 public:
-    CachedAllocator(T init) { _next = init; }
+	CachedAllocator(T init) { _next = init; }
 
-    T allocate() {
-        T res;
-        if (_freed.empty()) {
-            res = _next++;
+	T allocate() {
+		T res;
+		if (_freed.empty()) {
+			res = _next++;
 		} else {
-            res = _freed.front();
+			res = _freed.front();
 			_freed.pop();
 		}
-        return res;
-    }
+		return res;
+	}
 
-    void free(T x) {
-        _freed.push(x);
-    }
+	void free(T x) {
+		std::cerr << "Allocator: Freed(" << x << ")" << std::endl;
+		_freed.push(x);
+	}
 };
 
 #endif // ALLOCATOR_H

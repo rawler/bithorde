@@ -4,6 +4,8 @@
 
 #include <errno.h>
 
+using namespace std;
+
 Lookup::Lookup(BHFuse * fs, fuse_req_t req, MagnetURI & uri) :
     fs(fs),
     req(req),

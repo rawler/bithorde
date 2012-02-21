@@ -84,13 +84,13 @@ void Client::onMessage(const bithorde::AssetStatus & msg) {
 	Asset::Handle handle = msg.handle();
 	if (_assetMap.count(handle)) {
 		Asset* a = _assetMap[handle];
-		if (a->isBound()) {
+		if (a->_handle == handle) {
 			a->handleMessage(msg);
 		} else if (msg.status() != bithorde::Status::SUCCESS) {
-			_assetMap.erase(a->_handle);
-			_handleAllocator.free(a->_handle);
+			_assetMap.erase(handle);
+			_handleAllocator.free(handle);
 		} else {
-		    cerr << "WARNING: Status OK recieved for Asset supposedly closed." << endl;
+		    cerr << "WARNING: Status OK recieved for Asset supposedly closed or re-written." << endl;
 		}
 	} else {
 		cerr << "WARNING: AssetStatus for unmapped handle" << endl;
@@ -119,10 +119,10 @@ void Client::onMessage(const bithorde::Ping & msg) {
 }
 
 bool Client::bind(ReadAsset &asset) {
-	// TODO: BOOST_ASSERT(asset._client == this);
 	BOOST_ASSERT(asset._handle < 0);
 	BOOST_ASSERT(asset.requestIds().size() > 0);
 	asset._handle = _handleAllocator.allocate();
+	cerr << asset._handle << endl;
 	_assetMap[asset._handle] = &asset;
 	bithorde::BindRead msg;
 	msg.set_handle(asset._handle);
