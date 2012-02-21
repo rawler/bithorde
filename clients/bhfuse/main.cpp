@@ -107,7 +107,6 @@ int BHFuse::fuse_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, fu
 {
 	FUSEAsset* a = static_cast<FUSEAsset*>(inode_cache[ino]);
 	if (a) {
-		(cerr << "Reading..." << endl).flush();
 		a->read(req, off, size);
 		return 0;
 	} else {

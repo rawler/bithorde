@@ -122,7 +122,7 @@ bool Client::bind(ReadAsset &asset) {
 	BOOST_ASSERT(asset._handle < 0);
 	BOOST_ASSERT(asset.requestIds().size() > 0);
 	asset._handle = _handleAllocator.allocate();
-	cerr << asset._handle << endl;
+	BOOST_ASSERT(asset._handle > 0);
 	_assetMap[asset._handle] = &asset;
 	bithorde::BindRead msg;
 	msg.set_handle(asset._handle);

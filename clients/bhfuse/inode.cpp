@@ -127,5 +127,4 @@ void FUSEAsset::closeOne()
 {
 	if (!--_openCount)
 		asset->close();
-	cerr << "Inode " << nr << " Has open: " << _openCount << endl;
 }

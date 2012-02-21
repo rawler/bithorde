@@ -25,7 +25,6 @@ public:
 	}
 
 	void free(T x) {
-		std::cerr << "Allocator: Freed(" << x << ")" << std::endl;
 		_freed.push(x);
 	}
 };
