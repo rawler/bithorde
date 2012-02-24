@@ -1,13 +1,12 @@
 #include "main.h"
 
-#include <signal.h>
+#include <boost/program_options.hpp>
 #include <errno.h>
+#include <signal.h>
 
 using namespace std;
 namespace asio = boost::asio;
-
-static const string UNIX_SOCK_PATH("/tmp/bithorde");
-static const string mountPoint("/tmp/bhfuse");
+namespace po = boost::program_options;
 
 static asio::io_service ioSvc;
 
@@ -25,21 +24,50 @@ int main(int argc, char *argv[])
 {
 	signal(SIGINT, &sigint);
 
-	vector<string> args;
-	args.push_back("-v");
-	args.push_back("-d");
+	BoostAsioFilesystem_Options opts;
 
-	BHFuse fs(ioSvc, mountPoint, args);
+	po::options_description desc("Supported options");
+	desc.add_options()
+		("help,h",
+			"Show help")
+		("name,n", po::value< string >()->default_value("bhget"),
+			"Bithorde-name of this client")
+		("debug,d",
+			"Show fuse-commands, for debugging purposes")
+		("url,u", po::value< string >()->default_value("/tmp/bithorde"),
+			"Where to connect to bithorde. Either host:port, or /path/socket")
+		("mountpoint", po::value< string >(&opts.mountpoint), 
+			"Where to mount filesystem")
+	;
+	po::positional_options_description p;
+	p.add("mountpoint", 1);
+
+	po::command_line_parser parser(argc, argv);
+	parser.options(desc).positional(p);
+
+	po::variables_map vm;
+	po::store(parser.run(), vm);
+	po::notify(vm);
+
+	if (vm.count("help") || !vm.count("mountpoint")) {
+		cerr << desc << endl;
+		return 1;
+	}
+
+	if (vm.count("debug"))
+		opts.debug = true;
+
+	BHFuse fs(ioSvc, vm["url"].as<string>(), opts);
 
 	return ioSvc.run();
 }
 
-BHFuse::BHFuse(asio::io_service& ioSvc, std::string mountPoint, std::vector< std::string > args) :
-	BoostAsioFilesystem(ioSvc, mountPoint, args),
+BHFuse::BHFuse(asio::io_service & ioSvc, string mountpoint, BoostAsioFilesystem_Options & opts) :
+	BoostAsioFilesystem(ioSvc, opts),
 	ioSvc(ioSvc),
 	ino_allocator(2)
 {
-	asio::local::stream_protocol::endpoint bithorded(UNIX_SOCK_PATH);
+	asio::local::stream_protocol::endpoint bithorded(mountpoint);
 	Connection::Pointer connection = Connection::create(ioSvc, bithorded);
 	client = Client::create(connection, "bhfuse");
 	client->authenticated.connect(boost::bind(&BHFuse::onConnected, this, _1));

@@ -11,6 +11,15 @@
 
 #include <lib/types.h>
 
+struct BoostAsioFilesystem_Options {
+	std::string mountpoint;
+	bool debug;
+
+	std::vector<std::string> aux;
+
+	BoostAsioFilesystem_Options();
+};
+
 class BoostAsioFilesystem
 {
 	/****************************************************************************************
@@ -19,7 +28,7 @@ class BoostAsioFilesystem
 	* method.
 	***************************************************************************************/
 public:
-	BoostAsioFilesystem(boost::asio::io_service& ioSvc, std::string& mountpoint, std::vector<std::string>& args);
+	BoostAsioFilesystem(boost::asio::io_service& ioSvc, BoostAsioFilesystem_Options& options);
 	~BoostAsioFilesystem();
 
 	/************************************************************************************

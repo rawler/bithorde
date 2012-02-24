@@ -8,6 +8,7 @@
 #include <boost/bind.hpp>
 
 #include <fuse_lowlevel.h>
+#include <fuse_opt.h>
 
 using namespace std;
 namespace asio = boost::asio;
@@ -46,16 +47,26 @@ extern "C" {
     }
 }
 
-BoostAsioFilesystem::BoostAsioFilesystem(asio::io_service& ioSvc, string& mountpoint, vector<string>& args)
-	: _channel(ioSvc), _mountpoint(mountpoint), _fuse_chan(0), _fuse_session(0)
+BoostAsioFilesystem_Options::BoostAsioFilesystem_Options()
+	: mountpoint(""), debug(false)
+{}
+
+
+BoostAsioFilesystem::BoostAsioFilesystem(asio::io_service & ioSvc, BoostAsioFilesystem_Options & options)
+	: _channel(ioSvc), _mountpoint(options.mountpoint), _fuse_chan(0), _fuse_session(0)
 {
-	uint16_t argc = args.size();
-	char** argv = (char**)alloca(argc * sizeof(char*));
+	vector<string> opts(options.aux);
+	if (options.debug) {
+		opts.push_back("-v");
+		opts.push_back("-d");
+	}
+
+	uint16_t argc = opts.size();
+	char** argv = (char**)malloc(argc * sizeof(char*));
 	for (int i=0; i < argc; i++)
-		argv[i] = strdup(args[i].c_str());
+		argv[i] = strdup(opts[i].c_str());
 
 	fuse_args f_args = FUSE_ARGS_INIT(argc, argv);
-
 	_fuse_chan = fuse_mount(_mountpoint.c_str(), &f_args);
 	if (!_fuse_chan)
 		throw string("Failed to mount");
