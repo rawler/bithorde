@@ -19,26 +19,58 @@ const size_t SEND_BUF_LOW_WATER_MARK = MAX_MSG;
 namespace asio = boost::asio;
 using namespace std;
 
-Connection::Connection(boost::asio::io_service& ioSvc, const boost::asio::local::stream_protocol::endpoint& addr) :
+template <typename Protocol>
+class ConnectionImpl : public Connection {
+	typedef typename Protocol::socket Socket;
+	typedef typename Protocol::endpoint EndPoint;
+
+	Socket _socket;
+public:
+	ConnectionImpl(boost::asio::io_service& ioSvc, const EndPoint& addr) 
+		: Connection(ioSvc), _socket(ioSvc)
+	{
+		_socket.connect(addr);
+	}
+
+	void trySend() {
+		if (_sendBuf.size) {
+			_socket.async_write_some(asio::buffer(_sendBuf.ptr, _sendBuf.size),
+				boost::bind(&Connection::onWritten, shared_from_this(),
+							asio::placeholders::error, asio::placeholders::bytes_transferred)
+			);
+		}
+	}
+
+	void tryRead() {
+		_socket.async_read_some(asio::buffer(_rcvBuf.allocate(MAX_MSG), MAX_MSG),
+			boost::bind(&Connection::onRead, shared_from_this(),
+				asio::placeholders::error, asio::placeholders::bytes_transferred
+			)
+		);
+	}
+};
+
+Connection::Connection(asio::io_service & ioSvc) :
 	_state(Connected),
-	_socket(ioSvc),
 	_ioSvc(ioSvc)
 {
-	_socket.connect(addr);
-
 	_sendBuf.allocate(SEND_BUF_EMERGENCY); // Prepare so we don't have to move it later during async send.
 }
 
-Connection::~Connection() {
-// 	disconnected();
+Connection::Pointer Connection::create(boost::asio::io_service& ioSvc, const boost::asio::ip::tcp::endpoint& addr)  {
+	Pointer c(new ConnectionImpl<asio::ip::tcp>(ioSvc, addr));
+	c->tryRead();
+	return c;
 }
 
-void Connection::tryRead() {
-	_socket.async_read_some(asio::buffer(_rcvBuf.allocate(MAX_MSG), MAX_MSG),
-		boost::bind(&Connection::onRead, shared_from_this(),
-			asio::placeholders::error, asio::placeholders::bytes_transferred
-		)
-	);
+Connection::Pointer Connection::create(boost::asio::io_service& ioSvc, const boost::asio::local::stream_protocol::endpoint& addr)  {
+	Pointer c(new ConnectionImpl<asio::local::stream_protocol>(ioSvc, addr));
+	c->tryRead();
+	return c;
+}
+
+Connection::~Connection() {
+	disconnected();
 }
 
 void Connection::onRead(const boost::system::error_code& err, size_t count)
@@ -152,12 +184,6 @@ bool Connection::sendMessage(Connection::MessageType type, const::google::protob
 }
 
 void Connection::trySend() {
-	if (_sendBuf.size) {
-		_socket.async_write_some(asio::buffer(_sendBuf.ptr, _sendBuf.size),
-			boost::bind(&Connection::onWritten, shared_from_this(),
-						asio::placeholders::error, asio::placeholders::bytes_transferred)
-		);
-	}
 }
 
 void Connection::onWritten(const boost::system::error_code& err, size_t written) {
