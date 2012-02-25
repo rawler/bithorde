@@ -6,16 +6,22 @@
 
 #include <lib/client.h>
 
+static const int ATTR_TIMEOUT = 2;
+static const int INODE_TIMEOUT = 4;
+
 using namespace std;
 namespace asio = boost::asio;
 
-INode::INode(BHFuse *fs, fuse_ino_t ino) :
+INode::INode(BHFuse *fs, fuse_ino_t ino, LookupParams& lookup_params) :
 	fs(fs),
 	_refCount(1),
+	lookup_params(lookup_params),
 	nr(ino),
 	size(0)
 {
 }
+
+INode::~INode() {}
 
 void INode::takeRef() {
 	_refCount++;
@@ -29,8 +35,8 @@ bool INode::fuse_reply_lookup(fuse_req_t req) {
 	fuse_entry_param e;
 	bzero(&e, sizeof(e));
 	fill_stat_t(e.attr);
-	e.attr_timeout = 5;
-	e.entry_timeout = 3600;
+	e.attr_timeout = ATTR_TIMEOUT;
+	e.entry_timeout = INODE_TIMEOUT;
 	e.generation = 1;
 	e.ino = nr;
 
@@ -58,8 +64,8 @@ BHReadOperation::BHReadOperation(fuse_req_t req, off_t off, size_t size) :
 	size(size)
 {}
 
-FUSEAsset::FUSEAsset(BHFuse* fs, fuse_ino_t ino, ReadAsset* asset) :
-	INode(fs, ino),
+FUSEAsset::FUSEAsset(BHFuse* fs, fuse_ino_t ino, ReadAsset* asset, LookupParams& lookup_params) :
+	INode(fs, ino, lookup_params),
 	asset(asset),
 	_openCount(0),
 	_holdOpenTimer(fs->ioSvc)
@@ -73,6 +79,14 @@ FUSEAsset::FUSEAsset(BHFuse* fs, fuse_ino_t ino, ReadAsset* asset) :
 	}
 
 	asset->dataArrived.connect(boost::bind(&FUSEAsset::onDataArrived, this, _1, _2, _3));
+}
+
+
+FUSEAsset::~FUSEAsset()
+{
+	_holdOpenTimer.cancel();
+	BOOST_ASSERT(_refCount == 0);
+	BOOST_ASSERT(_openCount == 0);
 }
 
 void FUSEAsset::fuse_dispatch_open(fuse_req_t req, fuse_file_info * fi)

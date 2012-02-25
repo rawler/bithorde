@@ -80,9 +80,15 @@ int BHFuse::fuse_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
 	if (parent != 1)
 		return ENOENT;
 
+	LookupParams lp(parent, name);
+	if (_lookup_cache.count(lp)) {
+		_lookup_cache[lp]->fuse_reply_lookup(req);
+		return 0;
+	}
+
 	MagnetURI uri;
 	if (uri.parse(name)) {
-		Lookup * lookup = new Lookup(this, req, uri);
+		Lookup * lookup = new Lookup(this, req, uri, lp);
 		lookup->perform(client);
 		return 0;
 	} else {
@@ -103,8 +109,8 @@ int BHFuse::fuse_getattr(fuse_req_t req, fuse_ino_t ino, fuse_file_info *) {
 		attr.st_ino = ino;
 		attr.st_nlink = 2;
 		fuse_reply_attr(req, &attr, 5);
-	} else if (inode_cache.count(ino)) {
-		inode_cache[ino]->fuse_reply_stat(req);
+	} else if (_inode_cache.count(ino)) {
+		_inode_cache[ino]->fuse_reply_stat(req);
 	} else {
 		return ENOENT;
 	}
@@ -112,7 +118,7 @@ int BHFuse::fuse_getattr(fuse_req_t req, fuse_ino_t ino, fuse_file_info *) {
 }
 
 int BHFuse::fuse_open(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi) {
-	FUSEAsset* a = static_cast<FUSEAsset*>(inode_cache[ino]);
+	FUSEAsset* a = static_cast<FUSEAsset*>(_inode_cache[ino]);
 	if (a) {
 		a->fuse_dispatch_open(req, fi);
 		return 0;
@@ -122,7 +128,7 @@ int BHFuse::fuse_open(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi) {
 }
 
 int BHFuse::fuse_release(fuse_req_t req, fuse_ino_t ino, fuse_file_info * fi) {
-	if (FUSEAsset * a = static_cast<FUSEAsset*>(inode_cache[ino])) {
+	if (FUSEAsset * a = static_cast<FUSEAsset*>(_inode_cache[ino])) {
 		a->fuse_dispatch_close(req, fi);
 		return 0;
 	} else {
@@ -132,7 +138,7 @@ int BHFuse::fuse_release(fuse_req_t req, fuse_ino_t ino, fuse_file_info * fi) {
 
 int BHFuse::fuse_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, fuse_file_info *)
 {
-	FUSEAsset* a = static_cast<FUSEAsset*>(inode_cache[ino]);
+	FUSEAsset* a = static_cast<FUSEAsset*>(_inode_cache[ino]);
 	if (a) {
 		a->read(req, off, size);
 		return 0;
@@ -141,20 +147,22 @@ int BHFuse::fuse_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, fu
 	}
 }
 
-FUSEAsset * BHFuse::registerAsset(ReadAsset *asset)
+FUSEAsset * BHFuse::registerAsset(ReadAsset *asset, LookupParams& lookup_params)
 {
 	fuse_ino_t ino = ino_allocator.allocate();
-	FUSEAsset * a = new FUSEAsset(this, ino, asset);
-	inode_cache[ino] = a;
+	FUSEAsset * a = new FUSEAsset(this, ino, asset, lookup_params);
+	_inode_cache[ino] = a;
+	_lookup_cache[lookup_params] = a;
 	return a;
 }
 
 bool BHFuse::unrefInode(fuse_ino_t ino, int count)
 {
-	INode * i = inode_cache[ino];
+	INode * i = _inode_cache[ino];
 	if (i) {
 		if (!i->dropRefs(count)) {
-			inode_cache.erase(ino);
+			_inode_cache.erase(ino);
+			_lookup_cache.erase(i->lookup_params);
 			delete i;
 		}
 		return true;

@@ -25,12 +25,14 @@ public:
 
 public:
 	void onConnected(std::string remoteName);
-	FUSEAsset * registerAsset(ReadAsset * asset);
+	FUSEAsset * registerAsset(ReadAsset *asset, LookupParams& LookupParams);
 
 private:
 	bool unrefInode(fuse_ino_t ino, int count);
 
-	std::map<fuse_ino_t, INode *> inode_cache;
+	std::map<fuse_ino_t, INode *> _inode_cache;
+	std::map<LookupParams, INode *> _lookup_cache;
+
 	CachedAllocator<fuse_ino_t> ino_allocator;
 };
 

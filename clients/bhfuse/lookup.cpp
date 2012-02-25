@@ -6,11 +6,12 @@
 
 using namespace std;
 
-Lookup::Lookup(BHFuse * fs, fuse_req_t req, MagnetURI & uri) :
+Lookup::Lookup(BHFuse * fs, fuse_req_t req, MagnetURI & uri, LookupParams& p) :
     fs(fs),
     req(req),
     fi(0),
-    fuseAsset(0)
+    fuseAsset(0),
+    lookup_params(p)
 {
 	ReadAsset::IdList ids = uri.toIdList();
 
@@ -37,7 +38,7 @@ void Lookup::onStatusUpdate(const bithorde::AssetStatus &msg)
 		if (fuseAsset) {
 			fuseAsset->fuse_reply_open(req, fi);
 		} else {
-			fuseAsset = fs->registerAsset(asset);
+			fuseAsset = fs->registerAsset(asset, lookup_params);
 			fuseAsset->fuse_reply_lookup(req);
 		}
 	} else {
