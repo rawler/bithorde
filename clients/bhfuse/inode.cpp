@@ -8,6 +8,7 @@
 
 static const int ATTR_TIMEOUT = 2;
 static const int INODE_TIMEOUT = 4;
+static const int BLOCK_SIZE = 64*1024;
 
 using namespace std;
 namespace asio = boost::asio;
@@ -107,34 +108,42 @@ void FUSEAsset::fuse_dispatch_close(fuse_req_t req, fuse_file_info *) {
 void FUSEAsset::fuse_reply_open(fuse_req_t req, fuse_file_info * fi) {
 	_openCount++;
 	_holdOpenTimer.cancel();
+	fi->direct_io = false;
+	fi->flush = false;
 	fi->keep_cache = true;
+	fi->nonseekable = false;
 	::fuse_reply_open(req, fi);
 }
 
 void FUSEAsset::read(fuse_req_t req, off_t off, size_t size)
 {
-	int tag = asset->aSyncRead(off, size);
-	readOperations[tag] = BHReadOperation(req, off, size);
+	if (off >= (off_t)this->size) {
+		fuse_reply_buf(req, 0, 0);
+	} else {
+		int tag = asset->aSyncRead(off, size);
+		readOperations[tag] = BHReadOperation(req, off, size);
+	}
 }
 
 void FUSEAsset::fill_stat_t(struct stat &s) {
 	s.st_mode = S_IFREG | 0555;
+	s.st_blksize = BLOCK_SIZE;
 	s.st_ino = nr;
 	s.st_size = size;
 	s.st_nlink = 1;
 }
 
 void FUSEAsset::onDataArrived(uint64_t offset, ByteArray& data, int tag) {
-	BHReadOperation &op = readOperations[tag];
-	if (op.req) {
+	if (readOperations.count(tag)) {
+		BHReadOperation &op = readOperations[tag];
 		if ((off_t)offset == op.off)
 			fuse_reply_buf(op.req, (const char*)data.data(), data.size());
 		else
 			fuse_reply_err(op.req, EIO);
+		readOperations.erase(tag);
 	} else {
 		(cerr << "ERROR: got response for unknown request").flush();
 	}
-	readOperations.erase(tag);
 }
 
 void FUSEAsset::closeOne()
