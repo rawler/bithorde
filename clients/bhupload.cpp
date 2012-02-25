@@ -29,10 +29,9 @@ int BHUpload::main(const std::vector<std::string>& args) {
 			return -1;
 	}
 
-	asio::local::stream_protocol::endpoint ep(optConnectUrl);
-	Connection::Pointer c = Connection::create(_ioSvc, ep);
-	_client = Client::create(c, optMyName);
+	_client = Client::create(_ioSvc, optMyName);
 	_client->authenticated.connect(boost::bind(&BHUpload::onAuthenticated, this, _1));
+	_client->connect(optConnectUrl);
 
 	_ioSvc.run();
 

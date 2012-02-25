@@ -4,29 +4,67 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <boost/bind.hpp>
 #include <boost/assert.hpp>
+#include <boost/bind.hpp>
+#include <boost/lexical_cast.hpp>
+#include <boost/xpressive/xpressive.hpp>
 
 #define DEFAULT_ASSET_TIMEOUT 4000
 
 using namespace std;
+namespace asio = boost::asio;
+namespace xpressive = boost::xpressive;
 
 uint64_t rand64() {
 	// TODO: improve seeding throuh srandomdev
 	return (((uint64_t)rand()) << 32) | rand();
 }
 
-Client::Client(Connection::Pointer connection, std::string myName) :
-	_connection(connection),
+Client::Client(asio::io_service& ioSvc, string myName) :
+	_ioSvc(ioSvc),
+	_connection(),
 	_myName(myName),
 	_handleAllocator(1),
 	_rpcIdAllocator(1),
 	_protoVersion(0)
 {
+}
+
+void Client::connect(Connection::Pointer newConn) {
+	BOOST_ASSERT(!_connection);
+
+	_connection = newConn;
 	_connection->message.connect(boost::bind(&Client::onIncomingMessage, this, _1, _2));
 	_connection->writable.connect(writable);
 
 	sayHello();
+}
+
+void Client::connect(asio::ip::tcp::endpoint& ep) {
+	connect(Connection::create(_ioSvc, ep));
+}
+
+void Client::connect(asio::local::stream_protocol::endpoint& ep) {
+	connect(Connection::create(_ioSvc, ep));
+}
+
+void Client::connect(string spec) {
+	xpressive::sregex host_port_regex = xpressive::sregex::compile("(\\w+):(\\d+)");
+	xpressive::smatch res;
+	if (spec[0] == '/') {
+		asio::local::stream_protocol::endpoint ep(spec);
+		connect(ep);
+	} else if (xpressive::regex_match(spec, res, host_port_regex)) {
+		asio::ip::tcp::resolver resolver(_ioSvc);
+		asio::ip::tcp::resolver::query q(res[1], res[2]);
+		asio::ip::tcp::resolver::iterator iter = resolver.resolve(q);
+		if (iter != asio::ip::tcp::resolver::iterator()) {
+			asio::ip::tcp::endpoint ep(iter->endpoint());
+			connect(ep);
+		}
+	} else {
+		throw string("Failed to parse: " + spec);
+	}
 }
 
 bool Client::sendMessage(Connection::MessageType type, const::google::protobuf::Message &msg)

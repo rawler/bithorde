@@ -4,6 +4,8 @@
 #include <map>
 #include <string>
 
+#include <boost/asio/ip/tcp.hpp>
+#include <boost/asio/local/stream_protocol.hpp>
 #include <boost/bind.hpp>
 #include <boost/make_shared.hpp>
 #include <boost/signal.hpp>
@@ -15,6 +17,7 @@
 class Client
 	: public boost::signals::trackable, public boost::enable_shared_from_this<Client>
 {
+	boost::asio::io_service& _ioSvc;
 	Connection::Pointer _connection;
 
 	std::string _myName;
@@ -29,9 +32,17 @@ class Client
 public:
 	typedef boost::shared_ptr<Client> Pointer;
 
-	static Pointer create(Connection::Pointer conn, std::string myName) {
-		return Pointer(new Client(conn, myName));
+	static Pointer create(boost::asio::io_service& ioSvc, std::string myName) {
+		return Pointer(new Client(ioSvc, myName));
 	}
+
+	/**
+	 * Tries to parse spec either as HOST:PORT, or as /absolute/socket/path and connect to it. 
+	 */
+	void connect(std::string spec);
+
+	void connect(boost::asio::ip::tcp::endpoint& ep);
+	void connect(boost::asio::local::stream_protocol::endpoint& ep);
 
 	bool bind(ReadAsset & asset);
 	bool bind(UploadAsset & asset);
@@ -42,10 +53,11 @@ public:
 	boost::signal<void ()> writable;
 
 protected:
-	Client(Connection::Pointer conn, std::string myName);
+	Client(boost::asio::io_service& ioSvc, std::string myName);
 
 	void sayHello();
 
+	void connect(Connection::Pointer newConn);
 	void onDisconnected();
 	void onIncomingMessage(Connection::MessageType type, ::google::protobuf::Message& msg);
 

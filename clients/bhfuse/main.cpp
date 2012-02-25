@@ -62,15 +62,14 @@ int main(int argc, char *argv[])
 	return ioSvc.run();
 }
 
-BHFuse::BHFuse(asio::io_service & ioSvc, string mountpoint, BoostAsioFilesystem_Options & opts) :
+BHFuse::BHFuse(asio::io_service & ioSvc, string bithorded, BoostAsioFilesystem_Options & opts) :
 	BoostAsioFilesystem(ioSvc, opts),
 	ioSvc(ioSvc),
 	ino_allocator(2)
 {
-	asio::local::stream_protocol::endpoint bithorded(mountpoint);
-	Connection::Pointer connection = Connection::create(ioSvc, bithorded);
-	client = Client::create(connection, "bhfuse");
+	client = Client::create(ioSvc, "bhfuse");
 	client->authenticated.connect(boost::bind(&BHFuse::onConnected, this, _1));
+	client->connect(bithorded);
 }
 
 void BHFuse::onConnected(std::string remoteName) {
