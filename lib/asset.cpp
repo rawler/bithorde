@@ -53,7 +53,7 @@ void ReadAsset::handleMessage(const bithorde::AssetStatus &msg)
 	if (msg.has_size()) {
 		if (_size < 0) {
 			_size = msg.size();
-		} else if (_size != msg.size()) {
+		} else if (_size != (int64_t)msg.size()) {
 			// TODO: Application::instance().logger().warning("Peer tried to change asset-size.");
 		}
 	}

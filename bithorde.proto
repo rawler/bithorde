@@ -85,7 +85,7 @@ message AssetStatus { // Server->Client, confirm bind-status (respond to Bind-Re
   required uint32 handle = 1;
   required Status status = 2;
   repeated Identifier ids = 3;    // Used to notify client of new ids
-  optional uint32 size = 4;       // Notify Client of known size
+  optional uint64 size = 4;       // Notify Client of known size
 
   // How well the server will be able to serve this asset. The number is not absolute in
   // any sense, but only relative to other assets in the same pipe. Each node estimates
