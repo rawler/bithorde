@@ -49,18 +49,35 @@ extern "C" {
 
 BoostAsioFilesystem_Options::BoostAsioFilesystem_Options()
 	: mountpoint(""), debug(false)
-{}
+{
+	this->insert(value_type("max_read", "65536"));
+	this->insert(value_type("async_read", ""));
+	this->insert(value_type("allow_other", ""));
+}
 
+void BoostAsioFilesystem_Options::format_ll_opts(std::vector<std::string>& target) {
+	target.push_back(name);
+	target.push_back("-ofsname="+name);
+
+	if (debug) {
+		target.push_back("-d");
+	}
+	BoostAsioFilesystem_Options::iterator iter;
+	for (iter = begin(); iter != end(); iter++) {
+		ostringstream oss;
+		oss << "-o" << iter->first;
+		if (iter->second.length())
+			oss << '=' << iter->second;
+		target.push_back(oss.str());
+	}
+	target.insert(target.end(), args.begin(), args.end());
+}
 
 BoostAsioFilesystem::BoostAsioFilesystem(asio::io_service & ioSvc, BoostAsioFilesystem_Options & options)
 	: _channel(ioSvc), _mountpoint(options.mountpoint), _fuse_chan(0), _fuse_session(0)
 {
 	vector<string> opts;
-	opts.push_back("");
-	opts.insert(opts.end(), options.aux.begin(), options.aux.end());
-	if (options.debug) {
-		opts.push_back("-d");
-	}
+	options.format_ll_opts(opts);
 
 	uint16_t argc = opts.size();
 	char** argv = (char**)malloc(argc * sizeof(char*));

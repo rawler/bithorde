@@ -11,13 +11,16 @@
 
 #include <lib/types.h>
 
-struct BoostAsioFilesystem_Options {
+struct BoostAsioFilesystem_Options : public std::map<std::string, std::string> {
+	std::string name;
 	std::string mountpoint;
 	bool debug;
 
-	std::vector<std::string> aux;
+	std::vector<std::string> args;
 
 	BoostAsioFilesystem_Options();
+
+	void format_ll_opts(std::vector<std::string>& target);
 };
 
 class BoostAsioFilesystem

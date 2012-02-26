@@ -54,11 +54,9 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
+	opts.name = "bhfuse";
 	if (vm.count("debug"))
 		opts.debug = true;
-
-	opts.aux.push_back("-o"); opts.aux.push_back("max_read=65536");
-	opts.aux.push_back("-o"); opts.aux.push_back("async_read");
 
 	BHFuse fs(ioSvc, vm["url"].as<string>(), opts);
 
