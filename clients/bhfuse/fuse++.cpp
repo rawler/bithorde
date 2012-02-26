@@ -55,9 +55,10 @@ BoostAsioFilesystem_Options::BoostAsioFilesystem_Options()
 BoostAsioFilesystem::BoostAsioFilesystem(asio::io_service & ioSvc, BoostAsioFilesystem_Options & options)
 	: _channel(ioSvc), _mountpoint(options.mountpoint), _fuse_chan(0), _fuse_session(0)
 {
-	vector<string> opts(options.aux);
+	vector<string> opts;
+	opts.push_back("");
+	opts.insert(opts.end(), options.aux.begin(), options.aux.end());
 	if (options.debug) {
-		opts.push_back("-v");
 		opts.push_back("-d");
 	}
 

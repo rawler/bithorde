@@ -49,7 +49,7 @@ bool INode::fuse_reply_stat(fuse_req_t req) {
 	struct stat s;
 	bzero(&s, sizeof(s));
 	fill_stat_t(s);
-	fuse_reply_attr(req, &s, 5);
+	fuse_reply_attr(req, &s, ATTR_TIMEOUT);
 	return true;
 }
 
@@ -92,6 +92,8 @@ FUSEAsset::~FUSEAsset()
 
 void FUSEAsset::fuse_dispatch_open(fuse_req_t req, fuse_file_info * fi)
 {
+	_openCount++;
+	_holdOpenTimer.cancel(); // TODO: potential race-condition, if timeout has already been scheduled for this round
 	if (asset && asset->isBound()) {
 		this->fuse_reply_open(req, fi);
 	} else {
@@ -106,9 +108,6 @@ void FUSEAsset::fuse_dispatch_close(fuse_req_t req, fuse_file_info *) {
 }
 
 void FUSEAsset::fuse_reply_open(fuse_req_t req, fuse_file_info * fi) {
-	_openCount++;
-	_holdOpenTimer.cancel();
-	fi->direct_io = false;
 	fi->flush = false;
 	fi->keep_cache = true;
 	fi->nonseekable = false;

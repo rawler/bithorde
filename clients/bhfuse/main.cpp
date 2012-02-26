@@ -57,6 +57,9 @@ int main(int argc, char *argv[])
 	if (vm.count("debug"))
 		opts.debug = true;
 
+	opts.aux.push_back("-o"); opts.aux.push_back("max_read=65536");
+	opts.aux.push_back("-o"); opts.aux.push_back("async_read");
+
 	BHFuse fs(ioSvc, vm["url"].as<string>(), opts);
 
 	return ioSvc.run();
@@ -118,8 +121,8 @@ int BHFuse::fuse_getattr(fuse_req_t req, fuse_ino_t ino, fuse_file_info *) {
 }
 
 int BHFuse::fuse_open(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi) {
-	FUSEAsset* a = static_cast<FUSEAsset*>(_inode_cache[ino]);
-	if (a) {
+	FUSEAsset* a;
+	if (_inode_cache.count(ino) && (a = dynamic_cast<FUSEAsset*>(_inode_cache[ino]))) {
 		a->fuse_dispatch_open(req, fi);
 		return 0;
 	} else {
@@ -138,7 +141,7 @@ int BHFuse::fuse_release(fuse_req_t req, fuse_ino_t ino, fuse_file_info * fi) {
 
 int BHFuse::fuse_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, fuse_file_info *)
 {
-	FUSEAsset* a = static_cast<FUSEAsset*>(_inode_cache[ino]);
+	FUSEAsset* a = dynamic_cast<FUSEAsset*>(_inode_cache[ino]);
 	if (a) {
 		a->read(req, off, size);
 		return 0;
