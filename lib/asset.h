@@ -63,12 +63,12 @@ private:
 class UploadAsset : public Asset
 {
 public:
-    explicit UploadAsset(ClientPointer client, uint64_t size);
+	explicit UploadAsset(ClientPointer client, uint64_t size);
 
-    bool tryWrite(uint64_t offset, byte* data, size_t amount);
+	bool tryWrite(uint64_t offset, byte* data, size_t amount);
 
 protected:
-    virtual void handleMessage(const bithorde::Read::Response &msg);
+	virtual void handleMessage(const bithorde::Read::Response &msg);
 };
 
 #endif // ASSET_H

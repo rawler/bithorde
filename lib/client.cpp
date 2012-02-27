@@ -128,11 +128,10 @@ void Client::onMessage(const bithorde::AssetStatus & msg) {
 			_assetMap.erase(handle);
 			_handleAllocator.free(handle);
 		} else {
-		    cerr << "WARNING: Status OK recieved for Asset supposedly closed or re-written." << endl;
+			cerr << "WARNING: Status OK recieved for Asset supposedly closed or re-written." << endl;
 		}
 	} else {
 		cerr << "WARNING: AssetStatus for unmapped handle" << endl;
-		// TODO: Log error
 	}
 }
 

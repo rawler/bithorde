@@ -66,8 +66,8 @@ void ReadAsset::handleMessage(const bithorde::Read::Response &msg) {
 		ByteArray data(content.begin(), content.end());
 		dataArrived(msg.offset(), data, msg.reqid());
 	} else {
-                cerr << "Error: failed read, " << msg.status() << endl;
-                ByteArray nil;
+		cerr << "Error: failed read, " << msg.status() << endl;
+		ByteArray nil;
 		dataArrived(msg.offset(), nil, msg.reqid());
 	}
 	_client->releaseRPCRequest(msg.reqid());
@@ -78,9 +78,9 @@ int ReadAsset::aSyncRead(uint64_t offset, ssize_t size)
 	if (!_client)
 		return -1;
 	int reqId = _client->allocRPCRequest(_handle);
-        int64_t maxSize = _size - offset;
-        if (size > maxSize)
-            size = maxSize;
+	int64_t maxSize = _size - offset;
+	if (size > maxSize)
+		size = maxSize;
 	bithorde::Read_Request req;
 	req.set_handle(_handle);
 	req.set_reqid(reqId);
