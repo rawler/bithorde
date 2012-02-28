@@ -22,10 +22,12 @@ public:
 
 	Client::Pointer client;
 	boost::asio::io_service& ioSvc;
+	std::string bithorded;
 
 public:
 	void onConnected(std::string remoteName);
 	FUSEAsset * registerAsset(ReadAsset *asset, LookupParams& LookupParams);
+	void reconnect();
 
 private:
 	bool unrefInode(fuse_ino_t ino, int count);
@@ -33,7 +35,7 @@ private:
 	std::map<fuse_ino_t, INode *> _inode_cache;
 	std::map<LookupParams, INode *> _lookup_cache;
 
-	CachedAllocator<fuse_ino_t> ino_allocator;
+	CachedAllocator<fuse_ino_t> _ino_allocator;
 };
 
 #endif // MAIN_H

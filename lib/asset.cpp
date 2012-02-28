@@ -43,7 +43,7 @@ ReadAsset::ReadAsset(ClientPointer client, IdList requestIds) :
 	_requestIds(requestIds)
 {}
 
-ReadAsset::IdList & ReadAsset::requestIds()
+const ReadAsset::IdList & ReadAsset::requestIds() const
 {
 	return _requestIds;
 }

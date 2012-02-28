@@ -31,6 +31,9 @@ public:
 	{
 		_socket.connect(addr);
 	}
+	~ConnectionImpl() {
+		close();
+	}
 
 	void trySend() {
 		if (_sendBuf.size) {
@@ -47,6 +50,13 @@ public:
 				asio::placeholders::error, asio::placeholders::bytes_transferred
 			)
 		);
+	}
+
+	void close() {
+		if (_socket.is_open()) {
+			_socket.close();
+			disconnected();
+		}
 	}
 };
 
@@ -69,14 +79,10 @@ Connection::Pointer Connection::create(boost::asio::io_service& ioSvc, const boo
 	return c;
 }
 
-Connection::~Connection() {
-	disconnected();
-}
-
 void Connection::onRead(const boost::system::error_code& err, size_t count)
 {
 	if (err || count == 0) {
-		// TODO: Close and signal closed to upstream. This, with it's socket, will be deleted when all references are cleared
+		close();
 		return;
 	} else {
 		_rcvBuf.charge(count);
@@ -183,9 +189,6 @@ bool Connection::sendMessage(Connection::MessageType type, const::google::protob
 	}
 }
 
-void Connection::trySend() {
-}
-
 void Connection::onWritten(const boost::system::error_code& err, size_t written) {
 	if (written >= 0) {
 		_sendBuf.pop(written);
@@ -194,5 +197,6 @@ void Connection::onWritten(const boost::system::error_code& err, size_t written)
 			writable();
 	} else {
 		cerr << "Failed to write. Disconnecting..." << endl;
+		close();
 	}
 }

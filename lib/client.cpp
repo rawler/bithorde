@@ -36,6 +36,7 @@ void Client::connect(Connection::Pointer newConn) {
 	_connection = newConn;
 	_connection->message.connect(boost::bind(&Client::onIncomingMessage, this, _1, _2));
 	_connection->writable.connect(writable);
+	_connection->disconnected.connect(boost::bind(&Client::onDisconnected, this));
 
 	sayHello();
 }
@@ -65,6 +66,18 @@ void Client::connect(string spec) {
 	} else {
 		throw string("Failed to parse: " + spec);
 	}
+}
+
+void Client::onDisconnected() {
+	_connection.reset();
+	for (auto iter=_assetMap.begin(); iter != _assetMap.end(); iter++) {
+		ReadAsset* asset = dynamic_cast<ReadAsset*>(iter->second);
+		if (!asset) {
+			_handleAllocator.free(iter->first);
+			_assetMap.erase(iter);
+		}
+	}
+	disconnected();
 }
 
 bool Client::sendMessage(Connection::MessageType type, const::google::protobuf::Message &msg)
@@ -111,6 +124,12 @@ void Client::onMessage(const bithorde::HandShake &msg)
 	if (msg.has_challenge()) {
 		// Setup encryption
 	} else {
+		for (auto iter = _assetMap.begin(); iter != _assetMap.end(); iter++) {
+			ReadAsset* asset = dynamic_cast<ReadAsset*>(iter->second);
+			BOOST_ASSERT(iter->second);
+			informBound(*asset);
+		}
+			
 		authenticated(_peerName);
 	}
 }
@@ -122,7 +141,7 @@ void Client::onMessage(const bithorde::AssetStatus & msg) {
 	Asset::Handle handle = msg.handle();
 	if (_assetMap.count(handle)) {
 		Asset* a = _assetMap[handle];
-		if (a->_handle == handle) {
+		if (a) {
 			a->handleMessage(msg);
 		} else if (msg.status() != bithorde::Status::SUCCESS) {
 			_assetMap.erase(handle);
@@ -152,6 +171,7 @@ void Client::onMessage(const bithorde::DataSegment & msg) {}
 void Client::onMessage(const bithorde::HandShakeConfirmed & msg) {}
 void Client::onMessage(const bithorde::Ping & msg) {
 	bithorde::Ping reply;
+	cerr << "Was here" << endl;
 	_connection->sendMessage(Connection::Ping, reply);
 }
 
@@ -161,19 +181,8 @@ bool Client::bind(ReadAsset &asset) {
 	asset._handle = _handleAllocator.allocate();
 	BOOST_ASSERT(asset._handle > 0);
 	_assetMap[asset._handle] = &asset;
-	bithorde::BindRead msg;
-	msg.set_handle(asset._handle);
 
-	ReadAsset::IdList& ids = asset.requestIds();
-	for (ReadAsset::IdList::iterator iter = ids.begin(); iter < ids.end(); iter++) {
-		ReadAsset::Identifier& id = *iter;
-		bithorde::Identifier * bhId = msg.add_ids();
-		bhId->set_type(id.first);
-		bhId->set_id(id.second.data(), id.second.size());
-	}
-	msg.set_timeout(DEFAULT_ASSET_TIMEOUT);
-	msg.set_uuid(rand64());
-	return _connection->sendMessage(Connection::BindRead, msg);
+	return informBound(asset);
 }
 
 bool Client::bind(UploadAsset & asset)
@@ -197,8 +206,29 @@ bool Client::release(Asset & asset)
 	msg.set_timeout(DEFAULT_ASSET_TIMEOUT);
 	msg.set_uuid(rand64());
 
+	_assetMap[asset._handle] = NULL;
 	asset._handle = -1;
 
+	return _connection->sendMessage(Connection::BindRead, msg);
+}
+
+bool Client::informBound(const ReadAsset& asset)
+{
+	BOOST_ASSERT(_connection);
+	BOOST_ASSERT(asset._handle >= 0);
+
+	bithorde::BindRead msg;
+	msg.set_handle(asset._handle);
+
+	auto ids = asset.requestIds();
+	for (auto iter = ids.begin(); iter < ids.end(); iter++) {
+		ReadAsset::Identifier& id = *iter;
+		bithorde::Identifier * bhId = msg.add_ids();
+		bhId->set_type(id.first);
+		bhId->set_id(id.second.data(), id.second.size());
+	}
+	msg.set_timeout(DEFAULT_ASSET_TIMEOUT);
+	msg.set_uuid(rand64());
 	return _connection->sendMessage(Connection::BindRead, msg);
 }
 

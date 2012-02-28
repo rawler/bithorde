@@ -4,6 +4,9 @@
 #include <errno.h>
 #include <signal.h>
 
+const int RECONNECT_ATTEMPTS = 10;
+const int RECONNECT_INTERVAL_MS = 500;
+
 using namespace std;
 namespace asio = boost::asio;
 namespace po = boost::program_options;
@@ -66,11 +69,29 @@ int main(int argc, char *argv[])
 BHFuse::BHFuse(asio::io_service & ioSvc, string bithorded, BoostAsioFilesystem_Options & opts) :
 	BoostAsioFilesystem(ioSvc, opts),
 	ioSvc(ioSvc),
-	ino_allocator(2)
+	bithorded(bithorded),
+	_ino_allocator(2)
 {
 	client = Client::create(ioSvc, "bhfuse");
 	client->authenticated.connect(boost::bind(&BHFuse::onConnected, this, _1));
+	client->disconnected.connect(boost::bind(&BHFuse::reconnect, this));
+
 	client->connect(bithorded);
+}
+
+void BHFuse::reconnect()
+{
+	cerr << "Disconnected, trying reconnect..." << endl;
+	for (int i=0; i < RECONNECT_ATTEMPTS; i++) {
+		usleep(RECONNECT_INTERVAL_MS * 1000);
+		try {
+			client->connect(bithorded);
+			return;
+		} catch (boost::system::system_error e) {
+			cerr << "Failed to reconnect, retrying..." << endl;
+		}
+	}
+	cerr << "Giving up." << endl;
 }
 
 void BHFuse::onConnected(std::string remoteName) {
@@ -150,7 +171,7 @@ int BHFuse::fuse_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, fu
 
 FUSEAsset * BHFuse::registerAsset(ReadAsset *asset, LookupParams& lookup_params)
 {
-	fuse_ino_t ino = ino_allocator.allocate();
+	fuse_ino_t ino = _ino_allocator.allocate();
 	FUSEAsset * a = new FUSEAsset(this, ino, asset, lookup_params);
 	_inode_cache[ino] = a;
 	_lookup_cache[lookup_params] = a;
@@ -164,6 +185,7 @@ bool BHFuse::unrefInode(fuse_ino_t ino, int count)
 		if (!i->dropRefs(count)) {
 			_inode_cache.erase(ino);
 			_lookup_cache.erase(i->lookup_params);
+			_ino_allocator.free(ino);
 			delete i;
 		}
 		return true;

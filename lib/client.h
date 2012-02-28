@@ -51,6 +51,7 @@ public:
 
 	boost::signal<void (std::string&)> authenticated;
 	boost::signal<void ()> writable;
+	boost::signal<void ()> disconnected;
 
 protected:
 	Client(boost::asio::io_service& ioSvc, std::string myName);
@@ -76,6 +77,7 @@ private:
 	friend class ReadAsset;
 	bool release(Asset & a);
 
+	bool informBound(const ReadAsset&);
 	int allocRPCRequest(Asset::Handle asset);
 	void releaseRPCRequest(int reqId);
 };

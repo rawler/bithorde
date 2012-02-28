@@ -48,7 +48,7 @@ public:
 	explicit ReadAsset(ClientPointer client, ReadAsset::IdList requestIds);
 
 	int aSyncRead(uint64_t offset, ssize_t size);
-	IdList & requestIds();
+	const IdList & requestIds() const;
 
 	boost::signal<void (uint64_t offset, ByteArray& data, int tag)> dataArrived;
 

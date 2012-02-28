@@ -37,7 +37,6 @@ public:
 
 	static Pointer create(boost::asio::io_service& ioSvc, const boost::asio::local::stream_protocol::endpoint& addr);
 	static Pointer create(boost::asio::io_service& ioSvc, const boost::asio::ip::tcp::endpoint& addr);
-	~Connection();
 
 	boost::signal<void ()> disconnected;
 	boost::signal<void (MessageType, ::google::protobuf::Message&)> message;
@@ -56,6 +55,8 @@ protected:
 	void onWritten(const boost::system::error_code& err, size_t count);
 
 	bool encode(Connection::MessageType type, const::google::protobuf::Message &msg);
+
+	virtual void close() = 0;
 
 protected:
 	State _state;
