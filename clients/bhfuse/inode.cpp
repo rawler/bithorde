@@ -69,7 +69,8 @@ FUSEAsset::FUSEAsset(BHFuse* fs, fuse_ino_t ino, ReadAsset* asset, LookupParams&
 	INode(fs, ino, lookup_params),
 	asset(asset),
 	_openCount(0),
-	_holdOpenTimer(fs->ioSvc)
+	_holdOpenTimer(fs->ioSvc),
+	_connected(true)
 {
 	size = asset->size();
 
@@ -79,7 +80,8 @@ FUSEAsset::FUSEAsset(BHFuse* fs, fuse_ino_t ino, ReadAsset* asset, LookupParams&
 		_holdOpenTimer.async_wait(boost::bind(&FUSEAsset::closeOne, this));
 	}
 
-	asset->dataArrived.connect(boost::bind(&FUSEAsset::onDataArrived, this, _1, _2, _3));
+	asset->statusUpdate.connect(boost::bind(&FUSEAsset::onStatusChanged, this, Asset::STATUS));
+	asset->dataArrived.connect(boost::bind(&FUSEAsset::onDataArrived, this, ReadAsset::OFFSET, ReadAsset::DATA, ReadAsset::TAG));
 }
 
 
@@ -120,7 +122,7 @@ void FUSEAsset::read(fuse_req_t req, off_t off, size_t size)
 		fuse_reply_buf(req, 0, 0);
 	} else {
 		int tag = asset->aSyncRead(off, size);
-		readOperations[tag] = BHReadOperation(req, off, size);
+		_readOperations[tag] = BHReadOperation(req, off, size);
 	}
 }
 
@@ -132,14 +134,37 @@ void FUSEAsset::fill_stat_t(struct stat &s) {
 	s.st_nlink = 1;
 }
 
+void FUSEAsset::onStatusChanged(const bithorde::AssetStatus& s)
+{
+	switch (s.status()) {
+	case bithorde::SUCCESS:
+		if (!_connected) {
+			map<off_t, BHReadOperation> oldReads = _readOperations;
+			_readOperations.clear();
+			for (auto iter = oldReads.begin(); iter != oldReads.end(); iter++) {
+				int tag = asset->aSyncRead(iter->second.off, iter->second.size);
+				_readOperations[tag] = iter->second;
+			}
+			_connected = true;
+		}
+		break;
+	case bithorde::NOTFOUND:
+	case bithorde::INVALID_HANDLE:
+		if (fs->client->isConnected())
+			fs->client->bind(*asset);
+	default:
+		_connected = false;
+	}
+}
+
 void FUSEAsset::onDataArrived(uint64_t offset, ByteArray& data, int tag) {
-	if (readOperations.count(tag)) {
-		BHReadOperation &op = readOperations[tag];
+	if (_readOperations.count(tag)) {
+		BHReadOperation &op = _readOperations[tag];
 		if ((off_t)offset == op.off)
 			fuse_reply_buf(op.req, (const char*)data.data(), data.size());
 		else
 			fuse_reply_err(op.req, EIO);
-		readOperations.erase(tag);
+		_readOperations.erase(tag);
 	} else {
 		(cerr << "ERROR: got response for unknown request").flush();
 	}

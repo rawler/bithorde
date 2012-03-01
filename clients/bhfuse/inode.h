@@ -43,8 +43,7 @@ protected:
 	virtual void fill_stat_t(struct stat & s) = 0;
 };
 
-class BHReadOperation {
-public:
+struct BHReadOperation {
 	fuse_req_t req;
 	off_t off;
 	size_t size;
@@ -69,12 +68,14 @@ protected:
 	virtual void fill_stat_t(struct stat & s);
 private:
 	void onDataArrived(uint64_t offset, ByteArray& data, int tag);
+	void onStatusChanged(const bithorde::AssetStatus& s);
 	void closeOne();
 private:
 	// Counter to determine whether the underlying asset needs to be held open.
 	std::atomic<int> _openCount;
 	boost::asio::deadline_timer _holdOpenTimer;
-	std::map<off_t, BHReadOperation> readOperations;
+	std::map<off_t, BHReadOperation> _readOperations;
+	bool _connected;
 };
 
 #endif // INODE_H
