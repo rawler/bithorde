@@ -4,7 +4,7 @@
 #include <errno.h>
 #include <signal.h>
 
-const int RECONNECT_ATTEMPTS = 10;
+const int RECONNECT_ATTEMPTS = 30;
 const int RECONNECT_INTERVAL_MS = 500;
 
 using namespace std;
