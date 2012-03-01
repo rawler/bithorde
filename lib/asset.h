@@ -5,6 +5,7 @@
 #include <utility>
 #include <vector>
 
+#include <boost/bind/arg.hpp>
 #include <boost/signal.hpp>
 #include <boost/shared_ptr.hpp>
 
@@ -27,6 +28,7 @@ public:
 
 	boost::signal<void ()> closed;
 	boost::signal<void (const bithorde::AssetStatus&)> statusUpdate;
+	static boost::arg<1> STATUS;
 
 	void close();
 protected:
@@ -51,6 +53,9 @@ public:
 	const IdList & requestIds() const;
 
 	boost::signal<void (uint64_t offset, ByteArray& data, int tag)> dataArrived;
+	static boost::arg<1> OFFSET;
+	static boost::arg<2> DATA;
+	static boost::arg<3> TAG;
 
 protected:
 	virtual void handleMessage(const bithorde::AssetStatus &msg);
