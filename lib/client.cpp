@@ -172,7 +172,6 @@ void Client::onMessage(const bithorde::Read::Response & msg) {
 		a->handleMessage(msg);
 	} else {
 		cerr << "WARNING: ReadResponse " << msg.reqid() << msg.has_reqid() << " for unmapped handle" << endl;
-		// TODO: Log error
 	}
 }
 
@@ -181,7 +180,6 @@ void Client::onMessage(const bithorde::DataSegment & msg) {}
 void Client::onMessage(const bithorde::HandShakeConfirmed & msg) {}
 void Client::onMessage(const bithorde::Ping & msg) {
 	bithorde::Ping reply;
-	cerr << "Was here" << endl;
 	_connection->sendMessage(Connection::Ping, reply);
 }
 
