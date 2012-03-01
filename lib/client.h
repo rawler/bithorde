@@ -44,6 +44,8 @@ public:
 	void connect(boost::asio::ip::tcp::endpoint& ep);
 	void connect(boost::asio::local::stream_protocol::endpoint& ep);
 
+	bool isConnected();
+
 	bool bind(ReadAsset & asset);
 	bool bind(UploadAsset & asset);
 

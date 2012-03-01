@@ -81,6 +81,11 @@ void Client::onDisconnected() {
 	disconnected();
 }
 
+bool Client::isConnected()
+{
+	return _connection;
+}
+
 bool Client::sendMessage(Connection::MessageType type, const::google::protobuf::Message &msg)
 {
 	BOOST_ASSERT(_connection);
@@ -217,6 +222,9 @@ bool Client::informBound(const ReadAsset& asset)
 {
 	BOOST_ASSERT(_connection);
 	BOOST_ASSERT(asset._handle >= 0);
+
+	if (!_connection)
+		return false;
 
 	bithorde::BindRead msg;
 	msg.set_handle(asset._handle);
