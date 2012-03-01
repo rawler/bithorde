@@ -75,7 +75,7 @@ void ReadAsset::handleMessage(const bithorde::Read::Response &msg) {
 
 int ReadAsset::aSyncRead(uint64_t offset, ssize_t size)
 {
-	if (!_client)
+	if (!_client || !_client->isConnected())
 		return -1;
 	int reqId = _client->allocRPCRequest(_handle);
 	int64_t maxSize = _size - offset;
