@@ -33,6 +33,7 @@ Client::Client(asio::io_service& ioSvc, string myName) :
 void Client::connect(Connection::Pointer newConn) {
 	BOOST_ASSERT(!_connection);
 
+	_rpcIdAllocator.reset();
 	_connection = newConn;
 	_connection->message.connect(boost::bind(&Client::onIncomingMessage, this, _1, _2));
 	_connection->writable.connect(writable);

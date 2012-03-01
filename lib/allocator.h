@@ -7,9 +7,12 @@ template <typename T>
 struct CachedAllocator {
 private:
 	std::queue<T> _freed;
+	T _init;
 	T _next;
 public:
-	CachedAllocator(T init) { _next = init; }
+	CachedAllocator(T init) 
+		: _init(init), _next(init)
+	{}
 
 	T allocate() {
 		T res;
@@ -24,6 +27,11 @@ public:
 
 	void free(T x) {
 		_freed.push(x);
+	}
+
+	void reset() {
+		_next = _init;
+		_freed = std::queue<T>();
 	}
 };
 
