@@ -92,6 +92,7 @@ void BHFuse::reconnect()
 		}
 	}
 	cerr << "Giving up." << endl;
+	ioSvc.stop();
 }
 
 void BHFuse::onConnected(std::string remoteName) {
