@@ -73,7 +73,11 @@ void Client::onDisconnected() {
 	_connection.reset();
 	for (auto iter=_assetMap.begin(); iter != _assetMap.end(); iter++) {
 		ReadAsset* asset = dynamic_cast<ReadAsset*>(iter->second);
-		if (!asset) {
+		if (asset) {
+			bithorde::AssetStatus s;
+			s.set_status(bithorde::DISCONNECTED);
+			asset->statusUpdate(s);
+		} else {
 			_handleAllocator.free(iter->first);
 			_assetMap.erase(iter);
 		}
