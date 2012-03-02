@@ -69,11 +69,13 @@ protected:
 private:
 	void onDataArrived(uint64_t offset, ByteArray& data, int tag);
 	void onStatusChanged(const bithorde::AssetStatus& s);
+	void tryRebind();
 	void closeOne();
 private:
 	// Counter to determine whether the underlying asset needs to be held open.
 	std::atomic<int> _openCount;
 	boost::asio::deadline_timer _holdOpenTimer;
+	boost::asio::deadline_timer _rebindTimer;
 	std::map<off_t, BHReadOperation> _readOperations;
 	bool _connected;
 };

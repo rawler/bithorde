@@ -9,6 +9,7 @@
 static const int ATTR_TIMEOUT = 2;
 static const int INODE_TIMEOUT = 4;
 static const int BLOCK_SIZE = 64*1024;
+static const int REBIND_INTERVAL_MS = 500;
 
 using namespace std;
 namespace asio = boost::asio;
@@ -70,6 +71,7 @@ FUSEAsset::FUSEAsset(BHFuse* fs, fuse_ino_t ino, ReadAsset* asset, LookupParams&
 	asset(asset),
 	_openCount(0),
 	_holdOpenTimer(fs->ioSvc),
+	_rebindTimer(fs->ioSvc),
 	_connected(true)
 {
 	size = asset->size();
@@ -88,6 +90,7 @@ FUSEAsset::FUSEAsset(BHFuse* fs, fuse_ino_t ino, ReadAsset* asset, LookupParams&
 FUSEAsset::~FUSEAsset()
 {
 	_holdOpenTimer.cancel();
+	_rebindTimer.cancel();
 	BOOST_ASSERT(_refCount == 0);
 	BOOST_ASSERT(_openCount == 0);
 }
@@ -150,21 +153,36 @@ void FUSEAsset::onStatusChanged(const bithorde::AssetStatus& s)
 		break;
 	case bithorde::NOTFOUND:
 	case bithorde::INVALID_HANDLE:
-		if (fs->client->isConnected())
-			fs->client->bind(*asset);
+		if (fs->client->isConnected()) {
+			_rebindTimer.expires_from_now(boost::posix_time::milliseconds(REBIND_INTERVAL_MS));
+			_rebindTimer.async_wait(boost::bind(&FUSEAsset::tryRebind, this));
+		}
+
 	default:
 		_connected = false;
+	}
+}
+
+void FUSEAsset::tryRebind()
+{
+	if (fs->client->isConnected()) {
+		fs->client->bind(*asset);
+	} else {
+		_rebindTimer.expires_from_now(boost::posix_time::milliseconds(REBIND_INTERVAL_MS));
+		_rebindTimer.async_wait(boost::bind(&FUSEAsset::tryRebind, this));
 	}
 }
 
 void FUSEAsset::onDataArrived(uint64_t offset, ByteArray& data, int tag) {
 	if (_readOperations.count(tag)) {
 		BHReadOperation &op = _readOperations[tag];
-		if ((off_t)offset == op.off)
-			fuse_reply_buf(op.req, (const char*)data.data(), data.size());
-		else
-			fuse_reply_err(op.req, EIO);
-		_readOperations.erase(tag);
+		if (_connected) {
+			if ((off_t)offset == op.off)
+				fuse_reply_buf(op.req, (const char*)data.data(), data.size());
+			else
+				fuse_reply_err(op.req, EIO);
+			_readOperations.erase(tag);
+		} // else wait for reconnection
 	} else {
 		(cerr << "ERROR: got response for unknown request").flush();
 	}
@@ -172,6 +190,12 @@ void FUSEAsset::onDataArrived(uint64_t offset, ByteArray& data, int tag) {
 
 void FUSEAsset::closeOne()
 {
-	if (!--_openCount)
+	if (!--_openCount) {
+		_rebindTimer.cancel();
 		asset->close();
+		for (auto iter = _readOperations.begin(); iter != _readOperations.end(); iter++) {
+			fuse_reply_err(iter->second.req, EIO);
+		}
+		_readOperations.clear();
+	}
 }
