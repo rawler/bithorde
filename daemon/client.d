@@ -74,8 +74,10 @@ class BindRead : message.BindRead {
     final void callback(IServerAsset asset, message.Status sCode, message.AssetStatus status) {
         _callbacks[--_callbackCounter](this, asset, sCode, status);
     }
-    final void pushCallback(CallBack cb) {
+    final void pushCallback(CallBack cb) in {
         assert(_callbackCounter < _callbacks.length);
+        assert(cb !is null);
+    } body {
         _callbacks[_callbackCounter++] = cb;
     }
     void abort(message.Status s) {
@@ -190,8 +192,11 @@ class Client : lib.client.Client {
             return assetSource ? assetSource.hashIds : null;
         }
         void aSyncRead(ulong offset, uint length, BHReadCallback cb) {
-            assert(assetSource);
-            return assetSource.aSyncRead(offset, length, cb);
+            if (assetSource) {
+                return assetSource.aSyncRead(offset, length, cb);
+            } else {
+                cb(message.Status.NOTFOUND, null, null);
+            }
         }
         void addDataSegment(message.DataSegment req) {
             auto asset = cast(CacheManager.Asset)assetSource;
