@@ -41,10 +41,12 @@ SET(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 set(Boost_USE_STATIC_LIBS        ON)
 set(Boost_USE_MULTITHREADED      ON)
 set(Boost_USE_STATIC_RUNTIME    OFF)
-find_package( Boost COMPONENTS filesystem program_options signals system )
+find_package( Boost REQUIRED COMPONENTS filesystem program_options signals system unit_test_framework )
 if(Boost_FOUND)
 	include_directories(${Boost_INCLUDE_DIRS})
 endif()
+
+INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR})
 
 # Generate Protocol-buffer sources
 SET(PROTOBUF_REQUIRE_CPP TRUE)
@@ -54,3 +56,4 @@ FIND_PACKAGE(PkgConfig REQUIRED)
 
 ADD_SUBDIRECTORY(lib)
 ADD_SUBDIRECTORY(clients)
+ADD_SUBDIRECTORY(tests)
