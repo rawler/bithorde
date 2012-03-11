@@ -14,28 +14,5 @@
     limitations under the License.
 */
 
-#include "treestore.hpp"
+#include "hashtree.hpp"
 
-#include <boost/assert.hpp>
-
-uint calc_leaves(uint treesize, int layers)
-{
-	if (treesize == 0) return 0;
-	if (layers == 0) return 1;
-	uint leftside = 1 << layers;
-	if (leftside <= treesize)
-		return (1<<(layers-1)) + calc_leaves(treesize-leftside, layers-1);
-	else
-		return calc_leaves(treesize-1, layers-1);
-}
-
-uint calc_leaves(uint treesize) {
-	BOOST_ASSERT(treesize >= 1);
-	uint layers = (int)log2f(treesize);
-	return calc_leaves(treesize, layers);
-}
-
-std::ostream& operator<<(std::ostream& str, const NodeIdx& idx)
-{
-	return str << "NodeIdx("<<idx.nodeIdx<<','<<idx.layerSize<<')';
-}

@@ -40,7 +40,7 @@ inline uint treesize(uint leafs) {
 		return leafs;
 }
 
-uint bottomlayersize(uint treesize, int layers=-1);
+uint calc_leaves(uint treesize);
 
 struct NodeIdx {
 	uint nodeIdx;
@@ -59,6 +59,11 @@ struct NodeIdx {
 		return NodeIdx(nodeIdx ^ 0x01, layerSize);
 	}
 
+	bool operator<(const NodeIdx& other) {
+		BOOST_ASSERT(this->layerSize == other.layerSize);
+		return this->nodeIdx < other.nodeIdx;
+	}
+
 	bool isValid() {
 		return nodeIdx < layerSize;
 	}
@@ -72,6 +77,7 @@ struct NodeIdx {
 		return (layerSize == 1);
 	}
 };
+const NodeIdx TREE_ROOT_NODE(0,1);
 
 std::ostream& operator<<(std::ostream& str,const NodeIdx& idx);
 
@@ -79,24 +85,28 @@ template <typename Node, typename BackingStore>
 class TreeStore
 {
 public:
-	TreeStore(BackingStore& backingStore, uint leafs) 
-		: _storage(backingStore), _leafs(leafs)
+	TreeStore(BackingStore& backingStore) 
+		: _storage(backingStore), _leaves(calc_leaves(backingStore.size()))
 	{
-		BOOST_ASSERT(backingStore.size() >= treesize(leafs));
+		BOOST_ASSERT(backingStore.size() >= treesize(_leaves));
 	}
 
 	NodeIdx leaf(uint i) {
-		return NodeIdx(i, _leafs);
+		return NodeIdx(i, _leaves);
 	};
-	
-	Node& operator[](NodeIdx& idx) {
+
+	Node& operator[](const NodeIdx& idx) {
 		int layer_offset = treesize(parentlayersize(idx.layerSize));
 		return _storage[layer_offset + idx.nodeIdx];
 	}
 
+	uint leaves() {
+		return _leaves;
+	}
+
 private:
 	BackingStore& _storage;
-	uint _leafs;
+	uint _leaves;
 };
 
 #endif // TREESTORE_H

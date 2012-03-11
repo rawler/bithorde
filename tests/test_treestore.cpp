@@ -1,5 +1,3 @@
-#define BOOST_TEST_MODULE treestore test
-
 #include <vector>
 
 #include <boost/test/unit_test.hpp>
@@ -25,10 +23,10 @@ BOOST_AUTO_TEST_CASE( function_test )
 	BOOST_CHECK_EQUAL( treesize(8), 8+4+2+1);
 	BOOST_CHECK_EQUAL( treesize(9), 9+5+3+2+1);
 
-	for (int i=0; i < 64; i++) {
+	for (int i=1; i < 64; i++) {
 		auto ts = treesize(i);
-		auto blocks = bottomlayersize(ts);
-		BOOST_CHECK_EQUAL( blocks, i );
+		auto leaves = calc_leaves(ts);
+		BOOST_CHECK_EQUAL( leaves, i );
 	}
 }
 
@@ -38,7 +36,7 @@ BOOST_AUTO_TEST_CASE( idx_test )
 	for (uint i=0; i < store.size(); i++)
 		store[i] = i;
 
-	TreeStore<MyNode, MyStorage> tree(store, 6);
+	TreeStore<MyNode, MyStorage> tree(store);
 	NodeIdx idx(0,1);
 
 	BOOST_CHECK( NodeIdx(0,1).isValid() );
@@ -61,6 +59,8 @@ BOOST_AUTO_TEST_CASE( idx_test )
 	BOOST_CHECK( tree.leaf(5).parent().parent().parent().isRoot() );
 	BOOST_CHECK( not tree.leaf(5).parent().parent().isRoot() );
 
+	BOOST_CHECK_EQUAL( NodeIdx(0,2).sibling(), NodeIdx(1,2) );
+	BOOST_CHECK_EQUAL( NodeIdx(1,2).sibling(), NodeIdx(0,2) );
 	BOOST_CHECK_EQUAL( NodeIdx(0,5).sibling(), NodeIdx(1,5) );
 	BOOST_CHECK_EQUAL( NodeIdx(1,5).sibling(), NodeIdx(0,5) );
 	BOOST_CHECK( not NodeIdx(4,5).sibling().isValid() );
