@@ -5,8 +5,8 @@
 #include <crypto++/tiger.h>
 #include <boost/test/unit_test.hpp>
 
-#include "daemon/lib/treestore.hpp"
-#include "daemon/lib/hashtree.hpp"
+#include "bithorded/lib/treestore.hpp"
+#include "bithorded/lib/hashtree.hpp"
 
 using namespace std;
 

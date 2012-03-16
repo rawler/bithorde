@@ -2,7 +2,7 @@
 
 #include <boost/test/unit_test.hpp>
 
-#include "daemon/lib/treestore.hpp"
+#include "bithorded/lib/treestore.hpp"
 
 using namespace std;
 
