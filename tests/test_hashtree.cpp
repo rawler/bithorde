@@ -1,5 +1,3 @@
-#define BOOST_TEST_MODULE hashtree test
-
 #include <vector>
 
 #include <crypto++/tiger.h>

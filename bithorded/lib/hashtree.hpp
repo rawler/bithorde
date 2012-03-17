@@ -22,6 +22,7 @@
 
 #include "treestore.hpp"
 
+#pragma pack(push, 1)
 template <int DigestSize>
 struct HashNode {
 	enum State {
@@ -39,6 +40,7 @@ struct HashNode {
 		return res;
 	}
 };
+#pragma pack(pop)
 
 const static byte TREE_INTERNAL_PREFIX = 0x01;
 const static byte TREE_LEAF_PREFIX = 0x00;
@@ -68,30 +70,33 @@ public:
 		computeLeaf(input, length, current.digest);
 		current.state = Node::State::SET;
 
+		Node currentCpy = current;
+
 		while (not currentIdx.isRoot()) {
+			NodeIdx siblingIdx = currentIdx.sibling();
+			Node siblingCpy = _store[siblingIdx];
+
 			NodeIdx parentIdx = currentIdx.parent();
 			Node& parent = _store[parentIdx];
-			if (parent.state == Node::State::SET)
+			if (parent.state == Node::State::SET) // TODO: Should probably verify it?
 				break;
 
-			NodeIdx siblingIdx = currentIdx.sibling();
 			if (siblingIdx.isValid()) {
-				Node& sibling = _store[siblingIdx];
-				if (sibling.state != Node::State::SET) {
+				if (siblingCpy.state != Node::State::SET) {
 					break;
 				} else {
 					BOOST_ASSERT(!(currentIdx == siblingIdx));
 					if (siblingIdx < currentIdx)
-						computeInternal(sibling, current, parent);
+						computeInternal(siblingCpy, currentCpy, parent);
 					else
-						computeInternal(current, sibling, parent);
+						computeInternal(currentCpy, siblingCpy, parent);
 				}
 			} else {
-				memcpy(parent.digest, current.digest, DIGESTSIZE);
+				memcpy(parent.digest, currentCpy.digest, DIGESTSIZE);
 			}
 			parent.state = Node::State::SET;
 			currentIdx = parentIdx;
-			current = parent;
+			currentCpy = parent;
 		}
 	}
 
