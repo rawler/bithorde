@@ -20,6 +20,7 @@
 module lib.digest.Tiger;
 
 private import tango.core.ByteSwap;
+private import tango.core.Exception;
 
 private import lib.digest.stateful;
 private import lib.digest.MerkleDamgard;
@@ -95,14 +96,17 @@ final class Tiger : MerkleDamgard, IStatefulDigest
         ***********************************************************************/
         size_t load(ubyte[] buf) {
                 const cs = context.sizeof;
+                const ns = npass.sizeof;
+                const store_size = cs+ns;
+                if (buf.length < store_size)
+                        throw new IOException("Insufficient data");
                 auto cmem = cast(ubyte[])context;
                 cmem[0..$] = buf[0..cs];
                 ne.bswapa64(cmem);
-                const ns = npass.sizeof;
                 auto nmem = (cast(ubyte*)&npass)[0..ns];
                 nmem[0..$] = buf[cs..cs+ns];
                 ne.bswapa32(nmem);
-                return cs + ns + super.load(buf[cs+ns..$]);
+                return store_size + super.load(buf[cs+ns..$]);
         }
 
         /***********************************************************************

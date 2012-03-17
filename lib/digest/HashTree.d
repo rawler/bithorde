@@ -18,6 +18,7 @@
  ******************************************************************************/
 module lib.digest.HashTree;
 
+private import tango.core.Exception;
 private import tango.io.device.Array;
 private import tango.io.stream.Data;
 private import tango.util.container.more.Stack;
@@ -106,7 +107,8 @@ public:
                 assert(blen == digestSize);
                 h = allocDigestBuf;
                 auto r = inp.read(h);
-                assert(r == blen);
+                if (r != blen)
+                    throw new IOException("Failed to load expected hashing-state.");
             }
         }
         segmentsize = inp.int32;

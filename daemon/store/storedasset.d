@@ -179,13 +179,21 @@ public:
      ************************************************************************************/
     void assetOpen(FilePath path, File.Style style) {
         hashedPtr = cacheMap.header.hashedAmount;
+        void loadFailed(HashType type) {
+            if (hashedPtr != 0)
+                log.warn("Missing {} in stored hashState. Forced-reset, will trigger rehash.", HashMap[type].name);
+            resetHashes();
+        }
         foreach (type, hasher; hashers) {
             if (type in cacheMap.header.hashes) {
-                hasher.load(cacheMap.header.hashes[type]);
+                try {
+                    hasher.load(cacheMap.header.hashes[type]);
+                } catch (Exception e) {
+                    loadFailed(type);
+                    break;
+                }
             } else {
-                if (hashedPtr != 0)
-                    log.warn("Missing {} in stored hashState. Forced-reset, will trigger blocking rehash.", HashMap[type]);
-                resetHashes();
+                loadFailed(type);
                 break;
             }
         }

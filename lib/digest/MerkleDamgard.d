@@ -19,6 +19,7 @@
 module lib.digest.MerkleDamgard;
 
 public  import tango.core.ByteSwap;
+private import tango.core.Exception;
 
 public  import tango.util.digest.Digest;
 
@@ -236,10 +237,14 @@ package class MerkleDamgard : Digest, IStatefulDigest
         ***********************************************************************/
         size_t load(ubyte[] buf) {
                 const bs = bytes.sizeof;
+                if (buf.length < bs)
+                        throw new IOException("Insufficient buffer");
                 auto bmem = (cast(ubyte*)&bytes)[0..bs];
                 bmem[0..$] = buf[0..bs];
                 ne.bswapa32(bmem);
                 auto bufFill = bytes % buffer.length;
+                if (buf.length < bs+bufFill)
+                        throw new IOException("Insufficient buffer");
                 buffer[0..bufFill] = buf[bs..bs+bufFill];
                 return bs+bufFill;
         }
