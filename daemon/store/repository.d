@@ -447,7 +447,10 @@ private:
         while (idMapFlusher) {
             try {
                 scanForChanges();
-                if (idMapDirty)
+            } catch (Exception e) {
+                log.error("Failed fs-sync with {}", e);
+            }
+            if (idMapDirty) try {
                     saveIdMap();
             } catch (Exception e) {
                 log.error("Failed flushing IdMap with {}", e);
