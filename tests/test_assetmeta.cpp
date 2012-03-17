@@ -11,8 +11,8 @@
 using namespace std;
 namespace fs = boost::filesystem;
 
-typedef HashNode< CryptoPP::Tiger::DIGESTSIZE > MyNode;
-typedef HashTree< CryptoPP::Tiger, AssetMeta > TigerTree;
+typedef HashNode< CryptoPP::Tiger > MyNode;
+typedef HashTree< MyNode, AssetMeta > TigerTree;
 
 const fs::path TEST_FILE("/tmp/assetmeta_test");
 

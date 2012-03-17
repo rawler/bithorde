@@ -23,8 +23,10 @@
 #include "treestore.hpp"
 
 #pragma pack(push, 1)
-template <int DigestSize>
+template <typename _HashAlgorithm>
 struct HashNode {
+	typedef _HashAlgorithm HashAlgorithm;
+	const static size_t DigestSize = HashAlgorithm::DIGESTSIZE;
 	enum State {
 		EMPTY = 0,
 		SET = 1,
@@ -45,12 +47,13 @@ struct HashNode {
 const static byte TREE_INTERNAL_PREFIX = 0x01;
 const static byte TREE_LEAF_PREFIX = 0x00;
 
-template <typename HashAlgorithm, typename BackingStore>
+template <typename HashNode, typename BackingStore>
 class HashTree
 {
 public:
-	typedef HashNode< HashAlgorithm::DIGESTSIZE > Node;
-	const static size_t DIGESTSIZE = HashAlgorithm::DIGESTSIZE;
+	typedef HashNode Node;
+	typedef typename HashNode::HashAlgorithm HashAlgorithm;
+	const static size_t DigestSize = HashNode::DigestSize;
 	const static size_t BLOCKSIZE = 1024;
 
 	HashTree(BackingStore& store) :
@@ -92,7 +95,7 @@ public:
 						computeInternal(currentCpy, siblingCpy, parent);
 				}
 			} else {
-				memcpy(parent.digest, currentCpy.digest, DIGESTSIZE);
+				memcpy(parent.digest, currentCpy.digest, DigestSize);
 			}
 			parent.state = Node::State::SET;
 			currentIdx = parentIdx;
@@ -109,8 +112,8 @@ private:
 
 	void computeInternal(const Node& leftChild, const Node& rightChild, Node& output) {
 		_hasher.Update(&TREE_INTERNAL_PREFIX, 1);
-		_hasher.Update(leftChild.digest, DIGESTSIZE);
-		_hasher.Update(rightChild.digest, DIGESTSIZE);
+		_hasher.Update(leftChild.digest, DigestSize);
+		_hasher.Update(rightChild.digest, DigestSize);
 		_hasher.Final(output.digest);
 	}
 

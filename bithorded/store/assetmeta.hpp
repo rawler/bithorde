@@ -26,7 +26,7 @@
 #include "bithorded/lib/hashtree.hpp"
 #include "lib/types.h"
 
-typedef HashNode<CryptoPP::Tiger::DIGESTSIZE> TigerNode;
+typedef HashNode<CryptoPP::Tiger> TigerNode;
 
 class AssetMeta
 {

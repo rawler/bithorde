@@ -8,9 +8,9 @@
 
 using namespace std;
 
-typedef HashNode< CryptoPP::Tiger::DIGESTSIZE > MyNode;
+typedef HashNode< CryptoPP::Tiger > MyNode;
 typedef vector< MyNode > Storage;
-typedef HashTree< CryptoPP::Tiger, Storage > TigerTree;
+typedef HashTree< MyNode, Storage > TigerTree;
 
 BOOST_AUTO_TEST_CASE( hashtree_random_sequence )
 {
