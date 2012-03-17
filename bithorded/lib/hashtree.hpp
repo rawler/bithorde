@@ -103,6 +103,11 @@ public:
 		}
 	}
 
+	bool isBlockSet(uint idx) {
+		NodeIdx block = _store.leaf(idx);
+		return _store[block].state == HashNode::State::SET;
+	}
+
 private:
 	void computeLeaf(const byte* input, size_t length, byte* output) {
 		_hasher.Update(&TREE_LEAF_PREFIX, 1);
