@@ -4,6 +4,7 @@
 // imported to bithorde from http://www.cryptopp.com/wiki/File:RFC4648-Base32.zip by Ulrik Mikaelsson
 
 #include <crypto++/pch.h>
+#include <crypto++/files.h>
 
 #include "bithorde.pb.h"
 
@@ -40,3 +41,16 @@ const int *RFC4648Base32Decoder::GetDefaultDecodingLookupArray()
 	return s_array;
 }
 
+std::ostream& operator<<(std::ostream& str, const BitHordeIds& ids)
+{
+	for (auto iter = ids.begin(); iter != ids.end(); iter++) {
+		str << bithorde::HashType_Name(iter->type()) << "=";
+		CryptoPP::StringSource(iter->id(), true,
+			new RFC4648Base32Encoder(
+				new CryptoPP::FileSink(str)
+			)
+		);
+		str << ", ";
+	}
+	return str;
+}

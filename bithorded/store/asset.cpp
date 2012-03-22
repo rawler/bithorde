@@ -46,11 +46,15 @@ size_t Asset::can_read(uint64_t offset, size_t size)
 	return res;
 }
 
-bool Asset::getRootHash(byte* buf)
+bool Asset::getIds(BitHordeIds& ids)
 {
+	BOOST_ASSERT( ids.size() == 0 );
 	TigerNode& root = _hasher.getRoot();
+
 	if (root.state == TigerNode::State::SET) {
-		memcpy(buf, root.digest, _hasher.DigestSize);
+		auto tigerId = ids.Add();
+		tigerId->set_type(bithorde::TREE_TIGER);
+		tigerId->set_id(root.digest, TigerNode::DigestSize);
 		return true;
 	} else {
 		return false;

@@ -1,3 +1,4 @@
+INCLUDE_DIRECTORIES (${PROTOC_OUT_DIR}) # For generated protobuf headers.
 
 ADD_EXECUTABLE(bithorded
 	lib/threadpool.cpp lib/threadpool.hpp
@@ -7,6 +8,7 @@ ADD_EXECUTABLE(bithorded
 
 	store/asset.cpp store/asset.hpp
 	store/assetmeta.cpp store/assetmeta.hpp
+	store/linkedassetstore.cpp store/linkedassetstore.hpp
 
 	main.cpp
 )

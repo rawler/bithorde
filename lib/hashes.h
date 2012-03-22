@@ -1,7 +1,13 @@
 #ifndef HASHES_H
 #define HASHES_H
 
+#include <ostream>
+
 #include <crypto++/basecode.h>
+
+#include "bithorde.pb.h"
+
+typedef google::protobuf::RepeatedPtrField< bithorde::Identifier > BitHordeIds;
 
 //! Converts given data to base 32, the code is based on http://www.faqs.org/rfcs/rfc4648.html.
 class RFC4648Base32Encoder : public CryptoPP::SimpleProxyFilter
@@ -31,5 +37,7 @@ public:
 private:
 	static const int * CRYPTOPP_API GetDefaultDecodingLookupArray();
 };
+
+std::ostream& operator<<(std::ostream& str, const BitHordeIds& ids);
 
 #endif // HASHES_H

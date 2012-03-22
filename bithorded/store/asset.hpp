@@ -19,16 +19,20 @@
 #define ASSET_H
 
 #include <boost/filesystem/path.hpp>
+#include <boost/shared_ptr.hpp>
 
 #include "assetmeta.hpp"
 
 #include "../lib/hashtree.hpp"
 #include "../lib/randomaccessfile.hpp"
 
+#include "bithorde.pb.h"
+
 class Asset
 {
 public:
 	typedef HashTree<TigerNode, AssetMeta> Hasher;
+	typedef boost::shared_ptr<Asset> Ptr;
 
 	/**
 	 * All writes must be aligned on this BLOCKSIZE, or the data might be trimmed in the ends.
@@ -75,7 +79,7 @@ public:
 	/**
 	 * Writes the root hash of the asset into /buf/. Buf is assumed to have capacity for Hasher::DIGESTSIZE
 	 */
-	bool getRootHash(byte* buf);
+	bool getIds(BitHordeIds& ids);
 
 private:
 	void updateHash(uint64_t offset, uint64_t end);
