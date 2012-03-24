@@ -19,7 +19,7 @@ TARGET_LINK_LIBRARIES ( bhupload
 	bithorde
 )
 
-PKG_SEARCH_MODULE (FUSE REQUIRED fuse)
+PKG_CHECK_MODULES (FUSE REQUIRED fuse)
 
 ADD_EXECUTABLE(bhfuse
 	bhfuse/fuse++.cpp bhfuse/fuse++.hpp
