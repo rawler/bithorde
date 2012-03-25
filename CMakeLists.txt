@@ -46,11 +46,12 @@ if(Boost_FOUND)
 	include_directories(${Boost_INCLUDE_DIRS})
 endif()
 
-INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR})
+INCLUDE_DIRECTORIES (${CMAKE_SOURCE_DIR})
 
 # Generate Protocol-buffer sources
 SET(PROTOBUF_REQUIRE_CPP TRUE)
 FIND_PACKAGE(ProtocolBuffers REQUIRED)
+INCLUDE_DIRECTORIES (${PROTOC_OUT_DIR}) # For generated protobuf headers.
 
 FIND_PACKAGE(PkgConfig REQUIRED)
 

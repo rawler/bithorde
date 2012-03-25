@@ -5,6 +5,8 @@
 
 #include <crypto++/pch.h>
 
+#include "bithorde.pb.h"
+
 static const byte s_vecUpper[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
 static const byte s_vecLower[] = "abcdefghijklmnopqrstuvwxyz234567";
 
