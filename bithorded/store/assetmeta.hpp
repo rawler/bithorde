@@ -35,8 +35,12 @@ public:
 
 	TigerNode& operator[](const size_t offset);
 	size_t size();
+
+	const boost::filesystem::path& path() const;
 private:
 	void repage(uint64_t offset);
+
+	boost::filesystem::path _path;
 
 	boost::iostreams::mapped_file_params _fp;
 	boost::iostreams::mapped_file _f;

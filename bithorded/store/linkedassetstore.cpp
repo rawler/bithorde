@@ -93,7 +93,46 @@ void LinkedAssetStore::addAsset(const boost::filesystem3::path& file, LinkedAsse
 	}
 	fs::path metaPath = _metaFolder / random_string(20);
 	Asset::Ptr asset = boost::make_shared<Asset>(file, metaPath);
-	HashTask* task = new HashTask(asset, _ioSvc, handler);
+	HashTask* task = new HashTask(asset, _ioSvc, boost::bind(&LinkedAssetStore::_addAsset, this, _1, handler));
 	_threadPool.post(*task);
 }
+
+void LinkedAssetStore::_addAsset(Asset::Ptr& asset, LinkedAssetStore::ResultHandler upstream)
+{
+	BitHordeIds ids;
+	if (asset.get() && asset->getIds(ids)) {
+		for (auto iter=ids.begin(); iter != ids.end(); iter++) {
+			if (iter->type() == bithorde::HashType::TREE_TIGER) {
+				fs::path link = _tigerFolder / base32encode(iter->id());
+				if (fs::exists(fs::symlink_status(link)))
+					fs::remove(link);
+
+				// TODO: make links relative instead, so storage can be moved around a little.
+				fs::create_symlink(fs::absolute(asset->storageFile()), link);
+
+				link.replace_extension(".meta");
+				if (fs::exists(fs::symlink_status(link)))
+					fs::remove(link);
+				fs::create_symlink(fs::absolute(asset->metaFile()), link);
+			}
+		}
+	}
+	upstream(asset);
+}
+
+Asset::Ptr LinkedAssetStore::findAsset(const BitHordeIds& ids)
+{
+	for (auto iter=ids.begin(); iter != ids.end(); iter++) {
+		if (iter->type() == bithorde::HashType::TREE_TIGER) {
+			fs::path link = _tigerFolder / base32encode(iter->id());
+			if (fs::symbolic_link_exists(link)) {
+				fs::path metaFile(link);
+				metaFile.replace_extension(".meta");
+				return boost::make_shared<Asset>(link, metaFile);
+			}
+		}
+	}
+	return Asset::Ptr();
+}
+
 

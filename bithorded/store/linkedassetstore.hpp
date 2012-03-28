@@ -31,7 +31,7 @@ typedef google::protobuf::RepeatedPtrField< bithorde::Identifier > BitHordeIds;
 class LinkedAssetStore
 {
 public:
-	typedef boost::function< void ( boost::shared_ptr<Asset> )> ResultHandler;
+	typedef boost::function< void ( Asset::Ptr )> ResultHandler;
 	
 	LinkedAssetStore(boost::asio::io_service& ioSvc, const boost::filesystem::path& baseDir);
 
@@ -46,9 +46,11 @@ public:
 	/**
 	 * Finds an asset by bithorde HashId. (Only the tiger-hash is actually used)
 	 */
-	void findAsset(const BitHordeIds& ids);
+	Asset::Ptr findAsset(const BitHordeIds& ids);
 
 private:
+	void _addAsset(Asset::Ptr& asset, ResultHandler upstream);
+
 	ThreadPool _threadPool;
 	boost::asio::io_service& _ioSvc;
 	boost::filesystem::path _baseDir;

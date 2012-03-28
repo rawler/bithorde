@@ -21,6 +21,15 @@ void RFC4648Base32Encoder::IsolatedInitialize(const NameValuePairs &parameters)
 		MakeParameters(Name::EncodingLookupArray(), uppercase ? &s_vecUpper[0] : &s_vecLower[0], false)(Name::Log2Base(), 5, true)));
 }
 
+std::string base32encode(const std::string& s)
+{
+	std::string res;
+	CryptoPP::StringSource(s, true,
+	new RFC4648Base32Encoder(
+		new CryptoPP::StringSink(res)));
+	return res;
+}
+
 void RFC4648Base32Decoder::IsolatedInitialize(const NameValuePairs &parameters)
 {
 	BaseN_Decoder::Initialize(CombinedNameValuePairs(

@@ -24,6 +24,7 @@
 
 class RandomAccessFile {
 	int _fd;
+	const boost::filesystem::path _path;
 public:
 	const static size_t WINDOW_SIZE = 65536;
 
@@ -33,12 +34,12 @@ public:
 	/**
 	 * The number of bytes in the open file
 	 */
-	uint64_t size();
+	uint64_t size() const;
 
 	/**
 	 * The number of blocks of /blockSize/ required to hold all file content
 	 */
-	uint blocks(size_t blockSize);
+	uint blocks(size_t blockSize) const;
 
 	/**
 	 * Reads up to /size/ bytes from file and returns a pointer to the data.
@@ -53,6 +54,11 @@ public:
 	 * Writes up to /size/ bytes to file beginning at /offset/.
 	 */
 	ssize_t write(uint64_t offset, void* src, size_t size);
+
+	/**
+	 * Return the path used to open the file
+	 */
+	const boost::filesystem::path& path() const;
 };
 
 #endif // RANDOMACCESSFILE_H

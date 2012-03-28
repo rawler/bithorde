@@ -101,6 +101,16 @@ uint64_t Asset::size() {
 	return _file.size();
 }
 
+boost::filesystem3::path Asset::storageFile()
+{
+	return _file.path();
+}
+
+boost::filesystem3::path Asset::metaFile()
+{
+	return _metaStore.path();
+}
+
 void Asset::updateHash(uint64_t offset, uint64_t end)
 {
 	byte BUF[BLOCKSIZE];

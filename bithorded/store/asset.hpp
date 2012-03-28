@@ -81,6 +81,15 @@ public:
 	 */
 	bool getIds(BitHordeIds& ids);
 
+	/**
+	 * Get the path to the file used for storing actual blocks
+	 */
+	boost::filesystem::path storageFile();
+
+	/**
+	 * Get the path to the file used for storing meta-info such as the hashtree
+	 */
+	boost::filesystem::path metaFile();
 private:
 	void updateHash(uint64_t offset, uint64_t end);
 

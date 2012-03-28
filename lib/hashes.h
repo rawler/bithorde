@@ -26,6 +26,8 @@ public:
 	void IsolatedInitialize(const CryptoPP::NameValuePairs &parameters);
 };
 
+std::string base32encode(const std::string& s);
+
 //! Decode base 32 data back to bytes, the code is based on http://www.faqs.org/rfcs/rfc4648.html.
 class RFC4648Base32Decoder : public CryptoPP::BaseN_Decoder
 {

@@ -43,7 +43,7 @@ struct Header {
 #pragma pack(pop)
 
 AssetMeta::AssetMeta(const boost::filesystem::path& path, uint leafBlocks)
-	: _fp(path.string()), _f()
+	: _path(path), _fp(path.string()), _f()
 {
 	_fp.flags = io::mapped_file::mapmode::readwrite;
 	_fp.offset = 0;
@@ -106,4 +106,7 @@ size_t AssetMeta::size()
 	return (_file_size - _nodes_offset) / sizeof(TigerNode);
 }
 
-
+const boost::filesystem3::path& AssetMeta::path() const
+{
+	return _path;
+}

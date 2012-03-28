@@ -24,6 +24,7 @@
 #include <sys/stat.h>
 
 RandomAccessFile::RandomAccessFile(const boost::filesystem::path& path)
+	: _path(path)
 {
 	_fd = open(path.c_str(), O_RDWR);
 	if (_fd < 0)
@@ -36,14 +37,14 @@ RandomAccessFile::~RandomAccessFile()
 		close(_fd);
 }
 
-uint64_t RandomAccessFile::size()
+uint64_t RandomAccessFile::size() const
 {
 	struct stat s;
 	fstat(_fd, &s);
 	return s.st_size;
 }
 
-uint RandomAccessFile::blocks(size_t blockSize)
+uint RandomAccessFile::blocks(size_t blockSize) const
 {
 	// Round up the number of blocks
 	return (size() + blockSize - 1) / blockSize;
@@ -68,6 +69,11 @@ ssize_t RandomAccessFile::write(uint64_t offset, void* src, size_t size)
 	ssize_t written = pwrite64(_fd, src, size, offset);
 	BOOST_ASSERT( (size_t)written == size ); // TODO: Real error-handling
 	return written;
+}
+
+const boost::filesystem3::path& RandomAccessFile::path() const
+{
+	return _path;
 }
 
 

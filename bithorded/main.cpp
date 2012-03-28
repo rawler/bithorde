@@ -14,13 +14,20 @@ namespace asio = boost::asio;
 namespace fs = boost::filesystem;
 namespace po = boost::program_options;
 
-void whenDone(boost::shared_ptr<LinkedAssetStore> assetStore, boost::shared_ptr<Asset> a) {
+void whenDone(boost::shared_ptr<LinkedAssetStore> assetStore, Asset::Ptr a) {
 	if (a == NULL) {
 		cerr << "Failed" << endl;
 	} else {
 		google::protobuf::RepeatedPtrField<bithorde::Identifier> ids;
 		a->getIds(ids);
 
+		cerr << ids << endl;
+
+		Asset::Ptr sameAsset = assetStore->findAsset(ids);
+
+		BOOST_ASSERT(sameAsset.get());
+		ids.Clear();
+		sameAsset->getIds(ids);
 		cerr << ids << endl;
 	}
 }
