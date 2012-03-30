@@ -15,8 +15,8 @@
 */
 
 
-#ifndef ASSET_H
-#define ASSET_H
+#ifndef BITHORDED_ASSET_H
+#define BITHORDED_ASSET_H
 
 #include <boost/filesystem/path.hpp>
 #include <boost/shared_ptr.hpp>
@@ -27,6 +27,8 @@
 #include "../lib/randomaccessfile.hpp"
 
 #include "bithorde.pb.h"
+
+namespace bithorded {
 
 class Asset
 {
@@ -98,4 +100,5 @@ private:
 	Hasher _hasher;
 };
 
-#endif // ASSET_H
+}
+#endif // BITHORDED_ASSET_H

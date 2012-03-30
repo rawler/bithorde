@@ -1,5 +1,5 @@
-#ifndef CLIENT_H
-#define CLIENT_H
+#ifndef BITHORDE_CLIENT_H
+#define BITHORDE_CLIENT_H
 
 #include <map>
 #include <string>
@@ -13,6 +13,8 @@
 #include "asset.h"
 #include "connection.h"
 #include "allocator.h"
+
+namespace bithorde {
 
 class Client
 	: public boost::signals::trackable, public boost::enable_shared_from_this<Client>
@@ -84,4 +86,6 @@ private:
 	void releaseRPCRequest(int reqId);
 };
 
-#endif // CLIENT_H
+}
+
+#endif // BITHORDE_CLIENT_H

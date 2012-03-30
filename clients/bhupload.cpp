@@ -11,6 +11,8 @@ namespace po = boost::program_options;
 namespace fs = boost::filesystem;
 using namespace std;
 
+using namespace bithorde;
+
 const static size_t BLOCK_SIZE = (64*1024);
 
 BHUpload::BHUpload(boost::program_options::variables_map &args) :

@@ -5,6 +5,8 @@
 
 using namespace std;
 
+using namespace bithorde;
+
 Asset::Asset(ClientPointer client) :
 	_client(client),
 	_handle(-1),

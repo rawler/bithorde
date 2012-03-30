@@ -1,5 +1,5 @@
-#ifndef CLIPROGRESSBAR_H
-#define CLIPROGRESSBAR_H
+#ifndef BITHORDE_CLIPROGRESSBAR_H
+#define BITHORDE_CLIPROGRESSBAR_H
 
 #include <ostream>
 
@@ -21,4 +21,4 @@ private:
 	void tick();
 };
 
-#endif // CLIPROGRESSBAR_H
+#endif // BITHORDE_CLIPROGRESSBAR_H

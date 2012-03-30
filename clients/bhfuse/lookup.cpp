@@ -6,6 +6,8 @@
 
 using namespace std;
 
+using namespace bithorde;
+
 Lookup::Lookup(BHFuse * fs, fuse_req_t req, MagnetURI & uri, LookupParams& p) :
     fs(fs),
     req(req),

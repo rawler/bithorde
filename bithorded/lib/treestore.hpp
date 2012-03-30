@@ -17,8 +17,8 @@
 
 /// TreeStore as described briefly in http://www.lucidchart.com/publicSegments/view/4f5910e5-22dc-4b22-ba2c-6fee0a7c6148
 
-#ifndef TREESTORE_H
-#define TREESTORE_H
+#ifndef BITHORDED_TREESTORE_H
+#define BITHORDED_TREESTORE_H
 
 #include <math.h>
 #include <stdint.h>
@@ -109,4 +109,4 @@ private:
 	uint _leaves;
 };
 
-#endif // TREESTORE_H
+#endif // BITHORDED_TREESTORE_H

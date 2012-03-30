@@ -11,6 +11,8 @@
 using namespace std;
 namespace fs = boost::filesystem;
 
+using namespace bithorded;
+
 typedef HashNode< CryptoPP::Tiger > MyNode;
 typedef HashTree< MyNode, AssetMeta > TigerTree;
 

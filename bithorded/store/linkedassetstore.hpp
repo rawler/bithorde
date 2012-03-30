@@ -15,8 +15,8 @@
 */
 
 
-#ifndef LINKEDASSETSTORE_HPP
-#define LINKEDASSETSTORE_HPP
+#ifndef BITHORDED_LINKEDASSETSTORE_HPP
+#define BITHORDED_LINKEDASSETSTORE_HPP
 
 #include <boost/asio/io_service.hpp>
 #include <boost/filesystem/path.hpp>
@@ -25,6 +25,8 @@
 #include "asset.hpp"
 #include "bithorde.pb.h"
 #include "../lib/threadpool.hpp"
+
+namespace bithorded {
 
 typedef google::protobuf::RepeatedPtrField< bithorde::Identifier > BitHordeIds;
 
@@ -58,4 +60,5 @@ private:
 	boost::filesystem::path _tigerFolder;
 };
 
-#endif // LINKEDASSETSTORE_HPP
+}
+#endif // BITHORDED_LINKEDASSETSTORE_HPP

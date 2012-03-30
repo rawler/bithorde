@@ -13,6 +13,8 @@ namespace po = boost::program_options;
 
 static asio::io_service ioSvc;
 
+using namespace bithorde;
+
 void sigint(int sig) {
 	cerr << "Intercepted signal#" << sig << endl;
 	if (sig == SIGINT) {

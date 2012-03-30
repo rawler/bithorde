@@ -27,6 +27,8 @@ using namespace std;
 namespace asio = boost::asio;
 namespace fs = boost::filesystem;
 
+using namespace bithorded;
+
 const fs::path META_DIR = ".bh_meta/assets";
 const fs::path TIGER_DIR = ".bh_meta/tiger";
 

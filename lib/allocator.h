@@ -1,5 +1,5 @@
-#ifndef ALLOCATOR_H
-#define ALLOCATOR_H
+#ifndef BITHORDE_ALLOCATOR_H
+#define BITHORDE_ALLOCATOR_H
 
 #include <queue>
 

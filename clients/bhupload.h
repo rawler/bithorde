@@ -24,8 +24,8 @@ class BHUpload {
 	boost::asio::io_service _ioSvc;
 	boost::signals::connection _writeConnection;
 	std::list<boost::filesystem::path> _files;
-	Client::Pointer _client;
-	UploadAsset * _currentAsset;
+	bithorde::Client::Pointer _client;
+	bithorde::UploadAsset * _currentAsset;
 	std::ifstream _currentFile;
 	uint64_t _currentOffset;
 	Buffer _readBuf;

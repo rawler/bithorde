@@ -19,6 +19,8 @@
 
 using namespace std;
 
+using namespace bithorded;
+
 Asset::Asset(const boost::filesystem3::path& filePath, const boost::filesystem3::path& metaPath) :
   _file(filePath),
   _metaStore(metaPath, _file.blocks(BLOCKSIZE)),

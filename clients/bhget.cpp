@@ -10,6 +10,8 @@ namespace asio = boost::asio;
 namespace po = boost::program_options;
 using namespace std;
 
+using namespace bithorde;
+
 const static size_t BLOCK_SIZE = (64*1024);
 
 struct OutQueue {

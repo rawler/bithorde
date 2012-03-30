@@ -1,5 +1,5 @@
-#ifndef MAGNETURI_H
-#define MAGNETURI_H
+#ifndef BITHORDE_MAGNETURI_H
+#define BITHORDE_MAGNETURI_H
 
 #include <iostream>
 #include <string>
@@ -29,10 +29,10 @@ struct MagnetURI
 	std::vector<ExactIdentifier> xtIds;
 	uint64_t size;
 
-	ReadAsset::IdList toIdList();
+	bithorde::ReadAsset::IdList toIdList();
 
 	friend std::ostream & operator<<(std::ostream&, const MagnetURI&);
 };
 std::ostream& operator<<(std::ostream&,const MagnetURI&);
 
-#endif // MAGNETURI_H
+#endif // BITHORDE_MAGNETURI_H

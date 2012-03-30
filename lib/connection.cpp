@@ -19,6 +19,8 @@ const size_t SEND_BUF_LOW_WATER_MARK = MAX_MSG;
 namespace asio = boost::asio;
 using namespace std;
 
+using namespace bithorde;
+
 template <typename Protocol>
 class ConnectionImpl : public Connection {
 	typedef typename Protocol::socket Socket;

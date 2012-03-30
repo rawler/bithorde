@@ -84,15 +84,15 @@ bool MagnetURI::parse(const string& uri_)
 	return true;
 }
 
-ReadAsset::IdList MagnetURI::toIdList ()
+bithorde::ReadAsset::IdList MagnetURI::toIdList ()
 {
-	ReadAsset::IdList ids;
+	bithorde::ReadAsset::IdList ids;
 
 	vector<ExactIdentifier>::iterator iter;
 	for (iter=xtIds.begin(); iter != xtIds.end(); iter++) {
 		ByteArray hashId(iter->id.begin(), iter->id.end());
 		if (iter->type == "urn:tree:tiger")
-			ids.push_back(ReadAsset::Identifier(bithorde::TREE_TIGER, hashId));
+			ids.push_back(bithorde::ReadAsset::Identifier(bithorde::TREE_TIGER, hashId));
 	}
 
 	return ids;

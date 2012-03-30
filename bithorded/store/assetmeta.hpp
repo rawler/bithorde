@@ -15,8 +15,8 @@
 */
 
 
-#ifndef ASSETMETA_H
-#define ASSETMETA_H
+#ifndef BITHORDED_ASSETMETA_H
+#define BITHORDED_ASSETMETA_H
 
 #include <boost/filesystem/path.hpp>
 #include <boost/iostreams/device/mapped_file.hpp>
@@ -25,6 +25,8 @@
 
 #include "bithorded/lib/hashtree.hpp"
 #include "lib/types.h"
+
+namespace bithorded {
 
 typedef HashNode<CryptoPP::Tiger> TigerNode;
 
@@ -50,4 +52,5 @@ private:
 	size_t _file_size;
 };
 
-#endif // ASSETMETA_H
+}
+#endif // BITHORDED_ASSETMETA_H

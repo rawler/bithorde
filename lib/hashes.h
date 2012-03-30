@@ -1,5 +1,5 @@
-#ifndef HASHES_H
-#define HASHES_H
+#ifndef BITHORDE_HASHES_H
+#define BITHORDE_HASHES_H
 
 #include <ostream>
 
@@ -42,4 +42,4 @@ private:
 
 std::ostream& operator<<(std::ostream& str, const BitHordeIds& ids);
 
-#endif // HASHES_H
+#endif // BITHORDE_HASHES_H

@@ -15,8 +15,8 @@
 */
 
 
-#ifndef THREADPOOL_HPP
-#define THREADPOOL_HPP
+#ifndef BITHORDED_THREADPOOL_HPP
+#define BITHORDED_THREADPOOL_HPP
 
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/thread.hpp>
@@ -62,4 +62,4 @@ private:
 	std::queue<Task*> _tasks;
 };
 
-#endif // THREADPOOL_HPP
+#endif // BITHORDED_THREADPOOL_HPP

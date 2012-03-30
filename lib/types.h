@@ -1,5 +1,5 @@
-#ifndef TYPES_H
-#define TYPES_H
+#ifndef BITHORDE_TYPES_H
+#define BITHORDE_TYPES_H
 
 #include <stdexcept>
 #include <stdlib.h>
@@ -67,4 +67,4 @@ struct Buffer {
 	}
 };
 
-#endif // TYPES_H
+#endif // BITHORDE_TYPES_H

@@ -19,12 +19,12 @@ class Lookup : public boost::signals::trackable
 	fuse_file_info * fi;   // Set if came from fuse_open()
 	FUSEAsset * fuseAsset; // Set if came from fuse_open()
 	LookupParams lookup_params;   // Set if came from fuse_lookup()
-	ReadAsset * asset;
+	bithorde::ReadAsset * asset;
 public:
     explicit Lookup(BHFuse * fs, fuse_req_t req, MagnetURI & uri, LookupParams& p);
     explicit Lookup(BHFuse * fs, FUSEAsset * asset, fuse_req_t req, fuse_file_info * fi);
 
-    void perform(Client::Pointer& c);
+    void perform(bithorde::Client::Pointer& c);
 
 private:
     void onStatusUpdate(const bithorde::AssetStatus & msg);

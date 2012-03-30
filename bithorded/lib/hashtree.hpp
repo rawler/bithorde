@@ -14,8 +14,8 @@
     limitations under the License.
 */
 
-#ifndef HASHTREE_H
-#define HASHTREE_H
+#ifndef BITHORDED_HASHTREE_H
+#define BITHORDED_HASHTREE_H
 
 #include "lib/hashes.h"
 #include "lib/types.h"
@@ -127,4 +127,4 @@ private:
 	uint _leaves;
 };
 
-#endif // HASHTREE_H
+#endif // BITHORDED_HASHTREE_H

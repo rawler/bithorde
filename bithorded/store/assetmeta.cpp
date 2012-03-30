@@ -20,6 +20,7 @@
 #include <netinet/in.h>
 
 using namespace std;
+using namespace bithorded;
 
 const static size_t MAP_PAGE = 64*1024*1024;
 

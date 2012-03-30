@@ -15,8 +15,8 @@
 */
 
 
-#ifndef RANDOMACCESSFILE_H
-#define RANDOMACCESSFILE_H
+#ifndef BITHORDED_RANDOMACCESSFILE_H
+#define BITHORDED_RANDOMACCESSFILE_H
 
 #include <boost/filesystem/path.hpp>
 
@@ -61,4 +61,4 @@ public:
 	const boost::filesystem::path& path() const;
 };
 
-#endif // RANDOMACCESSFILE_H
+#endif // BITHORDED_RANDOMACCESSFILE_H

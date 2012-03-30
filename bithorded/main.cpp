@@ -14,6 +14,8 @@ namespace asio = boost::asio;
 namespace fs = boost::filesystem;
 namespace po = boost::program_options;
 
+using namespace bithorded;
+
 void whenDone(boost::shared_ptr<LinkedAssetStore> assetStore, Asset::Ptr a) {
 	if (a == NULL) {
 		cerr << "Failed" << endl;

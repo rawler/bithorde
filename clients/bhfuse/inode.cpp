@@ -14,6 +14,8 @@ static const int REBIND_INTERVAL_MS = 500;
 using namespace std;
 namespace asio = boost::asio;
 
+using namespace bithorde;
+
 INode::INode(BHFuse *fs, fuse_ino_t ino, LookupParams& lookup_params) :
 	fs(fs),
 	_refCount(1),

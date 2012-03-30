@@ -15,6 +15,8 @@ using namespace std;
 namespace asio = boost::asio;
 namespace xpressive = boost::xpressive;
 
+using namespace bithorde;
+
 uint64_t rand64() {
 	// TODO: improve seeding throuh srandomdev
 	return (((uint64_t)rand()) << 32) | rand();

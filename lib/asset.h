@@ -1,5 +1,5 @@
-#ifndef ASSET_H
-#define ASSET_H
+#ifndef BITHORDE_ASSET_H
+#define BITHORDE_ASSET_H
 
 #include <inttypes.h>
 #include <utility>
@@ -11,6 +11,8 @@
 
 #include "bithorde.pb.h"
 #include "types.h"
+
+namespace bithorde {
 
 class Client;
 
@@ -76,4 +78,6 @@ protected:
 	virtual void handleMessage(const bithorde::Read::Response &msg);
 };
 
-#endif // ASSET_H
+}
+
+#endif // BITHORDE_ASSET_H

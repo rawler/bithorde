@@ -1,5 +1,5 @@
-#ifndef CONNECTION_H
-#define CONNECTION_H
+#ifndef BITHORDE_CONNECTION_H
+#define BITHORDE_CONNECTION_H
 
 #include <queue>
 
@@ -10,6 +10,8 @@
 
 #include "bithorde.pb.h"
 #include "types.h"
+
+namespace bithorde {
 
 class Connection
 	: public boost::enable_shared_from_this<Connection>
@@ -70,4 +72,6 @@ private:
 	template <class T> bool dequeue(MessageType type, ::google::protobuf::io::CodedInputStream &stream);
 };
 
-#endif // CONNECTION_H
+}
+
+#endif // BITHORDE_CONNECTION_H

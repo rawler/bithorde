@@ -20,13 +20,13 @@ public:
 	virtual int fuse_release(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi);
 	virtual int fuse_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, fuse_file_info *fi);
 
-	Client::Pointer client;
+	bithorde::Client::Pointer client;
 	boost::asio::io_service& ioSvc;
 	std::string bithorded;
 
 public:
 	void onConnected(std::string remoteName);
-	FUSEAsset * registerAsset(ReadAsset *asset, LookupParams& LookupParams);
+	FUSEAsset * registerAsset(bithorde::ReadAsset *asset, LookupParams& LookupParams);
 	void reconnect();
 
 private:
