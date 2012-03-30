@@ -22,7 +22,7 @@ class BHUpload {
 
 	// Internal items
 	boost::asio::io_service _ioSvc;
-	boost::signals::connection _writeConnection;
+	boost::signals2::connection _writeConnection;
 	std::list<boost::filesystem::path> _files;
 	bithorde::Client::Pointer _client;
 	bithorde::UploadAsset * _currentAsset;

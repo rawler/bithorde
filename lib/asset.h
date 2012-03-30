@@ -5,8 +5,9 @@
 #include <utility>
 #include <vector>
 
+#include <boost/bind/placeholders.hpp>
 #include <boost/bind/arg.hpp>
-#include <boost/signal.hpp>
+#include <boost/signals2.hpp>
 #include <boost/shared_ptr.hpp>
 
 #include "bithorde.pb.h"
@@ -15,6 +16,8 @@
 namespace bithorde {
 
 class Client;
+
+static boost::arg<1> ASSET_ARG_STATUS;
 
 class Asset
 {
@@ -28,9 +31,10 @@ public:
 	bool isBound();
 	uint64_t size();
 
-	boost::signal<void ()> closed;
-	boost::signal<void (const bithorde::AssetStatus&)> statusUpdate;
-	static boost::arg<1> STATUS;
+	typedef boost::signals2::signal<void (const bithorde::AssetStatus&)> StatusSignal;
+	typedef boost::signals2::signal<void ()> VoidSignal;
+	VoidSignal closed;
+	StatusSignal statusUpdate;
 
 	void close();
 protected:
@@ -43,6 +47,10 @@ protected:
 	virtual void handleMessage(const bithorde::Read::Response &msg) = 0;
 };
 
+static boost::arg<1> ASSET_ARG_OFFSET;
+static boost::arg<2> ASSET_ARG_DATA;
+static boost::arg<3> ASSET_ARG_TAG;
+
 class ReadAsset : public Asset
 {
 public:
@@ -54,10 +62,8 @@ public:
 	int aSyncRead(uint64_t offset, ssize_t size);
 	const IdList & requestIds() const;
 
-	boost::signal<void (uint64_t offset, ByteArray& data, int tag)> dataArrived;
-	static boost::arg<1> OFFSET;
-	static boost::arg<2> DATA;
-	static boost::arg<3> TAG;
+	typedef boost::signals2::signal<void (uint64_t offset, ByteArray& data, int tag)> DataSignal;
+	DataSignal dataArrived;
 
 protected:
 	virtual void handleMessage(const bithorde::AssetStatus &msg);

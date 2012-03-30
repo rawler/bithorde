@@ -6,7 +6,8 @@
 #include <boost/asio/io_service.hpp>
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/local/stream_protocol.hpp>
-#include <boost/signal.hpp>
+#include <boost/signals2.hpp>
+#include <boost/smart_ptr/enable_shared_from_this.hpp>
 
 #include "bithorde.pb.h"
 #include "types.h"
@@ -40,9 +41,11 @@ public:
 	static Pointer create(boost::asio::io_service& ioSvc, const boost::asio::local::stream_protocol::endpoint& addr);
 	static Pointer create(boost::asio::io_service& ioSvc, const boost::asio::ip::tcp::endpoint& addr);
 
-	boost::signal<void ()> disconnected;
-	boost::signal<void (MessageType, ::google::protobuf::Message&)> message;
-	boost::signal<void ()> writable;
+	typedef boost::signals2::signal<void ()> VoidSignal;
+	typedef boost::signals2::signal<void (MessageType, ::google::protobuf::Message&)> MessageSignal;
+	VoidSignal disconnected;
+	MessageSignal message;
+	VoidSignal writable;
 
 public:
 	bool sendMessage(MessageType type, const ::google::protobuf::Message & msg, bool prioritized=false);

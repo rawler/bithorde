@@ -37,9 +37,10 @@ void Client::connect(Connection::Pointer newConn) {
 
 	_rpcIdAllocator.reset();
 	_connection = newConn;
-	_connection->message.connect(boost::bind(&Client::onIncomingMessage, this, _1, _2));
+	auto shared_this = shared_from_this();
+	_connection->message.connect(Connection::MessageSignal::slot_type(&Client::onIncomingMessage, this, _1, _2).track(shared_this));
 	_connection->writable.connect(writable);
-	_connection->disconnected.connect(boost::bind(&Client::onDisconnected, this));
+	_connection->disconnected.connect(Connection::VoidSignal::slot_type(&Client::onDisconnected, this).track(shared_this));
 
 	sayHello();
 }

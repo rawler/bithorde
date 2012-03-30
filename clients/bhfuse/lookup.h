@@ -1,7 +1,7 @@
 #ifndef LOOKUP_H
 #define LOOKUP_H
 
-#include <boost/signals/trackable.hpp>
+#include <boost/smart_ptr/enable_shared_from_this.hpp>
 
 #include <fuse_lowlevel.h>
 
@@ -12,7 +12,7 @@ typedef std::pair<fuse_ino_t, std::string> LookupParams;
 class BHFuse;
 class FUSEAsset;
 
-class Lookup : public boost::signals::trackable
+class Lookup : public boost::enable_shared_from_this<Lookup>
 {
 	BHFuse * fs;
 	fuse_req_t req;

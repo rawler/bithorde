@@ -52,7 +52,7 @@ struct BHReadOperation {
 	BHReadOperation(fuse_req_t req, off_t off, size_t size);
 };
 
-class FUSEAsset : public INode, public boost::signals::trackable {
+class FUSEAsset : public INode, public boost::enable_shared_from_this<FUSEAsset> {
 public:
 	FUSEAsset(BHFuse *fs, fuse_ino_t ino, bithorde::ReadAsset * asset, LookupParams& lookup_params);
 	virtual ~FUSEAsset();

@@ -8,7 +8,8 @@
 #include <boost/asio/local/stream_protocol.hpp>
 #include <boost/bind.hpp>
 #include <boost/make_shared.hpp>
-#include <boost/signal.hpp>
+#include <boost/signals2.hpp>
+#include <boost/smart_ptr/enable_shared_from_this.hpp>
 
 #include "asset.h"
 #include "connection.h"
@@ -17,7 +18,7 @@
 namespace bithorde {
 
 class Client
-	: public boost::signals::trackable, public boost::enable_shared_from_this<Client>
+	: public boost::enable_shared_from_this<Client>
 {
 	boost::asio::io_service& _ioSvc;
 	Connection::Pointer _connection;
@@ -45,6 +46,7 @@ public:
 
 	void connect(boost::asio::ip::tcp::endpoint& ep);
 	void connect(boost::asio::local::stream_protocol::endpoint& ep);
+	void connect(Connection::Pointer newConn);
 
 	bool isConnected();
 
@@ -53,16 +55,15 @@ public:
 
 	bool sendMessage(Connection::MessageType type, const ::google::protobuf::Message & msg);
 
-	boost::signal<void (std::string&)> authenticated;
-	boost::signal<void ()> writable;
-	boost::signal<void ()> disconnected;
+	boost::signals2::signal<void (std::string&)> authenticated;
+	boost::signals2::signal<void ()> writable;
+	boost::signals2::signal<void ()> disconnected;
 
 protected:
 	Client(boost::asio::io_service& ioSvc, std::string myName);
 
 	void sayHello();
 
-	void connect(Connection::Pointer newConn);
 	void onDisconnected();
 	void onIncomingMessage(Connection::MessageType type, ::google::protobuf::Message& msg);
 
