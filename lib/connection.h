@@ -49,8 +49,9 @@ public:
 	MessageSignal message;
 	VoidSignal writable;
 
-public:
 	bool sendMessage(MessageType type, const ::google::protobuf::Message & msg, bool prioritized=false);
+
+	virtual void close() = 0;
 
 protected:
 	Connection(boost::asio::io_service& ioSvc);
@@ -62,8 +63,6 @@ protected:
 	void onWritten(const boost::system::error_code& err, size_t count);
 
 	bool encode(Connection::MessageType type, const::google::protobuf::Message &msg);
-
-	virtual void close() = 0;
 
 protected:
 	State _state;

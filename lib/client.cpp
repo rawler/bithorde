@@ -154,7 +154,13 @@ void Client::onMessage(const bithorde::HandShake &msg)
 	}
 }
 
-void Client::onMessage(const bithorde::BindRead & msg) {}
+void Client::onMessage(const bithorde::BindRead & msg) {
+	cerr << "unsupported: handling BindRead" << endl;
+	bithorde::AssetStatus resp;
+	resp.set_handle(msg.handle());
+	resp.set_status(ERROR);
+	sendMessage(bithorde::Connection::AssetStatus, resp);
+}
 void Client::onMessage(const bithorde::AssetStatus & msg) {
 	if (!msg.has_handle())
 		return;
@@ -174,7 +180,14 @@ void Client::onMessage(const bithorde::AssetStatus & msg) {
 	}
 }
 
-void Client::onMessage(const bithorde::Read::Request & msg) {}
+void Client::onMessage(const bithorde::Read::Request & msg) {
+	cerr << "unsupported: handling Read-Requests" << endl;
+	bithorde::Read::Response resp;
+	resp.set_reqid(msg.reqid());
+	resp.set_status(ERROR);
+	sendMessage(bithorde::Connection::ReadResponse, resp);
+}
+
 void Client::onMessage(const bithorde::Read::Response & msg) {
 	Asset::Handle assetHandle = _requestIdMap[msg.reqid()];
 	if (_assetMap.count(assetHandle)) {
@@ -185,9 +198,21 @@ void Client::onMessage(const bithorde::Read::Response & msg) {
 	}
 }
 
-void Client::onMessage(const bithorde::BindWrite & msg) {}
-void Client::onMessage(const bithorde::DataSegment & msg) {}
-void Client::onMessage(const bithorde::HandShakeConfirmed & msg) {}
+void Client::onMessage(const bithorde::BindWrite & msg) {
+	cerr << "unsupported: handling BindWrite" << endl;
+	bithorde::AssetStatus resp;
+	resp.set_handle(msg.handle());
+	resp.set_status(ERROR);
+	sendMessage(bithorde::Connection::AssetStatus, resp);
+}
+void Client::onMessage(const bithorde::DataSegment & msg) {
+	cerr << "unsupported: handling DataSegment-pushes" << endl;
+	_connection->close();
+}
+void Client::onMessage(const bithorde::HandShakeConfirmed & msg) {
+	cerr << "unsupported: challenge-response handshakes" << endl;
+	_connection->close();
+}
 void Client::onMessage(const bithorde::Ping & msg) {
 	bithorde::Ping reply;
 	_connection->sendMessage(Connection::Ping, reply);
