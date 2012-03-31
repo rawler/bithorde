@@ -294,7 +294,7 @@ public:
      ***********************************************************************************/
     this(Pump p, Socket s) {
         if (s.socket.addressFamily is AddressFamily.INET)
-            s.socket.setNoDelay(true);
+            s.socket.setNoDelay(false);
         this._myname = myname;
         reset();
         super(p, s, 1024*1024);
