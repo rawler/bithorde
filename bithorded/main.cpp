@@ -8,6 +8,7 @@
 
 #include "lib/hashes.h"
 #include "store/linkedassetstore.hpp"
+#include "server/server.hpp"
 
 using namespace std;
 namespace asio = boost::asio;
@@ -41,14 +42,11 @@ int main(int argc, char* argv[]) {
 			"Show help")
 		("debug,d",
 			"Enable debug-logging")
-		("basedir,B", po::value< fs::path >(),
-			"Base-dir of Asset-store")
-		("file,f", po::value< fs::path >(),
-			"file")
+		("basedir,B", po::value< vector<fs::path> >(),
+			"Base-dir of Asset-store (can be repeated)")
 	;
 	po::positional_options_description p;
-	p.add("basedir", 1);
-	p.add("file", 1);
+	p.add("basedir", -1);
 
 	po::command_line_parser parser(argc, argv);
 	parser.options(desc).positional(p);
@@ -57,18 +55,14 @@ int main(int argc, char* argv[]) {
 	po::store(parser.run(), vm);
 	po::notify(vm);
 
-	if (vm.count("help") || !vm.count("file")) {
+	if (vm.count("help") || !vm.count("basedir")) {
 		cerr << desc << endl;
 		return 1;
 	}
 
 	asio::io_service ioSvc;
-	fs::path basedir = vm["basedir"].as< fs::path >();
 
-	boost::shared_ptr<LinkedAssetStore> store = boost::make_shared<LinkedAssetStore>(ioSvc, basedir);
-	fs::path file = vm["file"].as< fs::path >();
-
-	store->addAsset(file, boost::bind(&whenDone, store, _1));
+	Server server(ioSvc, vm["basedir"].as< vector<fs::path> >());
 
 	ioSvc.run();
 }

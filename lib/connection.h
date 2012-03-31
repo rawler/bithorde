@@ -38,8 +38,10 @@ public:
 		Authenticated,
 	};
 
-	static Pointer create(boost::asio::io_service& ioSvc, const boost::asio::local::stream_protocol::endpoint& addr);
 	static Pointer create(boost::asio::io_service& ioSvc, const boost::asio::ip::tcp::endpoint& addr);
+	static Pointer create(boost::asio::io_service& ioSvc, boost::shared_ptr< boost::asio::ip::tcp::socket >& socket);
+	static Pointer create(boost::asio::io_service& ioSvc, const boost::asio::local::stream_protocol::endpoint& addr);
+	static Pointer create(boost::asio::io_service& ioSvc, boost::shared_ptr< boost::asio::local::stream_protocol::socket >& socket);
 
 	typedef boost::signals2::signal<void ()> VoidSignal;
 	typedef boost::signals2::signal<void (MessageType, ::google::protobuf::Message&)> MessageSignal;

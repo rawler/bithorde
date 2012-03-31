@@ -42,8 +42,12 @@ public:
 	 * responder will be called asynchronously.
 	 *
 	 * In responder, the shared_ptr will be set to either a readily hashed instance, or empty if hashing failed
+	 *
+	 * If function returns true, /handler/ will be called on a thread running ioSvc.run()
+	 *
+	 * @returns true if file is within acceptable path, false otherwise
 	 */
-	void addAsset(const boost::filesystem::path& file, ResultHandler handler);
+	bool addAsset(const boost::filesystem::path& file, ResultHandler handler);
 
 	/**
 	 * Finds an asset by bithorde HashId. (Only the tiger-hash is actually used)

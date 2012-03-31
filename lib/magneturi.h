@@ -23,7 +23,8 @@ struct ExactIdentifier {
 struct MagnetURI
 {
 	MagnetURI();
-	MagnetURI(const bithorde::AssetStatus&);
+	MagnetURI(const bithorde::AssetStatus& s);
+	MagnetURI(const bithorde::BindRead& r);
 	bool parse(const std::string& uri);
 
 	std::vector<ExactIdentifier> xtIds;

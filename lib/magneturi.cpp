@@ -56,6 +56,13 @@ MagnetURI::MagnetURI(const bithorde::AssetStatus& s)
 		xtIds.push_back(ExactIdentifier(s.ids(i)));
 }
 
+MagnetURI::MagnetURI(const bithorde::BindRead& r)
+{
+	size = 0;
+	for (int i = 0; i < r.ids_size(); i++)
+		xtIds.push_back(ExactIdentifier(r.ids(i)));
+}
+
 bool MagnetURI::parse(const string& uri_)
 {
 	if (uri_.compare(0, MAGNET_PREFIX.size(), MAGNET_PREFIX))

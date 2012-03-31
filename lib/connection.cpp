@@ -26,20 +26,27 @@ class ConnectionImpl : public Connection {
 	typedef typename Protocol::socket Socket;
 	typedef typename Protocol::endpoint EndPoint;
 
-	Socket _socket;
+	boost::shared_ptr<Socket> _socket;
 public:
 	ConnectionImpl(boost::asio::io_service& ioSvc, const EndPoint& addr) 
-		: Connection(ioSvc), _socket(ioSvc)
+		: Connection(ioSvc), _socket(new Socket(ioSvc))
 	{
-		_socket.connect(addr);
+		_socket->connect(addr);
 	}
+
+	ConnectionImpl(boost::asio::io_service& ioSvc, boost::shared_ptr<Socket>& socket)
+		: Connection(ioSvc)
+	{
+		_socket = socket;
+	}
+
 	~ConnectionImpl() {
 		close();
 	}
 
 	void trySend() {
 		if (_sendBuf.size) {
-			_socket.async_write_some(asio::buffer(_sendBuf.ptr, _sendBuf.size),
+			_socket->async_write_some(asio::buffer(_sendBuf.ptr, _sendBuf.size),
 				boost::bind(&Connection::onWritten, shared_from_this(),
 							asio::placeholders::error, asio::placeholders::bytes_transferred)
 			);
@@ -47,7 +54,7 @@ public:
 	}
 
 	void tryRead() {
-		_socket.async_read_some(asio::buffer(_rcvBuf.allocate(MAX_MSG), MAX_MSG),
+		_socket->async_read_some(asio::buffer(_rcvBuf.allocate(MAX_MSG), MAX_MSG),
 			boost::bind(&Connection::onRead, shared_from_this(),
 				asio::placeholders::error, asio::placeholders::bytes_transferred
 			)
@@ -55,8 +62,8 @@ public:
 	}
 
 	void close() {
-		if (_socket.is_open()) {
-			_socket.close();
+		if (_socket->is_open()) {
+			_socket->close();
 			disconnected();
 		}
 	}
@@ -69,14 +76,28 @@ Connection::Connection(asio::io_service & ioSvc) :
 	_sendBuf.allocate(SEND_BUF_EMERGENCY); // Prepare so we don't have to move it later during async send.
 }
 
-Connection::Pointer Connection::create(boost::asio::io_service& ioSvc, const boost::asio::ip::tcp::endpoint& addr)  {
+Connection::Pointer Connection::create(asio::io_service& ioSvc, const boost::asio::ip::tcp::endpoint& addr)  {
 	Pointer c(new ConnectionImpl<asio::ip::tcp>(ioSvc, addr));
 	c->tryRead();
 	return c;
 }
 
-Connection::Pointer Connection::create(boost::asio::io_service& ioSvc, const boost::asio::local::stream_protocol::endpoint& addr)  {
+Connection::Pointer Connection::create(asio::io_service& ioSvc, boost::shared_ptr<boost::asio::ip::tcp::socket>& socket)
+{
+	Pointer c(new ConnectionImpl<asio::ip::tcp>(ioSvc, socket));
+	c->tryRead();
+	return c;
+}
+
+Connection::Pointer Connection::create(asio::io_service& ioSvc, const boost::asio::local::stream_protocol::endpoint& addr)  {
 	Pointer c(new ConnectionImpl<asio::local::stream_protocol>(ioSvc, addr));
+	c->tryRead();
+	return c;
+}
+
+Connection::Pointer Connection::create(asio::io_service& ioSvc, boost::shared_ptr< asio::local::stream_protocol::socket >& socket)
+{
+	Pointer c(new ConnectionImpl<asio::local::stream_protocol>(ioSvc, socket));
 	c->tryRead();
 	return c;
 }

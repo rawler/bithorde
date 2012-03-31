@@ -21,6 +21,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/make_shared.hpp>
 #include <string>
+#include <time.h>
 
 using namespace std;
 
@@ -47,6 +48,7 @@ LinkedAssetStore::LinkedAssetStore(boost::asio::io_service& ioSvc, const boost::
 		fs::create_directories(_metaFolder);
 	if (!fs::exists(_tigerFolder))
 		fs::create_directories(_tigerFolder);
+	srand(time(NULL));
 }
 
 struct HashTask : public Task {
@@ -87,16 +89,17 @@ string random_string(size_t len) {
 	return s;
 }
 
-void LinkedAssetStore::addAsset(const boost::filesystem3::path& file, LinkedAssetStore::ResultHandler handler)
+bool LinkedAssetStore::addAsset(const boost::filesystem3::path& file, LinkedAssetStore::ResultHandler handler)
 {
 	if (!path_is_in(file, _baseDir)) {
-		cerr << "Fail" << endl;
-		handler(Asset::Ptr());
+		return false;
+	} else {
+		fs::path metaPath = _metaFolder / random_string(20);
+		Asset::Ptr asset = boost::make_shared<Asset>(file, metaPath);
+		HashTask* task = new HashTask(asset, _ioSvc, boost::bind(&LinkedAssetStore::_addAsset, this, _1, handler));
+		_threadPool.post(*task);
+		return true;
 	}
-	fs::path metaPath = _metaFolder / random_string(20);
-	Asset::Ptr asset = boost::make_shared<Asset>(file, metaPath);
-	HashTask* task = new HashTask(asset, _ioSvc, boost::bind(&LinkedAssetStore::_addAsset, this, _1, handler));
-	_threadPool.post(*task);
 }
 
 void LinkedAssetStore::_addAsset(Asset::Ptr& asset, LinkedAssetStore::ResultHandler upstream)

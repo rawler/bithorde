@@ -9,7 +9,6 @@
 #include <boost/bind.hpp>
 #include <boost/make_shared.hpp>
 #include <boost/signals2.hpp>
-#include <boost/smart_ptr/enable_shared_from_this.hpp>
 
 #include "asset.h"
 #include "connection.h"
@@ -18,7 +17,6 @@
 namespace bithorde {
 
 class Client
-	: public boost::enable_shared_from_this<Client>
 {
 	boost::asio::io_service& _ioSvc;
 	Connection::Pointer _connection;
@@ -49,6 +47,7 @@ public:
 	void connect(Connection::Pointer newConn);
 
 	bool isConnected();
+	const std::string& peerName();
 
 	bool bind(ReadAsset & asset);
 	bool bind(UploadAsset & asset);
@@ -67,20 +66,24 @@ protected:
 	void onDisconnected();
 	void onIncomingMessage(Connection::MessageType type, ::google::protobuf::Message& msg);
 
-	void onMessage(const bithorde::HandShake & msg);
-	void onMessage(const bithorde::BindRead & msg);
-	void onMessage(const bithorde::AssetStatus & msg);
-	void onMessage(const bithorde::Read::Request & msg);
-	void onMessage(const bithorde::Read::Response & msg);
-	void onMessage(const bithorde::BindWrite & msg);
-	void onMessage(const bithorde::DataSegment & msg);
-	void onMessage(const bithorde::HandShakeConfirmed & msg);
-	void onMessage(const bithorde::Ping & msg);
+	virtual void onMessage(const bithorde::HandShake & msg);
+	virtual void onMessage(const bithorde::BindRead & msg);
+	virtual void onMessage(const bithorde::AssetStatus & msg);
+	virtual void onMessage(const bithorde::Read::Request & msg);
+	virtual void onMessage(const bithorde::Read::Response & msg);
+	virtual void onMessage(const bithorde::BindWrite & msg);
+	virtual void onMessage(const bithorde::DataSegment & msg);
+	virtual void onMessage(const bithorde::HandShakeConfirmed & msg);
+	virtual void onMessage(const bithorde::Ping & msg);
 
 private:
 	friend class Asset;
 	friend class ReadAsset;
 	bool release(Asset & a);
+
+	boost::signals2::scoped_connection _messageConnection;
+	boost::signals2::scoped_connection _writableConnection;
+	boost::signals2::scoped_connection _disconnectedConnection;
 
 	bool informBound(const ReadAsset&);
 	int allocRPCRequest(Asset::Handle asset);

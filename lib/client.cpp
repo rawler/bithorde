@@ -37,10 +37,10 @@ void Client::connect(Connection::Pointer newConn) {
 
 	_rpcIdAllocator.reset();
 	_connection = newConn;
-	auto shared_this = shared_from_this();
-	_connection->message.connect(Connection::MessageSignal::slot_type(&Client::onIncomingMessage, this, _1, _2).track(shared_this));
-	_connection->writable.connect(writable);
-	_connection->disconnected.connect(Connection::VoidSignal::slot_type(&Client::onDisconnected, this).track(shared_this));
+
+	_messageConnection = _connection->message.connect(Connection::MessageSignal::slot_type(&Client::onIncomingMessage, this, _1, _2));
+	_writableConnection = _connection->writable.connect(writable);
+	_disconnectedConnection = _connection->disconnected.connect(Connection::VoidSignal::slot_type(&Client::onDisconnected, this));
 
 	sayHello();
 }
@@ -93,6 +93,11 @@ bool Client::isConnected()
 	return _connection;
 }
 
+const std::string& Client::peerName()
+{
+	return _peerName;
+}
+
 bool Client::sendMessage(Connection::MessageType type, const::google::protobuf::Message &msg)
 {
 	BOOST_ASSERT(_connection);
@@ -128,13 +133,15 @@ void Client::onMessage(const bithorde::HandShake &msg)
 	if (msg.protoversion() >= 2) {
 		_protoVersion = 2;
 	} else {
-		// TODO: LogFail and disconnect
+		cerr << "Only Protocol-version 2 or higer supported" << endl;
+		// TODO: disconnect properly
 		return;
 	}
 
 	_peerName = msg.name();
 
 	if (msg.has_challenge()) {
+		cerr << "Challenge required" << endl;
 		// Setup encryption
 	} else {
 		for (auto iter = _assetMap.begin(); iter != _assetMap.end(); iter++) {
