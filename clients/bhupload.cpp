@@ -16,9 +16,10 @@ using namespace bithorde;
 const static size_t BLOCK_SIZE = (64*1024);
 
 BHUpload::BHUpload(boost::program_options::variables_map &args) :
+	optConnectUrl(args["url"].as<string>()),
+	optLink(args.count("link")),
 	optMyName(args["name"].as<string>()),
 	optQuiet(args.count("quiet")),
-	optConnectUrl(args["url"].as<string>()),
 	_currentAsset(NULL)
 {
 	_readBuf.allocate(BLOCK_SIZE);
@@ -69,7 +70,10 @@ void BHUpload::nextAsset() {
 	} else {
 		fs::path& p = _files.front();
 		_currentFile.open(p.c_str(), ifstream::in | ifstream::binary);
-		_currentAsset = new UploadAsset(_client, fs::file_size(p));
+		if (optLink)
+			_currentAsset = new UploadAsset(_client, p);
+		else
+			_currentAsset = new UploadAsset(_client, fs::file_size(p));
 		_currentAsset->statusUpdate.connect(boost::bind(&BHUpload::onStatusUpdate, this, _1));
 		_client->bind(*_currentAsset);
 
@@ -85,7 +89,7 @@ void BHUpload::onStatusUpdate(const bithorde::AssetStatus& status)
 		if (status.ids_size()) {
 			cout << MagnetURI(status) << endl;
 			nextAsset();
-		} else {
+		} else if (!optLink) {
 			cerr << "Uploading ..." << endl;
 			_writeConnection = _client->writable.connect(boost::bind(&BHUpload::onWritable, this));
 			onWritable();
@@ -93,6 +97,7 @@ void BHUpload::onStatusUpdate(const bithorde::AssetStatus& status)
 		break;
 	default:
 		cerr << "Failed ..." << endl;
+		nextAsset();
 		break;
 	}
 }
@@ -144,6 +149,8 @@ int main(int argc, char *argv[]) {
 			"Don't show progressbar")
 		("url,u", po::value< string >()->default_value("/tmp/bithorde"),
 			"Where to connect to bithorde. Either host:port, or /path/socket")
+		("link,l",
+			"Add asset-link, instead of uploading asset data")
 		("file", po::value< vector<string> >(), "file(s) to upload or request link for")
 	;
 	po::positional_options_description p;

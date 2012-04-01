@@ -16,9 +16,10 @@
 
 class BHUpload {
 	// Options
+	std::string optConnectUrl;
+	bool optLink;
 	std::string optMyName;
 	bool optQuiet;
-	std::string optConnectUrl;
 
 	// Internal items
 	boost::asio::io_service _ioSvc;

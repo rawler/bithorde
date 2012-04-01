@@ -1,9 +1,13 @@
-#include "asset.h"
-#include "client.h"
 
+#include "asset.h"
+
+#include <boost/filesystem.hpp>
 #include <iostream>
 
+#include "client.h"
+
 using namespace std;
+namespace fs = boost::filesystem;
 
 using namespace bithorde;
 
@@ -93,10 +97,16 @@ int ReadAsset::aSyncRead(uint64_t offset, ssize_t size)
 	return reqId;
 }
 
-UploadAsset::UploadAsset(ClientPointer client, uint64_t size) :
-	Asset(client)
+UploadAsset::UploadAsset(ClientPointer client, uint64_t size)
+	: Asset(client)
 {
 	_size = size;
+}
+
+UploadAsset::UploadAsset(Asset::ClientPointer client, const fs::path& path)
+	: Asset(client), _linkPath(fs::absolute(path))
+{
+	_size = fs::file_size(_linkPath);
 }
 
 bool UploadAsset::tryWrite(uint64_t offset, byte* data, size_t amount)
@@ -107,6 +117,11 @@ bool UploadAsset::tryWrite(uint64_t offset, byte* data, size_t amount)
 	msg.set_offset(offset);
 	msg.set_content(data, amount);
 	return _client->sendMessage(Connection::DataSegment, msg);
+}
+
+const fs::path& UploadAsset::link()
+{
+	return _linkPath;
 }
 
 void UploadAsset::handleMessage(const bithorde::Read::Response&) {

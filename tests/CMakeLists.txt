@@ -8,6 +8,6 @@ ADD_EXECUTABLE( unittests
 )
 
 TARGET_LINK_LIBRARIES( unittests
-	${Boost_LIBRARIES}
 	bithorde
+	${Boost_LIBRARIES}
 )

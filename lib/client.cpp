@@ -240,6 +240,9 @@ bool Client::bind(UploadAsset & asset)
 	bithorde::BindWrite msg;
 	msg.set_handle(asset._handle);
 	msg.set_size(asset.size());
+	const auto& link = asset.link();
+	if (!link.empty())
+		msg.set_linkpath(link.string());
 	return _connection->sendMessage(Connection::BindWrite, msg);
 }
 

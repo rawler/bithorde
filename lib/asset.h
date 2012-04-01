@@ -7,6 +7,7 @@
 
 #include <boost/bind/placeholders.hpp>
 #include <boost/bind/arg.hpp>
+#include <boost/filesystem/path.hpp>
 #include <boost/signals2.hpp>
 #include <boost/shared_ptr.hpp>
 
@@ -75,10 +76,13 @@ private:
 
 class UploadAsset : public Asset
 {
+	boost::filesystem::path _linkPath;
 public:
 	explicit UploadAsset(ClientPointer client, uint64_t size);
+	explicit UploadAsset(ClientPointer client, const boost::filesystem::path& path);
 
 	bool tryWrite(uint64_t offset, byte* data, size_t amount);
+	const boost::filesystem::path& link();
 
 protected:
 	virtual void handleMessage(const bithorde::Read::Response &msg);

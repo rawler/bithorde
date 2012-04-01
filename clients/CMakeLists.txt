@@ -7,16 +7,16 @@ ADD_EXECUTABLE(bhget
 )
 
 TARGET_LINK_LIBRARIES ( bhget
-	${Boost_LIBRARIES}
 	bithorde
+	${Boost_LIBRARIES}
 )
 
 ADD_EXECUTABLE(bhupload
 	bhupload.cpp bhupload.h
 )
 TARGET_LINK_LIBRARIES ( bhupload
-	${Boost_LIBRARIES}
 	bithorde
+	${Boost_LIBRARIES}
 )
 
 PKG_CHECK_MODULES (FUSE REQUIRED fuse)
@@ -33,7 +33,7 @@ SET_TARGET_PROPERTIES(bhfuse PROPERTIES
 	COMPILE_FLAGS "${FUSE_FLAG_STRING}"
 )
 TARGET_LINK_LIBRARIES ( bhfuse
+	bithorde
 	${Boost_LIBRARIES}
 	${FUSE_LIBRARIES}
-	bithorde
 )
