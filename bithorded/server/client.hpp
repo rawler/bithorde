@@ -18,6 +18,7 @@
 #ifndef BITHORDED_CLIENT_H
 #define BITHORDED_CLIENT_H
 
+#include "lib/allocator.h"
 #include "lib/client.h"
 #include "bithorded/store/asset.hpp"
 
@@ -27,6 +28,7 @@ class Server;
 class Client : public bithorde::Client
 {
 	Server& _server;
+	std::vector< Asset::Ptr > _assets;
 public:
 	static Pointer create(Server& server, std::string myName) {
 		return Pointer(new Client(server, myName));
@@ -38,9 +40,13 @@ protected:
 	virtual void onMessage(const bithorde::HandShake& msg);
 	virtual void onMessage(const bithorde::BindWrite& msg);
 	virtual void onMessage(const bithorde::BindRead& msg);
+    virtual void onMessage(const bithorde::Read::Request& msg);
 
 private:
 	void onLinkHashDone(bithorde::Asset::Handle handle, bithorded::Asset::Ptr a);
+	bool assignAsset(bithorde::Asset::Handle handle, const bithorded::Asset::Ptr& a);
+	void clearAsset(bithorde::Asset::Handle handle);
+	Asset::Ptr& getAsset(bithorde::Asset::Handle handle);
 };
 
 }

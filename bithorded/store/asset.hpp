@@ -100,5 +100,8 @@ private:
 	Hasher _hasher;
 };
 
+// Empty dummy Asset::Ptr, for cases when a null Ptr& is needed.
+static Asset::Ptr ASSET_NONE;
+
 }
 #endif // BITHORDED_ASSET_H

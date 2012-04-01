@@ -95,8 +95,7 @@ void Asset::notifyValidRange(uint64_t offset, uint64_t size)
 
 const byte* Asset::read(uint64_t offset, size_t& size, byte* buf)
 {
-	// TODO: Implement
-	return NULL;
+	return _file.read(offset, size, buf);
 }
 
 uint64_t Asset::size() {
