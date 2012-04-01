@@ -68,12 +68,10 @@ void ReadAsset::handleMessage(const bithorde::AssetStatus &msg)
 
 void ReadAsset::handleMessage(const bithorde::Read::Response &msg) {
 	if (msg.status() == bithorde::SUCCESS) {
-		const std::string & content = msg.content();
-		ByteArray data(content.begin(), content.end());
-		dataArrived(msg.offset(), data, msg.reqid());
+		dataArrived(msg.offset(), msg.content(), msg.reqid());
 	} else {
 		cerr << "Error: failed read, " << msg.status() << endl;
-		ByteArray nil;
+		string nil;
 		dataArrived(msg.offset(), nil, msg.reqid());
 	}
 	_client->releaseRPCRequest(msg.reqid());

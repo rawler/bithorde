@@ -15,7 +15,7 @@ using namespace bithorde;
 const static size_t BLOCK_SIZE = (64*1024);
 
 struct OutQueue {
-	typedef pair<uint64_t, ByteArray> Chunk;
+	typedef pair<uint64_t, string> Chunk;
 	uint64_t position;
 	list<Chunk> _stored;
 
@@ -23,7 +23,7 @@ struct OutQueue {
 		position(0)
 	{}
 
-	void send(uint64_t offset, const ByteArray & data) {
+	void send(uint64_t offset, const string& data) {
 		if (offset <= position) {
 			BOOST_ASSERT(offset == position);
 			_flush(data);
@@ -34,7 +34,7 @@ struct OutQueue {
 	}
 
 private:
-	void _queue(uint64_t offset, const ByteArray & data) {
+	void _queue(uint64_t offset, const string& data) {
 		list<Chunk>::iterator pos = _stored.begin();
 		while ((pos != _stored.end()) && (pos->first < offset))
 			pos++;
@@ -54,7 +54,7 @@ private:
 		}
 	}
 
-	void _flush(const ByteArray & data) {
+	void _flush(const string& data) {
 		ssize_t datasize = data.size();
 		if (write(1, data.data(), datasize) == datasize)
 			position += datasize;
@@ -159,7 +159,7 @@ void BHGet::requestMore()
 	}
 }
 
-void BHGet::onDataChunk(uint64_t offset, ByteArray& data, int tag)
+void BHGet::onDataChunk(uint64_t offset, const string& data, int tag)
 {
 	_outQueue->send(offset, data);
 	if ((data.size() < BLOCK_SIZE) && ((offset+data.size()) < _asset->size())) {

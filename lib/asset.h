@@ -55,7 +55,7 @@ static boost::arg<3> ASSET_ARG_TAG;
 class ReadAsset : public Asset
 {
 public:
-	typedef std::pair<bithorde::HashType, ByteArray> Identifier;
+	typedef std::pair<bithorde::HashType, std::string> Identifier;
 	typedef std::vector<Identifier> IdList;
 
 	explicit ReadAsset(ClientPointer client, ReadAsset::IdList requestIds);
@@ -63,7 +63,7 @@ public:
 	int aSyncRead(uint64_t offset, ssize_t size);
 	const IdList & requestIds() const;
 
-	typedef boost::signals2::signal<void (uint64_t offset, ByteArray& data, int tag)> DataSignal;
+	typedef boost::signals2::signal<void (uint64_t offset, const std::string& data, int tag)> DataSignal;
 	DataSignal dataArrived;
 
 protected:

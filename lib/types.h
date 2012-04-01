@@ -7,7 +7,6 @@
 #include <vector>
 
 typedef unsigned char byte;
-typedef std::vector<byte> ByteArray;
 
 struct Buffer {
 	byte* ptr;

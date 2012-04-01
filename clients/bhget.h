@@ -33,7 +33,7 @@ public:
 private:
 	void onAuthenticated(std::string& peerName);
 	void onStatusUpdate(const bithorde::AssetStatus&);
-	void onDataChunk(uint64_t offset, ByteArray& data, int tag);
+	void onDataChunk(uint64_t offset, const std::string& data, int tag);
 
 	void nextAsset();
 	void requestMore();

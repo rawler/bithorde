@@ -176,7 +176,7 @@ void FUSEAsset::tryRebind()
 	}
 }
 
-void FUSEAsset::onDataArrived(uint64_t offset, ByteArray& data, int tag) {
+void FUSEAsset::onDataArrived(uint64_t offset, const std::string& data, int tag) {
 	if (_readOperations.count(tag)) {
 		BHReadOperation &op = _readOperations[tag];
 		if (_connected) {

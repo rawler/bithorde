@@ -97,9 +97,8 @@ bithorde::ReadAsset::IdList MagnetURI::toIdList ()
 
 	vector<ExactIdentifier>::iterator iter;
 	for (iter=xtIds.begin(); iter != xtIds.end(); iter++) {
-		ByteArray hashId(iter->id.begin(), iter->id.end());
 		if (iter->type == "urn:tree:tiger")
-			ids.push_back(bithorde::ReadAsset::Identifier(bithorde::TREE_TIGER, hashId));
+			ids.push_back(bithorde::ReadAsset::Identifier(bithorde::TREE_TIGER, iter->id));
 	}
 
 	return ids;
