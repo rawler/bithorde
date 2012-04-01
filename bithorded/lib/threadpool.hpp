@@ -20,6 +20,7 @@
 
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/thread.hpp>
+#include <map>
 #include <queue>
 
 class Task {
@@ -38,11 +39,12 @@ public:
 private:
 	void thread_main();
 	Task* getTask();
+	size_t workerCount();
 
 	bool _running;
 	boost::mutex _m;
 	uint _maxThreads;
-	boost::thread_group _threads;
+	std::map<boost::thread::id, boost::thread*> _threads;
 	std::queue<Task*> _tasks;
 };
 

@@ -39,15 +39,23 @@ void ThreadPool::post(Task& task)
 	if (!_running)
 		return;
 	size_t threads = _threads.size();
-	if ((threads < _maxThreads) && (threads < _tasks.size()))
-		_threads.create_thread(boost::bind(&ThreadPool::thread_main, this));
+	if ((threads < _maxThreads) && (threads < _tasks.size())) {
+		auto thread = new boost::thread(boost::bind(&ThreadPool::thread_main, this));
+		_threads[thread->get_id()] = thread;
+	}
 }
 
 void ThreadPool::join()
 {
 	_running = false;
-	_m.lock(); _m.unlock(); // Synchronize with other threads
-	_threads.join_all();
+	while (size_t workers = workerCount())
+		boost::this_thread::sleep(boost::posix_time::milliseconds(10*workers));
+}
+
+size_t ThreadPool::workerCount()
+{
+	mutex_guard m(_m);
+	return _threads.size();
 }
 
 void ThreadPool::thread_main()
@@ -55,6 +63,12 @@ void ThreadPool::thread_main()
 	while (Task* t = getTask()) {
 		(*t)();
 	}
+
+	mutex_guard m(_m);
+	auto id = boost::this_thread::get_id();
+	auto thread = _threads[id];
+	_threads.erase(id);
+	delete thread;
 }
 
 Task* ThreadPool::getTask()
