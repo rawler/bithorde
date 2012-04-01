@@ -158,7 +158,8 @@ void Connection::onRead(const boost::system::error_code& err, size_t count)
 	tryRead();
 	return;
 proto_error:
-	// TODO: _logger.error("ERROR: BitHorde Protocol Error, Disconnecting");
+	cerr << "ERROR: BitHorde Protocol Error, Disconnecting" << endl;
+	close();
 	return;
 }
 
