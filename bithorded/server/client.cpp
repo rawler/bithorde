@@ -109,7 +109,7 @@ void Client::onMessage(const bithorde::Read::Request& msg)
 	Asset::Ptr& asset = getAsset(msg.handle());
 	if (asset) {
 		uint64_t offset = msg.offset();
-		uint32_t size = msg.size();
+		size_t size = msg.size();
 		if (size > MAX_CHUNK)
 			size = MAX_CHUNK;
 		byte buf[MAX_CHUNK];
