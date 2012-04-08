@@ -30,7 +30,7 @@ Lookup::Lookup(BHFuse *fs, FUSEAsset *asset, fuse_req_t req, fuse_file_info *fi)
 
 void Lookup::perform(Client::Pointer& c)
 {
-	asset->statusUpdate.connect(Asset::StatusSignal::slot_type(&Lookup::onStatusUpdate, this, _1).track(shared_from_this()));
+	statusConnection = asset->statusUpdate.connect(Asset::StatusSignal::slot_type(&Lookup::onStatusUpdate, this, _1));
 	c->bind(*asset);
 }
 

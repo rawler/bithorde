@@ -52,7 +52,7 @@ struct BHReadOperation {
 	BHReadOperation(fuse_req_t req, off_t off, size_t size);
 };
 
-class FUSEAsset : public INode, public boost::enable_shared_from_this<FUSEAsset> {
+class FUSEAsset : public INode {
 public:
 	FUSEAsset(BHFuse *fs, fuse_ino_t ino, bithorde::ReadAsset * asset, LookupParams& lookup_params);
 	virtual ~FUSEAsset();
@@ -78,6 +78,9 @@ private:
 	boost::asio::deadline_timer _rebindTimer;
 	std::map<off_t, BHReadOperation> _readOperations;
 	bool _connected;
+
+	boost::signals2::scoped_connection _statusConnection;
+	boost::signals2::scoped_connection _dataConnection;
 };
 
 #endif // INODE_H

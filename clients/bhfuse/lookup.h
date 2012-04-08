@@ -1,7 +1,7 @@
 #ifndef LOOKUP_H
 #define LOOKUP_H
 
-#include <boost/smart_ptr/enable_shared_from_this.hpp>
+#include <boost/signals2/connection.hpp>
 
 #include <fuse_lowlevel.h>
 
@@ -12,7 +12,7 @@ typedef std::pair<fuse_ino_t, std::string> LookupParams;
 class BHFuse;
 class FUSEAsset;
 
-class Lookup : public boost::enable_shared_from_this<Lookup>
+class Lookup
 {
 	BHFuse * fs;
 	fuse_req_t req;
@@ -20,6 +20,7 @@ class Lookup : public boost::enable_shared_from_this<Lookup>
 	FUSEAsset * fuseAsset; // Set if came from fuse_open()
 	LookupParams lookup_params;   // Set if came from fuse_lookup()
 	bithorde::ReadAsset * asset;
+	boost::signals2::scoped_connection statusConnection;
 public:
     explicit Lookup(BHFuse * fs, fuse_req_t req, MagnetURI & uri, LookupParams& p);
     explicit Lookup(BHFuse * fs, FUSEAsset * asset, fuse_req_t req, fuse_file_info * fi);

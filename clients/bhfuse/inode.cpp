@@ -84,9 +84,8 @@ FUSEAsset::FUSEAsset(BHFuse* fs, fuse_ino_t ino, ReadAsset* asset, LookupParams&
 		_holdOpenTimer.async_wait(boost::bind(&FUSEAsset::closeOne, this));
 	}
 
-	auto shared_this = shared_from_this();
-	asset->statusUpdate.connect(Asset::StatusSignal::slot_type(&FUSEAsset::onStatusChanged, this, ASSET_ARG_STATUS).track(shared_this));
-	asset->dataArrived.connect(ReadAsset::DataSignal::slot_type(&FUSEAsset::onDataArrived, this, ASSET_ARG_OFFSET, ASSET_ARG_DATA, ASSET_ARG_TAG).track(shared_this));
+	_statusConnection = asset->statusUpdate.connect(Asset::StatusSignal::slot_type(&FUSEAsset::onStatusChanged, this, ASSET_ARG_STATUS));
+	_dataConnection = asset->dataArrived.connect(ReadAsset::DataSignal::slot_type(&FUSEAsset::onDataArrived, this, ASSET_ARG_OFFSET, ASSET_ARG_DATA, ASSET_ARG_TAG));
 }
 
 
