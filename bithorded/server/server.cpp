@@ -23,6 +23,7 @@
 #include <iostream>
 
 #include "client.hpp"
+#include "config.hpp"
 
 using namespace std;
 
@@ -31,32 +32,37 @@ namespace fs = boost::filesystem;
 
 using namespace bithorded;
 
-Server::Server(asio::io_service& ioSvc, const std::vector< boost::filesystem3::path >& assetStores) :
+Server::Server(asio::io_service& ioSvc, Config& cfg) :
+	_cfg(cfg),
 	_ioSvc(ioSvc),
 	_tcpListener(ioSvc),
 	_localListener(ioSvc)
 {
-	for (auto iter=assetStores.begin(); iter != assetStores.end(); iter++) {
+	for (auto iter=_cfg.linkroots.begin(); iter != _cfg.linkroots.end(); iter++) {
 		_assetStores.push_back( unique_ptr<LinkedAssetStore>(new LinkedAssetStore(ioSvc, *iter)) );
 	}
 
-	auto tcpPort = asio::ip::tcp::endpoint(boost::asio::ip::tcp::v4(), 1338);
-	_tcpListener.open(tcpPort.protocol());
-	_tcpListener.set_option(boost::asio::ip::tcp::acceptor::reuse_address(true));
-	_tcpListener.bind(tcpPort);
-	_tcpListener.listen();
+	if (_cfg.tcpPort) {
+		auto tcpPort = asio::ip::tcp::endpoint(boost::asio::ip::tcp::v4(), _cfg.tcpPort);
+		_tcpListener.open(tcpPort.protocol());
+		_tcpListener.set_option(boost::asio::ip::tcp::acceptor::reuse_address(true));
+		_tcpListener.bind(tcpPort);
+		_tcpListener.listen();
+		
+		waitForTCPConnection();
+	}
 
-	fs::path localPath("/tmp/bithorde-test");
-	if (fs::exists(localPath))
-		fs::remove(localPath);
-	auto localPort = asio::local::stream_protocol::endpoint(localPath.string());
-	_localListener.open(localPort.protocol());
-	_localListener.set_option(boost::asio::local::stream_protocol::acceptor::reuse_address(true));
-	_localListener.bind(localPort);
-	_localListener.listen(4);
-
-	waitForTCPConnection();
-	waitForLocalConnection();
+	if (!_cfg.unixSocket.empty()) {
+		if (fs::exists(_cfg.unixSocket))
+			fs::remove(_cfg.unixSocket);
+		auto localPort = asio::local::stream_protocol::endpoint(_cfg.unixSocket);
+		_localListener.open(localPort.protocol());
+		_localListener.set_option(boost::asio::local::stream_protocol::acceptor::reuse_address(true));
+		_localListener.bind(localPort);
+		_localListener.listen(4);
+		
+		waitForLocalConnection();
+	}
 }
 
 asio::io_service& Server::ioService()

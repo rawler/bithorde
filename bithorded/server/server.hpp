@@ -34,8 +34,11 @@
 
 namespace bithorded {
 
+class Config;
+
 class Server
 {
+	Config &_cfg;
 	boost::asio::io_service& _ioSvc;
 
 	boost::asio::ip::tcp::acceptor _tcpListener;
@@ -43,7 +46,7 @@ class Server
 
 	std::vector< std::unique_ptr<bithorded::LinkedAssetStore> > _assetStores;
 public:
-	Server(boost::asio::io_service& ioSvc, const std::vector<boost::filesystem::path>& assetStores);
+	Server(boost::asio::io_service& ioSvc, Config& cfg);
 
 	boost::asio::io_service& ioService();
 

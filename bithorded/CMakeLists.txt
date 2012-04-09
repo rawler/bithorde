@@ -7,6 +7,7 @@ ADD_EXECUTABLE(bithorded
 	lib/treestore.cpp lib/treestore.hpp
 
 	server/client.cpp server/client.hpp
+	server/config.cpp server/config.hpp
 	server/server.cpp server/server.hpp
 
 	store/asset.cpp store/asset.hpp
