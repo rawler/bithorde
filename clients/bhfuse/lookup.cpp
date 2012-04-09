@@ -3,21 +3,22 @@
 #include "lookup.h"
 
 #include <errno.h>
+#include <boost/make_shared.hpp>
 
 using namespace std;
 
 using namespace bithorde;
 
 Lookup::Lookup(BHFuse * fs, fuse_req_t req, MagnetURI & uri, LookupParams& p) :
-    fs(fs),
-    req(req),
-    fi(0),
-    fuseAsset(0),
-    lookup_params(p)
+	fs(fs),
+	req(req),
+	fi(0),
+	fuseAsset(0),
+	lookup_params(p)
 {
 	ReadAsset::IdList ids = uri.toIdList();
 
-	asset = new ReadAsset(fs->client, ids);
+	asset = boost::make_shared<ReadAsset>(fs->client, ids);
 }
 
 Lookup::Lookup(BHFuse *fs, FUSEAsset *asset, fuse_req_t req, fuse_file_info *fi) :

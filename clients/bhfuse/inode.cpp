@@ -68,7 +68,7 @@ BHReadOperation::BHReadOperation(fuse_req_t req, off_t off, size_t size) :
 	size(size)
 {}
 
-FUSEAsset::FUSEAsset(BHFuse* fs, fuse_ino_t ino, ReadAsset* asset, LookupParams& lookup_params) :
+FUSEAsset::FUSEAsset(BHFuse* fs, fuse_ino_t ino, boost::shared_ptr< ReadAsset > asset, LookupParams& lookup_params) :
 	INode(fs, ino, lookup_params),
 	asset(asset),
 	_openCount(0),
@@ -100,7 +100,6 @@ FUSEAsset::~FUSEAsset()
 void FUSEAsset::fuse_dispatch_open(fuse_req_t req, fuse_file_info * fi)
 {
 	_openCount++;
-	_holdOpenTimer.cancel(); // TODO: potential race-condition, if timeout has already been scheduled for this round
 	if (asset && asset->isBound()) {
 		this->fuse_reply_open(req, fi);
 	} else {
@@ -192,7 +191,7 @@ void FUSEAsset::onDataArrived(uint64_t offset, const std::string& data, int tag)
 
 void FUSEAsset::closeOne()
 {
-	if (!--_openCount) {
+	if ((--_openCount) <= 0) {
 		_rebindTimer.cancel();
 		asset->close();
 		for (auto iter = _readOperations.begin(); iter != _readOperations.end(); iter++) {

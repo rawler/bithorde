@@ -26,7 +26,7 @@ public:
 
 public:
 	void onConnected(std::string remoteName);
-	FUSEAsset * registerAsset(bithorde::ReadAsset *asset, LookupParams& LookupParams);
+	FUSEAsset * registerAsset(boost::shared_ptr< bithorde::ReadAsset > asset, LookupParams& lookup_params);
 	void reconnect();
 
 private:

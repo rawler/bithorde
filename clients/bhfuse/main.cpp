@@ -172,7 +172,7 @@ int BHFuse::fuse_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, fu
 	}
 }
 
-FUSEAsset * BHFuse::registerAsset(ReadAsset *asset, LookupParams& lookup_params)
+FUSEAsset * BHFuse::registerAsset(boost::shared_ptr< ReadAsset > asset, LookupParams& lookup_params)
 {
 	fuse_ino_t ino = _ino_allocator.allocate();
 	FUSEAsset * a = new FUSEAsset(this, ino, asset, lookup_params);

@@ -54,10 +54,10 @@ struct BHReadOperation {
 
 class FUSEAsset : public INode {
 public:
-	FUSEAsset(BHFuse *fs, fuse_ino_t ino, bithorde::ReadAsset * asset, LookupParams& lookup_params);
+	FUSEAsset(BHFuse *fs, fuse_ino_t ino, boost::shared_ptr<bithorde::ReadAsset> asset, LookupParams& lookup_params);
 	virtual ~FUSEAsset();
 
-	bithorde::ReadAsset * asset;
+	boost::shared_ptr<bithorde::ReadAsset> asset;
 
 	void fuse_dispatch_open(fuse_req_t req, fuse_file_info * fi);
 	void fuse_dispatch_close(fuse_req_t req, fuse_file_info * fi);

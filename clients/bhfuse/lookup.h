@@ -1,6 +1,7 @@
 #ifndef LOOKUP_H
 #define LOOKUP_H
 
+#include <boost/shared_ptr.hpp>
 #include <boost/signals2/connection.hpp>
 
 #include <fuse_lowlevel.h>
@@ -19,7 +20,7 @@ class Lookup
 	fuse_file_info * fi;   // Set if came from fuse_open()
 	FUSEAsset * fuseAsset; // Set if came from fuse_open()
 	LookupParams lookup_params;   // Set if came from fuse_lookup()
-	bithorde::ReadAsset * asset;
+	boost::shared_ptr<bithorde::ReadAsset> asset;
 	boost::signals2::scoped_connection statusConnection;
 public:
     explicit Lookup(BHFuse * fs, fuse_req_t req, MagnetURI & uri, LookupParams& p);
