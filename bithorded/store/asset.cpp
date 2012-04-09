@@ -21,10 +21,11 @@ using namespace std;
 
 using namespace bithorded;
 
-Asset::Asset(const boost::filesystem3::path& filePath, const boost::filesystem3::path& metaPath) :
-  _file(filePath),
-  _metaStore(metaPath, _file.blocks(BLOCKSIZE)),
-  _hasher(_metaStore)
+Asset::Asset(const boost::filesystem3::path& metaFolder) :
+	_metaFolder(metaFolder),
+	_file(metaFolder/"data"),
+	_metaStore(metaFolder/"meta", _file.blocks(BLOCKSIZE)),
+	_hasher(_metaStore)
 {
 }
 
@@ -102,14 +103,9 @@ uint64_t Asset::size() {
 	return _file.size();
 }
 
-boost::filesystem3::path Asset::storageFile()
+boost::filesystem3::path Asset::folder()
 {
-	return _file.path();
-}
-
-boost::filesystem3::path Asset::metaFile()
-{
-	return _metaStore.path();
+	return _metaFolder;
 }
 
 void Asset::updateHash(uint64_t offset, uint64_t end)

@@ -60,7 +60,7 @@ private:
 	ThreadPool _threadPool;
 	boost::asio::io_service& _ioSvc;
 	boost::filesystem::path _baseDir;
-	boost::filesystem::path _metaFolder;
+	boost::filesystem::path _assetsFolder;
 	boost::filesystem::path _tigerFolder;
 };
 

@@ -41,7 +41,7 @@ public:
 	 */
 	const static int BLOCKSIZE = Hasher::BLOCKSIZE;
 
-	Asset(const boost::filesystem::path& filePath, const boost::filesystem::path& metaPath);
+	Asset(const boost::filesystem::path& metaFolder);
 
 	/**
 	 * Will read up to /size/ bytes from underlying file, and store into a buffer.
@@ -84,17 +84,13 @@ public:
 	bool getIds(BitHordeIds& ids);
 
 	/**
-	 * Get the path to the file used for storing actual blocks
+	 * Get the path to the folder containing file data + metadata
 	 */
-	boost::filesystem::path storageFile();
-
-	/**
-	 * Get the path to the file used for storing meta-info such as the hashtree
-	 */
-	boost::filesystem::path metaFile();
+	boost::filesystem::path folder();
 private:
 	void updateHash(uint64_t offset, uint64_t end);
 
+	boost::filesystem::path _metaFolder;
 	RandomAccessFile _file;
 	AssetMeta _metaStore;
 	Hasher _hasher;

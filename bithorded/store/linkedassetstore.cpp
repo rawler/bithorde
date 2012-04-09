@@ -39,13 +39,13 @@ LinkedAssetStore::LinkedAssetStore(boost::asio::io_service& ioSvc, const boost::
 	_threadPool(THREADPOOL_CONCURRENCY),
 	_ioSvc(ioSvc),
 	_baseDir(baseDir),
-	_metaFolder(baseDir/META_DIR),
+	_assetsFolder(baseDir/META_DIR),
 	_tigerFolder(baseDir/TIGER_DIR)
 {
 	if (!fs::exists(_baseDir))
 		throw ios_base::failure("LinkedAssetStore: baseDir does not exist");
-	if (!fs::exists(_metaFolder))
-		fs::create_directories(_metaFolder);
+	if (!fs::exists(_assetsFolder))
+		fs::create_directories(_assetsFolder);
 	if (!fs::exists(_tigerFolder))
 		fs::create_directories(_tigerFolder);
 	srand(time(NULL));
@@ -94,8 +94,15 @@ bool LinkedAssetStore::addAsset(const boost::filesystem3::path& file, LinkedAsse
 	if (!path_is_in(file, _baseDir)) {
 		return false;
 	} else {
-		fs::path metaPath = _metaFolder / random_string(20);
-		Asset::Ptr asset = boost::make_shared<Asset>(file, metaPath);
+		fs::path assetFolder;
+		do {
+			assetFolder = _assetsFolder / random_string(20);
+		} while (fs::exists(assetFolder));
+
+		fs::create_directory(assetFolder);
+		fs::create_symlink(file, assetFolder/"data");
+
+		Asset::Ptr asset = boost::make_shared<Asset>(assetFolder);
 		HashTask* task = new HashTask(asset, _ioSvc, boost::bind(&LinkedAssetStore::_addAsset, this, _1, handler));
 		_threadPool.post(*task);
 		return true;
@@ -113,12 +120,7 @@ void LinkedAssetStore::_addAsset(Asset::Ptr& asset, LinkedAssetStore::ResultHand
 					fs::remove(link);
 
 				// TODO: make links relative instead, so storage can be moved around a little.
-				fs::create_symlink(fs::absolute(asset->storageFile()), link);
-
-				link.replace_extension(".meta");
-				if (fs::exists(fs::symlink_status(link)))
-					fs::remove(link);
-				fs::create_symlink(fs::absolute(asset->metaFile()), link);
+				fs::create_symlink(fs::absolute(asset->folder()), link);
 			}
 		}
 	}
@@ -130,10 +132,10 @@ Asset::Ptr LinkedAssetStore::findAsset(const BitHordeIds& ids)
 	for (auto iter=ids.begin(); iter != ids.end(); iter++) {
 		if (iter->type() == bithorde::HashType::TREE_TIGER) {
 			fs::path link = _tigerFolder / base32encode(iter->id());
-			if (fs::symbolic_link_exists(link)) {
-				fs::path metaFile(link);
-				metaFile.replace_extension(".meta");
-				return boost::make_shared<Asset>(link, metaFile);
+			boost::system::error_code e;
+			auto asset = fs::read_symlink(link, e);
+			if (!e && fs::is_directory(asset)) {
+				return boost::make_shared<Asset>(asset);
 			}
 		}
 	}
