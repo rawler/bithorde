@@ -71,7 +71,7 @@ struct HashTask : public Task {
 
 bool path_is_in(const fs::path& path, const fs::path& folder) {
 	string path_(fs::absolute(path).string());
-	string folder_(fs::absolute(folder).string());
+	string folder_(fs::absolute(folder).string()+'/');
 	return boost::starts_with(path_, folder_);
 }
 
