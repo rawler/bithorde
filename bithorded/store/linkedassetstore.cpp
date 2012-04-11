@@ -21,6 +21,7 @@
 #include <boost/make_shared.hpp>
 #include <string>
 #include <time.h>
+#include <utime.h>
 
 using namespace std;
 
@@ -112,6 +113,10 @@ void LinkedAssetStore::_addAsset(Asset::Ptr& asset, LinkedAssetStore::ResultHand
 {
 	BitHordeIds ids;
 	if (asset.get() && asset->getIds(ids)) {
+		const char *data_path = (asset->folder()/"data").c_str();
+		lutimes(data_path, NULL);
+		cerr << data_path << endl;
+
 		for (auto iter=ids.begin(); iter != ids.end(); iter++) {
 			if (iter->type() == bithorde::HashType::TREE_TIGER) {
 				fs::path link = _tigerFolder / base32encode(iter->id());
@@ -126,15 +131,76 @@ void LinkedAssetStore::_addAsset(Asset::Ptr& asset, LinkedAssetStore::ResultHand
 	upstream(asset);
 }
 
+
+void purgeLink(const fs::path& path) {
+	fs::remove(path);
+}
+
+void purgeLinkAndAsset(const fs::path& path) {
+	boost::system::error_code e;
+	auto asset = fs::read_symlink(path, e);
+	purgeLink(path);
+	if (!e && fs::is_directory(asset))
+		fs::remove_all(asset);
+}
+
+enum LinkStatus{
+	OK,
+	BROKEN,
+	OUTDATED,
+};
+
+LinkStatus validateDataSymlink(const fs::path& path) {
+	struct stat linkStat, dataStat;
+
+	const char* c_path = path.c_str();
+	if (lstat(c_path, &linkStat) ||
+	    !S_ISLNK(linkStat.st_mode) ||
+	    stat(c_path, &dataStat) ||
+	    !S_ISREG(dataStat.st_mode))
+		return BROKEN;
+	if (linkStat.st_mtime >= dataStat.st_mtime)
+		return OK;
+	else
+		return OUTDATED;
+}
+
+void noop(Asset::Ptr) {}
+
 Asset::Ptr LinkedAssetStore::findAsset(const BitHordeIds& ids)
 {
 	for (auto iter=ids.begin(); iter != ids.end(); iter++) {
 		if (iter->type() == bithorde::HashType::TREE_TIGER) {
-			fs::path link = _tigerFolder / base32encode(iter->id());
+			fs::path hashLink = _tigerFolder / base32encode(iter->id());
 			boost::system::error_code e;
-			auto asset = fs::read_symlink(link, e);
-			if (!e && fs::is_directory(asset)) {
-				return boost::make_shared<Asset>(asset);
+			auto assetFolder = fs::read_symlink(hashLink, e);
+			Asset::Ptr asset;
+			if (e || !fs::is_directory(assetFolder)) {
+				purgeLink(hashLink);
+				continue;
+			} else {
+				auto assetDataPath = assetFolder/"data";
+				switch (validateDataSymlink(assetDataPath)) {
+				case OUTDATED:
+					cerr << "Warning; outdated asset detected, " << assetFolder << endl;
+					purgeLink(hashLink);
+					fs::remove(assetFolder/"meta");
+				case OK:
+					asset = boost::make_shared<Asset>(assetFolder);
+					break;
+
+				case BROKEN:
+					cerr << "Warning; broken asset detected, " << assetFolder << endl;
+					purgeLinkAndAsset(hashLink);
+				default:
+					continue;
+				}
+			}
+			if (asset->hasRootHash()) {
+				return asset;
+			} else {
+				cerr << "Unhashed asset detected, hashing" << endl;
+				_threadPool.post(*new HashTask(asset, _ioSvc, boost::bind(&LinkedAssetStore::_addAsset, this, _1, &noop)));
 			}
 		}
 	}
