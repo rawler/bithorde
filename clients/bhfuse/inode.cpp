@@ -18,7 +18,7 @@ using namespace bithorde;
 
 INode::INode(BHFuse *fs, fuse_ino_t ino, LookupParams& lookup_params) :
 	fs(fs),
-	_refCount(1),
+	_refCount(0),
 	lookup_params(lookup_params),
 	nr(ino),
 	size(0)
@@ -36,6 +36,8 @@ bool INode::dropRefs(int count) {
 }
 
 bool INode::fuse_reply_lookup(fuse_req_t req) {
+	_refCount++;
+
 	fuse_entry_param e;
 	bzero(&e, sizeof(e));
 	fill_stat_t(e.attr);
