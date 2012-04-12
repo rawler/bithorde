@@ -35,6 +35,9 @@ private:
 	std::string _msg;
 };
 
+// Special Exception to hint at version-printing.
+class VersionExit : public std::exception {};
+
 struct Config
 {
 	Config(int argc, char* argv[]);

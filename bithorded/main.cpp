@@ -6,6 +6,7 @@
 
 #include <crypto++/files.h>
 
+#include "buildconf.hpp"
 #include "lib/hashes.h"
 #include "store/linkedassetstore.hpp"
 #include "server/config.hpp"
@@ -43,6 +44,8 @@ int main(int argc, char* argv[]) {
 		Server server(ioSvc, cfg);
 		ioSvc.run();
 		return 0;
+	} catch (VersionExit& e) {
+		return bithorde::exit_version();
 	} catch (ArgumentError& e) {
 		cerr << e.what() << endl;
 		Config::print_usage(cerr);

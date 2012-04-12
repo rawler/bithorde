@@ -15,6 +15,8 @@ ADD_EXECUTABLE(bithorded
 	store/linkedassetstore.cpp store/linkedassetstore.hpp
 
 	main.cpp
+
+	${BitHorde_BINARY_DIR}/buildconf.cpp
 )
 
 TARGET_LINK_LIBRARIES(bithorded

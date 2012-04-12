@@ -4,6 +4,7 @@ LINK_DIRECTORIES (${BitHorde_BINARY_DIR}/lib)
 
 ADD_EXECUTABLE(bhget
 	bhget.cpp bhget.h
+	${BitHorde_BINARY_DIR}/buildconf.cpp
 )
 
 TARGET_LINK_LIBRARIES ( bhget
@@ -13,6 +14,7 @@ TARGET_LINK_LIBRARIES ( bhget
 
 ADD_EXECUTABLE(bhupload
 	bhupload.cpp bhupload.h
+	${BitHorde_BINARY_DIR}/buildconf.cpp
 )
 TARGET_LINK_LIBRARIES ( bhupload
 	bithorde
@@ -26,6 +28,7 @@ ADD_EXECUTABLE(bhfuse
 	bhfuse/inode.cpp bhfuse/inode.h
 	bhfuse/lookup.cpp bhfuse/lookup.h
 	bhfuse/main.cpp bhfuse/main.h
+	${BitHorde_BINARY_DIR}/buildconf.cpp
 )
 
 STRING(REPLACE ";" " " FUSE_FLAG_STRING "${FUSE_CFLAGS}")

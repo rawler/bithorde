@@ -60,6 +60,9 @@ bithorded::Config::Config(int argc, char* argv[])
 	po::store(po::parse_command_line(argc, argv, cmdline_options), vm, true);
 	notify(vm);
 
+	if (vm.count("version"))
+		throw VersionExit();
+
 	if (!configPath.empty()) {
 		std::ifstream cfg(configPath);
 		po::store(po::parse_config_file(cfg, config_options), vm);

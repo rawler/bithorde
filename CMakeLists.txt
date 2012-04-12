@@ -5,6 +5,17 @@ CMAKE_MINIMUM_REQUIRED(VERSION 2.8)
 SET (EXECUTABLE_OUTPUT_PATH ${PROJECT_BINARY_DIR}/bin CACHE PATH
    "Single output directory for building all executables.")
 
+# Setup CMAKE
+set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
+
+# Read out git-version from Git.
+include(GetGitRevisionDescription)
+git_describe(BUILD_VERSION --dirty=-modified)
+if(NOT DEFINED BUILD_VERSION)
+  set(BUILD_VERSION RELEASE_VERSION)
+endif(NOT DEFINED BUILD_VERSION)
+configure_file("${CMAKE_CURRENT_SOURCE_DIR}/buildconf.cpp.in" "${CMAKE_CURRENT_BINARY_DIR}/buildconf.cpp" @ONLY)
+
 #-----------------------------------------------------------------------------
 # Let's use the highest warning level.
 #-----------------------------------------------------------------------------
@@ -36,8 +47,6 @@ ENDIF(CMAKE_BUILD_TOOL MATCHES "make")
 
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
 ADD_DEFINITIONS(-D_FILE_OFFSET_BITS=64)
-
-SET(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 
 set(Boost_USE_STATIC_LIBS        ON)
 set(Boost_USE_MULTITHREADED      ON)

@@ -6,6 +6,8 @@
 #include <sstream>
 #include <utility>
 
+#include "buildconf.hpp"
+
 namespace asio = boost::asio;
 namespace po = boost::program_options;
 namespace fs = boost::filesystem;
@@ -143,6 +145,8 @@ int main(int argc, char *argv[]) {
 	desc.add_options()
 		("help,h",
 			"Show help")
+		("version,v",
+			"Show version")
 		("name,n", po::value< string >()->default_value("bhupload"),
 			"Bithorde-name of this client")
 		("quiet,q",
@@ -162,6 +166,9 @@ int main(int argc, char *argv[]) {
 	po::variables_map vm;
 	po::store(parser.run(), vm);
 	po::notify(vm);
+
+	if (vm.count("version"))
+		return bithorde::exit_version();
 
 	if (vm.count("help") || !vm.count("file")) {
 		cerr << desc << endl;

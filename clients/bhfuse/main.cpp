@@ -4,6 +4,8 @@
 #include <errno.h>
 #include <signal.h>
 
+#include "buildconf.hpp"
+
 const int RECONNECT_ATTEMPTS = 30;
 const int RECONNECT_INTERVAL_MS = 500;
 
@@ -35,6 +37,8 @@ int main(int argc, char *argv[])
 	desc.add_options()
 		("help,h",
 			"Show help")
+		("version,v",
+			"Show version")
 		("name,n", po::value< string >()->default_value("bhget"),
 			"Bithorde-name of this client")
 		("debug,d",
@@ -53,6 +57,9 @@ int main(int argc, char *argv[])
 	po::variables_map vm;
 	po::store(parser.run(), vm);
 	po::notify(vm);
+
+	if (vm.count("version"))
+		return bithorde::exit_version();
 
 	if (vm.count("help") || !vm.count("mountpoint")) {
 		cerr << desc << endl;

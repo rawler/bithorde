@@ -1,0 +1,10 @@
+#include <iostream>
+
+namespace bithorde {
+	const char* build_version="@BUILD_VERSION@";
+
+	int exit_version() {
+		std::cerr << "BitHorde version " << build_version << std::endl;
+		return 0;
+	}
+}
