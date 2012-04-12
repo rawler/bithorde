@@ -27,10 +27,20 @@ mount BitHorde to a given mountpoint, for other applications to gain direct acce
 Building BitHorde
 =================
 
-BitHorde is written in D using the Tango stdlib, and is using CMake for build management.
-BitHorde is currently only tested for Linux (will possibly work on other POSIX-systems).
-Once libtango, a d-compiler (LDC suggested), make and cmake is installed, something
-like this should do;
+BitHorde is written in C++ using the boost libraries, and is using CMake for build
+management. BitHorde is currently only tested for Linux (will possibly work on other
+POSIX-systems).
+
+Build requirements (Ubuntu Package Names)
+
+  cmake
+  libboost-all-dev (>= 1.46, might work with earlier, may not need all modules)
+  libcrypto++-dev
+  libfuse-dev
+  libprotobuf-dev
+  pkg-config
+
+With all dependencies installed, building should be as simple as:
 
 ::
 

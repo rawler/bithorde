@@ -23,3 +23,9 @@ TARGET_LINK_LIBRARIES(bithorded
 	${Boost_LIBRARIES}
 	bithorde
 )
+
+# Install client-programs
+INSTALL(TARGETS
+	bithorded
+	RUNTIME DESTINATION bin
+)

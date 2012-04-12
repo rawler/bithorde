@@ -40,3 +40,9 @@ TARGET_LINK_LIBRARIES ( bhfuse
 	${Boost_LIBRARIES}
 	${FUSE_LIBRARIES}
 )
+
+# Install client-programs
+INSTALL(TARGETS
+	bhget bhupload bhfuse
+	RUNTIME DESTINATION bin
+)

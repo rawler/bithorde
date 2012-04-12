@@ -1,6 +1,7 @@
 PROJECT (BitHorde)
 
 CMAKE_MINIMUM_REQUIRED(VERSION 2.8)
+SET(RELEASE_VERSION "0.3-preview1")
 
 SET (EXECUTABLE_OUTPUT_PATH ${PROJECT_BINARY_DIR}/bin CACHE PATH
    "Single output directory for building all executables.")
@@ -69,3 +70,21 @@ ADD_SUBDIRECTORY(lib)
 ADD_SUBDIRECTORY(clients)
 ADD_SUBDIRECTORY(bithorded)
 ADD_SUBDIRECTORY(tests)
+
+# Config installation
+set(CONF_INSTALL_DIR etc CACHE PATH "Where should config-template be installed?")
+INSTALL(FILES template.config
+  DESTINATION ${CONF_INSTALL_DIR}
+  RENAME bithorde.conf
+)
+
+# CPack packaging
+INCLUDE(InstallRequiredSystemLibraries)
+SET(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Caching friend2friend oriented content-distribution.")
+SET(CPACK_PACKAGE_VENDOR "bithorde.org")
+SET(CPACK_PACKAGE_DESCRIPTION_FILE "${CMAKE_CURRENT_SOURCE_DIR}/README")
+SET(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
+SET(CPACK_PACKAGE_VERSION "${BUILD_VERSION}")
+SET(CPACK_PACKAGE_INSTALL_DIRECTORY "bithorde-${CPACK_PACKAGE_VERSION}")
+SET(CPACK_PACKAGE_EXECUTABLES "bhfuse" "bhget" "bhupload" "bithorded")
+INCLUDE(CPack)
