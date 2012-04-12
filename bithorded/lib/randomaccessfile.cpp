@@ -23,10 +23,16 @@
 #include <ios>
 #include <sys/stat.h>
 
-RandomAccessFile::RandomAccessFile(const boost::filesystem::path& path)
+RandomAccessFile::RandomAccessFile(const boost::filesystem::path& path, RandomAccessFile::Mode mode)
 	: _path(path)
 {
-	_fd = open(path.c_str(), O_RDWR);
+        int m;
+        switch (mode) {
+          case READ: m = O_RDONLY; break;
+          case WRITE: m = O_WRONLY; break;
+          case READWRITE: m = O_RDWR; break;
+        }
+	_fd = open(path.c_str(), m);
 	if (_fd < 0)
 		throw std::ios_base::failure("Failed opening "+path.string());
 }

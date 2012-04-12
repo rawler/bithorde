@@ -27,8 +27,13 @@ class RandomAccessFile {
 	const boost::filesystem::path _path;
 public:
 	const static size_t WINDOW_SIZE = 65536;
+        enum Mode {
+          READ = 1,
+          WRITE = 2,
+          READWRITE = 3,
+        };
 
-	RandomAccessFile(const boost::filesystem3::path& path);
+	RandomAccessFile(const boost::filesystem3::path& path, Mode mode=READ);
 	~RandomAccessFile();
 
 	/**
