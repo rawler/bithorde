@@ -49,7 +49,8 @@ private:
 
 	size_t _leafBlocks;
 	size_t _nodes_offset;
-	size_t _file_size;
+	int64_t _file_size;
+	size_t _slice_size;
 };
 
 }
