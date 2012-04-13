@@ -6,6 +6,7 @@
 #include <sys/stat.h>
 
 #include <boost/asio/deadline_timer.hpp>
+#include <boost/smart_ptr/enable_shared_from_this2.hpp>
 
 #include <fuse_lowlevel.h>
 
@@ -17,24 +18,27 @@
 class BHFuse;
 
 class INode {
-public:
-	BHFuse * fs;
-
-	// Counts references held to this INode.
+	// Counts references held to this INode. TODO: break out of INode alltogether.
 	std::atomic<int> _refCount;
+
+public:
+	typedef boost::shared_ptr<INode> Ptr;
+
+	BHFuse * fs;
 
 	LookupParams lookup_params;
 
 	fuse_ino_t nr;
 	uint64_t size;
 
-	INode(BHFuse * fs, fuse_ino_t ino, LookupParams& lookup_params);
+	INode(BHFuse* fs, ino_t ino, LookupParams& lookup_params);
 	virtual ~INode();
+
 	void takeRef();
 
 	/**
-	* Returns true if there are still references left to this asset.
-	*/
+	 * Returns true if there are still references left to this asset.
+	 */
 	bool dropRefs(int count);
 
 	bool fuse_reply_lookup(fuse_req_t req);
@@ -52,10 +56,14 @@ struct BHReadOperation {
 	BHReadOperation(fuse_req_t req, off_t off, size_t size);
 };
 
-class FUSEAsset : public INode {
+class FUSEAsset : public INode, public boost::enable_shared_from_this2<FUSEAsset> {
+	FUSEAsset(BHFuse* fs, ino_t ino, boost::shared_ptr< bithorde::ReadAsset > asset, LookupParams& lookup_params);
+	void init();
 public:
-	FUSEAsset(BHFuse *fs, fuse_ino_t ino, boost::shared_ptr<bithorde::ReadAsset> asset, LookupParams& lookup_params);
+	typedef boost::shared_ptr<FUSEAsset> Ptr;
 	virtual ~FUSEAsset();
+
+	static Ptr create(BHFuse* fs, ino_t ino, boost::shared_ptr< bithorde::ReadAsset > asset, LookupParams& lookup_params);
 
 	boost::shared_ptr<bithorde::ReadAsset> asset;
 

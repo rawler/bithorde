@@ -16,16 +16,18 @@ namespace asio = boost::asio;
 
 using namespace bithorde;
 
-INode::INode(BHFuse *fs, fuse_ino_t ino, LookupParams& lookup_params) :
-	fs(fs),
+INode::INode(BHFuse* fs, ino_t ino, LookupParams& lookup_params) :
 	_refCount(0),
+	fs(fs),
 	lookup_params(lookup_params),
 	nr(ino),
 	size(0)
 {
 }
 
-INode::~INode() {}
+INode::~INode() {
+	BOOST_ASSERT(_refCount == 0);
+}
 
 void INode::takeRef() {
 	_refCount++;
@@ -70,7 +72,7 @@ BHReadOperation::BHReadOperation(fuse_req_t req, off_t off, size_t size) :
 	size(size)
 {}
 
-FUSEAsset::FUSEAsset(BHFuse* fs, fuse_ino_t ino, boost::shared_ptr< ReadAsset > asset, LookupParams& lookup_params) :
+FUSEAsset::FUSEAsset(BHFuse* fs, ino_t ino, boost::shared_ptr< ReadAsset > asset, LookupParams& lookup_params) :
 	INode(fs, ino, lookup_params),
 	asset(asset),
 	_openCount(0),
@@ -79,24 +81,33 @@ FUSEAsset::FUSEAsset(BHFuse* fs, fuse_ino_t ino, boost::shared_ptr< ReadAsset > 
 	_connected(true)
 {
 	size = asset->size();
+}
 
+void FUSEAsset::init()
+{
 	if (asset->isBound()) { // Schedule a delayed close of the initial reference.
 		_openCount++;
 		_holdOpenTimer.expires_from_now(boost::posix_time::milliseconds(200));
-		_holdOpenTimer.async_wait(boost::bind(&FUSEAsset::closeOne, this));
+		_holdOpenTimer.async_wait(boost::bind(&FUSEAsset::closeOne, shared_from_this()));
 	}
 
 	_statusConnection = asset->statusUpdate.connect(Asset::StatusSignal::slot_type(&FUSEAsset::onStatusChanged, this, ASSET_ARG_STATUS));
 	_dataConnection = asset->dataArrived.connect(ReadAsset::DataSignal::slot_type(&FUSEAsset::onDataArrived, this, ASSET_ARG_OFFSET, ASSET_ARG_DATA, ASSET_ARG_TAG));
 }
 
-
 FUSEAsset::~FUSEAsset()
 {
 	_holdOpenTimer.cancel();
 	_rebindTimer.cancel();
-	BOOST_ASSERT(_refCount == 0);
 	BOOST_ASSERT(_openCount == 0);
+}
+
+FUSEAsset::Ptr FUSEAsset::create(BHFuse* fs, ino_t ino, boost::shared_ptr< ReadAsset > asset, LookupParams& lookup_params)
+{
+	FUSEAsset *a = new FUSEAsset(fs, ino, asset, lookup_params);
+	Ptr p(a);
+	a->init();
+	return p;
 }
 
 void FUSEAsset::fuse_dispatch_open(fuse_req_t req, fuse_file_info * fi)
@@ -158,7 +169,7 @@ void FUSEAsset::onStatusChanged(const bithorde::AssetStatus& s)
 	case bithorde::INVALID_HANDLE:
 		if (fs->client->isConnected()) {
 			_rebindTimer.expires_from_now(boost::posix_time::milliseconds(REBIND_INTERVAL_MS));
-			_rebindTimer.async_wait(boost::bind(&FUSEAsset::tryRebind, this));
+			_rebindTimer.async_wait(boost::bind(&FUSEAsset::tryRebind, shared_from_this()));
 		}
 
 	default:
@@ -172,7 +183,7 @@ void FUSEAsset::tryRebind()
 		fs->client->bind(*asset);
 	} else {
 		_rebindTimer.expires_from_now(boost::posix_time::milliseconds(REBIND_INTERVAL_MS));
-		_rebindTimer.async_wait(boost::bind(&FUSEAsset::tryRebind, this));
+		_rebindTimer.async_wait(boost::bind(&FUSEAsset::tryRebind, shared_from_this()));
 	}
 }
 

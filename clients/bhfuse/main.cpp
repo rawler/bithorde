@@ -150,8 +150,8 @@ int BHFuse::fuse_getattr(fuse_req_t req, fuse_ino_t ino, fuse_file_info *) {
 }
 
 int BHFuse::fuse_open(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi) {
-	FUSEAsset* a;
-	if (_inode_cache.count(ino) && (a = dynamic_cast<FUSEAsset*>(_inode_cache[ino]))) {
+	FUSEAsset * a;
+	if (_inode_cache.count(ino) && (a = dynamic_cast<FUSEAsset*>(_inode_cache[ino].get()))) {
 		a->fuse_dispatch_open(req, fi);
 		return 0;
 	} else {
@@ -160,7 +160,7 @@ int BHFuse::fuse_open(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi) {
 }
 
 int BHFuse::fuse_release(fuse_req_t req, fuse_ino_t ino, fuse_file_info * fi) {
-	if (FUSEAsset * a = static_cast<FUSEAsset*>(_inode_cache[ino])) {
+	if (FUSEAsset * a = dynamic_cast<FUSEAsset*>(_inode_cache[ino].get())) {
 		a->fuse_dispatch_close(req, fi);
 		return 0;
 	} else {
@@ -170,8 +170,7 @@ int BHFuse::fuse_release(fuse_req_t req, fuse_ino_t ino, fuse_file_info * fi) {
 
 int BHFuse::fuse_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, fuse_file_info *)
 {
-	FUSEAsset* a = dynamic_cast<FUSEAsset*>(_inode_cache[ino]);
-	if (a) {
+	if (FUSEAsset* a = dynamic_cast<FUSEAsset*>(_inode_cache[ino].get())) {
 		a->read(req, off, size);
 		return 0;
 	} else {
@@ -182,21 +181,20 @@ int BHFuse::fuse_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, fu
 FUSEAsset * BHFuse::registerAsset(boost::shared_ptr< ReadAsset > asset, LookupParams& lookup_params)
 {
 	fuse_ino_t ino = _ino_allocator.allocate();
-	FUSEAsset * a = new FUSEAsset(this, ino, asset, lookup_params);
+	FUSEAsset::Ptr a = FUSEAsset::create(this, ino, asset, lookup_params);
 	_inode_cache[ino] = a;
 	_lookup_cache[lookup_params] = a;
-	return a;
+	return static_cast<FUSEAsset*>(a.get());
 }
 
 bool BHFuse::unrefInode(fuse_ino_t ino, int count)
 {
-	INode * i = _inode_cache[ino];
+	INode::Ptr i = _inode_cache[ino];
 	if (i) {
 		if (!i->dropRefs(count)) {
 			_inode_cache.erase(ino);
 			_lookup_cache.erase(i->lookup_params);
 			_ino_allocator.free(ino);
-			delete i;
 		}
 		return true;
 	} else {
