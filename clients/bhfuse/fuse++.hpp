@@ -1,5 +1,5 @@
-#ifndef QFILESYSTEM_H
-#define QFILESYSTEM_H
+#ifndef FUSEPP_H
+#define FUSEPP_H
 
 #include <string>
 #include <vector>
@@ -80,4 +80,4 @@ private:
 	Buffer _receive_buf;
 };
 
-#endif // QFILESYSTEM_H
+#endif // FUSEPP_H
