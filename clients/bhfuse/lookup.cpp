@@ -13,7 +13,6 @@ Lookup::Lookup(BHFuse * fs, fuse_req_t req, MagnetURI & uri, LookupParams& p) :
 	fs(fs),
 	req(req),
 	fi(0),
-	fuseAsset(0),
 	lookup_params(p)
 {
 	ReadAsset::IdList ids = uri.toIdList();
@@ -21,7 +20,7 @@ Lookup::Lookup(BHFuse * fs, fuse_req_t req, MagnetURI & uri, LookupParams& p) :
 	asset = boost::make_shared<ReadAsset>(fs->client, ids);
 }
 
-Lookup::Lookup(BHFuse *fs, FUSEAsset *asset, fuse_req_t req, fuse_file_info *fi) :
+Lookup::Lookup(BHFuse *fs, boost::shared_ptr<FUSEAsset>& asset, fuse_req_t req, fuse_file_info *fi) :
 	fs(fs),
 	req(req),
 	fi(fi),
@@ -41,8 +40,8 @@ void Lookup::onStatusUpdate(const bithorde::AssetStatus &msg)
 		if (fuseAsset) {
 			fuseAsset->fuse_reply_open(req, fi);
 		} else {
-			fuseAsset = fs->registerAsset(asset, lookup_params);
-			fuseAsset->fuse_reply_lookup(req);
+			FUSEAsset* f_asset = fs->registerAsset(asset, lookup_params);
+			f_asset->fuse_reply_lookup(req);
 		}
 	} else {
 		fuse_reply_err(req, ENOENT);

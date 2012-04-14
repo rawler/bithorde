@@ -116,7 +116,8 @@ void FUSEAsset::fuse_dispatch_open(fuse_req_t req, fuse_file_info * fi)
 	if (asset && asset->isBound()) {
 		this->fuse_reply_open(req, fi);
 	} else {
-		Lookup * l = new Lookup(fs, this, req, fi);
+		Ptr self = shared_from_this();
+		Lookup * l = new Lookup(fs, self, req, fi);
 		l->perform(fs->client);
 	}
 }
