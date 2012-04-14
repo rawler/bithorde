@@ -104,7 +104,7 @@ Connection::Pointer Connection::create(asio::io_service& ioSvc, boost::shared_pt
 
 void Connection::onRead(const boost::system::error_code& err, size_t count)
 {
-	if (err || count == 0) {
+	if (err || (count == 0)) {
 		close();
 		return;
 	} else {
@@ -214,7 +214,7 @@ bool Connection::sendMessage(Connection::MessageType type, const::google::protob
 }
 
 void Connection::onWritten(const boost::system::error_code& err, size_t written) {
-	if (written >= 0) {
+	if ((!err) && (written >= 0)) {
 		_sendBuf.pop(written);
 		trySend();
 		if (_sendBuf.size < SEND_BUF_LOW_WATER_MARK)
