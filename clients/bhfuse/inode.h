@@ -8,8 +8,6 @@
 #include <boost/asio/deadline_timer.hpp>
 #include <boost/smart_ptr/enable_shared_from_this2.hpp>
 
-#include <fuse_lowlevel.h>
-
 #include "lib/asset.h"
 #include "lib/types.h"
 

@@ -4,9 +4,9 @@
 #include <boost/shared_ptr.hpp>
 #include <boost/signals2/connection.hpp>
 
-#include <fuse_lowlevel.h>
-
 #include <lib/bithorde.h>
+
+#include "fuse++.hpp"
 
 typedef std::pair<fuse_ino_t, std::string> LookupParams;
 
