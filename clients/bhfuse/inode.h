@@ -66,8 +66,8 @@ public:
 	boost::shared_ptr<bithorde::ReadAsset> asset;
 
 	void fuse_dispatch_open(fuse_req_t req, fuse_file_info * fi);
-	void fuse_dispatch_close(fuse_req_t req, fuse_file_info * fi);
-	void fuse_reply_open(fuse_req_t req, fuse_file_info * fi);
+	void fuse_dispatch_close( fuse_req_t req, fuse_file_info*);
+	void fuse_reply_open(fuse_req_t req);
 
 	void read(fuse_req_t req, off_t off, size_t size);
 protected:

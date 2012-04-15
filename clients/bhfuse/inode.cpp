@@ -114,10 +114,10 @@ void FUSEAsset::fuse_dispatch_open(fuse_req_t req, fuse_file_info * fi)
 {
 	_openCount++;
 	if (asset && asset->isBound()) {
-		this->fuse_reply_open(req, fi);
+		this->fuse_reply_open(req);
 	} else {
 		Ptr self = shared_from_this();
-		Lookup * l = new Lookup(fs, self, req, fi);
+		Lookup * l = new Lookup(fs, self, req);
 		l->perform(fs->client);
 	}
 }
@@ -127,11 +127,13 @@ void FUSEAsset::fuse_dispatch_close(fuse_req_t req, fuse_file_info *) {
 	fuse_reply_err(req, 0);
 }
 
-void FUSEAsset::fuse_reply_open(fuse_req_t req, fuse_file_info * fi) {
-	fi->flush = false;
-	fi->keep_cache = true;
-	fi->nonseekable = false;
-	::fuse_reply_open(req, fi);
+void FUSEAsset::fuse_reply_open(fuse_req_t req) {
+	fuse_file_info fi;
+	bzero(&fi, sizeof(fuse_file_info));
+	fi.flush = false;
+	fi.keep_cache = true;
+	fi.nonseekable = false;
+	::fuse_reply_open(req, &fi);
 }
 
 void FUSEAsset::read(fuse_req_t req, off_t off, size_t size)
