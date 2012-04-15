@@ -176,7 +176,7 @@ void Client::onMessage(const bithorde::AssetStatus & msg) {
 			cerr << "WARNING: Status OK recieved for Asset supposedly closed or re-written." << endl;
 		}
 	} else {
-		cerr << "WARNING: AssetStatus for unmapped handle" << endl;
+		cerr << "WARNING: AssetStatus " << bithorde::Status_Name(msg.status()) << " for unmapped handle" << endl;
 	}
 }
 
@@ -224,6 +224,7 @@ bool Client::bind(ReadAsset &asset) {
 		BOOST_ASSERT(asset.requestIds().size() > 0);
 		asset._handle = _handleAllocator.allocate();
 		BOOST_ASSERT(asset._handle > 0);
+		BOOST_ASSERT(_assetMap.count(asset._handle) == 0);
 		_assetMap[asset._handle] = &asset;
 	}
 
@@ -254,7 +255,7 @@ bool Client::release(Asset & asset)
 	msg.set_timeout(DEFAULT_ASSET_TIMEOUT);
 	msg.set_uuid(rand64());
 
-	_assetMap[asset._handle] = NULL;
+	_assetMap.erase(asset._handle);
 	asset._handle = -1;
 
 	return _connection->sendMessage(Connection::BindRead, msg);
