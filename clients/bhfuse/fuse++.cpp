@@ -121,7 +121,7 @@ BoostAsioFilesystem::~BoostAsioFilesystem() {
 
 void BoostAsioFilesystem::dispatch_waiting(const boost::system::error_code& error, size_t count) {
 	if (error) {
-		cerr << "ERROR: error" << endl;
+		cerr << "ERROR reading from fuse: " << error.message() << endl;
 	} else {
 		fuse_session_process(_fuse_session, (const char*)_receive_buf.ptr, count, _fuse_chan);
 		readNext();
