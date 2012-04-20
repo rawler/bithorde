@@ -57,7 +57,7 @@ AssetMeta::AssetMeta(const boost::filesystem::path& path, uint leafBlocks)
 	_file_size = _nodes_offset + treesize(leafBlocks)*sizeof(TigerNode);
 
 	auto status = fs::status(path);
-	int64_t size;
+	uint64_t size;
 
 	if (fs::exists(status)) {
 		size = fs::file_size(path);
@@ -66,7 +66,7 @@ AssetMeta::AssetMeta(const boost::filesystem::path& path, uint leafBlocks)
 		_fp.new_file_size = _file_size;
 	}
 
-	_slice_size = std::min(_file_size, (int64_t)MAP_PAGE);
+	_slice_size = std::min(_file_size, (uint64_t)MAP_PAGE);
 	_f.open(_fp);
 	Header* hdr = (Header*) _f.data();
 	if (size > 0) {
@@ -99,7 +99,7 @@ void AssetMeta::repage(uint64_t offset)
 	int physpagesize = getpagesize();
 
 	int64_t pageStart = offset - (MAP_PAGE / 4);
-	if (pageStart + MAP_PAGE > _file_size)
+	if ((uint64_t)(pageStart + MAP_PAGE) > _file_size)
 		pageStart = _file_size - (MAP_PAGE - physpagesize);
 
 	// Align on correct pages
@@ -110,7 +110,7 @@ void AssetMeta::repage(uint64_t offset)
 	_fp.offset = pageStart;
 	_f.close();
 	_f.open(_fp);
-	_slice_size = std::min(_file_size - pageStart, (int64_t)MAP_PAGE);
+	_slice_size = std::min(_file_size - pageStart, (uint64_t)MAP_PAGE);
 }
 
 size_t AssetMeta::size()

@@ -49,7 +49,7 @@ private:
 
 	size_t _leafBlocks;
 	size_t _nodes_offset;
-	int64_t _file_size;
+	uint64_t _file_size;
 	size_t _slice_size;
 };
 
