@@ -255,7 +255,8 @@ bool Client::release(Asset & asset)
 	msg.set_timeout(DEFAULT_ASSET_TIMEOUT);
 	msg.set_uuid(rand64());
 
-	_assetMap.erase(asset._handle);
+	// Leave handle dangling, so it won't be reused until confirmation has been received from the other side.
+	_assetMap[asset._handle] = NULL;
 	asset._handle = -1;
 
 	return _connection->sendMessage(Connection::BindRead, msg);
