@@ -79,7 +79,7 @@ void Server::waitForTCPConnection()
 void Server::onTCPConnected(boost::shared_ptr< asio::ip::tcp::socket >& socket, const boost::system::error_code& ec)
 {
 	if (!ec) {
-		bithorded::Client::Pointer c = bithorded::Client::create(*this, "testserver");
+		bithorded::Client::Pointer c = bithorded::Client::create(*this, _cfg.nodeName);
 		c->connect(bithorde::Connection::create(_ioSvc, socket));
 		clientConnected(c);
 		waitForTCPConnection();
@@ -95,7 +95,7 @@ void Server::waitForLocalConnection()
 void Server::onLocalConnected(boost::shared_ptr< boost::asio::local::stream_protocol::socket >& socket, const boost::system::error_code& ec)
 {
 	if (!ec) {
-		bithorded::Client::Pointer c = bithorded::Client::create(*this, "testserver");
+		bithorded::Client::Pointer c = bithorded::Client::create(*this, _cfg.nodeName);
 		c->connect(bithorde::Connection::create(_ioSvc, socket));
 		clientConnected(c);
 		waitForLocalConnection();
