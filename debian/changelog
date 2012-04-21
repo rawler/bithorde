@@ -1,3 +1,13 @@
+bithorde (0.2-1) natty; urgency=high
+
+  * Final 0.2 release
+   - Lots of small but important bugfixes
+   - Small optimizations
+  * Added support for incoming-only 'clients', who can be authenticated and encrypted, but won't recieve requests from this node.
+  * Allow incoming-only friend connections (who will still receive requests when connected).
+
+ -- Ulrik Mikaelsson <ulrik.mikaelsson@gmail.com>  Sat, 21 Apr 2012 17:32:15 +0200
+
 bithorde (0.1.99+0.2rc2-2) natty; urgency=low
 
   * Fixed a rare deadlock, and prevent some theoretical future locking problems.

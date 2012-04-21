@@ -2,7 +2,7 @@
 cmake_minimum_required(VERSION 2.6)
 
 project (BitHorde)
-set(RELEASE_VERSION "0.2rc2")
+set(RELEASE_VERSION "0.2")
 
 # Init D-stuff
 set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
