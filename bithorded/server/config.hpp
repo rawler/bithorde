@@ -19,6 +19,7 @@
 #define BITHORDED_CONFIG_HPP
 
 #include <boost/asio/ip/address.hpp>
+#include <boost/filesystem/path.hpp>
 
 #include <map>
 #include <string>
@@ -38,6 +39,11 @@ private:
 // Special Exception to hint at version-printing.
 class VersionExit : public std::exception {};
 
+struct Source {
+	std::string name;
+	boost::filesystem::path root;
+};
+
 struct Config
 {
 	Config(int argc, char* argv[]);
@@ -51,7 +57,7 @@ struct Config
 	uint16_t tcpPort;
 	std::string unixSocket;
 
-	std::vector<std::string> linkroots;
+	std::vector<Source> sources;
 };
 
 }

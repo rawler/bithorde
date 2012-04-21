@@ -17,6 +17,7 @@
 #include "config.hpp"
 
 #include <boost/any.hpp>
+#include <boost/algorithm/string/predicate.hpp>
 #include <boost/asio/ip/host_name.hpp>
 #include <boost/assert.hpp>
 #include <boost/foreach.hpp>
@@ -31,6 +32,65 @@ namespace asio = boost::asio;
 namespace po = boost::program_options;
 
 po::options_description cmdline_options;
+
+class OptionGroup {
+	std::string _name;
+	std::map<string, po::variable_value> _map;
+public:
+	OptionGroup() {}
+	OptionGroup(const std::string& name)
+		: _name(name)
+	{
+	}
+
+	const po::variable_value & operator[](const std::string &key) {
+		return _map[key];
+	}
+
+	string name() const {
+		auto periodpos = _name.rfind('.');
+		if (periodpos == string::npos)
+			return _name;
+		else
+			return _name.substr(periodpos+1);
+	}
+
+	void insert(const string& key, const po::variable_value& value) {
+		_map[key] = value;
+	}
+};
+
+class DynamicMap : public po::variables_map {
+	map< string, OptionGroup> _groups;
+public:
+	void store(const po::basic_parsed_options<char>& opts) {
+		for (auto opt=opts.options.begin(); opt != opts.options.end(); opt++ ) {
+			size_t periodpos = opt->string_key.rfind('.');
+			if (periodpos != string::npos) {
+				string group_name = opt->string_key.substr(0, periodpos);
+				if (!_groups.count(group_name))
+					_groups[group_name] = OptionGroup(group_name);
+
+				// TODO: now just pushes the first value, should support multi-value
+				if (opt->value.size()) {
+					string key_name = opt->string_key.substr(periodpos+1);
+					po::variable_value v(opt->value.front(), false);
+					_groups[group_name].insert(key_name, v);
+				}
+			}
+		}
+		po::store(opts, *this, true);
+	}
+
+	vector<OptionGroup> groups(const string& prefix) {
+		vector<OptionGroup> res;
+		for (auto group=_groups.begin(); group != _groups.end(); group++ ) {
+			if (boost::starts_with(group->first, prefix))
+				res.push_back(group->second);
+		}
+		return res;
+	}
+};
 
 bithorded::Config::Config(int argc, char* argv[])
 {
@@ -50,14 +110,12 @@ bithorded::Config::Config(int argc, char* argv[])
 			"TCP port to listen on for incoming connections")
 		("server.unixSocket", po::value<string>(&unixSocket)->default_value("/tmp/bithorde"),
 			"Path to UNIX-socket to listen on")
-		("storage.linkroot", po::value< vector<string> >(&linkroots),
-			"Root folders allowed for linked upload (repeatable)")
 	;
 
 	cmdline_options.add(cli_options).add(config_options);
 
-	po::variables_map vm;
-	po::store(po::parse_command_line(argc, argv, cmdline_options), vm, true);
+	DynamicMap vm;
+	vm.store(po::parse_command_line(argc, argv, cmdline_options));
 	notify(vm);
 
 	if (vm.count("version"))
@@ -65,7 +123,7 @@ bithorded::Config::Config(int argc, char* argv[])
 
 	if (!configPath.empty()) {
 		std::ifstream cfg(configPath);
-		po::store(po::parse_config_file(cfg, config_options), vm);
+		vm.store(po::parse_config_file(cfg, config_options, true));
 		notify(vm);
 	}
 
@@ -79,8 +137,17 @@ bithorded::Config::Config(int argc, char* argv[])
 		throw ArgumentError("Usage:");
 	}
 
-	if (linkroots.empty()) {
-		throw ArgumentError("Needs at least one storage.linkroot to share.");
+	vector<OptionGroup> source_opts = vm.groups("source");
+	for (auto opt=source_opts.begin(); opt != source_opts.end(); opt++) {
+		Source src;
+		src.name = opt->name();
+		auto root_opt = (*opt)["root"];
+		src.root = root_opt.as<string>();
+		sources.push_back(src);
+	}
+
+	if (sources.empty()) {
+		throw ArgumentError("Needs at least one source root to share.");
 	}
 }
 

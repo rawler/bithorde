@@ -38,8 +38,8 @@ Server::Server(asio::io_service& ioSvc, Config& cfg) :
 	_tcpListener(ioSvc),
 	_localListener(ioSvc)
 {
-	for (auto iter=_cfg.linkroots.begin(); iter != _cfg.linkroots.end(); iter++) {
-		_assetStores.push_back( unique_ptr<LinkedAssetStore>(new LinkedAssetStore(ioSvc, *iter)) );
+	for (auto iter=_cfg.sources.begin(); iter != _cfg.sources.end(); iter++) {
+		_assetStores.push_back( unique_ptr<LinkedAssetStore>(new LinkedAssetStore(ioSvc, iter->root)) );
 	}
 
 	if (_cfg.tcpPort) {
