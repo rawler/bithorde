@@ -15,13 +15,13 @@
 */
 
 
-#include "asset.hpp"
+#include "sourceasset.hpp"
 
 using namespace std;
 
 using namespace bithorded;
 
-Asset::Asset(const boost::filesystem3::path& metaFolder) :
+SourceAsset::SourceAsset(const boost::filesystem3::path& metaFolder) :
 	_metaFolder(metaFolder),
 	_file(metaFolder/"data"),
 	_metaStore(metaFolder/"meta", _file.blocks(BLOCKSIZE)),
@@ -29,7 +29,7 @@ Asset::Asset(const boost::filesystem3::path& metaFolder) :
 {
 }
 
-size_t Asset::can_read(uint64_t offset, size_t size)
+size_t SourceAsset::can_read(uint64_t offset, size_t size)
 {
 	size_t res = 0;
 	uint currentBlock = offset / BLOCKSIZE;
@@ -49,7 +49,7 @@ size_t Asset::can_read(uint64_t offset, size_t size)
 	return res;
 }
 
-bool Asset::getIds(BitHordeIds& ids)
+bool SourceAsset::getIds(BitHordeIds& ids)
 {
 	BOOST_ASSERT( ids.size() == 0 );
 	TigerNode& root = _hasher.getRoot();
@@ -64,7 +64,7 @@ bool Asset::getIds(BitHordeIds& ids)
 	}
 }
 
-bool Asset::hasRootHash()
+bool SourceAsset::hasRootHash()
 {
 	TigerNode& root = _hasher.getRoot();
 	return (root.state == TigerNode::State::SET);
@@ -82,9 +82,9 @@ uint64_t roundDown(uint64_t val, uint64_t block) {
 	return (val / block) * block;
 }
 
-void Asset::notifyValidRange(uint64_t offset, uint64_t size)
+void SourceAsset::notifyValidRange(uint64_t offset, uint64_t size)
 {
-	uint64_t filesize = Asset::size();
+	uint64_t filesize = SourceAsset::size();
 
 	offset = roundUp(offset, BLOCKSIZE);
 	uint64_t end = offset + size;
@@ -94,21 +94,21 @@ void Asset::notifyValidRange(uint64_t offset, uint64_t size)
 	updateHash(offset, end);
 }
 
-const byte* Asset::read(uint64_t offset, size_t& size, byte* buf)
+const byte* SourceAsset::read(uint64_t offset, size_t& size, byte* buf)
 {
 	return _file.read(offset, size, buf);
 }
 
-uint64_t Asset::size() {
+uint64_t SourceAsset::size() {
 	return _file.size();
 }
 
-boost::filesystem3::path Asset::folder()
+boost::filesystem3::path SourceAsset::folder()
 {
 	return _metaFolder;
 }
 
-void Asset::updateHash(uint64_t offset, uint64_t end)
+void SourceAsset::updateHash(uint64_t offset, uint64_t end)
 {
 	byte BUF[BLOCKSIZE];
 
@@ -128,7 +128,7 @@ void Asset::updateHash(uint64_t offset, uint64_t end)
 	}
 }
 
-size_t Asset::write(uint64_t offset, const void* buf, size_t size)
+size_t SourceAsset::write(uint64_t offset, const void* buf, size_t size)
 {
 	// TODO
 	return 0;

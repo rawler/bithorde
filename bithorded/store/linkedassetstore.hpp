@@ -22,7 +22,7 @@
 #include <boost/filesystem/path.hpp>
 #include <boost/function.hpp>
 
-#include "asset.hpp"
+#include "sourceasset.hpp"
 #include "bithorde.pb.h"
 #include "../lib/threadpool.hpp"
 
@@ -33,7 +33,7 @@ typedef google::protobuf::RepeatedPtrField< bithorde::Identifier > BitHordeIds;
 class LinkedAssetStore
 {
 public:
-	typedef boost::function< void ( Asset::Ptr )> ResultHandler;
+	typedef boost::function< void ( SourceAsset::Ptr )> ResultHandler;
 	
 	LinkedAssetStore(boost::asio::io_service& ioSvc, const boost::filesystem::path& baseDir);
 
@@ -55,7 +55,7 @@ public:
 	Asset::Ptr findAsset(const BitHordeIds& ids);
 
 private:
-	void _addAsset(Asset::Ptr& asset, ResultHandler upstream);
+	void _addAsset( bithorded::SourceAsset::Ptr& asset, bithorded::LinkedAssetStore::ResultHandler upstream);
 
 	ThreadPool _threadPool;
 	boost::asio::io_service& _ioSvc;

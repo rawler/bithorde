@@ -23,6 +23,7 @@
 
 #include "assetmeta.hpp"
 
+#include "../server/asset.hpp"
 #include "../lib/hashtree.hpp"
 #include "../lib/randomaccessfile.hpp"
 
@@ -30,18 +31,18 @@
 
 namespace bithorded {
 
-class Asset
+class SourceAsset : public Asset
 {
 public:
 	typedef HashTree<TigerNode, AssetMeta> Hasher;
-	typedef boost::shared_ptr<Asset> Ptr;
+	typedef boost::shared_ptr<SourceAsset> Ptr;
 
 	/**
 	 * All writes must be aligned on this BLOCKSIZE, or the data might be trimmed in the ends.
 	 */
 	const static int BLOCKSIZE = Hasher::BLOCKSIZE;
 
-	Asset(const boost::filesystem::path& metaFolder);
+	SourceAsset(const boost::filesystem::path& metaFolder);
 
 	/**
 	 * Will read up to /size/ bytes from underlying file, and store into a buffer.
@@ -49,19 +50,19 @@ public:
 	 * @arg size - will be filled in with the amount actually read
 	 * @return a pointer to the buffer read, which may or may not be /buf/, or null on error.
 	 */
-	const byte* read(uint64_t offset, size_t& size, byte* buf);
+	virtual const byte* read(uint64_t offset, size_t& size, byte* buf);
 
 	/**
 	 * The size of the asset, in bytes
 	 */
-	uint64_t size();
+	virtual uint64_t size();
 
 	/**
 	 * Returns the amount readable, starting at /offset/, and up to size.
 	 *
 	 * @return the amount of data available, or null if no data can be read
 	 */
-	size_t can_read(uint64_t offset, size_t size);
+	virtual size_t can_read(uint64_t offset, size_t size);
 
 	/**
 	 * Notify that given range of the file is available for hashing. Should respect BLOCKSIZE
@@ -81,7 +82,7 @@ public:
 	/**
 	 * Writes the root hash of the asset into /buf/. Buf is assumed to have capacity for Hasher::DIGESTSIZE
 	 */
-	bool getIds(BitHordeIds& ids);
+	virtual bool getIds(BitHordeIds& ids);
 
 	/**
 	 * Get the path to the folder containing file data + metadata

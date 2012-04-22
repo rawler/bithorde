@@ -44,6 +44,11 @@ struct Source {
 	boost::filesystem::path root;
 };
 
+struct Friend {
+	std::string name;
+	std::string addr;
+};
+
 struct Config
 {
 	Config(int argc, char* argv[]);

@@ -78,7 +78,7 @@ void Client::onMessage(const bithorde::BindRead& msg)
 		// Trying to open
 		LOG(INFO) << peerName() << " requested: " << MagnetURI(msg) << endl;
 
-		Asset::Ptr a = _server.findAsset(msg.ids());
+		Asset::Ptr a = _server.findAsset(msg);
 		if (a) {
 			if (assignAsset(h, a)) {
 				LOG(INFO) << "found" << endl;

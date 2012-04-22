@@ -54,12 +54,12 @@ LinkedAssetStore::LinkedAssetStore(boost::asio::io_service& ioSvc, const boost::
 }
 
 struct HashTask : public Task {
-	Asset::Ptr asset;
+	SourceAsset::Ptr asset;
 	asio::io_service& io_svc;
 	asio::io_service::work _work;
 	LinkedAssetStore::ResultHandler handler;
 
-	HashTask(Asset::Ptr asset, asio::io_service& io_svc, LinkedAssetStore::ResultHandler handler )
+	HashTask(SourceAsset::Ptr asset, asio::io_service& io_svc, LinkedAssetStore::ResultHandler handler )
 		: asset(asset), io_svc(io_svc), _work(io_svc), handler(handler)
 	{}
 	
@@ -104,14 +104,14 @@ bool LinkedAssetStore::addAsset(const boost::filesystem3::path& file, LinkedAsse
 		fs::create_directory(assetFolder);
 		fs::create_symlink(file, assetFolder/"data");
 
-		Asset::Ptr asset = boost::make_shared<Asset>(assetFolder);
+		SourceAsset::Ptr asset = boost::make_shared<SourceAsset>(assetFolder);
 		HashTask* task = new HashTask(asset, _ioSvc, boost::bind(&LinkedAssetStore::_addAsset, this, _1, handler));
 		_threadPool.post(*task);
 		return true;
 	}
 }
 
-void LinkedAssetStore::_addAsset(Asset::Ptr& asset, LinkedAssetStore::ResultHandler upstream)
+void LinkedAssetStore::_addAsset(SourceAsset::Ptr& asset, LinkedAssetStore::ResultHandler upstream)
 {
 	BitHordeIds ids;
 	if (asset.get() && asset->getIds(ids)) {
@@ -175,7 +175,7 @@ Asset::Ptr LinkedAssetStore::findAsset(const BitHordeIds& ids)
 			fs::path hashLink = _tigerFolder / base32encode(iter->id());
 			boost::system::error_code e;
 			auto assetFolder = fs::read_symlink(hashLink, e);
-			Asset::Ptr asset;
+			SourceAsset::Ptr asset;
 			if (e || !fs::is_directory(assetFolder)) {
 				purgeLink(hashLink);
 				continue;
@@ -187,7 +187,7 @@ Asset::Ptr LinkedAssetStore::findAsset(const BitHordeIds& ids)
 					purgeLink(hashLink);
 					fs::remove(assetFolder/"meta");
 				case OK:
-					asset = boost::make_shared<Asset>(assetFolder);
+					asset = boost::make_shared<SourceAsset>(assetFolder);
 					break;
 
 				case BROKEN:

@@ -20,7 +20,7 @@
 
 #include "lib/allocator.h"
 #include "lib/client.h"
-#include "bithorded/store/asset.hpp"
+#include "asset.hpp"
 
 namespace bithorded {
 

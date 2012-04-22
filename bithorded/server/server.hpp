@@ -27,9 +27,9 @@
 #include <boost/asio/local/stream_protocol.hpp>
 #include <boost/filesystem/path.hpp>
 
-#include <bithorded/store/asset.hpp>
-#include <bithorded/store/linkedassetstore.hpp>
-
+#include "../store/sourceasset.hpp"
+#include "../store/linkedassetstore.hpp"
+#include "bithorde.pb.h"
 #include "client.hpp"
 
 namespace bithorded {
@@ -51,7 +51,7 @@ public:
 	boost::asio::io_service& ioService();
 
 	bool linkAsset(const boost::filesystem::path& filePath, LinkedAssetStore::ResultHandler resultHandler);
-	bithorded::Asset::Ptr findAsset(const BitHordeIds& ids);
+	bithorded::Asset::Ptr findAsset( const bithorde::BindRead& req);
 
 private:
 	void clientConnected(const bithorded::Client::Pointer& client);

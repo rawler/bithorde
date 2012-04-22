@@ -6,11 +6,12 @@ ADD_EXECUTABLE(bithorded
 	lib/randomaccessfile.cpp lib/randomaccessfile.hpp
 	lib/treestore.cpp lib/treestore.hpp
 
+	server/asset.cpp server/asset.hpp
 	server/client.cpp server/client.hpp
 	server/config.cpp server/config.hpp
 	server/server.cpp server/server.hpp
 
-	store/asset.cpp store/asset.hpp
+	store/sourceasset.cpp store/sourceasset.hpp
 	store/assetmeta.cpp store/assetmeta.hpp
 	store/linkedassetstore.cpp store/linkedassetstore.hpp
 
