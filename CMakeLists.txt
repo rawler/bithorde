@@ -82,6 +82,11 @@ INSTALL(FILES template.config
   RENAME bithorde.conf
 )
 
+# Test Setup
+ENABLE_TESTING()
+ADD_TEST(NAME UnitTests COMMAND unittests)
+SET_TESTS_PROPERTIES(UnitTests PROPERTIES TIMEOUT 60)
+
 # CPack packaging
 INCLUDE(InstallRequiredSystemLibraries)
 SET(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Caching friend2friend oriented content-distribution.")
