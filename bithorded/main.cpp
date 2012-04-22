@@ -12,6 +12,8 @@
 #include "server/config.hpp"
 #include "server/server.hpp"
 
+#include <glog/logging.h>
+
 using namespace std;
 namespace asio = boost::asio;
 namespace fs = boost::filesystem;
@@ -19,25 +21,10 @@ namespace po = boost::program_options;
 
 using namespace bithorded;
 
-void whenDone(boost::shared_ptr<LinkedAssetStore> assetStore, Asset::Ptr a) {
-	if (a == NULL) {
-		cerr << "Failed" << endl;
-	} else {
-		google::protobuf::RepeatedPtrField<bithorde::Identifier> ids;
-		a->getIds(ids);
-
-		cerr << ids << endl;
-
-		Asset::Ptr sameAsset = assetStore->findAsset(ids);
-
-		BOOST_ASSERT(sameAsset.get());
-		ids.Clear();
-		sameAsset->getIds(ids);
-		cerr << ids << endl;
-	}
-}
-
 int main(int argc, char* argv[]) {
+	google::InitGoogleLogging(argv[0]);
+	google::LogToStderr();
+
 	try {
 		Config cfg(argc, argv);
 		asio::io_service ioSvc;

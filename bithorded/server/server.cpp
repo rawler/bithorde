@@ -25,6 +25,8 @@
 #include "client.hpp"
 #include "config.hpp"
 
+#include <glog/logging.h>
+
 using namespace std;
 
 namespace asio = boost::asio;
@@ -112,7 +114,7 @@ void Server::clientConnected(const bithorde::Client::Pointer& client)
 
 void Server::clientDisconnected(bithorde::Client::Pointer& client)
 {
-	cerr << "Disconnected: " << client->peerName() << endl;
+	LOG(INFO) << "Disconnected: " << client->peerName() << endl;
 	// Will destroy the client, unless others are holding references.
 	client.reset();
 }

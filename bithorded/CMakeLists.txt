@@ -21,6 +21,7 @@ ADD_EXECUTABLE(bithorded
 
 TARGET_LINK_LIBRARIES(bithorded
 	${Boost_LIBRARIES}
+	${GLOG_LIBRARIES}
 	bithorde
 )
 

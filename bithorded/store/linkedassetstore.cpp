@@ -23,6 +23,8 @@
 #include <time.h>
 #include <utime.h>
 
+#include <glog/logging.h>
+
 using namespace std;
 
 namespace asio = boost::asio;
@@ -115,7 +117,6 @@ void LinkedAssetStore::_addAsset(Asset::Ptr& asset, LinkedAssetStore::ResultHand
 	if (asset.get() && asset->getIds(ids)) {
 		const char *data_path = (asset->folder()/"data").c_str();
 		lutimes(data_path, NULL);
-		cerr << data_path << endl;
 
 		for (auto iter=ids.begin(); iter != ids.end(); iter++) {
 			if (iter->type() == bithorde::HashType::TREE_TIGER) {
@@ -182,7 +183,7 @@ Asset::Ptr LinkedAssetStore::findAsset(const BitHordeIds& ids)
 				auto assetDataPath = assetFolder/"data";
 				switch (validateDataSymlink(assetDataPath)) {
 				case OUTDATED:
-					cerr << "Warning; outdated asset detected, " << assetFolder << endl;
+					LOG(WARNING) << "outdated asset detected, " << assetFolder << endl;
 					purgeLink(hashLink);
 					fs::remove(assetFolder/"meta");
 				case OK:
@@ -190,7 +191,7 @@ Asset::Ptr LinkedAssetStore::findAsset(const BitHordeIds& ids)
 					break;
 
 				case BROKEN:
-					cerr << "Warning; broken asset detected, " << assetFolder << endl;
+					LOG(WARNING) << "broken asset detected, " << assetFolder << endl;
 					purgeLinkAndAsset(hashLink);
 				default:
 					continue;
@@ -199,7 +200,7 @@ Asset::Ptr LinkedAssetStore::findAsset(const BitHordeIds& ids)
 			if (asset->hasRootHash()) {
 				return asset;
 			} else {
-				cerr << "Unhashed asset detected, hashing" << endl;
+				LOG(WARNING) << "Unhashed asset detected, hashing" << endl;
 				_threadPool.post(*new HashTask(asset, _ioSvc, boost::bind(&LinkedAssetStore::_addAsset, this, _1, &noop)));
 			}
 		}

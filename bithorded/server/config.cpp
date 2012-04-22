@@ -26,6 +26,8 @@
 #include <iostream>
 #include <fstream>
 
+#include "buildconf.hpp"
+
 using namespace std;
 
 namespace asio = boost::asio;
@@ -125,12 +127,6 @@ bithorded::Config::Config(int argc, char* argv[])
 		std::ifstream cfg(configPath);
 		vm.store(po::parse_config_file(cfg, config_options, true));
 		notify(vm);
-	}
-
-	if (vm.count("version")) {
-		// TODO: Git-version
-		cerr << "Version: pre-alpha" << endl;
-		exit(0);
 	}
 
 	if (vm.count("help")) {

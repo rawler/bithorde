@@ -23,6 +23,8 @@
 #include "server.hpp"
 #include "lib/magneturi.h"
 
+#include <glog/logging.h>
+
 const size_t MAX_ASSETS = 1024;
 const size_t MAX_CHUNK = 64*1024;
 
@@ -40,7 +42,7 @@ Client::Client(Server& server, string myName) :
 void Client::onMessage(const bithorde::HandShake& msg)
 {
 	bithorde::Client::onMessage(msg);
-	cerr << "Connected: " << msg.name() << endl;
+	LOG(INFO) << "Connected: " << msg.name() << endl;
 }
 
 void Client::onMessage(const bithorde::BindWrite& msg)
@@ -52,15 +54,15 @@ void Client::onMessage(const bithorde::BindWrite& msg)
 		fs::path path(msg.linkpath());
 		if (path.is_absolute()) {
 			if (_server.linkAsset(path, boost::bind(&Client::onLinkHashDone, this, h, _1))) {
-				cerr << "Hashing " << path << endl;
+				LOG(INFO) << "Hashing " << path << endl;
 				resp.set_status(bithorde::SUCCESS);
 			} else {
-				cerr << "Upload did not match any allowed assetStore: " << path << endl;
+				LOG(ERROR) << "Upload did not match any allowed assetStore: " << path << endl;
 				resp.set_status(bithorde::ERROR);
 			}
 		}
 	} else {
-		cerr << "Sorry, upload isn't supported yet" << endl;
+		LOG(ERROR) << "Sorry, upload isn't supported yet" << endl;
 		resp.set_status(bithorde::ERROR);
 	}
 	sendMessage(bithorde::Connection::AssetStatus, resp);
@@ -74,23 +76,22 @@ void Client::onMessage(const bithorde::BindRead& msg)
 
 	if (msg.ids_size() > 0) {
 		// Trying to open
-		cerr << peerName() << " requested: " << MagnetURI(msg) << endl;
+		LOG(INFO) << peerName() << " requested: " << MagnetURI(msg) << endl;
 
 		Asset::Ptr a = _server.findAsset(msg.ids());
 		if (a) {
 			if (assignAsset(h, a)) {
-				cerr << "found" << endl;
+				LOG(INFO) << "found" << endl;
 				resp.set_status(bithorde::SUCCESS);
 				resp.set_availability(1000);
 				resp.set_size(a->size());
 				resp.mutable_ids()->CopyFrom(msg.ids());
 			} else {
-				cerr << "too large handle" << endl;
 				resp.set_status(bithorde::INVALID_HANDLE);
 			}
 		} else {
 			resp.set_status(bithorde::NOTFOUND);
-			cerr << "not found" << endl;
+			LOG(INFO) << "not found" << endl;
 		}
 	} else {
 		// Trying to close
@@ -147,7 +148,7 @@ bool Client::assignAsset(bithorde::Asset::Handle handle_, const Asset::Ptr& a)
 	size_t handle = handle_;
 	if (handle >= _assets.size()) {
 		if (handle > MAX_ASSETS) {
-			cerr << peerName() << ": handle larger than allowed limit (" << handle << " < " << MAX_ASSETS << ")" << endl;
+			LOG(ERROR) << peerName() << ": handle larger than allowed limit (" << handle << " < " << MAX_ASSETS << ")" << endl;
 			return false;
 		}
 		size_t new_size = _assets.size() + (handle - _assets.size() + 1) * 2;
