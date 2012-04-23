@@ -51,7 +51,7 @@ public:
 	boost::asio::io_service& ioService();
 
 	bool linkAsset(const boost::filesystem::path& filePath, LinkedAssetStore::ResultHandler resultHandler);
-	bithorded::Asset::Ptr findAsset( const bithorde::BindRead& req);
+	void async_findAsset(const bithorde::BindRead& req, Asset::Target tgt);
 
 private:
 	void clientConnected(const bithorded::Client::Pointer& client);

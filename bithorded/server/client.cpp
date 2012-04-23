@@ -53,7 +53,7 @@ void Client::onMessage(const bithorde::BindWrite& msg)
 	if (msg.has_linkpath()) {
 		fs::path path(msg.linkpath());
 		if (path.is_absolute()) {
-			if (_server.linkAsset(path, boost::bind(&Client::onLinkHashDone, this, h, _1))) {
+			if (_server.linkAsset(path, boost::bind(&Client::onLinkHashDone, shared_from_this(), h, _1))) {
 				LOG(INFO) << "Hashing " << path << endl;
 				resp.set_status(bithorde::SUCCESS);
 			} else {
@@ -70,36 +70,20 @@ void Client::onMessage(const bithorde::BindWrite& msg)
 
 void Client::onMessage(const bithorde::BindRead& msg)
 {
-	bithorde::AssetStatus resp;
-	bithorde::Asset::Handle h = msg.handle();
-	resp.set_handle(h);
-
 	if (msg.ids_size() > 0) {
 		// Trying to open
 		LOG(INFO) << peerName() << " requested: " << MagnetURI(msg) << endl;
 
-		Asset::Ptr a = _server.findAsset(msg);
-		if (a) {
-			if (assignAsset(h, a)) {
-				LOG(INFO) << "found" << endl;
-				resp.set_status(bithorde::SUCCESS);
-				resp.set_availability(1000);
-				resp.set_size(a->size());
-				resp.mutable_ids()->CopyFrom(msg.ids());
-			} else {
-				resp.set_status(bithorde::INVALID_HANDLE);
-			}
-		} else {
-			resp.set_status(bithorde::NOTFOUND);
-			LOG(INFO) << "not found" << endl;
-		}
+		_server.async_findAsset(msg, boost::bind(&Client::onAssetResponse, shared_from_this(), msg, _1));
 	} else {
 		// Trying to close
+		auto h = msg.handle();
 		clearAsset(h);
+		bithorde::AssetStatus resp;
+		resp.set_handle(h);
 		resp.set_status(bithorde::NOTFOUND);
+		sendMessage(bithorde::Connection::AssetStatus, resp);
 	}
-
-	sendMessage(bithorde::Connection::AssetStatus, resp);
 }
 
 void Client::onMessage(const bithorde::Read::Request& msg)
@@ -127,6 +111,30 @@ void Client::onMessage(const bithorde::Read::Request& msg)
 	}
 
 	sendMessage(bithorde::Connection::ReadResponse, resp);
+}
+
+void Client::onAssetResponse ( const bithorde::BindRead& req, Asset::Ptr a )
+{
+	bithorde::AssetStatus resp;
+	bithorde::Asset::Handle h = req.handle();
+	resp.set_handle(h);
+
+	if (a) {
+		if (assignAsset(h, a)) {
+			LOG(INFO) << "found" << endl;
+			resp.set_status(bithorde::SUCCESS);
+			resp.set_availability(1000);
+			resp.set_size(a->size());
+			a->getIds(*resp.mutable_ids());
+		} else {
+			resp.set_status(bithorde::INVALID_HANDLE);
+		}
+	} else {
+		resp.set_status(bithorde::NOTFOUND);
+		LOG(INFO) << "not found" << endl;
+	}
+
+	sendMessage(bithorde::Connection::AssetStatus, resp);
 }
 
 void Client::onLinkHashDone(bithorde::Asset::Handle handle, Asset::Ptr a)

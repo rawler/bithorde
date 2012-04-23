@@ -19,6 +19,7 @@
 #define BITHORDED_ASSET_HPP
 
 #include <boost/shared_ptr.hpp>
+#include <boost/function.hpp>
 
 #include <lib/hashes.h>
 #include <lib/types.h>
@@ -30,6 +31,7 @@ class Asset
 {
 public:
 	typedef boost::shared_ptr<Asset> Ptr;
+	typedef boost::function<void(Asset::Ptr)> Target;
 
 	virtual const byte* read(uint64_t offset, size_t& size, byte* buf) = 0;
 	virtual uint64_t size() = 0;

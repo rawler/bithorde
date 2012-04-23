@@ -18,6 +18,8 @@
 #ifndef BITHORDED_CLIENT_H
 #define BITHORDED_CLIENT_H
 
+#include <boost/smart_ptr/enable_shared_from_this.hpp>
+
 #include "lib/allocator.h"
 #include "lib/client.h"
 #include "asset.hpp"
@@ -25,7 +27,7 @@
 namespace bithorded {
 
 class Server;
-class Client : public bithorde::Client
+class Client : public bithorde::Client, public boost::enable_shared_from_this<Client>
 {
 	Server& _server;
 	std::vector< Asset::Ptr > _assets;
@@ -43,6 +45,7 @@ protected:
     virtual void onMessage(const bithorde::Read::Request& msg);
 
 private:
+	void onAssetResponse( const bithorde::BindRead& req, bithorded::Asset::Ptr a);
 	void onLinkHashDone(bithorde::Asset::Handle handle, bithorded::Asset::Ptr a);
 	bool assignAsset(bithorde::Asset::Handle handle, const bithorded::Asset::Ptr& a);
 	void clearAsset(bithorde::Asset::Handle handle);
