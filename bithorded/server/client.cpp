@@ -33,8 +33,8 @@ namespace fs = boost::filesystem;
 
 using namespace bithorded;
 
-Client::Client(Server& server, string myName) :
-	bithorde::Client(server.ioService(), myName), 
+Client::Client( Server& server) :
+	bithorde::Client(server.ioService(), server.name()),
 	_server(server)
 {
 }

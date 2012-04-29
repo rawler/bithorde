@@ -6,6 +6,8 @@ ADD_EXECUTABLE(bithorded
 	lib/randomaccessfile.cpp lib/randomaccessfile.hpp
 	lib/treestore.cpp lib/treestore.hpp
 
+	router/router.cpp router/router.hpp
+
 	server/asset.cpp server/asset.hpp
 	server/client.cpp server/client.hpp
 	server/config.cpp server/config.hpp

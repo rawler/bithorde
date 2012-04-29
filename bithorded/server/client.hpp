@@ -32,12 +32,12 @@ class Client : public bithorde::Client, public boost::enable_shared_from_this<Cl
 	Server& _server;
 	std::vector< Asset::Ptr > _assets;
 public:
-	static Pointer create(Server& server, std::string myName) {
-		return Pointer(new Client(server, myName));
+	static Pointer create(Server& server) {
+		return Pointer(new Client(server));
 	}
 
 protected:
-	Client(Server& server, std::string myName);
+	Client(Server& server);
 
 	virtual void onMessage(const bithorde::HandShake& msg);
 	virtual void onMessage(const bithorde::BindWrite& msg);

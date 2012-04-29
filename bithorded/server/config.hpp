@@ -47,6 +47,7 @@ struct Source {
 struct Friend {
 	std::string name;
 	std::string addr;
+	ushort port;
 };
 
 struct Config
@@ -63,6 +64,7 @@ struct Config
 	std::string unixSocket;
 
 	std::vector<Source> sources;
+	std::vector<Friend> friends;
 };
 
 }

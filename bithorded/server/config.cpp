@@ -137,13 +137,26 @@ bithorded::Config::Config(int argc, char* argv[])
 	for (auto opt=source_opts.begin(); opt != source_opts.end(); opt++) {
 		Source src;
 		src.name = opt->name();
-		auto root_opt = (*opt)["root"];
-		src.root = root_opt.as<string>();
+		src.root = (*opt)["root"].as<string>();
 		sources.push_back(src);
 	}
 
-	if (sources.empty()) {
-		throw ArgumentError("Needs at least one source root to share.");
+	vector<OptionGroup> friend_opts = vm.groups("friend");
+	for (auto opt=friend_opts.begin(); opt != friend_opts.end(); opt++) {
+		Friend f;
+		f.name = opt->name();
+		string addr = (*opt)["addr"].as<string>();
+		size_t colpos = addr.rfind(':');
+		f.addr = addr.substr(0, colpos);
+		if (colpos == string::npos)
+			f.port = 1337;
+		else
+			f.port = boost::lexical_cast<ushort>(addr.substr(colpos+1));
+		friends.push_back(f);
+	}
+
+	if (friends.empty() && sources.empty()) {
+		throw ArgumentError("Needs at least one friend or source root to receive assets.");
 	}
 }
 

@@ -38,11 +38,14 @@ Server::Server(asio::io_service& ioSvc, Config& cfg) :
 	_cfg(cfg),
 	_ioSvc(ioSvc),
 	_tcpListener(ioSvc),
-	_localListener(ioSvc)
+	_localListener(ioSvc),
+	_router(*this)
 {
-	for (auto iter=_cfg.sources.begin(); iter != _cfg.sources.end(); iter++) {
+	for (auto iter=_cfg.sources.begin(); iter != _cfg.sources.end(); iter++)
 		_assetStores.push_back( unique_ptr<LinkedAssetStore>(new LinkedAssetStore(ioSvc, iter->root)) );
-	}
+
+	for (auto iter=_cfg.friends.begin(); iter != _cfg.friends.end(); iter++)
+		_router.addFriend(*iter);
 
 	if (_cfg.tcpPort) {
 		auto tcpPort = asio::ip::tcp::endpoint(boost::asio::ip::tcp::v4(), _cfg.tcpPort);
@@ -81,11 +84,16 @@ void Server::waitForTCPConnection()
 void Server::onTCPConnected(boost::shared_ptr< asio::ip::tcp::socket >& socket, const boost::system::error_code& ec)
 {
 	if (!ec) {
-		bithorded::Client::Pointer c = bithorded::Client::create(*this, _cfg.nodeName);
-		c->connect(bithorde::Connection::create(_ioSvc, socket));
-		clientConnected(c);
+		onTCPConnected(socket);
 		waitForTCPConnection();
 	}
+}
+
+void Server::onTCPConnected ( boost::shared_ptr< asio::ip::tcp::socket >& socket )
+{
+	bithorded::Client::Pointer c = bithorded::Client::create(*this);
+	c->connect(bithorde::Connection::create(_ioSvc, socket));
+	clientConnected(c);
 }
 
 void Server::waitForLocalConnection()
@@ -97,7 +105,7 @@ void Server::waitForLocalConnection()
 void Server::onLocalConnected(boost::shared_ptr< boost::asio::local::stream_protocol::socket >& socket, const boost::system::error_code& ec)
 {
 	if (!ec) {
-		bithorded::Client::Pointer c = bithorded::Client::create(*this, _cfg.nodeName);
+		bithorded::Client::Pointer c = bithorded::Client::create(*this);
 		c->connect(bithorde::Connection::create(_ioSvc, socket));
 		clientConnected(c);
 		waitForLocalConnection();
@@ -110,11 +118,17 @@ void Server::clientConnected(const bithorde::Client::Pointer& client)
 	// destroyed until the disconnected signal calls clientDisconnected, which releases
 	// the reference
 	client->disconnected.connect(boost::bind(&Server::clientDisconnected, this, client));
+	client->authenticated.connect(boost::bind(&Server::clientAuthenticated, this, client));
+}
+
+void Server::clientAuthenticated(const bithorde::Client::Pointer& client) {
+	_router.onConnected(client);
 }
 
 void Server::clientDisconnected(bithorde::Client::Pointer& client)
 {
 	LOG(INFO) << "Disconnected: " << client->peerName() << endl;
+	_router.onDisconnected(client);
 	// Will destroy the client, unless others are holding references.
 	client.reset();
 }
@@ -129,7 +143,7 @@ bool Server::linkAsset(const boost::filesystem3::path& filePath, LinkedAssetStor
 	return false;
 }
 
-void Server::async_findAsset( const bithorde::BindRead& req, Asset::Target tgt)
+void Server::async_findAsset(const bithorde::BindRead& req, Asset::Target tgt)
 {
 	for (auto iter=_assetStores.begin(); iter != _assetStores.end(); iter++) {
 		Asset::Ptr asset((*iter)->findAsset(req.ids()));
@@ -137,5 +151,5 @@ void Server::async_findAsset( const bithorde::BindRead& req, Asset::Target tgt)
 			return tgt(asset);
 	}
 
-	return tgt(Asset::Ptr());
+	_router.findAsset(req, tgt);
 }
