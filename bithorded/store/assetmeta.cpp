@@ -24,7 +24,7 @@
 using namespace std;
 using namespace bithorded;
 
-const static size_t MAP_PAGE = 64*1024*1024;
+const static size_t MAP_PAGE = 1024*1024;
 
 namespace io = boost::iostreams;
 namespace fs = boost::filesystem;
