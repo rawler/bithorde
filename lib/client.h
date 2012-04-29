@@ -32,10 +32,12 @@ class Client
 	uint8_t _protoVersion;
 public:
 	typedef boost::shared_ptr<Client> Pointer;
+	typedef boost::weak_ptr<Client> WeakPtr;
 
 	static Pointer create(boost::asio::io_service& ioSvc, std::string myName) {
 		return Pointer(new Client(ioSvc, myName));
 	}
+	virtual ~Client() {}
 
 	/**
 	 * Tries to parse spec either as HOST:PORT, or as /absolute/socket/path and connect to it. 

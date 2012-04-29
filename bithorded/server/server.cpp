@@ -112,20 +112,21 @@ void Server::onLocalConnected(boost::shared_ptr< boost::asio::local::stream_prot
 	}
 }
 
-void Server::clientConnected(const bithorde::Client::Pointer& client)
+void Server::clientConnected(const bithorded::Client::Pointer& client)
 {
 	// When storing a client-copy in the bound reference, we make sure the Client isn't
 	// destroyed until the disconnected signal calls clientDisconnected, which releases
 	// the reference
 	client->disconnected.connect(boost::bind(&Server::clientDisconnected, this, client));
-	client->authenticated.connect(boost::bind(&Server::clientAuthenticated, this, client));
+	client->authenticated.connect(boost::bind(&Server::clientAuthenticated, this, Client::WeakPtr(client)));
 }
 
-void Server::clientAuthenticated(const bithorde::Client::Pointer& client) {
-	_router.onConnected(client);
+void Server::clientAuthenticated(const bithorded::Client::WeakPtr& client_) {
+	if (Client::Pointer client = client_.lock())
+		_router.onConnected(client);
 }
 
-void Server::clientDisconnected(bithorde::Client::Pointer& client)
+void Server::clientDisconnected(bithorded::Client::Pointer& client)
 {
 	LOG(INFO) << "Disconnected: " << client->peerName() << endl;
 	_router.onDisconnected(client);

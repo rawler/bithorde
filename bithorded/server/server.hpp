@@ -59,7 +59,7 @@ public:
 	void onTCPConnected(boost::shared_ptr<boost::asio::ip::tcp::socket>& socket);
 private:
 	void clientConnected(const bithorded::Client::Pointer& client);
-	void clientAuthenticated( const bithorde::Client::Pointer& client);
+	void clientAuthenticated(const bithorded::Client::WeakPtr& client);
 	void clientDisconnected(bithorded::Client::Pointer& client);
 	
 	void waitForTCPConnection();
