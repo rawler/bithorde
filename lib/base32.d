@@ -90,7 +90,7 @@ uint allocateEncodeSize(uint length)
 char[] encode(ubyte[] data, char[] buff, bool pad=true)
 in
 {
-    assert(data);
+    assert(data.ptr || !data.length);
     assert(buff.length >= allocateEncodeSize(data));
 }
 body
@@ -138,7 +138,7 @@ body
 char[] encode(ubyte[] data, bool pad=true)
 in
 {
-    assert(data);
+    assert(data.ptr || !data.length);
 }
 body
 {
@@ -172,7 +172,7 @@ body
 ubyte[] decode(char[] data)
 in
 {
-    assert(data);
+    assert(data.ptr || !data.length);
 }
 body
 {
@@ -206,7 +206,7 @@ body
 ubyte[] decode(char[] data, ubyte[] buff)
 in
 {
-    assert(data);
+    assert(data.ptr || !data.length);
 }
 body
 {
