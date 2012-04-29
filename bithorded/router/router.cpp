@@ -122,8 +122,8 @@ void Router::onConnected(const bithorde::Client::Pointer& client )
 void Router::onDisconnected(const bithorde::Client::Pointer& client)
 {
 	string peerName = client->peerName();
-	_connectedFriends.erase(peerName);
-	_connectors[peerName] = FriendConnector::create(_server, _friends[peerName]);
+	if (_connectedFriends.erase(peerName))
+		_connectors[peerName] = FriendConnector::create(_server, _friends[peerName]);
 }
 
 
