@@ -164,7 +164,7 @@ bool Client::assignAsset(bithorde::Asset::Handle handle_, const Asset::Ptr& a)
 			new_size = MAX_ASSETS;
 		_assets.resize(new_size);
 	}
-	_assets.at(handle) = a;
+	_assets[handle] = a;
 	return true;
 }
 
@@ -172,7 +172,7 @@ void Client::clearAsset(bithorde::Asset::Handle handle_)
 {
 	size_t handle = handle_;
 	if (handle < _assets.size())
-		_assets.at(handle).reset();
+		_assets[handle].reset();
 }
 
 Asset::Ptr& Client::getAsset(bithorde::Asset::Handle handle_)
