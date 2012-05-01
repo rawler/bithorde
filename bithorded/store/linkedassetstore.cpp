@@ -132,7 +132,6 @@ void LinkedAssetStore::_addAsset(SourceAsset::Ptr& asset, LinkedAssetStore::Resu
 	upstream(asset);
 }
 
-
 void purgeLink(const fs::path& path) {
 	fs::remove(path);
 }
@@ -168,44 +167,59 @@ LinkStatus validateDataSymlink(const fs::path& path) {
 
 void noop(Asset::Ptr) {}
 
-Asset::Ptr LinkedAssetStore::findAsset(const BitHordeIds& ids)
-{
-	for (auto iter=ids.begin(); iter != ids.end(); iter++) {
-		if (iter->type() == bithorde::HashType::TREE_TIGER) {
-			fs::path hashLink = _tigerFolder / base32encode(iter->id());
-			boost::system::error_code e;
-			auto assetFolder = fs::read_symlink(hashLink, e);
-			SourceAsset::Ptr asset;
-			if (e || !fs::is_directory(assetFolder)) {
-				purgeLink(hashLink);
-				continue;
-			} else {
-				auto assetDataPath = assetFolder/"data";
-				switch (validateDataSymlink(assetDataPath)) {
-				case OUTDATED:
-					LOG(WARNING) << "outdated asset detected, " << assetFolder << endl;
-					purgeLink(hashLink);
-					fs::remove(assetFolder/"meta");
-				case OK:
-					asset = boost::make_shared<SourceAsset>(assetFolder);
-					break;
+SourceAsset::Ptr openAssetFolder(const fs::path& referrer, const fs::path& assetFolder) {
+	auto assetDataPath = assetFolder/"data";
+	switch (validateDataSymlink(assetDataPath)) {
+	case OUTDATED:
+		LOG(WARNING) << "outdated asset detected, " << assetFolder << endl;
+		purgeLink(referrer);
+		fs::remove(referrer/"meta");
+	case OK:
+		return boost::make_shared<SourceAsset>(assetFolder);
+		break;
 
-				case BROKEN:
-					LOG(WARNING) << "broken asset detected, " << assetFolder << endl;
-					purgeLinkAndAsset(hashLink);
-				default:
-					continue;
-				}
-			}
+	case BROKEN:
+		LOG(WARNING) << "broken asset detected, " << assetFolder << endl;
+		purgeLinkAndAsset(referrer);
+	default:
+		break;
+	}
+	return SourceAsset::Ptr();
+}
+
+SourceAsset::Ptr LinkedAssetStore::_openTiger(const std::string& tigerId)
+{
+	SourceAsset::Ptr asset;
+	if (_tigerMap.count(tigerId))
+		asset = _tigerMap[tigerId].lock();
+	if (!asset) {
+		fs::path hashLink = _tigerFolder / base32encode(tigerId);
+		boost::system::error_code e;
+		auto assetFolder = fs::read_symlink(hashLink, e);
+		if (e || !fs::is_directory(assetFolder)) {
+			purgeLink(hashLink);
+		} else if (asset = openAssetFolder(hashLink, assetFolder)) {
 			if (asset->hasRootHash()) {
-				return asset;
+				_tigerMap[tigerId] = asset;
 			} else {
+				asset.reset();
 				LOG(WARNING) << "Unhashed asset detected, hashing" << endl;
 				_threadPool.post(*new HashTask(asset, _ioSvc, boost::bind(&LinkedAssetStore::_addAsset, this, _1, &noop)));
 			}
 		}
 	}
-	return Asset::Ptr();
+	return asset;
+}
+
+Asset::Ptr LinkedAssetStore::findAsset(const BitHordeIds& ids)
+{
+	SourceAsset::Ptr asset;
+	for (auto iter=ids.begin(); iter != ids.end(); iter++) {
+		if (iter->type() == bithorde::HashType::TREE_TIGER
+			&& (asset = _openTiger(iter->id())))
+			break;
+	}
+	return asset;
 }
 
 

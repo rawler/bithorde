@@ -36,6 +36,7 @@ class SourceAsset : public Asset
 public:
 	typedef HashTree<TigerNode, AssetMeta> Hasher;
 	typedef boost::shared_ptr<SourceAsset> Ptr;
+	typedef boost::weak_ptr<SourceAsset> WeakPtr;
 
 	/**
 	 * All writes must be aligned on this BLOCKSIZE, or the data might be trimmed in the ends.

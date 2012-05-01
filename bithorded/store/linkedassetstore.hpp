@@ -21,6 +21,7 @@
 #include <boost/asio/io_service.hpp>
 #include <boost/filesystem/path.hpp>
 #include <boost/function.hpp>
+#include <map>
 
 #include "sourceasset.hpp"
 #include "bithorde.pb.h"
@@ -32,6 +33,12 @@ typedef google::protobuf::RepeatedPtrField< bithorde::Identifier > BitHordeIds;
 
 class LinkedAssetStore
 {
+	ThreadPool _threadPool;
+	boost::asio::io_service& _ioSvc;
+	boost::filesystem::path _baseDir;
+	boost::filesystem::path _assetsFolder;
+	boost::filesystem::path _tigerFolder;
+	std::map<std::string, SourceAsset::WeakPtr> _tigerMap;
 public:
 	typedef boost::function< void ( SourceAsset::Ptr )> ResultHandler;
 	
@@ -55,13 +62,8 @@ public:
 	Asset::Ptr findAsset(const BitHordeIds& ids);
 
 private:
+	SourceAsset::Ptr _openTiger(const std::string& tigerId);
 	void _addAsset( bithorded::SourceAsset::Ptr& asset, bithorded::LinkedAssetStore::ResultHandler upstream);
-
-	ThreadPool _threadPool;
-	boost::asio::io_service& _ioSvc;
-	boost::filesystem::path _baseDir;
-	boost::filesystem::path _assetsFolder;
-	boost::filesystem::path _tigerFolder;
 };
 
 }
