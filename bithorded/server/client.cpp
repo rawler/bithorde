@@ -70,14 +70,15 @@ void Client::onMessage(const bithorde::BindWrite& msg)
 
 void Client::onMessage(const bithorde::BindRead& msg)
 {
+	auto h = msg.handle();
 	if (msg.ids_size() > 0) {
 		// Trying to open
-		LOG(INFO) << peerName() << " requested: " << MagnetURI(msg) << endl;
+		LOG(INFO) << peerName() << ':' << h << " requested: " << MagnetURI(msg) << endl;
 
 		_server.async_findAsset(msg, boost::bind(&Client::onAssetResponse, shared_from_this(), msg, _1));
 	} else {
 		// Trying to close
-		auto h = msg.handle();
+		LOG(INFO) << peerName() << ':' << h << " closed" << endl;
 		clearAsset(h);
 		bithorde::AssetStatus resp;
 		resp.set_handle(h);
@@ -121,7 +122,7 @@ void Client::onAssetResponse ( const bithorde::BindRead& req, Asset::Ptr a )
 
 	if (a) {
 		if (assignAsset(h, a)) {
-			LOG(INFO) << "found" << endl;
+			LOG(INFO) << peerName() << ':' << h << " found and bound" << endl;
 			resp.set_status(bithorde::SUCCESS);
 			resp.set_availability(1000);
 			resp.set_size(a->size());
@@ -131,7 +132,7 @@ void Client::onAssetResponse ( const bithorde::BindRead& req, Asset::Ptr a )
 		}
 	} else {
 		resp.set_status(bithorde::NOTFOUND);
-		LOG(INFO) << "not found" << endl;
+		LOG(INFO) << peerName() << ':' << h << " not found" << endl;
 	}
 
 	sendMessage(bithorde::Connection::AssetStatus, resp);
