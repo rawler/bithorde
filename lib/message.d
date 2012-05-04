@@ -152,6 +152,27 @@ class Identifier : ProtoBufMessage {
     }
 }
 
+/****************************************************************************************
+ * Return new deep-copied instance of the Identifier
+ ***************************************************************************************/
+Identifier[] idsCopy(Identifier[] input) {
+    Identifier[] res = input.dup;
+    foreach (id; res)
+        id = id.dup;
+    return res;
+}
+
+/****************************************************************************************
+ * Return whether as and bs has any id in common
+ ***************************************************************************************/
+bool idsOverlap(Identifier[] as, Identifier[] bs) {
+    foreach (a; as) foreach (b; bs) {
+        if (as == bs)
+            return true;
+    }
+    return false;
+}
+
 class HandShake : Message {
     mixin(PBField!(char[], "name"));
     mixin(PBField!(ubyte, "protoversion"));
