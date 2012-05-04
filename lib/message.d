@@ -116,6 +116,7 @@ class Identifier : ProtoBufMessage {
         this.id = id;
     }
     this() {}
+
     mixin(PBField!(HashType, "type"));
     mixin(PBField!(ubyte[], "id"));
     mixin ProtoBufCodec!(PBMapping("type", 1),
@@ -127,8 +128,27 @@ class Identifier : ProtoBufMessage {
         return new Identifier(type, id.dup);
     }
 
-    bool opEquals(Identifier other) {
-        return (this.type == other.type) && (this.id == other.id);
+    // Hash-key support
+    hash_t toHash() {
+        hash_t res = type;
+        foreach (byte b; id)
+            res = (res*9) + b;
+        return res;
+    }
+
+    int opEquals(Object o) {
+        Identifier id = cast(Identifier)o;
+        return id && (this.type == id.type) && (this.id == id.id);
+    }
+
+    int opCmp(Object o) {
+        Identifier other = cast(Identifier) o;
+        if (!other)
+            return -1;
+        if (this.type == other.type)
+            return this.id <> other.id;
+        else
+            return this.type - other.type;
     }
 }
 
