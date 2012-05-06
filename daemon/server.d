@@ -34,6 +34,7 @@ private import Text = tango.text.Util;
 private import tango.sys.Common;
 private import tango.text.Arguments;
 private import tango.time.Clock;
+private import tango.util.container.more.CacheMap;
 private import tango.util.container.more.Stack;
 private import tango.util.Convert;
 private import tango.util.log.Log;
@@ -49,6 +50,8 @@ private import lib.connection;
 private import lib.httpserver;
 private import lib.pumping;
 private import message = lib.message;
+
+const int SESSION_FILTER_SIZE = 16*1024;
 
 class Server : IAssetSource
 {
@@ -71,6 +74,7 @@ package:
     bool running = true;
 
     Client[char[]] connectedClients;
+    CacheMap!(ulong, ulong) lastSessions;
 
     Pump pump;
 
@@ -112,6 +116,7 @@ public:
         }
 
         // Setup helper functions, routing and caching
+        this.lastSessions = new typeof(lastSessions)(SESSION_FILTER_SIZE);
         this.router = new Router();
         if (config.cachedir)
             this.cacheMgr = new CacheManager(config.cachedir, config.cacheMaxSize, config.usefsync, args["prune"].set, router, pump);
@@ -166,6 +171,13 @@ public:
     }
 
     bool findAsset(BindRead req) {
+        ulong _;
+        if (lastSessions.get(req.uuid, _)) {
+            req.callback(null, message.Status.WOULD_LOOP, null);
+            return true;
+        }
+        lastSessions.add(req.uuid, req.uuid);
+
         foreach (repo; linkRepos) {
             if (repo.findAsset(req))
                 return true;
