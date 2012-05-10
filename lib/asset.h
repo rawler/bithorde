@@ -11,6 +11,7 @@
 #include <boost/signals2.hpp>
 #include <boost/shared_ptr.hpp>
 
+#include "hashes.h"
 #include "bithorde.pb.h"
 #include "types.h"
 
@@ -26,7 +27,7 @@ public:
 	typedef boost::shared_ptr<Client> ClientPointer;
 	typedef int Handle;
 
-	explicit Asset(ClientPointer client);
+	explicit Asset(const ClientPointer& client);
 	virtual ~Asset();
 
 	bool isBound();
@@ -52,16 +53,18 @@ static boost::arg<1> ASSET_ARG_OFFSET;
 static boost::arg<2> ASSET_ARG_DATA;
 static boost::arg<3> ASSET_ARG_TAG;
 
-class ReadAsset : public Asset
+class ReadAsset : public Asset, boost::noncopyable
 {
 public:
-	typedef std::pair<bithorde::HashType, std::string> Identifier;
-	typedef std::vector<Identifier> IdList;
+	typedef boost::shared_ptr<Client> ClientPointer;
+	typedef boost::shared_ptr<ReadAsset> Ptr;
 
-	explicit ReadAsset(ClientPointer client, ReadAsset::IdList requestIds);
+	typedef std::pair<bithorde::HashType, std::string> Identifier;
+
+	explicit ReadAsset(const bithorde::ReadAsset::ClientPointer& client, const BitHordeIds& requestIds);
 
 	int aSyncRead(uint64_t offset, ssize_t size);
-	const IdList & requestIds() const;
+	const BitHordeIds & requestIds() const;
 
 	typedef boost::signals2::signal<void (uint64_t offset, const std::string& data, int tag)> DataSignal;
 	DataSignal dataArrived;
@@ -71,15 +74,15 @@ protected:
 	virtual void handleMessage(const bithorde::Read::Response &msg);
 
 private:
-	IdList _requestIds;
+	BitHordeIds _requestIds;
 };
 
 class UploadAsset : public Asset
 {
 	boost::filesystem::path _linkPath;
 public:
-	explicit UploadAsset(ClientPointer client, uint64_t size);
-	explicit UploadAsset(ClientPointer client, const boost::filesystem::path& path);
+	explicit UploadAsset(const ClientPointer& client, uint64_t size);
+	explicit UploadAsset(const ClientPointer& client, const boost::filesystem::path& path);
 
 	bool tryWrite(uint64_t offset, byte* data, size_t amount);
 	const boost::filesystem::path& link();

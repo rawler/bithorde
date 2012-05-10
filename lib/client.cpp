@@ -273,13 +273,7 @@ bool Client::informBound(const ReadAsset& asset)
 	bithorde::BindRead msg;
 	msg.set_handle(asset._handle);
 
-	auto ids = asset.requestIds();
-	for (auto iter = ids.begin(); iter < ids.end(); iter++) {
-		ReadAsset::Identifier& id = *iter;
-		bithorde::Identifier * bhId = msg.add_ids();
-		bhId->set_type(id.first);
-		bhId->set_id(id.second.data(), id.second.size());
-	}
+	msg.mutable_ids()->CopyFrom(asset.requestIds());
 	msg.set_timeout(DEFAULT_ASSET_TIMEOUT);
 	msg.set_uuid(rand64());
 	return _connection->sendMessage(Connection::BindRead, msg);

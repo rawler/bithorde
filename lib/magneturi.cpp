@@ -91,14 +91,17 @@ bool MagnetURI::parse(const string& uri_)
 	return true;
 }
 
-bithorde::ReadAsset::IdList MagnetURI::toIdList ()
+BitHordeIds MagnetURI::toIdList ()
 {
-	bithorde::ReadAsset::IdList ids;
+	BitHordeIds ids;
 
 	vector<ExactIdentifier>::iterator iter;
 	for (iter=xtIds.begin(); iter != xtIds.end(); iter++) {
-		if (iter->type == "urn:tree:tiger")
-			ids.push_back(bithorde::ReadAsset::Identifier(bithorde::TREE_TIGER, iter->id));
+		if (iter->type == "urn:tree:tiger") {
+			bithorde::Identifier* id = ids.Add();
+			id->set_type(bithorde::TREE_TIGER);
+			id->set_id(iter->id);
+		}
 	}
 
 	return ids;

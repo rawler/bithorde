@@ -11,7 +11,7 @@ namespace fs = boost::filesystem;
 
 using namespace bithorde;
 
-Asset::Asset(ClientPointer client) :
+Asset::Asset(const bithorde::Asset::ClientPointer& client) :
 	_client(client),
 	_handle(-1),
 	_size(-1)
@@ -44,12 +44,12 @@ void Asset::handleMessage(const bithorde::AssetStatus & msg)
 	statusUpdate(msg);;
 }
 
-ReadAsset::ReadAsset(ClientPointer client, IdList requestIds) :
+ReadAsset::ReadAsset(const bithorde::ReadAsset::ClientPointer& client, const BitHordeIds& requestIds) :
 	Asset(client),
 	_requestIds(requestIds)
 {}
 
-const ReadAsset::IdList & ReadAsset::requestIds() const
+const BitHordeIds& ReadAsset::requestIds() const
 {
 	return _requestIds;
 }
@@ -95,13 +95,13 @@ int ReadAsset::aSyncRead(uint64_t offset, ssize_t size)
 	return reqId;
 }
 
-UploadAsset::UploadAsset(ClientPointer client, uint64_t size)
+UploadAsset::UploadAsset(const bithorde::Asset::ClientPointer& client, uint64_t size)
 	: Asset(client)
 {
 	_size = size;
 }
 
-UploadAsset::UploadAsset(Asset::ClientPointer client, const fs::path& path)
+UploadAsset::UploadAsset(const bithorde::Asset::ClientPointer& client, const boost::filesystem3::path& path)
 	: Asset(client), _linkPath(fs::absolute(path))
 {
 	_size = fs::file_size(_linkPath);

@@ -113,13 +113,13 @@ void BHGet::nextAsset() {
 		_asset = NULL;
 	}
 
-	ReadAsset::IdList ids;
-	while (ids.empty() && !_assets.empty()) {
+	BitHordeIds ids;
+	while ((!ids.size()) && (!_assets.empty())) {
 		MagnetURI nextUri = _assets.front();
 		_assets.pop_front();
 		ids = nextUri.toIdList();
 	}
-	if (ids.empty()) {
+	if (!ids.size()) {
 		_ioSvc.stop();
 		return;
 	}

@@ -14,7 +14,7 @@ Lookup::Lookup(BHFuse * fs, fuse_req_t req, MagnetURI & uri, LookupParams& p) :
 	req(req),
 	lookup_params(p)
 {
-	ReadAsset::IdList ids = uri.toIdList();
+	BitHordeIds ids = uri.toIdList();
 
 	asset = boost::make_shared<ReadAsset>(fs->client, ids);
 }

@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-#include "asset.h"
+#include "hashes.h"
 #include "types.h"
 
 struct ExactIdentifier {
@@ -30,7 +30,7 @@ struct MagnetURI
 	std::vector<ExactIdentifier> xtIds;
 	uint64_t size;
 
-	bithorde::ReadAsset::IdList toIdList();
+	BitHordeIds toIdList();
 
 	friend std::ostream & operator<<(std::ostream&, const MagnetURI&);
 };
