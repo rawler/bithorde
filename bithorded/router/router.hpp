@@ -38,7 +38,7 @@ class Router
 	Server& _server;
 	std::map<std::string, Friend> _friends;
 	std::map<std::string, boost::shared_ptr<FriendConnector> > _connectors;
-	std::map<std::string, Client::Pointer > _connectedFriends;
+	std::map<std::string, Client::Ptr > _connectedFriends;
 public:
 	Router(Server& server);
 
@@ -46,10 +46,10 @@ public:
 
 	Server& server() { return _server; }
 
+	void onConnected(const bithorded::Client::Ptr& client);
+	void onDisconnected(const bithorded::Client::Ptr& client);
 	void findAsset(::bithorde::BindRead req, Asset::Target tgt);
 
-	void onConnected(const bithorde::Client::Pointer& client);
-	void onDisconnected(const bithorde::Client::Pointer& client);
 };
 
 }}

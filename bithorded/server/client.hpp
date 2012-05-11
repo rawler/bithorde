@@ -32,8 +32,10 @@ class Client : public bithorde::Client, public boost::enable_shared_from_this<Cl
 	Server& _server;
 	std::vector< Asset::Ptr > _assets;
 public:
-	static Pointer create(Server& server) {
-		return Pointer(new Client(server));
+	typedef boost::shared_ptr<Client> Ptr;
+	typedef boost::weak_ptr<Client> WeakPtr;
+	static Ptr create(Server& server) {
+		return Ptr(new Client(server));
 	}
 
 protected:
@@ -42,7 +44,7 @@ protected:
 	virtual void onMessage(const bithorde::HandShake& msg);
 	virtual void onMessage(const bithorde::BindWrite& msg);
 	virtual void onMessage(const bithorde::BindRead& msg);
-    virtual void onMessage(const bithorde::Read::Request& msg);
+	virtual void onMessage(const bithorde::Read::Request& msg);
 
 private:
 	void onAssetResponse( const bithorde::BindRead& req, bithorded::Asset::Ptr a);

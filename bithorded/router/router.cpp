@@ -107,7 +107,7 @@ void bithorded::router::Router::findAsset(bithorde::BindRead req, Asset::Target 
 	tgt(Asset::Ptr());
 }
 
-void Router::onConnected(const bithorde::Client::Pointer& client )
+void Router::onConnected(const bithorded::Client::Ptr& client )
 {
 	string peerName = client->peerName();
 	if (_friends.count(peerName)) {
@@ -119,7 +119,7 @@ void Router::onConnected(const bithorde::Client::Pointer& client )
 	}
 }
 
-void Router::onDisconnected(const bithorde::Client::Pointer& client)
+void Router::onDisconnected(const bithorded::Client::Ptr& client)
 {
 	string peerName = client->peerName();
 	if (_connectedFriends.erase(peerName))
