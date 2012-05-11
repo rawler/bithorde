@@ -54,7 +54,7 @@ public:
 	std::string name() { return _cfg.nodeName; }
 
 	bool linkAsset(const boost::filesystem::path& filePath, LinkedAssetStore::ResultHandler resultHandler);
-	void async_findAsset(const bithorde::BindRead& req, Asset::Target tgt);
+	Asset::Ptr async_findAsset(const bithorde::BindRead& req);
 
 	void onTCPConnected(boost::shared_ptr<boost::asio::ip::tcp::socket>& socket);
 private:

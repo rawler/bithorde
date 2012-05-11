@@ -102,11 +102,6 @@ void bithorded::router::Router::addFriend(const bithorded::Friend& f)
 	_friends[f.name] = f;
 }
 
-void bithorded::router::Router::findAsset(bithorde::BindRead req, Asset::Target tgt)
-{
-	tgt(Asset::Ptr());
-}
-
 void Router::onConnected(const bithorded::Client::Ptr& client )
 {
 	string peerName = client->peerName();
@@ -126,6 +121,10 @@ void Router::onDisconnected(const bithorded::Client::Ptr& client)
 		_connectors[peerName] = FriendConnector::create(_server, _friends[peerName]);
 }
 
+bithorded::Asset::Ptr bithorded::router::Router::findAsset(bithorde::BindRead req)
+{
+	return Asset::Ptr();
+}
 
 
 

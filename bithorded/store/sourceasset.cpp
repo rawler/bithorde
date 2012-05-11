@@ -17,6 +17,8 @@
 
 #include "sourceasset.hpp"
 
+const size_t MAX_CHUNK = 64*1024;
+
 using namespace std;
 
 using namespace bithorded;
@@ -27,11 +29,15 @@ SourceAsset::SourceAsset(const boost::filesystem3::path& metaFolder) :
 	_metaStore(metaFolder/"meta", _file.blocks(BLOCKSIZE)),
 	_hasher(_metaStore)
 {
+	if (hasRootHash())
+		setStatus(bithorde::SUCCESS);
 }
 
 size_t SourceAsset::can_read(uint64_t offset, size_t size)
 {
 	size_t res = 0;
+	if (size > MAX_CHUNK)
+		size = MAX_CHUNK;
 	uint currentBlock = offset / BLOCKSIZE;
 	uint endBlockNum = (offset + size) / BLOCKSIZE;
 	size_t currentBlockSize = BLOCKSIZE - (offset % BLOCKSIZE);
@@ -94,9 +100,14 @@ void SourceAsset::notifyValidRange(uint64_t offset, uint64_t size)
 	updateHash(offset, end);
 }
 
-const byte* SourceAsset::read(uint64_t offset, size_t& size, byte* buf)
+void SourceAsset::async_read(uint64_t offset, size_t& size, ReadCallback cb)
 {
-	return _file.read(offset, size, buf);
+	byte buf[MAX_CHUNK];
+	const byte* data = _file.read(offset, size, buf);
+	if (data)
+		cb(offset, std::string((char*)data, size));
+	else
+		cb(offset, std::string());
 }
 
 uint64_t SourceAsset::size() {

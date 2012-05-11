@@ -75,7 +75,17 @@ void Client::onMessage(const bithorde::BindRead& msg)
 		// Trying to open
 		LOG(INFO) << peerName() << ':' << h << " requested: " << MagnetURI(msg) << endl;
 
-		_server.async_findAsset(msg, boost::bind(&Client::onAssetResponse, shared_from_this(), msg, _1));
+		auto asset = _server.async_findAsset(msg);
+		if (asset && !assignAsset(h, asset)) {
+			bithorde::AssetStatus resp;
+			resp.set_handle(h);
+			resp.set_status(bithorde::INVALID_HANDLE);
+			sendMessage(bithorde::Connection::AssetStatus, resp);
+		} else if (asset && (asset->status == bithorde::Status::NONE)) {
+			asset->statusChange.connect(boost::bind(&Client::onAssetResponse, this, msg, asset)); // TODO: bind weak_ptr
+		} else {
+			onAssetResponse(msg, asset);
+		}
 	} else {
 		// Trying to close
 		LOG(INFO) << peerName() << ':' << h << " closed" << endl;
@@ -89,28 +99,31 @@ void Client::onMessage(const bithorde::BindRead& msg)
 
 void Client::onMessage(const bithorde::Read::Request& msg)
 {
-	bithorde::Read::Response resp;
-	resp.set_reqid(msg.reqid());
-
 	Asset::Ptr& asset = getAsset(msg.handle());
 	if (asset) {
 		uint64_t offset = msg.offset();
 		size_t size = msg.size();
 		if (size > MAX_CHUNK)
 			size = MAX_CHUNK;
-		byte buf[MAX_CHUNK];
-		auto read = asset->read(offset, size, buf);
-		if (read) {
-			resp.set_status(bithorde::SUCCESS);
-			resp.set_offset(offset);
-			resp.set_content(read, size);
-		} else {
-			resp.set_status(bithorde::NOTFOUND);
-		}
+		asset->async_read(offset, size, boost::bind(&Client::onReadResponse, this, msg, _1, _2)); // TODO: Weak callback
 	} else {
+		bithorde::Read::Response resp;
+		resp.set_reqid(msg.reqid());
 		resp.set_status(bithorde::INVALID_HANDLE);
+		sendMessage(bithorde::Connection::ReadResponse, resp);
 	}
+}
 
+void Client::onReadResponse(const bithorde::Read::Request& req, int64_t offset, const std::string& data) {
+	bithorde::Read::Response resp;
+	resp.set_reqid(req.reqid());
+	if ((offset >= 0) && (data.size() > 0)) {
+		resp.set_status(bithorde::SUCCESS);
+		resp.set_offset(offset);
+		resp.set_content(data);
+	} else {
+		resp.set_status(bithorde::NOTFOUND);
+	}
 	sendMessage(bithorde::Connection::ReadResponse, resp);
 }
 
@@ -121,15 +134,11 @@ void Client::onAssetResponse ( const bithorde::BindRead& req, Asset::Ptr a )
 	resp.set_handle(h);
 
 	if (a) {
-		if (assignAsset(h, a)) {
-			LOG(INFO) << peerName() << ':' << h << " found and bound" << endl;
-			resp.set_status(bithorde::SUCCESS);
-			resp.set_availability(1000);
-			resp.set_size(a->size());
-			a->getIds(*resp.mutable_ids());
-		} else {
-			resp.set_status(bithorde::INVALID_HANDLE);
-		}
+		LOG(INFO) << peerName() << ':' << h << " found and bound" << endl;
+		resp.set_status(bithorde::SUCCESS);
+		resp.set_availability(1000);
+		resp.set_size(a->size());
+		a->getIds(*resp.mutable_ids());
 	} else {
 		resp.set_status(bithorde::NOTFOUND);
 		LOG(INFO) << peerName() << ':' << h << " not found" << endl;

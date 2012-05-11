@@ -48,6 +48,7 @@ protected:
 
 private:
 	void onAssetResponse( const bithorde::BindRead& req, bithorded::Asset::Ptr a);
+	void onReadResponse( const bithorde::Read::Request& req, int64_t offset, const std::string& data);
 	void onLinkHashDone(bithorde::Asset::Handle handle, bithorded::Asset::Ptr a);
 	bool assignAsset(bithorde::Asset::Handle handle, const bithorded::Asset::Ptr& a);
 	void clearAsset(bithorde::Asset::Handle handle);

@@ -19,3 +19,10 @@
 
 using namespace bithorded;
 
+void Asset::setStatus(bithorde::Status newStatus)
+{
+	if (newStatus != status) {
+		status = newStatus;
+		statusChange(newStatus);
+	}
+}

@@ -46,12 +46,9 @@ public:
 	SourceAsset(const boost::filesystem::path& metaFolder);
 
 	/**
-	 * Will read up to /size/ bytes from underlying file, and store into a buffer.
-	 *
-	 * @arg size - will be filled in with the amount actually read
-	 * @return a pointer to the buffer read, which may or may not be /buf/, or null on error.
+	 * Will read up to /size/ bytes from underlying file, and send to callback.
 	 */
-	virtual const byte* read(uint64_t offset, size_t& size, byte* buf);
+	virtual void async_read(uint64_t offset, size_t& size, ReadCallback cb);
 
 	/**
 	 * The size of the asset, in bytes

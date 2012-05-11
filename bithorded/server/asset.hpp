@@ -20,6 +20,7 @@
 
 #include <boost/shared_ptr.hpp>
 #include <boost/function.hpp>
+#include <boost/signals2/signal.hpp>
 
 #include <lib/hashes.h>
 #include <lib/types.h>
@@ -30,13 +31,22 @@ namespace bithorded
 class Asset
 {
 public:
-	typedef boost::shared_ptr<Asset> Ptr;
-	typedef boost::function<void(Asset::Ptr)> Target;
+	typedef boost::function<void(int64_t offset, const std::string& data)> ReadCallback;
 
-	virtual const byte* read(uint64_t offset, size_t& size, byte* buf) = 0;
+	bithorde::Status status;
+	boost::signals2::signal<void(const bithorde::Status&)> statusChange;
+	Asset() : status(bithorde::Status::NONE)
+	{}
+
+	typedef boost::shared_ptr<Asset> Ptr;
+
+	virtual void async_read(uint64_t offset, size_t& size, ReadCallback cb) = 0;
 	virtual uint64_t size() = 0;
 	virtual size_t can_read(uint64_t offset, size_t size) = 0;
 	virtual bool getIds(BitHordeIds& ids) = 0;
+
+protected:
+	void setStatus(bithorde::Status newStatus);
 };
 
 }

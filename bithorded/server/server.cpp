@@ -144,13 +144,13 @@ bool Server::linkAsset(const boost::filesystem3::path& filePath, LinkedAssetStor
 	return false;
 }
 
-void Server::async_findAsset(const bithorde::BindRead& req, Asset::Target tgt)
+Asset::Ptr Server::async_findAsset(const bithorde::BindRead& req)
 {
 	for (auto iter=_assetStores.begin(); iter != _assetStores.end(); iter++) {
 		Asset::Ptr asset((*iter)->findAsset(req.ids()));
 		if (asset)
-			return tgt(asset);
+			return asset;
 	}
 
-	_router.findAsset(req, tgt);
+	return _router.findAsset(req);
 }
