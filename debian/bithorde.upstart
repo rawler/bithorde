@@ -1,9 +1,6 @@
 
 start on (filesystem and net-device-up IFACE!=lo)
 
-exec /usr/bin/bithorded /etc/bithorde.conf
+exec /usr/bin/bithorded -c/etc/bithorde.conf
 respawn
-
-expect fork
-
 
