@@ -21,6 +21,11 @@ class Client;
 
 static boost::arg<1> ASSET_ARG_STATUS;
 
+/**
+ * Tests if any of the ids in a matches any of the ids in b
+ */
+bool idsOverlap(const BitHordeIds& a, const BitHordeIds& b);
+
 class Asset
 {
 public:

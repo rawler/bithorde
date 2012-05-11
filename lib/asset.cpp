@@ -11,6 +11,16 @@ namespace fs = boost::filesystem;
 
 using namespace bithorde;
 
+bool bithorde::idsOverlap(const BitHordeIds& a, const BitHordeIds& b) {
+	for (auto aiter=a.begin(); aiter != a.end(); aiter++) {
+		for (auto biter=b.begin(); biter != b.end(); biter++) {
+			if ((aiter->id() == biter->id()) && (aiter->type() == biter->type()))
+				return true;
+		}
+	}
+	return false;
+}
+
 Asset::Asset(const bithorde::Asset::ClientPointer& client) :
 	status(Status::NONE),
 	_client(client),
