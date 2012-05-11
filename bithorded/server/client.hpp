@@ -37,6 +37,7 @@ public:
 	static Ptr create(Server& server) {
 		return Ptr(new Client(server));
 	}
+	bool requestsAsset(const BitHordeIds& ids);
 
 protected:
 	Client(Server& server);

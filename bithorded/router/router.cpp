@@ -123,8 +123,24 @@ void Router::onDisconnected(const bithorded::Client::Ptr& client)
 
 bithorded::Asset::Ptr bithorded::router::Router::findAsset(bithorde::BindRead req)
 {
-	return Asset::Ptr();
+	if (_sessionMap.count(req.uuid()))
+		return Asset::Ptr(); // TODO: Send proper statusCode WOULDLOOP
+	auto asset = boost::make_shared<ForwardedAsset, Router&, const BitHordeIds&>(*this, req.ids());
+	_sessionMap[req.uuid()] = asset;
+
+	bindAsset(asset);
+	return asset;
 }
+
+void Router::bindAsset(const bithorded::router::ForwardedAsset::Ptr& asset)
+{
+	for (auto iter = _connectedFriends.begin(); iter != _connectedFriends.end(); iter++) {
+		auto f = iter->second;
+		if (!asset->hasUpstream(f->peerName()))
+			asset->bindUpstream(f);
+	}
+}
+
 
 
 

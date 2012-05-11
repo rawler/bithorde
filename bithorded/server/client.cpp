@@ -39,6 +39,18 @@ Client::Client( Server& server) :
 {
 }
 
+bool Client::requestsAsset(const BitHordeIds& ids) {
+	for (auto iter=_assets.begin(); iter!=_assets.end(); iter++) {
+		auto asset = *iter;
+		if (asset) {
+			BitHordeIds assetIds;
+			if (asset->getIds(assetIds) && idsOverlap(assetIds, ids))
+				return true;
+		}
+	}
+	return false;
+}
+
 void Client::onMessage(const bithorde::HandShake& msg)
 {
 	bithorde::Client::onMessage(msg);

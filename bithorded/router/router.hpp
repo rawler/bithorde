@@ -21,10 +21,12 @@
 #include <boost/asio/io_service.hpp>
 #include <boost/function.hpp>
 #include <boost/shared_ptr.hpp>
+#include <map>
 #include <vector>
 
 #include "../server/config.hpp"
 #include "../server/client.hpp"
+#include "asset.hpp"
 
 #include "bithorde.pb.h"
 
@@ -39,6 +41,8 @@ class Router
 	std::map<std::string, Friend> _friends;
 	std::map<std::string, boost::shared_ptr<FriendConnector> > _connectors;
 	std::map<std::string, Client::Ptr > _connectedFriends;
+
+	std::map< uint64_t, ForwardedAsset::WeakPtr > _sessionMap;
 public:
 	Router(Server& server);
 
@@ -50,6 +54,7 @@ public:
 	void onDisconnected(const bithorded::Client::Ptr& client);
 
 	bithorded::Asset::Ptr findAsset(::bithorde::BindRead req);
+	void bindAsset(const ForwardedAsset::Ptr& asset);
 };
 
 }}
