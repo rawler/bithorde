@@ -37,6 +37,7 @@ public:
 	typedef boost::signals2::signal<void ()> VoidSignal;
 	VoidSignal closed;
 	StatusSignal statusUpdate;
+	bithorde::Status status;
 
 	void close();
 protected:

@@ -12,6 +12,7 @@ namespace fs = boost::filesystem;
 using namespace bithorde;
 
 Asset::Asset(const bithorde::Asset::ClientPointer& client) :
+	status(Status::NONE),
 	_client(client),
 	_handle(-1),
 	_size(-1)
@@ -41,7 +42,8 @@ uint64_t Asset::size()
 
 void Asset::handleMessage(const bithorde::AssetStatus & msg)
 {
-	statusUpdate(msg);;
+	status = msg.status();
+	statusUpdate(msg);
 }
 
 ReadAsset::ReadAsset(const bithorde::ReadAsset::ClientPointer& client, const BitHordeIds& requestIds) :
