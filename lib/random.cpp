@@ -17,9 +17,27 @@
 #include "random.h"
 
 #include <stdlib.h>
+#include <sys/time.h>
+#include <unistd.h>
+
+class RandomGen {
+public:
+	RandomGen() {
+		timeval t;
+		gettimeofday(&t, NULL);
+		unsigned int seed = t.tv_sec;
+		seed = seed*1000000 + t.tv_sec;
+		seed = (seed << 8) + getpid(); // More than 64 new pids per microsecond is unlikely.
+		srand(1000000*t.tv_sec + t.tv_usec);
+	}
+	uint64_t rand64() {
+		return (((uint64_t)rand()) << 32) | rand();
+	}
+};
+
+RandomGen r;
 
 uint64_t rand64()
 {
-	// TODO: improve seeding throuh srandomdev
-	return (((uint64_t)rand()) << 32) | rand();
+	return r.rand64();
 }
