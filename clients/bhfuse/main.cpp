@@ -4,6 +4,8 @@
 #include <errno.h>
 #include <signal.h>
 
+#include <glog/logging.h>
+
 #include "buildconf.hpp"
 
 const int RECONNECT_ATTEMPTS = 30;
@@ -17,14 +19,19 @@ static asio::io_service ioSvc;
 
 using namespace bithorde;
 
+bool terminating = false;
 void sigint(int sig) {
-	cerr << "Intercepted signal#" << sig << endl;
+	LOG(INFO) << "Intercepted signal#" << sig;
 	if (sig == SIGINT) {
-		cerr << "Exiting..." << endl;
-		ioSvc.stop();
-		// TODO: Emergency exit on repeated sig
+		if (terminating) {
+			LOG(INFO) << "Exiting...";
+			exit(-1);
+		} else {
+			terminating = true;
+			LOG(INFO) << "Exiting...";
+			ioSvc.stop();
+		}
 	}
-	cerr.flush();
 }
 
 int main(int argc, char *argv[])
