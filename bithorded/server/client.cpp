@@ -94,7 +94,7 @@ void Client::onMessage(const bithorde::BindRead& msg)
 			resp.set_status(bithorde::INVALID_HANDLE);
 			sendMessage(bithorde::Connection::AssetStatus, resp);
 		} else if (asset && (asset->status == bithorde::Status::NONE)) {
-			asset->statusChange.connect(boost::bind(&Client::onAssetResponse, this, msg, asset)); // TODO: bind weak_ptr
+			asset->statusChange.connect(boost::bind(&Client::onAssetResponse, this, msg, Asset::WeakPtr(asset)));
 		} else {
 			onAssetResponse(msg, asset);
 		}
@@ -139,13 +139,13 @@ void Client::onReadResponse(const bithorde::Read::Request& req, int64_t offset, 
 	sendMessage(bithorde::Connection::ReadResponse, resp);
 }
 
-void Client::onAssetResponse ( const bithorde::BindRead& req, Asset::Ptr a )
+void Client::onAssetResponse ( const bithorde::BindRead& req, bithorded::Asset::WeakPtr a_ )
 {
 	bithorde::AssetStatus resp;
 	bithorde::Asset::Handle h = req.handle();
 	resp.set_handle(h);
 
-	if (a) {
+	if (Asset::Ptr a = a_.lock()) {
 		LOG(INFO) << peerName() << ':' << h << " found and bound" << endl;
 		resp.set_status(bithorde::SUCCESS);
 		resp.set_availability(1000);

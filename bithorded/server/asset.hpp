@@ -39,6 +39,7 @@ public:
 	{}
 
 	typedef boost::shared_ptr<Asset> Ptr;
+	typedef boost::weak_ptr<Asset> WeakPtr;
 
 	virtual void async_read(uint64_t offset, size_t& size, ReadCallback cb) = 0;
 	virtual uint64_t size() = 0;
