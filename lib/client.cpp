@@ -129,7 +129,8 @@ void Client::onMessage(const bithorde::HandShake &msg)
 		_protoVersion = 2;
 	} else {
 		cerr << "Only Protocol-version 2 or higer supported" << endl;
-		// TODO: disconnect properly
+		_connection->close();
+		_connection.reset();
 		return;
 	}
 
@@ -232,7 +233,7 @@ bool Client::bind(ReadAsset &asset, uint64_t uuid) {
 
 bool Client::bind(UploadAsset & asset)
 {
-	// TODO: BOOST_ASSERT(asset._client == this);
+	BOOST_ASSERT(asset._client.get() == this);
 	BOOST_ASSERT(asset._handle < 0);
 	BOOST_ASSERT(asset.size() > 0);
 	asset._handle = _handleAllocator.allocate();

@@ -79,7 +79,7 @@ bool MagnetURI::parse(const string& uri_)
 	for (vector<string>::iterator iter = attributes.begin(); iter != attributes.end(); iter++) {
 		string option = *iter;
 		size_t splitPos = option.find('=');
-		if (splitPos == option.size()) // TODO: Error handling
+		if (splitPos == option.size())
 			continue;
 		string key = option.substr(0, splitPos);
 		string value = option.substr(splitPos+1);

@@ -148,7 +148,7 @@ void Connection::onRead(const boost::system::error_code& err, size_t count)
 			if (_state == Authenticated) goto proto_error;
 			res = dequeue<bithorde::Ping>(Ping, stream); break;
 		default:
-			// TODO: _logger.warning("unknown message tag");
+			cerr << "BitHorde protocol warning: unknown message tag" << endl;
 			res = ::google::protobuf::internal::WireFormatLite::SkipMessage(&stream);
 		}
 	}

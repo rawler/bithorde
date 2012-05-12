@@ -126,7 +126,9 @@ void Client::onMessage(const bithorde::Read::Request& msg)
 		size_t size = msg.size();
 		if (size > MAX_CHUNK)
 			size = MAX_CHUNK;
-		asset->async_read(offset, size, boost::bind(&Client::onReadResponse, this, msg, _1, _2)); // TODO: Weak callback
+
+		// Raw pointer to this should be fine here, since asset has ownership of this. (Through member Ptr client)
+		asset->async_read(offset, size, boost::bind(&Client::onReadResponse, this, msg, _1, _2));
 	} else {
 		bithorde::Read::Response resp;
 		resp.set_reqid(msg.reqid());
