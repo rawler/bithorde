@@ -37,6 +37,12 @@ namespace bithorded {
 
 class Config;
 
+class BindError : public std::runtime_error {
+public:
+	bithorde::Status status;
+	explicit BindError(bithorde::Status status);
+};
+
 class Server
 {
 	Config &_cfg;

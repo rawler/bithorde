@@ -89,16 +89,23 @@ void Client::onMessage(bithorde::BindRead& msg)
 		if (!msg.has_uuid())
 			msg.set_uuid(rand64());
 
-		auto asset = _server.async_findAsset(msg);
-		if (asset && !assignAsset(h, asset)) {
+		try {
+			auto asset = _server.async_findAsset(msg);
+			if (asset && !assignAsset(h, asset)) {
+				bithorde::AssetStatus resp;
+				resp.set_handle(h);
+				resp.set_status(bithorde::INVALID_HANDLE);
+				sendMessage(bithorde::Connection::AssetStatus, resp);
+			} else if (asset && (asset->status == bithorde::Status::NONE)) {
+				asset->statusChange.connect(boost::bind(&Client::onAssetResponse, this, msg, Asset::WeakPtr(asset)));
+			} else {
+				onAssetResponse(msg, asset);
+			}
+		} catch (bithorded::BindError e) {
 			bithorde::AssetStatus resp;
 			resp.set_handle(h);
-			resp.set_status(bithorde::INVALID_HANDLE);
+			resp.set_status(e.status);
 			sendMessage(bithorde::Connection::AssetStatus, resp);
-		} else if (asset && (asset->status == bithorde::Status::NONE)) {
-			asset->statusChange.connect(boost::bind(&Client::onAssetResponse, this, msg, Asset::WeakPtr(asset)));
-		} else {
-			onAssetResponse(msg, asset);
 		}
 	} else {
 		// Trying to close

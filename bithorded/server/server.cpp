@@ -34,6 +34,12 @@ namespace fs = boost::filesystem;
 
 using namespace bithorded;
 
+BindError::BindError(bithorde::Status status):
+	runtime_error("findAsset failed with " + bithorde::Status_Name(status)),
+	status(status)
+{
+}
+
 Server::Server(asio::io_service& ioSvc, Config& cfg) :
 	_cfg(cfg),
 	_ioSvc(ioSvc),
