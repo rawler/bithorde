@@ -52,6 +52,7 @@ public:
 	const std::string& peerName();
 
 	bool bind(ReadAsset & asset);
+	bool bind(ReadAsset & asset, uint64_t uuid);
 	bool bind(UploadAsset & asset);
 
 	bool sendMessage(Connection::MessageType type, const ::google::protobuf::Message & msg);
@@ -69,7 +70,7 @@ protected:
 	void onIncomingMessage(Connection::MessageType type, ::google::protobuf::Message& msg);
 
 	virtual void onMessage(const bithorde::HandShake & msg);
-	virtual void onMessage(const bithorde::BindRead & msg);
+	virtual void onMessage(bithorde::BindRead& msg);
 	virtual void onMessage(const bithorde::AssetStatus & msg);
 	virtual void onMessage(const bithorde::Read::Request & msg);
 	virtual void onMessage(const bithorde::Read::Response & msg);
@@ -87,7 +88,7 @@ private:
 	boost::signals2::scoped_connection _writableConnection;
 	boost::signals2::scoped_connection _disconnectedConnection;
 
-	bool informBound(const ReadAsset&);
+	bool informBound(const bithorde::ReadAsset& asset, uint64_t uuid);
 	int allocRPCRequest(Asset::Handle asset);
 	void releaseRPCRequest(int reqId);
 };

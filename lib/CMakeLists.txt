@@ -13,6 +13,7 @@ ADD_LIBRARY(bithorde
 	connection.h connection.cpp
 	hashes.h hashes.cpp
 	magneturi.h magneturi.cpp
+	random.h random.cpp
 	types.h types.cpp
 )
 

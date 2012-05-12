@@ -14,16 +14,16 @@
     limitations under the License.
 */
 
-
 #include "client.hpp"
 
 #include <boost/assert.hpp>
 #include <iostream>
 
-#include "server.hpp"
-#include "lib/magneturi.h"
-
 #include <glog/logging.h>
+
+#include "server.hpp"
+#include "../../lib/magneturi.h"
+#include "../../lib/random.h"
 
 const size_t MAX_ASSETS = 1024;
 const size_t MAX_CHUNK = 64*1024;
@@ -80,12 +80,14 @@ void Client::onMessage(const bithorde::BindWrite& msg)
 	sendMessage(bithorde::Connection::AssetStatus, resp);
 }
 
-void Client::onMessage(const bithorde::BindRead& msg)
+void Client::onMessage(bithorde::BindRead& msg)
 {
 	auto h = msg.handle();
 	if (msg.ids_size() > 0) {
 		// Trying to open
 		LOG(INFO) << peerName() << ':' << h << " requested: " << MagnetURI(msg) << endl;
+		if (!msg.has_uuid())
+			msg.set_uuid(rand64());
 
 		auto asset = _server.async_findAsset(msg);
 		if (asset && !assignAsset(h, asset)) {

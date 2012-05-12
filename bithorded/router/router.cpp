@@ -121,23 +121,23 @@ void Router::onDisconnected(const bithorded::Client::Ptr& client)
 		_connectors[peerName] = FriendConnector::create(_server, _friends[peerName]);
 }
 
-bithorded::Asset::Ptr bithorded::router::Router::findAsset(bithorde::BindRead req)
+bithorded::Asset::Ptr bithorded::router::Router::findAsset(const bithorde::BindRead& req)
 {
 	if (_sessionMap.count(req.uuid()))
 		return Asset::Ptr(); // TODO: Send proper statusCode WOULDLOOP
 	auto asset = boost::make_shared<ForwardedAsset, Router&, const BitHordeIds&>(*this, req.ids());
 	_sessionMap[req.uuid()] = asset;
 
-	bindAsset(asset);
+	bindAsset(asset, req.uuid());
 	return asset;
 }
 
-void Router::bindAsset(const bithorded::router::ForwardedAsset::Ptr& asset)
+void Router::bindAsset(const bithorded::router::ForwardedAsset::Ptr& asset, uint64_t uuid)
 {
 	for (auto iter = _connectedFriends.begin(); iter != _connectedFriends.end(); iter++) {
 		auto f = iter->second;
 		if (!asset->hasUpstream(f->peerName()))
-			asset->bindUpstream(f);
+			asset->bindUpstream(f, uuid);
 	}
 }
 

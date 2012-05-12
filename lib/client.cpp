@@ -1,13 +1,13 @@
 #include "client.h"
 
-#include <iostream>
-#include <stdlib.h>
-#include <string.h>
-
 #include <boost/assert.hpp>
 #include <boost/bind.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/xpressive/xpressive.hpp>
+#include <iostream>
+#include <string.h>
+
+#include "random.h"
 
 #define DEFAULT_ASSET_TIMEOUT 4000
 
@@ -16,11 +16,6 @@ namespace asio = boost::asio;
 namespace xpressive = boost::xpressive;
 
 using namespace bithorde;
-
-uint64_t rand64() {
-	// TODO: improve seeding throuh srandomdev
-	return (((uint64_t)rand()) << 32) | rand();
-}
 
 Client::Client(asio::io_service& ioSvc, string myName) :
 	_ioSvc(ioSvc),
@@ -147,14 +142,14 @@ void Client::onMessage(const bithorde::HandShake &msg)
 		for (auto iter = _assetMap.begin(); iter != _assetMap.end(); iter++) {
 			ReadAsset* asset = dynamic_cast<ReadAsset*>(iter->second);
 			BOOST_ASSERT(iter->second);
-			informBound(*asset);
+			informBound(*asset, rand64());
 		}
 			
 		authenticated(_peerName);
 	}
 }
 
-void Client::onMessage(const bithorde::BindRead & msg) {
+void Client::onMessage(bithorde::BindRead & msg) {
 	cerr << "unsupported: handling BindRead" << endl;
 	bithorde::AssetStatus resp;
 	resp.set_handle(msg.handle());
@@ -219,6 +214,10 @@ void Client::onMessage(const bithorde::Ping & msg) {
 }
 
 bool Client::bind(ReadAsset &asset) {
+	return bind(asset, rand64());
+}
+
+bool Client::bind(ReadAsset &asset, uint64_t uuid) {
 	if (!asset.isBound()) {
 		BOOST_ASSERT(asset._handle < 0);
 		BOOST_ASSERT(asset.requestIds().size() > 0);
@@ -228,7 +227,7 @@ bool Client::bind(ReadAsset &asset) {
 		_assetMap[asset._handle] = &asset;
 	}
 
-	return informBound(asset);
+	return informBound(asset, uuid);
 }
 
 bool Client::bind(UploadAsset & asset)
@@ -262,7 +261,7 @@ bool Client::release(Asset & asset)
 	return _connection->sendMessage(Connection::BindRead, msg);
 }
 
-bool Client::informBound(const ReadAsset& asset)
+bool Client::informBound(const ReadAsset& asset, uint64_t uuid)
 {
 	BOOST_ASSERT(_connection);
 	BOOST_ASSERT(asset._handle >= 0);
@@ -275,7 +274,7 @@ bool Client::informBound(const ReadAsset& asset)
 
 	msg.mutable_ids()->CopyFrom(asset.requestIds());
 	msg.set_timeout(DEFAULT_ASSET_TIMEOUT);
-	msg.set_uuid(rand64());
+	msg.set_uuid(uuid);
 	return _connection->sendMessage(Connection::BindRead, msg);
 }
 

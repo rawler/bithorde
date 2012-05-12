@@ -44,7 +44,7 @@ protected:
 
 	virtual void onMessage(const bithorde::HandShake& msg);
 	virtual void onMessage(const bithorde::BindWrite& msg);
-	virtual void onMessage(const bithorde::BindRead& msg);
+	virtual void onMessage(bithorde::BindRead& msg);
 	virtual void onMessage(const bithorde::Read::Request& msg);
 
 private:

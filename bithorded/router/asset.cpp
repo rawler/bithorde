@@ -30,7 +30,7 @@ bool bithorded::router::ForwardedAsset::hasUpstream(const std::string peername)
 	return _upstream.count(peername);
 }
 
-void bithorded::router::ForwardedAsset::bindUpstream(const bithorded::Client::Ptr& f)
+void bithorded::router::ForwardedAsset::bindUpstream(const bithorded::Client::Ptr& f, uint64_t uuid)
 {
 	if (f->requestsAsset(_ids)) // This path surely doesn't have the asset.
 		return;
@@ -41,7 +41,7 @@ void bithorded::router::ForwardedAsset::bindUpstream(const bithorded::Client::Pt
 		bithorde::ASSET_ARG_OFFSET, bithorde::ASSET_ARG_DATA, bithorde::ASSET_ARG_TAG));
 	auto& upstream_ = _upstream[peername];
 	upstream_.reset(upstream);
-	f->bind(*upstream_);
+	f->bind(*upstream_, uuid);
 }
 
 void bithorded::router::ForwardedAsset::onUpstreamStatus(const string& peername, const bithorde::AssetStatus& status)
