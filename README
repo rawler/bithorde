@@ -37,6 +37,7 @@ Build requirements (Ubuntu Package Names)
   libboost-all-dev (>= 1.46, might work with earlier, may not need all modules)
   libcrypto++-dev
   libfuse-dev
+  libgoogle-glog-dev
   libprotobuf-dev
   pkg-config
 
