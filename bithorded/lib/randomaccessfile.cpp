@@ -73,7 +73,8 @@ ssize_t RandomAccessFile::write(uint64_t offset, void* src, size_t size)
 {
 	BOOST_ASSERT( size <= WINDOW_SIZE );
 	ssize_t written = pwrite64(_fd, src, size, offset);
-	BOOST_ASSERT( (size_t)written == size ); // TODO: Real error-handling
+	if ((size_t)written != size)
+		throw std::ios_base::failure("Failed to write");
 	return written;
 }
 
