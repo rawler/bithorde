@@ -82,7 +82,7 @@ void Client::onMessage(const bithorde::BindWrite& msg)
 
 void Client::onMessage(bithorde::BindRead& msg)
 {
-	auto h = msg.handle();
+	bithorde::Asset::Handle h = msg.handle();
 	if (msg.ids_size() > 0) {
 		// Trying to open
 		LOG(INFO) << peerName() << ':' << h << " requested: " << MagnetURI(msg) << endl;
@@ -91,30 +91,26 @@ void Client::onMessage(bithorde::BindRead& msg)
 
 		try {
 			auto asset = _server.async_findAsset(msg);
-			if (asset && !assignAsset(h, asset)) {
-				bithorde::AssetStatus resp;
-				resp.set_handle(h);
-				resp.set_status(bithorde::INVALID_HANDLE);
-				sendMessage(bithorde::Connection::AssetStatus, resp);
-			} else if (asset && (asset->status == bithorde::Status::NONE)) {
-				asset->statusChange.connect(boost::bind(&Client::onAssetResponse, this, msg, Asset::WeakPtr(asset)));
-			} else {
-				onAssetResponse(msg, asset);
+			if (!asset)
+				return informAssetStatus(h, bithorde::NOTFOUND);
+			if (!assignAsset(h, asset))
+				return informAssetStatus(h, bithorde::INVALID_HANDLE);
+
+			// Remember to inform peer about changes in asset-status.
+			asset->statusChange.connect(boost::bind(&Client::informAssetStatusUpdate, this, h, Asset::WeakPtr(asset)));
+
+			if (asset->status != bithorde::Status::NONE) {
+				// We already have a valid status for the asset, so inform about it
+				informAssetStatusUpdate(h, asset);
 			}
 		} catch (bithorded::BindError e) {
-			bithorde::AssetStatus resp;
-			resp.set_handle(h);
-			resp.set_status(e.status);
-			sendMessage(bithorde::Connection::AssetStatus, resp);
+			informAssetStatus(h, e.status);
 		}
 	} else {
 		// Trying to close
 		LOG(INFO) << peerName() << ':' << h << " closed" << endl;
 		clearAsset(h);
-		bithorde::AssetStatus resp;
-		resp.set_handle(h);
-		resp.set_status(bithorde::NOTFOUND);
-		sendMessage(bithorde::Connection::AssetStatus, resp);
+		informAssetStatus(h, bithorde::NOTFOUND);
 	}
 }
 
@@ -150,22 +146,30 @@ void Client::onReadResponse(const bithorde::Read::Request& req, int64_t offset, 
 	sendMessage(bithorde::Connection::ReadResponse, resp);
 }
 
-void Client::onAssetResponse ( const bithorde::BindRead& req, bithorded::Asset::WeakPtr a_ )
+void Client::informAssetStatus(bithorde::Asset::Handle h, bithorde::Status s)
 {
 	bithorde::AssetStatus resp;
-	bithorde::Asset::Handle h = req.handle();
+	resp.set_handle(h);
+	resp.set_status(s);
+	sendMessage(bithorde::Connection::AssetStatus, resp);
+}
+
+void Client::informAssetStatusUpdate(bithorde::Asset::Handle h, const bithorded::Asset::WeakPtr& asset_)
+{
+	bithorde::AssetStatus resp;
 	resp.set_handle(h);
 
-	if (Asset::Ptr a = a_.lock()) {
-		LOG(INFO) << peerName() << ':' << h << " found and bound" << endl;
-		resp.set_status(bithorde::SUCCESS);
-		resp.set_availability(1000);
-		resp.set_size(a->size());
-		a->getIds(*resp.mutable_ids());
+	if (auto asset = asset_.lock()) {
+		resp.set_status(asset->status);
+		if (asset->status == bithorde::SUCCESS) {
+			resp.set_availability(1000);
+			resp.set_size(asset->size());
+			asset->getIds(*resp.mutable_ids());
+		}
 	} else {
 		resp.set_status(bithorde::NOTFOUND);
-		LOG(INFO) << peerName() << ':' << h << " not found" << endl;
 	}
+	LOG(INFO) << peerName() << ':' << h << " new state " << bithorde::Status_Name(resp.status()) << endl;
 
 	sendMessage(bithorde::Connection::AssetStatus, resp);
 }
