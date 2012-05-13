@@ -54,7 +54,6 @@ public:
 	void onDisconnected(const bithorded::Client::Ptr& client);
 
 	bithorded::Asset::Ptr findAsset(const bithorde::BindRead& req);
-	void bindAsset(const bithorded::router::ForwardedAsset::Ptr& asset, uint64_t uuid);
 };
 
 }}
