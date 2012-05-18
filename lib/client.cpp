@@ -259,7 +259,10 @@ bool Client::release(Asset & asset)
 	_assetMap[asset._handle] = NULL;
 	asset._handle = -1;
 
-	return _connection->sendMessage(Connection::BindRead, msg);
+	if (_connection)
+		return _connection->sendMessage(Connection::BindRead, msg);
+	else
+		return true; // Since connection is down, other side should not have the bound state as it is.
 }
 
 bool Client::informBound(const ReadAsset& asset, uint64_t uuid)
