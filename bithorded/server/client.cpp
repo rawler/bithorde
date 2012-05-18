@@ -19,7 +19,8 @@
 #include <boost/assert.hpp>
 #include <iostream>
 
-#include <glog/logging.h>
+#include <log4cplus/logger.h>
+#include <log4cplus/loggingmacros.h>
 
 #include "server.hpp"
 #include "../../lib/magneturi.h"
@@ -32,6 +33,10 @@ using namespace std;
 namespace fs = boost::filesystem;
 
 using namespace bithorded;
+
+namespace bithorded {
+	log4cplus::Logger clientLogger = log4cplus::Logger::getInstance("client");
+}
 
 Client::Client( Server& server) :
 	bithorde::Client(server.ioService(), server.name()),
@@ -54,7 +59,7 @@ bool Client::requestsAsset(const BitHordeIds& ids) {
 void Client::onMessage(const bithorde::HandShake& msg)
 {
 	bithorde::Client::onMessage(msg);
-	LOG(INFO) << "Connected: " << msg.name() << endl;
+	LOG4CPLUS_INFO(clientLogger, "Connected: " << msg.name());
 }
 
 void Client::onMessage(const bithorde::BindWrite& msg)
@@ -66,15 +71,15 @@ void Client::onMessage(const bithorde::BindWrite& msg)
 		fs::path path(msg.linkpath());
 		if (path.is_absolute()) {
 			if (_server.linkAsset(path, boost::bind(&Client::onLinkHashDone, shared_from_this(), h, _1))) {
-				LOG(INFO) << "Hashing " << path << endl;
+				LOG4CPLUS_INFO(clientLogger, "Linking " << path);
 				resp.set_status(bithorde::SUCCESS);
 			} else {
-				LOG(ERROR) << "Upload did not match any allowed assetStore: " << path << endl;
+				LOG4CPLUS_ERROR(clientLogger, "Upload did not match any allowed assetStore: " << path);
 				resp.set_status(bithorde::ERROR);
 			}
 		}
 	} else {
-		LOG(ERROR) << "Sorry, upload isn't supported yet" << endl;
+		LOG4CPLUS_ERROR(clientLogger, "Sorry, upload isn't supported yet");
 		resp.set_status(bithorde::ERROR);
 	}
 	sendMessage(bithorde::Connection::AssetStatus, resp);
@@ -85,7 +90,7 @@ void Client::onMessage(bithorde::BindRead& msg)
 	bithorde::Asset::Handle h = msg.handle();
 	if (msg.ids_size() > 0) {
 		// Trying to open
-		LOG(INFO) << peerName() << ':' << h << " requested: " << MagnetURI(msg) << endl;
+		LOG4CPLUS_INFO(clientLogger, peerName() << ':' << h << " requested: " << MagnetURI(msg));
 		if (!msg.has_uuid())
 			msg.set_uuid(rand64());
 
@@ -108,7 +113,7 @@ void Client::onMessage(bithorde::BindRead& msg)
 		}
 	} else {
 		// Trying to close
-		LOG(INFO) << peerName() << ':' << h << " closed" << endl;
+		LOG4CPLUS_INFO(clientLogger, peerName() << ':' << h << " closed");
 		clearAsset(h);
 		informAssetStatus(h, bithorde::NOTFOUND);
 	}
@@ -169,7 +174,7 @@ void Client::informAssetStatusUpdate(bithorde::Asset::Handle h, const bithorded:
 	} else {
 		resp.set_status(bithorde::NOTFOUND);
 	}
-	LOG(INFO) << peerName() << ':' << h << " new state " << bithorde::Status_Name(resp.status()) << endl;
+	LOG4CPLUS_INFO(clientLogger, peerName() << ':' << h << " new state " << bithorde::Status_Name(resp.status()));
 
 	sendMessage(bithorde::Connection::AssetStatus, resp);
 }
@@ -193,7 +198,7 @@ bool Client::assignAsset(bithorde::Asset::Handle handle_, const Asset::Ptr& a)
 	size_t handle = handle_;
 	if (handle >= _assets.size()) {
 		if (handle > MAX_ASSETS) {
-			LOG(ERROR) << peerName() << ": handle larger than allowed limit (" << handle << " < " << MAX_ASSETS << ")" << endl;
+			LOG4CPLUS_ERROR(clientLogger, peerName() << ": handle larger than allowed limit (" << handle << " < " << MAX_ASSETS << ")");
 			return false;
 		}
 		size_t new_size = _assets.size() + (handle - _assets.size() + 1) * 2;

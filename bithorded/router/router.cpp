@@ -22,7 +22,8 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/make_shared.hpp>
 
-#include <glog/logging.h>
+#include <log4cplus/logger.h>
+#include <log4cplus/loggingmacros.h>
 
 #include "../server/server.hpp"
 
@@ -32,6 +33,10 @@ using namespace bithorded::router;
 using namespace std;
 
 const boost::posix_time::seconds RECONNECT_INTERVAL(5);
+
+namespace bithorded { namespace router {
+	log4cplus::Logger routerLog = log4cplus::Logger::getInstance("router");
+} }
 
 class bithorded::router::FriendConnector : public boost::enable_shared_from_this<bithorded::router::FriendConnector> {
 	Server& _server;
@@ -106,7 +111,7 @@ void Router::onConnected(const bithorded::Client::Ptr& client )
 {
 	string peerName = client->peerName();
 	if (_friends.count(peerName)) {
-		LOG(INFO) << "Friend " << peerName << " connected" << endl;
+		LOG4CPLUS_INFO(routerLog, "Friend " << peerName << " connected");
 		if (_connectors[peerName].get())
 			_connectors[peerName]->cancel();
 		_connectors.erase(peerName);

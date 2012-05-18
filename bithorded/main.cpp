@@ -5,14 +5,13 @@
 #include <iostream>
 
 #include <crypto++/files.h>
+#include <log4cplus/configurator.h>
 
 #include "buildconf.hpp"
 #include "lib/hashes.h"
 #include "store/linkedassetstore.hpp"
 #include "server/config.hpp"
 #include "server/server.hpp"
-
-#include <glog/logging.h>
 
 using namespace std;
 namespace asio = boost::asio;
@@ -22,8 +21,8 @@ namespace po = boost::program_options;
 using namespace bithorded;
 
 int main(int argc, char* argv[]) {
-	google::InitGoogleLogging(argv[0]);
-	google::LogToStderr();
+	log4cplus::BasicConfigurator config;
+	config.configure();
 
 	try {
 		Config cfg(argc, argv);

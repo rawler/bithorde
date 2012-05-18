@@ -4,7 +4,9 @@
 #include <errno.h>
 #include <signal.h>
 
-#include <glog/logging.h>
+#include <log4cplus/logger.h>
+#include <log4cplus/loggingmacros.h>
+#include <log4cplus/configurator.h>
 
 #include "buildconf.hpp"
 
@@ -19,16 +21,17 @@ static asio::io_service ioSvc;
 
 using namespace bithorde;
 
+log4cplus::Logger sigLogger = log4cplus::Logger::getInstance("signal");
 bool terminating = false;
 void sigint(int sig) {
-	LOG(INFO) << "Intercepted signal#" << sig;
+	LOG4CPLUS_INFO(sigLogger, "Intercepted signal#" << sig);
 	if (sig == SIGINT) {
 		if (terminating) {
-			LOG(INFO) << "Exiting...";
+			LOG4CPLUS_INFO(sigLogger, "Force Exiting...");
 			exit(-1);
 		} else {
 			terminating = true;
-			LOG(INFO) << "Exiting...";
+			LOG4CPLUS_INFO(sigLogger, "Cleanly Exiting...");
 			ioSvc.stop();
 		}
 	}
@@ -37,6 +40,8 @@ void sigint(int sig) {
 int main(int argc, char *argv[])
 {
 	signal(SIGINT, &sigint);
+	log4cplus::BasicConfigurator config;
+	config.configure();
 
 	BoostAsioFilesystem_Options opts;
 

@@ -25,7 +25,8 @@
 #include "client.hpp"
 #include "config.hpp"
 
-#include <glog/logging.h>
+#include <log4cplus/logger.h>
+#include <log4cplus/loggingmacros.h>
 
 using namespace std;
 
@@ -33,6 +34,10 @@ namespace asio = boost::asio;
 namespace fs = boost::filesystem;
 
 using namespace bithorded;
+
+namespace bithorded {
+	log4cplus::Logger serverLog = log4cplus::Logger::getInstance("server");
+}
 
 BindError::BindError(bithorde::Status status):
 	runtime_error("findAsset failed with " + bithorde::Status_Name(status)),
@@ -134,7 +139,7 @@ void Server::clientAuthenticated(const bithorded::Client::WeakPtr& client_) {
 
 void Server::clientDisconnected(bithorded::Client::Ptr& client)
 {
-	LOG(INFO) << "Disconnected: " << client->peerName() << endl;
+	LOG4CPLUS_INFO(serverLog, "Disconnected: " << client->peerName());
 	_router.onDisconnected(client);
 	// Will destroy the client, unless others are holding references.
 	client.reset();

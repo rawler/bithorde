@@ -23,7 +23,8 @@
 #include <time.h>
 #include <utime.h>
 
-#include <glog/logging.h>
+#include <log4cplus/logger.h>
+#include <log4cplus/loggingmacros.h>
 
 using namespace std;
 
@@ -36,6 +37,10 @@ const fs::path META_DIR = ".bh_meta/assets";
 const fs::path TIGER_DIR = ".bh_meta/tiger";
 
 const int THREADPOOL_CONCURRENCY = 4;
+
+namespace bithorded {
+	log4cplus::Logger storeLog = log4cplus::Logger::getInstance("store");
+}
 
 LinkedAssetStore::LinkedAssetStore(boost::asio::io_service& ioSvc, const boost::filesystem3::path& baseDir) :
 	_threadPool(THREADPOOL_CONCURRENCY),
@@ -171,7 +176,7 @@ SourceAsset::Ptr openAssetFolder(const fs::path& referrer, const fs::path& asset
 	auto assetDataPath = assetFolder/"data";
 	switch (validateDataSymlink(assetDataPath)) {
 	case OUTDATED:
-		LOG(WARNING) << "outdated asset detected, " << assetFolder << endl;
+		LOG4CPLUS_WARN(storeLog, "outdated asset detected, " << assetFolder);
 		purgeLink(referrer);
 		fs::remove(referrer/"meta");
 	case OK:
@@ -179,7 +184,7 @@ SourceAsset::Ptr openAssetFolder(const fs::path& referrer, const fs::path& asset
 		break;
 
 	case BROKEN:
-		LOG(WARNING) << "broken asset detected, " << assetFolder << endl;
+		LOG4CPLUS_WARN(storeLog, "broken asset detected, " << assetFolder);
 		purgeLinkAndAsset(referrer);
 	default:
 		break;
@@ -203,7 +208,7 @@ SourceAsset::Ptr LinkedAssetStore::_openTiger(const std::string& tigerId)
 				_tigerMap[tigerId] = asset;
 			} else {
 				asset.reset();
-				LOG(WARNING) << "Unhashed asset detected, hashing" << endl;
+				LOG4CPLUS_WARN(storeLog, "Unhashed asset detected, hashing");
 				_threadPool.post(*new HashTask(asset, _ioSvc, boost::bind(&LinkedAssetStore::_addAsset, this, _1, &noop)));
 			}
 		}

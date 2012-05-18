@@ -21,10 +21,15 @@
 #include <boost/smart_ptr/make_shared.hpp>
 #include <utility>
 
-#include <glog/logging.h>
+#include <log4cplus/logger.h>
+#include <log4cplus/loggingmacros.h>
 
 using namespace bithorded::router;
 using namespace std;
+
+namespace bithorded { namespace router {
+	log4cplus::Logger assetLogger = log4cplus::Logger::getInstance("router");
+} }
 
 bool bithorded::router::ForwardedAsset::hasUpstream(const std::string peername)
 {
@@ -52,19 +57,19 @@ void bithorded::router::ForwardedAsset::bindUpstreams(const std::map< string, bi
 void bithorded::router::ForwardedAsset::onUpstreamStatus(const string& peername, const bithorde::AssetStatus& status)
 {
 	if (status.status() == bithorde::Status::SUCCESS) {
-		DLOG(INFO) << "Found upstream " << peername;
+		LOG4CPLUS_DEBUG(assetLogger, "Found upstream " << peername);
 		if (status.has_size()) {
 			if (_size == -1) {
 				_size = status.size();
 			} else if (_size != (int64_t)status.size()) {
-				LOG(WARNING) << peername << " responded with mismatching size, ignoring...";
+				LOG4CPLUS_WARN(assetLogger, peername << " responded with mismatching size, ignoring...");
 				_upstream.erase(peername);
 			}
 		} else {
-			LOG(WARNING) << peername << " SUCCESS response not accompanied with asset-size.";
+			LOG4CPLUS_WARN(assetLogger, peername << " SUCCESS response not accompanied with asset-size.");
 		}
 	} else {
-		DLOG(INFO) << "Failed upstream " << peername;
+		LOG4CPLUS_DEBUG(assetLogger, "Failed upstream " << peername);
 		_upstream.erase(peername);
 	}
 	updateStatus();
