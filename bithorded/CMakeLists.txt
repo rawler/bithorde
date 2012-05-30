@@ -14,9 +14,9 @@ ADD_EXECUTABLE(bithorded
 	server/config.cpp server/config.hpp
 	server/server.cpp server/server.hpp
 
-	store/sourceasset.cpp store/sourceasset.hpp
+	source/asset.cpp source/asset.hpp
+	source/store.cpp source/store.hpp
 	store/assetmeta.cpp store/assetmeta.hpp
-	store/linkedassetstore.cpp store/linkedassetstore.hpp
 
 	main.cpp
 

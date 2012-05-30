@@ -14,7 +14,7 @@
     limitations under the License.
 */
 
-#include "linkedassetstore.hpp"
+#include "store.hpp"
 
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/filesystem.hpp>
@@ -32,6 +32,7 @@ namespace asio = boost::asio;
 namespace fs = boost::filesystem;
 
 using namespace bithorded;
+using namespace bithorded::source;
 
 const fs::path META_DIR = ".bh_meta/assets";
 const fs::path TIGER_DIR = ".bh_meta/tiger";
@@ -42,7 +43,7 @@ namespace bithorded {
 	log4cplus::Logger storeLog = log4cplus::Logger::getInstance("store");
 }
 
-LinkedAssetStore::LinkedAssetStore(boost::asio::io_service& ioSvc, const boost::filesystem3::path& baseDir) :
+Store::Store(boost::asio::io_service& ioSvc, const boost::filesystem3::path& baseDir) :
 	_threadPool(THREADPOOL_CONCURRENCY),
 	_ioSvc(ioSvc),
 	_baseDir(baseDir),
@@ -62,9 +63,9 @@ struct HashTask : public Task {
 	SourceAsset::Ptr asset;
 	asio::io_service& io_svc;
 	asio::io_service::work _work;
-	LinkedAssetStore::ResultHandler handler;
+	Store::ResultHandler handler;
 
-	HashTask(SourceAsset::Ptr asset, asio::io_service& io_svc, LinkedAssetStore::ResultHandler handler )
+	HashTask(SourceAsset::Ptr asset, asio::io_service& io_svc, Store::ResultHandler handler )
 		: asset(asset), io_svc(io_svc), _work(io_svc), handler(handler)
 	{}
 	
@@ -96,7 +97,7 @@ string random_string(size_t len) {
 	return s;
 }
 
-bool LinkedAssetStore::addAsset(const boost::filesystem3::path& file, LinkedAssetStore::ResultHandler handler)
+bool Store::addAsset(const boost::filesystem3::path& file, Store::ResultHandler handler)
 {
 	if (!path_is_in(file, _baseDir)) {
 		return false;
@@ -110,13 +111,13 @@ bool LinkedAssetStore::addAsset(const boost::filesystem3::path& file, LinkedAsse
 		fs::create_symlink(file, assetFolder/"data");
 
 		SourceAsset::Ptr asset = boost::make_shared<SourceAsset>(assetFolder);
-		HashTask* task = new HashTask(asset, _ioSvc, boost::bind(&LinkedAssetStore::_addAsset, this, _1, handler));
+		HashTask* task = new HashTask(asset, _ioSvc, boost::bind(&Store::_addAsset, this, _1, handler));
 		_threadPool.post(*task);
 		return true;
 	}
 }
 
-void LinkedAssetStore::_addAsset(SourceAsset::Ptr& asset, LinkedAssetStore::ResultHandler upstream)
+void Store::_addAsset(SourceAsset::Ptr& asset, Store::ResultHandler upstream)
 {
 	BitHordeIds ids;
 	if (asset.get() && asset->getIds(ids)) {
@@ -192,7 +193,7 @@ SourceAsset::Ptr openAssetFolder(const fs::path& referrer, const fs::path& asset
 	return SourceAsset::Ptr();
 }
 
-SourceAsset::Ptr LinkedAssetStore::_openTiger(const std::string& tigerId)
+SourceAsset::Ptr Store::_openTiger(const std::string& tigerId)
 {
 	SourceAsset::Ptr asset;
 	if (_tigerMap.count(tigerId))
@@ -209,14 +210,14 @@ SourceAsset::Ptr LinkedAssetStore::_openTiger(const std::string& tigerId)
 			} else {
 				asset.reset();
 				LOG4CPLUS_WARN(storeLog, "Unhashed asset detected, hashing");
-				_threadPool.post(*new HashTask(asset, _ioSvc, boost::bind(&LinkedAssetStore::_addAsset, this, _1, &noop)));
+				_threadPool.post(*new HashTask(asset, _ioSvc, boost::bind(&Store::_addAsset, this, _1, &noop)));
 			}
 		}
 	}
 	return asset;
 }
 
-Asset::Ptr LinkedAssetStore::findAsset(const BitHordeIds& ids)
+Asset::Ptr Store::findAsset(const BitHordeIds& ids)
 {
 	SourceAsset::Ptr asset;
 	for (auto iter=ids.begin(); iter != ids.end(); iter++) {

@@ -50,6 +50,9 @@ protected:
 	void setStatus(bithorde::Status newStatus);
 };
 
+// Empty dummy Asset::Ptr, for cases when a null Ptr& is needed.
+static Asset::Ptr ASSET_NONE;
+
 }
 
 #endif // BITHORDED_ASSET_HPP

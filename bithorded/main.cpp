@@ -9,7 +9,6 @@
 
 #include "buildconf.hpp"
 #include "lib/hashes.h"
-#include "store/linkedassetstore.hpp"
 #include "server/config.hpp"
 #include "server/server.hpp"
 

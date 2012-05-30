@@ -53,7 +53,7 @@ Server::Server(asio::io_service& ioSvc, Config& cfg) :
 	_router(*this)
 {
 	for (auto iter=_cfg.sources.begin(); iter != _cfg.sources.end(); iter++)
-		_assetStores.push_back( unique_ptr<LinkedAssetStore>(new LinkedAssetStore(ioSvc, iter->root)) );
+		_assetStores.push_back( unique_ptr<source::Store>(new source::Store(ioSvc, iter->root)) );
 
 	for (auto iter=_cfg.friends.begin(); iter != _cfg.friends.end(); iter++)
 		_router.addFriend(*iter);
@@ -145,7 +145,7 @@ void Server::clientDisconnected(bithorded::Client::Ptr& client)
 	client.reset();
 }
 
-bool Server::linkAsset(const boost::filesystem3::path& filePath, LinkedAssetStore::ResultHandler resultHandler)
+bool Server::linkAsset(const boost::filesystem3::path& filePath, source::Store::ResultHandler resultHandler)
 {
 	for (auto iter=_assetStores.begin(); iter != _assetStores.end(); iter++) {
 		bool res = (*iter)->addAsset(filePath, resultHandler);

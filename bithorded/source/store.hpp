@@ -15,23 +15,22 @@
 */
 
 
-#ifndef BITHORDED_LINKEDASSETSTORE_HPP
-#define BITHORDED_LINKEDASSETSTORE_HPP
+#ifndef BITHORDED_SOURCE_STORE_HPP
+#define BITHORDED_SOURCE_STORE_HPP
 
 #include <boost/asio/io_service.hpp>
 #include <boost/filesystem/path.hpp>
 #include <boost/function.hpp>
 #include <map>
 
-#include "sourceasset.hpp"
+#include "asset.hpp"
 #include "bithorde.pb.h"
 #include "../lib/threadpool.hpp"
 
 namespace bithorded {
+	namespace source {
 
-typedef google::protobuf::RepeatedPtrField< bithorde::Identifier > BitHordeIds;
-
-class LinkedAssetStore
+class Store
 {
 	ThreadPool _threadPool;
 	boost::asio::io_service& _ioSvc;
@@ -42,7 +41,7 @@ class LinkedAssetStore
 public:
 	typedef boost::function< void ( SourceAsset::Ptr )> ResultHandler;
 	
-	LinkedAssetStore(boost::asio::io_service& ioSvc, const boost::filesystem::path& baseDir);
+	Store(boost::asio::io_service& ioSvc, const boost::filesystem::path& baseDir);
 
 	/**
 	 * Add an asset to the idx, creating a hash in the background. When hashing is done,
@@ -63,8 +62,9 @@ public:
 
 private:
 	SourceAsset::Ptr _openTiger(const std::string& tigerId);
-	void _addAsset( bithorded::SourceAsset::Ptr& asset, bithorded::LinkedAssetStore::ResultHandler upstream);
+	void _addAsset( SourceAsset::Ptr& asset, Store::ResultHandler upstream);
 };
 
+	}
 }
-#endif // BITHORDED_LINKEDASSETSTORE_HPP
+#endif // BITHORDED_SOURCE_STORE_HPP

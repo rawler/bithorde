@@ -15,13 +15,14 @@
 */
 
 
-#include "sourceasset.hpp"
+#include "asset.hpp"
 
 const size_t MAX_CHUNK = 64*1024;
 
 using namespace std;
 
 using namespace bithorded;
+using namespace bithorded::source;
 
 SourceAsset::SourceAsset(const boost::filesystem3::path& metaFolder) :
 	_metaFolder(metaFolder),

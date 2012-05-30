@@ -15,13 +15,13 @@
 */
 
 
-#ifndef BITHORDED_ASSET_H
-#define BITHORDED_ASSET_H
+#ifndef BITHORDED_SOURCE_ASSET_H
+#define BITHORDED_SOURCE_ASSET_H
 
 #include <boost/filesystem/path.hpp>
 #include <boost/shared_ptr.hpp>
 
-#include "assetmeta.hpp"
+#include "../store/assetmeta.hpp"
 
 #include "../server/asset.hpp"
 #include "../lib/hashtree.hpp"
@@ -30,6 +30,7 @@
 #include "bithorde.pb.h"
 
 namespace bithorded {
+	namespace source {
 
 class SourceAsset : public Asset
 {
@@ -95,8 +96,6 @@ private:
 	Hasher _hasher;
 };
 
-// Empty dummy Asset::Ptr, for cases when a null Ptr& is needed.
-static Asset::Ptr ASSET_NONE;
-
+	}
 }
-#endif // BITHORDED_ASSET_H
+#endif // BITHORDED_SOURCE_ASSET_H
