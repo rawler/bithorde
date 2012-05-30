@@ -53,7 +53,7 @@ public:
 	void onConnected(const bithorded::Client::Ptr& client);
 	void onDisconnected(const bithorded::Client::Ptr& client);
 
-	bithorded::Asset::Ptr findAsset(const bithorde::BindRead& req);
+	bithorded::IAsset::Ptr findAsset(const bithorde::BindRead& req);
 };
 
 }}

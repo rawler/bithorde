@@ -30,7 +30,7 @@ class Server;
 class Client : public bithorde::Client, public boost::enable_shared_from_this<Client>
 {
 	Server& _server;
-	std::vector< Asset::Ptr > _assets;
+	std::vector< IAsset::Ptr > _assets;
 public:
 	typedef boost::shared_ptr<Client> Ptr;
 	typedef boost::weak_ptr<Client> WeakPtr;
@@ -49,12 +49,12 @@ protected:
 
 private:
 	void informAssetStatus(bithorde::Asset::Handle h, bithorde::Status s);
-	void informAssetStatusUpdate(bithorde::Asset::Handle h, const bithorded::Asset::WeakPtr& asset);
+	void informAssetStatusUpdate(bithorde::Asset::Handle h, const bithorded::IAsset::WeakPtr& asset);
 	void onReadResponse( const bithorde::Read::Request& req, int64_t offset, const std::string& data);
-	void onLinkHashDone(bithorde::Asset::Handle handle, bithorded::Asset::Ptr a);
-	bool assignAsset(bithorde::Asset::Handle handle, const bithorded::Asset::Ptr& a);
+	void onLinkHashDone(bithorde::Asset::Handle handle, bithorded::IAsset::Ptr a);
+	bool assignAsset(bithorde::Asset::Handle handle, const bithorded::IAsset::Ptr& a);
 	void clearAsset(bithorde::Asset::Handle handle);
-	Asset::Ptr& getAsset(bithorde::Asset::Handle handle);
+	IAsset::Ptr& getAsset(bithorde::Asset::Handle handle);
 };
 
 }

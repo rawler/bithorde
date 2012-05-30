@@ -58,7 +58,7 @@ public:
 	/**
 	 * Finds an asset by bithorde HashId. (Only the tiger-hash is actually used)
 	 */
-	Asset::Ptr findAsset(const BitHordeIds& ids);
+	IAsset::Ptr findAsset(const BitHordeIds& ids);
 
 private:
 	SourceAsset::Ptr _openTiger(const std::string& tigerId);

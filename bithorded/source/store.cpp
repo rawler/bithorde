@@ -171,7 +171,7 @@ LinkStatus validateDataSymlink(const fs::path& path) {
 		return OUTDATED;
 }
 
-void noop(Asset::Ptr) {}
+void noop(IAsset::Ptr) {}
 
 SourceAsset::Ptr openAssetFolder(const fs::path& referrer, const fs::path& assetFolder) {
 	auto assetDataPath = assetFolder/"data";
@@ -217,7 +217,7 @@ SourceAsset::Ptr Store::_openTiger(const std::string& tigerId)
 	return asset;
 }
 
-Asset::Ptr Store::findAsset(const BitHordeIds& ids)
+IAsset::Ptr Store::findAsset(const BitHordeIds& ids)
 {
 	SourceAsset::Ptr asset;
 	for (auto iter=ids.begin(); iter != ids.end(); iter++) {

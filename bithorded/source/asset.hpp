@@ -32,7 +32,7 @@
 namespace bithorded {
 	namespace source {
 
-class SourceAsset : public Asset
+class SourceAsset : public IAsset
 {
 public:
 	typedef HashTree<TigerNode, AssetMeta> Hasher;

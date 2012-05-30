@@ -126,7 +126,7 @@ void Router::onDisconnected(const bithorded::Client::Ptr& client)
 		_connectors[peerName] = FriendConnector::create(_server, _friends[peerName]);
 }
 
-bithorded::Asset::Ptr bithorded::router::Router::findAsset(const bithorde::BindRead& req)
+bithorded::IAsset::Ptr bithorded::router::Router::findAsset(const bithorde::BindRead& req)
 {
 	if (_sessionMap.count(req.uuid()))
 		throw BindError(bithorde::WOULD_LOOP);

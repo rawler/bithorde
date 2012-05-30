@@ -28,18 +28,18 @@
 namespace bithorded
 {
 
-class Asset
+class IAsset
 {
 public:
 	typedef boost::function<void(int64_t offset, const std::string& data)> ReadCallback;
 
 	bithorde::Status status;
 	boost::signals2::signal<void(const bithorde::Status&)> statusChange;
-	Asset() : status(bithorde::Status::NONE)
+	IAsset() : status(bithorde::Status::NONE)
 	{}
 
-	typedef boost::shared_ptr<Asset> Ptr;
-	typedef boost::weak_ptr<Asset> WeakPtr;
+	typedef boost::shared_ptr<IAsset> Ptr;
+	typedef boost::weak_ptr<IAsset> WeakPtr;
 
 	virtual void async_read(uint64_t offset, size_t& size, ReadCallback cb) = 0;
 	virtual uint64_t size() = 0;
@@ -51,7 +51,7 @@ protected:
 };
 
 // Empty dummy Asset::Ptr, for cases when a null Ptr& is needed.
-static Asset::Ptr ASSET_NONE;
+static IAsset::Ptr ASSET_NONE;
 
 }
 

@@ -32,10 +32,10 @@ class Router;
 struct PendingRead {
 	uint64_t offset;
 	size_t size;
-	Asset::ReadCallback cb;
+	IAsset::ReadCallback cb;
 };
 
-class ForwardedAsset : public bithorded::Asset
+class ForwardedAsset : public bithorded::IAsset
 {
 	typedef bithorde::ReadAsset UpstreamAsset;
 

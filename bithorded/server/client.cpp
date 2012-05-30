@@ -102,7 +102,7 @@ void Client::onMessage(bithorde::BindRead& msg)
 				return informAssetStatus(h, bithorde::INVALID_HANDLE);
 
 			// Remember to inform peer about changes in asset-status.
-			asset->statusChange.connect(boost::bind(&Client::informAssetStatusUpdate, this, h, Asset::WeakPtr(asset)));
+			asset->statusChange.connect(boost::bind(&Client::informAssetStatusUpdate, this, h, IAsset::WeakPtr(asset)));
 
 			if (asset->status != bithorde::Status::NONE) {
 				// We already have a valid status for the asset, so inform about it
@@ -121,7 +121,7 @@ void Client::onMessage(bithorde::BindRead& msg)
 
 void Client::onMessage(const bithorde::Read::Request& msg)
 {
-	Asset::Ptr& asset = getAsset(msg.handle());
+	IAsset::Ptr& asset = getAsset(msg.handle());
 	if (asset) {
 		uint64_t offset = msg.offset();
 		size_t size = msg.size();
@@ -159,7 +159,7 @@ void Client::informAssetStatus(bithorde::Asset::Handle h, bithorde::Status s)
 	sendMessage(bithorde::Connection::AssetStatus, resp);
 }
 
-void Client::informAssetStatusUpdate(bithorde::Asset::Handle h, const bithorded::Asset::WeakPtr& asset_)
+void Client::informAssetStatusUpdate(bithorde::Asset::Handle h, const bithorded::IAsset::WeakPtr& asset_)
 {
 	bithorde::AssetStatus resp;
 	resp.set_handle(h);
@@ -179,7 +179,7 @@ void Client::informAssetStatusUpdate(bithorde::Asset::Handle h, const bithorded:
 	sendMessage(bithorde::Connection::AssetStatus, resp);
 }
 
-void Client::onLinkHashDone(bithorde::Asset::Handle handle, Asset::Ptr a)
+void Client::onLinkHashDone(bithorde::Asset::Handle handle, IAsset::Ptr a)
 {
 	bithorde::AssetStatus resp;
 	resp.set_handle(handle);
@@ -193,7 +193,7 @@ void Client::onLinkHashDone(bithorde::Asset::Handle handle, Asset::Ptr a)
 	sendMessage(bithorde::Connection::AssetStatus, resp);
 }
 
-bool Client::assignAsset(bithorde::Asset::Handle handle_, const Asset::Ptr& a)
+bool Client::assignAsset(bithorde::Asset::Handle handle_, const IAsset::Ptr& a)
 {
 	size_t handle = handle_;
 	if (handle >= _assets.size()) {
@@ -217,7 +217,7 @@ void Client::clearAsset(bithorde::Asset::Handle handle_)
 		_assets[handle].reset();
 }
 
-Asset::Ptr& Client::getAsset(bithorde::Asset::Handle handle_)
+IAsset::Ptr& Client::getAsset(bithorde::Asset::Handle handle_)
 {
 	size_t handle = handle_;
 	if (handle < _assets.size())
