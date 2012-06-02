@@ -105,7 +105,7 @@ class Client(Connection):
 
         handshake = message.HandShake()
         handshake.name = userName
-        handshake.protoversion = 1
+        handshake.protoversion = 2
         self.writeMsg(handshake)
 
     def onConnected(self):
