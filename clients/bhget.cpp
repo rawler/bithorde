@@ -146,7 +146,7 @@ void BHGet::onStatusUpdate(const bithorde::AssetStatus& status)
 		}
 		break;
 	default:
-		cerr << "Failed ..." << endl;
+		cerr << "Failed (" << bithorde::Status_Name(status.status()) << ") ..." << endl;
 		nextAsset();
 		break;
 	}
