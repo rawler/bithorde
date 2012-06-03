@@ -4,6 +4,7 @@
 #include <map>
 #include <string>
 
+#include <boost/asio/deadline_timer.hpp>
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/local/stream_protocol.hpp>
 #include <boost/bind.hpp>
@@ -16,15 +17,48 @@
 
 namespace bithorde {
 
+class Client;
+
+class AssetBinding {
+	friend class Client;
+
+	Client* _client;
+	Asset* _asset;
+	Asset::Handle _handle;
+	boost::asio::deadline_timer _statusTimer;
+public:
+	AssetBinding(Client* client, Asset* asset, Asset::Handle handle);
+
+	Asset* asset() const;
+
+	/** Returns a valid pointer if current binding is a readasset, otherwise NULL */
+	ReadAsset* readAsset() const;
+
+	operator bool() const { return _asset; }
+	Asset* operator->() const { return _asset; }
+
+	void close();
+private:
+	void setTimer(const boost::posix_time::time_duration& timeout);
+	void clearTimer();
+	void onTimeout(const boost::system::error_code& error);
+};
+
 class Client
 {
+	friend class AssetBinding;
+	friend class Asset;
+	friend class ReadAsset;
+
+	typedef std::unique_ptr<AssetBinding> AssetPtr;
+
 	boost::asio::io_service& _ioSvc;
 	Connection::Pointer _connection;
 
 	std::string _myName;
 	std::string _peerName;
 
-	std::map<Asset::Handle, Asset*> _assetMap;
+	std::map<Asset::Handle, AssetPtr> _assetMap;
 	std::map<int, Asset::Handle> _requestIdMap;
 	CachedAllocator<Asset::Handle> _handleAllocator;
 	CachedAllocator<int> _rpcIdAllocator;
@@ -80,15 +114,13 @@ protected:
 	virtual void onMessage(const bithorde::Ping & msg);
 
 private:
-	friend class Asset;
-	friend class ReadAsset;
 	bool release(Asset & a);
 
 	boost::signals2::scoped_connection _messageConnection;
 	boost::signals2::scoped_connection _writableConnection;
 	boost::signals2::scoped_connection _disconnectedConnection;
 
-	bool informBound(const bithorde::ReadAsset& asset, uint64_t uuid);
+	bool informBound(const bithorde::AssetBinding& asset, uint64_t uuid);
 	int allocRPCRequest(Asset::Handle asset);
 	void releaseRPCRequest(int reqId);
 };

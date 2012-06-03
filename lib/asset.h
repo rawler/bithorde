@@ -18,6 +18,7 @@
 namespace bithorde {
 
 class Client;
+class AssetBinding;
 
 static boost::arg<1> ASSET_ARG_STATUS;
 
@@ -28,6 +29,8 @@ bool idsOverlap(const BitHordeIds& a, const BitHordeIds& b);
 
 class Asset
 {
+	friend class Client;
+	friend class AssetBinding;
 public:
 	typedef boost::shared_ptr<Client> ClientPointer;
 	typedef int Handle;
@@ -50,7 +53,6 @@ protected:
 	Handle _handle;
 	int64_t _size;
 
-	friend class Client;
 	virtual void handleMessage(const bithorde::AssetStatus &msg);
 	virtual void handleMessage(const bithorde::Read::Response &msg) = 0;
 };

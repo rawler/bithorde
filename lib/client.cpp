@@ -1,7 +1,9 @@
 #include "client.h"
 
+#include <boost/asio/placeholders.hpp>
 #include <boost/assert.hpp>
 #include <boost/bind.hpp>
+#include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/xpressive/xpressive.hpp>
 #include <iostream>
@@ -9,13 +11,62 @@
 
 #include "random.h"
 
-#define DEFAULT_ASSET_TIMEOUT 4000
+const static boost::posix_time::millisec DEFAULT_ASSET_TIMEOUT(500);
 
 using namespace std;
 namespace asio = boost::asio;
 namespace xpressive = boost::xpressive;
 
 using namespace bithorde;
+
+AssetBinding::AssetBinding(Client* client, Asset* asset, Asset::Handle handle) :
+	_client(client),
+	_asset(asset),
+	_handle(handle),
+	_statusTimer(client->_ioSvc)
+{
+	setTimer(DEFAULT_ASSET_TIMEOUT*2);
+}
+
+Asset* AssetBinding::asset() const
+{
+	return _asset;
+}
+
+ReadAsset* AssetBinding::readAsset() const
+{
+	return dynamic_cast<ReadAsset*>(_asset);
+}
+
+void AssetBinding::close()
+{
+	_asset = NULL;
+	setTimer(DEFAULT_ASSET_TIMEOUT*2);
+}
+
+void AssetBinding::setTimer(const boost::posix_time::time_duration& timeout)
+{
+	_statusTimer.expires_from_now(timeout);
+	_statusTimer.async_wait(boost::bind(&AssetBinding::onTimeout, this, boost::asio::placeholders::error));
+}
+
+void AssetBinding::clearTimer()
+{
+	_statusTimer.cancel();
+}
+
+void AssetBinding::onTimeout(const boost::system::error_code& error)
+{
+	if (error)
+		return;
+	if (_asset) {
+		bithorde::AssetStatus msg;
+		msg.set_status(bithorde::Status::TIMEOUT);
+		_asset->handleMessage(msg);
+	} else {
+		_client->informBound(*this, rand64());
+	}
+}
 
 Client::Client(asio::io_service& ioSvc, string myName) :
 	_ioSvc(ioSvc),
@@ -70,7 +121,7 @@ void Client::connect(string spec) {
 void Client::onDisconnected() {
 	_connection.reset();
 	for (auto iter=_assetMap.begin(); iter != _assetMap.end(); iter++) {
-		ReadAsset* asset = dynamic_cast<ReadAsset*>(iter->second);
+		ReadAsset* asset = iter->second->readAsset();
 		if (asset) {
 			bithorde::AssetStatus s;
 			s.set_status(bithorde::DISCONNECTED);
@@ -141,9 +192,9 @@ void Client::onMessage(const bithorde::HandShake &msg)
 		// Setup encryption
 	} else {
 		for (auto iter = _assetMap.begin(); iter != _assetMap.end(); iter++) {
-			ReadAsset* asset = dynamic_cast<ReadAsset*>(iter->second);
-			BOOST_ASSERT(iter->second);
-			informBound(*asset, rand64());
+			ReadAsset* asset = iter->second->readAsset();
+			BOOST_ASSERT(asset);
+			informBound(*iter->second, rand64());
 		}
 			
 		authenticated(_peerName);
@@ -157,12 +208,14 @@ void Client::onMessage(bithorde::BindRead & msg) {
 	resp.set_status(ERROR);
 	sendMessage(bithorde::Connection::AssetStatus, resp);
 }
+
 void Client::onMessage(const bithorde::AssetStatus & msg) {
 	if (!msg.has_handle())
 		return;
 	Asset::Handle handle = msg.handle();
 	if (_assetMap.count(handle)) {
-		Asset* a = _assetMap[handle];
+		AssetBinding& a = *_assetMap[handle];
+		a.clearTimer();
 		if (a) {
 			a->handleMessage(msg);
 		} else if (msg.status() != bithorde::Status::SUCCESS) {
@@ -185,12 +238,17 @@ void Client::onMessage(const bithorde::Read::Request & msg) {
 }
 
 void Client::onMessage(const bithorde::Read::Response & msg) {
-	Asset::Handle assetHandle = _requestIdMap[msg.reqid()];
-	if (_assetMap.count(assetHandle)) {
-		Asset* a = _assetMap[assetHandle];
-		a->handleMessage(msg);
+	if (_requestIdMap.count(msg.reqid())) {
+		Asset::Handle assetHandle = _requestIdMap[msg.reqid()];
+		releaseRPCRequest(msg.reqid());
+		if (_assetMap.count(assetHandle)) {
+			Asset* a = _assetMap[assetHandle]->asset();
+			a->handleMessage(msg);
+		} else {
+			cerr << "WARNING: ReadResponse " << msg.reqid() << msg.has_reqid() << " for unmapped handle" << endl;
+		}
 	} else {
-		cerr << "WARNING: ReadResponse " << msg.reqid() << msg.has_reqid() << " for unmapped handle" << endl;
+		cerr << "WARNING: ReadResponse with unknown requestId" << endl;
 	}
 }
 
@@ -225,10 +283,10 @@ bool Client::bind(ReadAsset &asset, uint64_t uuid) {
 		asset._handle = _handleAllocator.allocate();
 		BOOST_ASSERT(asset._handle > 0);
 		BOOST_ASSERT(_assetMap.count(asset._handle) == 0);
-		_assetMap[asset._handle] = &asset;
+		_assetMap[asset._handle].reset(new AssetBinding(this, &asset, asset._handle));
 	}
 
-	return informBound(asset, uuid);
+	return informBound(*_assetMap[asset._handle], uuid);
 }
 
 bool Client::bind(UploadAsset & asset)
@@ -237,7 +295,7 @@ bool Client::bind(UploadAsset & asset)
 	BOOST_ASSERT(asset._handle < 0);
 	BOOST_ASSERT(asset.size() > 0);
 	asset._handle = _handleAllocator.allocate();
-	_assetMap[asset._handle] = &asset;
+	_assetMap[asset._handle].reset(new AssetBinding(this, &asset, asset._handle));
 	bithorde::BindWrite msg;
 	msg.set_handle(asset._handle);
 	msg.set_size(asset.size());
@@ -250,24 +308,22 @@ bool Client::bind(UploadAsset & asset)
 bool Client::release(Asset & asset)
 {
 	BOOST_ASSERT(asset.isBound());
-	bithorde::BindRead msg;
-	msg.set_handle(asset._handle);
-	msg.set_timeout(DEFAULT_ASSET_TIMEOUT);
-	msg.set_uuid(rand64());
+	BOOST_ASSERT(_assetMap[asset._handle]);
 
-	// Leave handle dangling, so it won't be reused until confirmation has been received from the other side.
-	_assetMap[asset._handle] = NULL;
+	auto& binding = *_assetMap[asset._handle];
+
+	// Leave binding dangling, so it won't be reused until confirmation has been received from the other side.
+	binding.close();
 	asset._handle = -1;
 
 	if (_connection)
-		return _connection->sendMessage(Connection::BindRead, msg);
+		return informBound(binding, rand64());
 	else
 		return true; // Since connection is down, other side should not have the bound state as it is.
 }
 
-bool Client::informBound(const ReadAsset& asset, uint64_t uuid)
+bool Client::informBound(const AssetBinding& asset, uint64_t uuid)
 {
-	BOOST_ASSERT(_connection);
 	BOOST_ASSERT(asset._handle >= 0);
 
 	if (!_connection)
@@ -276,9 +332,12 @@ bool Client::informBound(const ReadAsset& asset, uint64_t uuid)
 	bithorde::BindRead msg;
 	msg.set_handle(asset._handle);
 
-	msg.mutable_ids()->CopyFrom(asset.requestIds());
-	msg.set_timeout(DEFAULT_ASSET_TIMEOUT);
+	ReadAsset * readAsset = asset.readAsset();
+	if (readAsset)
+		msg.mutable_ids()->CopyFrom(readAsset->requestIds());
+	msg.set_timeout(DEFAULT_ASSET_TIMEOUT.total_milliseconds());
 	msg.set_uuid(uuid);
+
 	return _connection->sendMessage(Connection::BindRead, msg);
 }
 
@@ -291,6 +350,6 @@ int Client::allocRPCRequest(Asset::Handle asset)
 
 void Client::releaseRPCRequest(int reqId)
 {
-	_requestIdMap.erase(reqId);
-	_rpcIdAllocator.free(reqId);
+	if (_requestIdMap.erase(reqId))
+		_rpcIdAllocator.free(reqId);
 }
