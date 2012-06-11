@@ -128,12 +128,16 @@ void Router::onDisconnected(const bithorded::Client::Ptr& client)
 
 bithorded::IAsset::Ptr bithorded::router::Router::findAsset(const bithorde::BindRead& req)
 {
+	int timeout = req.has_timeout() ? req.timeout()-20 : 500; // TODO: Find actual reasonable time message has been in air. Use DEFAULT_ASSET_TIMEOUT from library.
+	if (timeout <= 0)
+		return bithorded::IAsset::Ptr();
+
 	if (_sessionMap.count(req.uuid()))
 		throw BindError(bithorde::WOULD_LOOP);
 	auto asset = boost::make_shared<ForwardedAsset, Router&, const BitHordeIds&>(*this, req.ids());
 	_sessionMap[req.uuid()] = asset;
 
-	asset->bindUpstreams(_connectedFriends, req.uuid());
+	asset->bindUpstreams(_connectedFriends, req.uuid(), timeout);
 	return asset;
 }
 

@@ -36,7 +36,7 @@ bool bithorded::router::ForwardedAsset::hasUpstream(const std::string peername)
 	return _upstream.count(peername);
 }
 
-void bithorded::router::ForwardedAsset::bindUpstreams(const std::map< string, bithorded::Client::Ptr >& friends, uint64_t uuid)
+void bithorded::router::ForwardedAsset::bindUpstreams(const std::map< string, bithorded::Client::Ptr >& friends, uint64_t uuid, int timeout)
 {
 	BOOST_FOREACH(auto f_, friends) {
 		auto f = f_.second;
@@ -49,7 +49,7 @@ void bithorded::router::ForwardedAsset::bindUpstreams(const std::map< string, bi
 			bithorde::ASSET_ARG_OFFSET, bithorde::ASSET_ARG_DATA, bithorde::ASSET_ARG_TAG));
 		auto& upstream_ = _upstream[peername];
 		upstream_.reset(upstream);
-		f->bind(*upstream_, uuid);
+		f->bind(*upstream_, uuid, timeout);
 	}
 	updateStatus();
 }

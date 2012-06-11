@@ -57,7 +57,7 @@ public:
 	{}
 
 	bool hasUpstream(const std::string peername);
-	void bindUpstreams(const std::map<std::string, Client::Ptr>& friends, uint64_t uuid);
+	void bindUpstreams(const std::map< std::string, bithorded::Client::Ptr >& friends, uint64_t uuid, int timeout);
 
 	virtual size_t can_read(uint64_t offset, size_t size);
 	virtual bool getIds(BitHordeIds& ids);

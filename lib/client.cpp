@@ -25,7 +25,7 @@ AssetBinding::AssetBinding(Client* client, Asset* asset, Asset::Handle handle) :
 	_handle(handle),
 	_statusTimer(client->_ioSvc)
 {
-	setTimer(DEFAULT_ASSET_TIMEOUT*2);
+	setTimer(DEFAULT_ASSET_TIMEOUT*2); // TODO: Get from actual timeout value
 }
 
 Asset* AssetBinding::asset() const
@@ -41,7 +41,7 @@ ReadAsset* AssetBinding::readAsset() const
 void AssetBinding::close()
 {
 	_asset = NULL;
-	setTimer(DEFAULT_ASSET_TIMEOUT*2);
+	setTimer(DEFAULT_ASSET_TIMEOUT*2); // TODO: Get from actual timeout value
 }
 
 void AssetBinding::setTimer(const boost::posix_time::time_duration& timeout)
@@ -64,7 +64,7 @@ void AssetBinding::onTimeout(const boost::system::error_code& error)
 		msg.set_status(bithorde::Status::TIMEOUT);
 		_asset->handleMessage(msg);
 	} else {
-		_client->informBound(*this, rand64());
+		_client->informBound(*this, rand64(), DEFAULT_ASSET_TIMEOUT.total_milliseconds());
 	}
 }
 
@@ -194,7 +194,7 @@ void Client::onMessage(const bithorde::HandShake &msg)
 		for (auto iter = _assetMap.begin(); iter != _assetMap.end(); iter++) {
 			ReadAsset* asset = iter->second->readAsset();
 			BOOST_ASSERT(asset);
-			informBound(*iter->second, rand64());
+			informBound(*iter->second, rand64(), DEFAULT_ASSET_TIMEOUT.total_milliseconds());
 		}
 			
 		authenticated(_peerName);
@@ -273,10 +273,10 @@ void Client::onMessage(const bithorde::Ping & msg) {
 }
 
 bool Client::bind(ReadAsset &asset) {
-	return bind(asset, rand64());
+	return bind(asset, rand64(), DEFAULT_ASSET_TIMEOUT.total_milliseconds());
 }
 
-bool Client::bind(ReadAsset &asset, uint64_t uuid) {
+bool Client::bind(ReadAsset& asset, uint64_t uuid, int timeout) {
 	if (!asset.isBound()) {
 		BOOST_ASSERT(asset._handle < 0);
 		BOOST_ASSERT(asset.requestIds().size() > 0);
@@ -286,7 +286,7 @@ bool Client::bind(ReadAsset &asset, uint64_t uuid) {
 		_assetMap[asset._handle].reset(new AssetBinding(this, &asset, asset._handle));
 	}
 
-	return informBound(*_assetMap[asset._handle], uuid);
+	return informBound(*_assetMap[asset._handle], uuid, timeout);
 }
 
 bool Client::bind(UploadAsset & asset)
@@ -317,12 +317,12 @@ bool Client::release(Asset & asset)
 	asset._handle = -1;
 
 	if (_connection)
-		return informBound(binding, rand64());
+		return informBound(binding, rand64(), DEFAULT_ASSET_TIMEOUT.total_milliseconds());
 	else
 		return true; // Since connection is down, other side should not have the bound state as it is.
 }
 
-bool Client::informBound(const AssetBinding& asset, uint64_t uuid)
+bool Client::informBound(const AssetBinding& asset, uint64_t uuid, int timeout)
 {
 	BOOST_ASSERT(asset._handle >= 0);
 
@@ -335,7 +335,7 @@ bool Client::informBound(const AssetBinding& asset, uint64_t uuid)
 	ReadAsset * readAsset = asset.readAsset();
 	if (readAsset)
 		msg.mutable_ids()->CopyFrom(readAsset->requestIds());
-	msg.set_timeout(DEFAULT_ASSET_TIMEOUT.total_milliseconds());
+	msg.set_timeout(timeout);
 	msg.set_uuid(uuid);
 
 	return _connection->sendMessage(Connection::BindRead, msg);
