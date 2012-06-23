@@ -90,10 +90,21 @@ int BHGet::main(const std::vector<std::string>& args) {
 	return 0;
 }
 
+bool resolvePath(MagnetURI& uri, const std::string &path_) {
+	char pathbuf[PATH_MAX];
+	auto path__ = realpath(path_.c_str(), pathbuf);
+	if (!path__) {
+		return false;
+	} else {
+		boost::filesystem::path p(path__);
+		return uri.parse(p.filename().string());
+	}
+}
+
 bool BHGet::queueAsset(const std::string& _uri) {
 	MagnetURI uri;
-	if (!uri.parse(_uri)) {
-		cerr << "Only magnet-links supported, not '" << _uri << "'" << endl;
+	if (!uri.parse(_uri) && !resolvePath(uri, _uri)) {
+		cerr << "Only magnet-links and symlinks to magnet-links supported, not '" << _uri << "'" << endl;
 		return false;
 	}
 
