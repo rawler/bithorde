@@ -6,10 +6,11 @@
 
 #include <lib/client.h>
 
-static const int ATTR_TIMEOUT = 2;
-static const int INODE_TIMEOUT = 4;
-static const int BLOCK_SIZE = 64*1024;
-static const int REBIND_INTERVAL_MS = 500;
+static const uint ATTR_TIMEOUT = 2;
+static const uint INODE_TIMEOUT = 4;
+static const size_t BLOCK_SIZE = 64*1024;
+static const uint REBIND_INTERVAL_MS = 1000;
+static const uint READ_RETRIES = 5;
 
 using namespace std;
 namespace asio = boost::asio;
@@ -63,13 +64,15 @@ bool INode::fuse_reply_stat(fuse_req_t req) {
 BHReadOperation::BHReadOperation() :
 	req(NULL),
 	off(-1),
-	size(0)
+	size(0),
+	retries(0)
 {}
 
 BHReadOperation::BHReadOperation(fuse_req_t req, off_t off, size_t size) :
 	req(req),
 	off(off),
-	size(size)
+	size(size),
+	retries(0)
 {}
 
 FUSEAsset::FUSEAsset(BHFuse* fs, ino_t ino, boost::shared_ptr< ReadAsset > asset, LookupParams& lookup_params) :
@@ -141,8 +144,7 @@ void FUSEAsset::read(fuse_req_t req, off_t off, size_t size)
 	if (off >= (off_t)this->size) {
 		fuse_reply_buf(req, 0, 0);
 	} else {
-		int tag = asset->aSyncRead(off, size);
-		_readOperations[tag] = BHReadOperation(req, off, size);
+		queueRead(BHReadOperation(req,off,size));
 	}
 }
 
@@ -162,13 +164,12 @@ void FUSEAsset::onStatusChanged(const bithorde::AssetStatus& s)
 	switch (s.status()) {
 	case bithorde::SUCCESS:
 		if (!_connected) {
+			_connected = true;
 			map<off_t, BHReadOperation> oldReads = _readOperations;
 			_readOperations.clear();
 			for (auto iter = oldReads.begin(); iter != oldReads.end(); iter++) {
-				int tag = asset->aSyncRead(iter->second.off, iter->second.size);
-				_readOperations[tag] = iter->second;
+				queueRead(iter->second);
 			}
-			_connected = true;
 		}
 		break;
 	case bithorde::NOTFOUND:
@@ -181,6 +182,20 @@ void FUSEAsset::onStatusChanged(const bithorde::AssetStatus& s)
 	default:
 		_connected = false;
 	}
+}
+
+void FUSEAsset::queueRead(const BHReadOperation& read)
+{
+	int tag = 0;
+	if (_connected) {
+		tag = asset->aSyncRead(read.off, read.size);
+	} else {
+		do {
+			tag++;
+		} while (_readOperations.count(tag)); // Just find a tag to hook it on
+	}
+	auto& op = _readOperations[tag] = read;
+	op.retries++;
 }
 
 void FUSEAsset::tryRebind()
@@ -197,14 +212,23 @@ void FUSEAsset::onDataArrived(uint64_t offset, const std::string& data, int tag)
 	if (_readOperations.count(tag)) {
 		BHReadOperation &op = _readOperations[tag];
 		if (_connected) {
-			if ((off_t)offset == op.off)
-				fuse_reply_buf(op.req, (const char*)data.data(), data.size());
-			else
-				fuse_reply_err(op.req, EIO);
-			_readOperations.erase(tag);
+			if (data.empty()) {
+				BHReadOperation opCopy = op;
+				_readOperations.erase(tag);
+				if (op.retries < READ_RETRIES)
+					queueRead(opCopy);
+				else
+					fuse_reply_err(op.req, EIO);
+			} else {
+				if ((off_t)offset == op.off)
+					fuse_reply_buf(op.req, (const char*)data.data(), data.size());
+				else
+					fuse_reply_err(op.req, EIO);
+				_readOperations.erase(tag);
+			}
 		} // else wait for reconnection
 	} else {
-		(cerr << "ERROR: got response for unknown request").flush();
+		(cerr << "ERROR: got response for unknown request " << tag << endl).flush();
 	}
 }
 

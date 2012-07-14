@@ -49,6 +49,7 @@ struct BHReadOperation {
 	fuse_req_t req;
 	off_t off;
 	size_t size;
+	uint retries;
 
 	BHReadOperation();
 	BHReadOperation(fuse_req_t req, off_t off, size_t size);
@@ -75,6 +76,7 @@ protected:
 private:
 	void onDataArrived(uint64_t offset, const std::string& data, int tag);
 	void onStatusChanged(const bithorde::AssetStatus& s);
+	void queueRead(const BHReadOperation& read);
 	void tryRebind();
 	void closeOne();
 private:
