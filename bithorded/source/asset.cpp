@@ -30,8 +30,7 @@ SourceAsset::SourceAsset(const boost::filesystem3::path& metaFolder) :
 	_metaStore(metaFolder/"meta", _file.blocks(BLOCKSIZE)),
 	_hasher(_metaStore)
 {
-	if (hasRootHash())
-		setStatus(bithorde::SUCCESS);
+	setStatus(bithorde::SUCCESS);
 }
 
 size_t SourceAsset::can_read(uint64_t offset, size_t size)
@@ -118,6 +117,12 @@ uint64_t SourceAsset::size() {
 boost::filesystem3::path SourceAsset::folder()
 {
 	return _metaFolder;
+}
+
+void SourceAsset::updateStatus()
+{
+	if (hasRootHash())
+		setStatus(bithorde::SUCCESS);
 }
 
 void SourceAsset::updateHash(uint64_t offset, uint64_t end)

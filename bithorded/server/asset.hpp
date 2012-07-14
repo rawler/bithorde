@@ -50,6 +50,11 @@ protected:
 	void setStatus(bithorde::Status newStatus);
 };
 
+class IAssetStore
+{
+	IAsset::Ptr findAsset(const BitHordeIds& ids);
+};
+
 // Empty dummy Asset::Ptr, for cases when a null Ptr& is needed.
 static IAsset::Ptr ASSET_NONE;
 

@@ -145,14 +145,14 @@ void Server::clientDisconnected(bithorded::Client::Ptr& client)
 	client.reset();
 }
 
-bool Server::linkAsset(const boost::filesystem3::path& filePath, source::Store::ResultHandler resultHandler)
+IAsset::Ptr Server::async_linkAsset(const boost::filesystem3::path& filePath)
 {
 	for (auto iter=_assetStores.begin(); iter != _assetStores.end(); iter++) {
-		bool res = (*iter)->addAsset(filePath, resultHandler);
+		auto res = (*iter)->addAsset(filePath);
 		if (res)
 			return res;
 	}
-	return false;
+	return ASSET_NONE;
 }
 
 IAsset::Ptr Server::async_findAsset(const bithorde::BindRead& req)

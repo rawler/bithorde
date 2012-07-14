@@ -63,16 +63,15 @@ struct HashTask : public Task {
 	SourceAsset::Ptr asset;
 	asio::io_service& io_svc;
 	asio::io_service::work _work;
-	Store::ResultHandler handler;
 
-	HashTask(SourceAsset::Ptr asset, asio::io_service& io_svc, Store::ResultHandler handler )
-		: asset(asset), io_svc(io_svc), _work(io_svc), handler(handler)
+	HashTask(SourceAsset::Ptr asset, asio::io_service& io_svc)
+		: asset(asset), io_svc(io_svc), _work(io_svc)
 	{}
 	
 	void operator()() {
 		asset->notifyValidRange(0, asset->size());
 
-		io_svc.post(boost::bind(handler, asset));
+		io_svc.post(boost::bind(&SourceAsset::updateStatus, asset));
 		delete this;
 	}
 };
@@ -97,10 +96,10 @@ string random_string(size_t len) {
 	return s;
 }
 
-bool Store::addAsset(const boost::filesystem3::path& file, Store::ResultHandler handler)
+IAsset::Ptr Store::addAsset(const boost::filesystem3::path& file)
 {
 	if (!path_is_in(file, _baseDir)) {
-		return false;
+		return ASSET_NONE;
 	} else {
 		fs::path assetFolder;
 		do {
@@ -111,16 +110,17 @@ bool Store::addAsset(const boost::filesystem3::path& file, Store::ResultHandler 
 		fs::create_symlink(file, assetFolder/"data");
 
 		SourceAsset::Ptr asset = boost::make_shared<SourceAsset>(assetFolder);
-		HashTask* task = new HashTask(asset, _ioSvc, boost::bind(&Store::_addAsset, this, _1, handler));
+		asset->statusChange.connect(boost::bind(&Store::_addAsset, this, asset.get()));
+		HashTask* task = new HashTask(asset, _ioSvc);
 		_threadPool.post(*task);
-		return true;
+		return asset;
 	}
 }
 
-void Store::_addAsset(SourceAsset::Ptr& asset, Store::ResultHandler upstream)
+void Store::_addAsset(SourceAsset* asset)
 {
 	BitHordeIds ids;
-	if (asset.get() && asset->getIds(ids)) {
+	if (asset && asset->getIds(ids)) {
 		const char *data_path = (asset->folder()/"data").c_str();
 		lutimes(data_path, NULL);
 
@@ -135,7 +135,6 @@ void Store::_addAsset(SourceAsset::Ptr& asset, Store::ResultHandler upstream)
 			}
 		}
 	}
-	upstream(asset);
 }
 
 void purgeLink(const fs::path& path) {
@@ -210,7 +209,7 @@ SourceAsset::Ptr Store::_openTiger(const std::string& tigerId)
 			} else {
 				asset.reset();
 				LOG4CPLUS_WARN(storeLog, "Unhashed asset detected, hashing");
-				_threadPool.post(*new HashTask(asset, _ioSvc, boost::bind(&Store::_addAsset, this, _1, &noop)));
+				_threadPool.post(*new HashTask(asset, _ioSvc));
 			}
 		}
 	}

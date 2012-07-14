@@ -64,25 +64,25 @@ void Client::onMessage(const bithorde::HandShake& msg)
 
 void Client::onMessage(const bithorde::BindWrite& msg)
 {
-	bithorde::Asset::Handle h = msg.handle();
-	bithorde::AssetStatus resp;
-	resp.set_handle(h);
 	if (msg.has_linkpath()) {
 		fs::path path(msg.linkpath());
 		if (path.is_absolute()) {
-			if (_server.linkAsset(path, boost::bind(&Client::onLinkHashDone, shared_from_this(), h, _1))) {
+			auto asset = _server.async_linkAsset(path);
+			if (asset) {
 				LOG4CPLUS_INFO(clientLogger, "Linking " << path);
-				resp.set_status(bithorde::SUCCESS);
+				assignAsset(msg.handle(), asset);
 			} else {
 				LOG4CPLUS_ERROR(clientLogger, "Upload did not match any allowed assetStore: " << path);
-				resp.set_status(bithorde::ERROR);
+				informAssetStatus(msg.handle(), bithorde::ERROR);
 			}
+		} else {
+			LOG4CPLUS_ERROR(clientLogger, "Relative links not supported" << path);
+			informAssetStatus(msg.handle(), bithorde::ERROR);
 		}
 	} else {
 		LOG4CPLUS_ERROR(clientLogger, "Sorry, upload isn't supported yet");
-		resp.set_status(bithorde::ERROR);
+		informAssetStatus(msg.handle(), bithorde::ERROR);
 	}
-	sendMessage(bithorde::Connection::AssetStatus, resp);
 }
 
 void Client::onMessage(bithorde::BindRead& msg)
@@ -96,18 +96,10 @@ void Client::onMessage(bithorde::BindRead& msg)
 
 		try {
 			auto asset = _server.async_findAsset(msg);
-			if (!asset)
-				return informAssetStatus(h, bithorde::NOTFOUND);
-			if (!assignAsset(h, asset))
-				return informAssetStatus(h, bithorde::INVALID_HANDLE);
-
-			// Remember to inform peer about changes in asset-status.
-			asset->statusChange.connect(boost::bind(&Client::informAssetStatusUpdate, this, h, IAsset::WeakPtr(asset)));
-
-			if (asset->status != bithorde::Status::NONE) {
-				// We already have a valid status for the asset, so inform about it
-				informAssetStatusUpdate(h, asset);
-			}
+			if (asset)
+				assignAsset(h, asset);
+			else
+				informAssetStatus(h, bithorde::NOTFOUND);
 		} catch (bithorded::BindError e) {
 			informAssetStatus(h, e.status);
 		}
@@ -179,27 +171,13 @@ void Client::informAssetStatusUpdate(bithorde::Asset::Handle h, const bithorded:
 	sendMessage(bithorde::Connection::AssetStatus, resp);
 }
 
-void Client::onLinkHashDone(bithorde::Asset::Handle handle, IAsset::Ptr a)
-{
-	bithorde::AssetStatus resp;
-	resp.set_handle(handle);
-	if (a && a->getIds(*resp.mutable_ids())) {
-		resp.set_status(bithorde::SUCCESS);
-		resp.set_size(a->size());
-	} else {
-		resp.set_status(bithorde::ERROR);
-	}
-	
-	sendMessage(bithorde::Connection::AssetStatus, resp);
-}
-
-bool Client::assignAsset(bithorde::Asset::Handle handle_, const IAsset::Ptr& a)
+bithorde::Status Client::assignAsset(bithorde::Asset::Handle handle_, const IAsset::Ptr& a)
 {
 	size_t handle = handle_;
 	if (handle >= _assets.size()) {
 		if (handle > MAX_ASSETS) {
 			LOG4CPLUS_ERROR(clientLogger, peerName() << ": handle larger than allowed limit (" << handle << " < " << MAX_ASSETS << ")");
-			return false;
+			return bithorde::INVALID_HANDLE;
 		}
 		size_t new_size = _assets.size() + (handle - _assets.size() + 1) * 2;
 		if (new_size > MAX_ASSETS)
@@ -207,14 +185,26 @@ bool Client::assignAsset(bithorde::Asset::Handle handle_, const IAsset::Ptr& a)
 		_assets.resize(new_size);
 	}
 	_assets[handle] = a;
-	return true;
+
+	// Remember to inform peer about changes in asset-status.
+	a->statusChange.connect(boost::bind(&Client::informAssetStatusUpdate, this, handle_, IAsset::WeakPtr(a)));
+
+	if (a->status != bithorde::Status::NONE) {
+		// We already have a valid status for the asset, so inform about it
+		informAssetStatusUpdate(handle_, a);
+	}
+
+	return a->status;
 }
 
 void Client::clearAsset(bithorde::Asset::Handle handle_)
 {
 	size_t handle = handle_;
-	if (handle < _assets.size())
+	if (handle < _assets.size()) {
+		if (auto& a=_assets[handle])
+			a->statusChange.disconnect(boost::bind(&Client::informAssetStatusUpdate, this, handle_, IAsset::WeakPtr(a)));
 		_assets[handle].reset();
+	}
 }
 
 IAsset::Ptr& Client::getAsset(bithorde::Asset::Handle handle_)

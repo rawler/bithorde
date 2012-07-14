@@ -21,8 +21,6 @@ using namespace bithorded;
 
 void IAsset::setStatus(bithorde::Status newStatus)
 {
-	if (newStatus != status) {
-		status = newStatus;
-		statusChange(newStatus);
-	}
+	status = newStatus;
+	statusChange(newStatus);
 }

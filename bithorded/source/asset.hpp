@@ -87,6 +87,11 @@ public:
 	 * Get the path to the folder containing file data + metadata
 	 */
 	boost::filesystem::path folder();
+
+	/**
+	 * Checks current status, possibly changing it if necessary
+	 */
+	void updateStatus();
 private:
 	void updateHash(uint64_t offset, uint64_t end);
 

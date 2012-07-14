@@ -51,8 +51,7 @@ private:
 	void informAssetStatus(bithorde::Asset::Handle h, bithorde::Status s);
 	void informAssetStatusUpdate(bithorde::Asset::Handle h, const bithorded::IAsset::WeakPtr& asset);
 	void onReadResponse( const bithorde::Read::Request& req, int64_t offset, const std::string& data);
-	void onLinkHashDone(bithorde::Asset::Handle handle, bithorded::IAsset::Ptr a);
-	bool assignAsset(bithorde::Asset::Handle handle, const bithorded::IAsset::Ptr& a);
+	bithorde::Status assignAsset(bithorde::Asset::Handle handle, const bithorded::IAsset::Ptr& a);
 	void clearAsset(bithorde::Asset::Handle handle);
 	IAsset::Ptr& getAsset(bithorde::Asset::Handle handle);
 };

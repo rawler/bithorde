@@ -39,8 +39,6 @@ class Store
 	boost::filesystem::path _tigerFolder;
 	std::map<std::string, SourceAsset::WeakPtr> _tigerMap;
 public:
-	typedef boost::function< void ( SourceAsset::Ptr )> ResultHandler;
-	
 	Store(boost::asio::io_service& ioSvc, const boost::filesystem::path& baseDir);
 
 	/**
@@ -53,7 +51,7 @@ public:
 	 *
 	 * @returns true if file is within acceptable path, false otherwise
 	 */
-	bool addAsset(const boost::filesystem::path& file, ResultHandler handler);
+	IAsset::Ptr addAsset(const boost::filesystem3::path& file);
 
 	/**
 	 * Finds an asset by bithorde HashId. (Only the tiger-hash is actually used)
@@ -62,7 +60,7 @@ public:
 
 private:
 	SourceAsset::Ptr _openTiger(const std::string& tigerId);
-	void _addAsset( SourceAsset::Ptr& asset, Store::ResultHandler upstream);
+	void _addAsset( bithorded::source::SourceAsset* asset);
 };
 
 	}
