@@ -86,6 +86,7 @@ void ReadAsset::handleMessage(const bithorde::Read::Response &msg) {
 		string nil;
 		dataArrived(msg.offset(), nil, msg.reqid());
 	}
+	_client->releaseRPCRequest(msg.reqid());
 }
 
 int ReadAsset::aSyncRead(uint64_t offset, ssize_t size)
