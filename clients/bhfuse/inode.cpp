@@ -156,6 +156,9 @@ void FUSEAsset::fill_stat_t(struct stat &s) {
 
 void FUSEAsset::onStatusChanged(const bithorde::AssetStatus& s)
 {
+	if (fs->debug) {
+		cerr << "BHFUSE:" << nr << ": statusUpdate " << bithorde::Status_Name(s.status()) << endl;
+	}
 	switch (s.status()) {
 	case bithorde::SUCCESS:
 		if (!_connected) {

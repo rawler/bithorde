@@ -64,6 +64,10 @@ public:
 	***********************************************************************************/
 	virtual int fuse_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, fuse_file_info *fi) = 0;
 
+	/************************************************************************************
+	 * Is filesystem running in debug-mode?
+	 ***********************************************************************************/
+	bool debug;
 private:
 	/************************************************************************************
 		* Read one instruction on Fuse Socket, and dispatch to handler.

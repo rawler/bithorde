@@ -78,6 +78,7 @@ BoostAsioFilesystem::BoostAsioFilesystem(asio::io_service & ioSvc, BoostAsioFile
 {
 	vector<string> opts;
 	options.format_ll_opts(opts);
+	debug = options.debug;
 
 	uint16_t argc = opts.size();
 	char** argv = (char**)malloc(argc * sizeof(char*));
