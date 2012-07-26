@@ -5,7 +5,7 @@
 #include <boost/bind.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/lexical_cast.hpp>
-#include <boost/xpressive/xpressive.hpp>
+#include <boost/regex.hpp>
 #include <iostream>
 #include <string.h>
 
@@ -15,7 +15,6 @@ const static boost::posix_time::millisec DEFAULT_ASSET_TIMEOUT(500);
 
 using namespace std;
 namespace asio = boost::asio;
-namespace xpressive = boost::xpressive;
 
 using namespace bithorde;
 
@@ -100,12 +99,12 @@ void Client::connect(asio::local::stream_protocol::endpoint& ep) {
 }
 
 void Client::connect(string spec) {
-	xpressive::sregex host_port_regex = xpressive::sregex::compile("(\\w+):(\\d+)");
-	xpressive::smatch res;
+	static const boost::regex host_port_regex("(\\w+):(\\d+)");
+        boost::smatch res;
 	if (spec[0] == '/') {
 		asio::local::stream_protocol::endpoint ep(spec);
 		connect(ep);
-	} else if (xpressive::regex_match(spec, res, host_port_regex)) {
+	} else if (boost::regex_match(spec, res, host_port_regex)) {
 		asio::ip::tcp::resolver resolver(_ioSvc);
 		asio::ip::tcp::resolver::query q(res[1], res[2]);
 		asio::ip::tcp::resolver::iterator iter = resolver.resolve(q);
