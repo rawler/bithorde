@@ -214,7 +214,7 @@ bool Connection::sendMessage(Connection::MessageType type, const::google::protob
 }
 
 void Connection::onWritten(const boost::system::error_code& err, size_t written) {
-	if ((!err) && (written >= 0)) {
+	if ((!err) && (written > 0)) {
 		_sendBuf.pop(written);
 		trySend();
 		if (_sendBuf.size < SEND_BUF_LOW_WATER_MARK)
