@@ -1,10 +1,8 @@
 
-IF(${PROTOBUF_FOUND})
-	WRAP_PROTO_CPP(BITHORDE_PROTO ${CMAKE_SOURCE_DIR}/bithorde.proto)
-ENDIF(${PROTOBUF_FOUND})
+PROTOBUF_GENERATE_CPP(PROTO_SRCS PROTO_HDRS ${CMAKE_SOURCE_DIR}/bithorde.proto)
 
 ADD_LIBRARY(bithorde
-	${BITHORDE_PROTO}
+	${PROTO_HDRS} ${PROTO_SRCS}
 	allocator.h
 	asset.h asset.cpp
 	bithorde.h
@@ -18,7 +16,7 @@ ADD_LIBRARY(bithorde
 )
 
 TARGET_LINK_LIBRARIES(bithorde
-	${PROTOBUF_LIBRARY}
+	${PROTOBUF_LIBRARIES}
 	${Boost_LIBRARIES}
 
 	pthread

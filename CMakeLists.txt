@@ -59,10 +59,9 @@ endif()
 
 INCLUDE_DIRECTORIES (${CMAKE_SOURCE_DIR})
 
-# Generate Protocol-buffer sources
-SET(PROTOBUF_REQUIRE_CPP TRUE)
-FIND_PACKAGE(ProtocolBuffers REQUIRED)
-INCLUDE_DIRECTORIES (${PROTOC_OUT_DIR}) # For generated protobuf headers.
+# Setup protocol buffers
+FIND_PACKAGE(Protobuf REQUIRED)
+INCLUDE_DIRECTORIES(${PROTOBUF_INCLUDE_DIRS} ${CMAKE_BINARY_DIR}/lib)
 
 # Setup the logging package
 FIND_PACKAGE(Log4cplus REQUIRED)
