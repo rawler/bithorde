@@ -14,7 +14,7 @@ public:
 	BHFuse(boost::asio::io_service & ioSvc, std::string bithorded, BoostAsioFilesystem_Options & opts);
 
 	virtual int fuse_lookup(fuse_req_t req, fuse_ino_t parent, const char *name);
-	virtual void fuse_forget(fuse_ino_t ino, ulong nlookup);
+	virtual void fuse_forget(fuse_ino_t ino, u_long nlookup);
 	virtual int fuse_getattr(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi);
 	virtual int fuse_open(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi);
 	virtual int fuse_release(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi);

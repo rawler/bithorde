@@ -42,7 +42,7 @@ public:
 	/************************************************************************************
 	* FUSE-hook informing that an INode may be forgotten
 	***********************************************************************************/
-	virtual void fuse_forget(fuse_ino_t ino, ulong nlookup) = 0;
+	virtual void fuse_forget(fuse_ino_t ino, u_long nlookup) = 0;
 
 	/************************************************************************************
 	* FUSE-hook for fetching attributes of an INode

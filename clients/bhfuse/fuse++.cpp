@@ -21,7 +21,7 @@ extern "C" {
         if (res)
             fuse_reply_err(req, res);
     }
-    static void _op_forget(fuse_req_t req, fuse_ino_t ino, ulong nlookup) {
+    static void _op_forget(fuse_req_t req, fuse_ino_t ino, u_long nlookup) {
         ((BoostAsioFilesystem*)fuse_req_userdata(req))->fuse_forget(ino, nlookup);
         fuse_reply_none(req);
     }

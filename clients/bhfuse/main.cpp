@@ -140,7 +140,7 @@ int BHFuse::fuse_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
 	}
 }
 
-void BHFuse::fuse_forget(fuse_ino_t ino, ulong nlookup) {
+void BHFuse::fuse_forget(fuse_ino_t ino, u_long nlookup) {
 	unrefInode(ino, nlookup);
 }
 
