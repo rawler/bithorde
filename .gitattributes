@@ -1,0 +1,12 @@
+# Define files by extension where git will normalize line-endings.
+*.txt	text
+*.py	text
+*.cpp	text
+*.h	text
+*.hpp	text
+*.config	text
+*.cmake	text
+*.in	text
+README	text
+LICENSE	text
+
