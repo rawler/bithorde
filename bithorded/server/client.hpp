@@ -39,8 +39,12 @@ public:
 	}
 	bool requestsAsset(const BitHordeIds& ids);
 
+	~Client() { clearAssets(); }
+
 protected:
 	Client(Server& server);
+
+	virtual void onDisconnected();
 
 	virtual void onMessage(const bithorde::HandShake& msg);
 	virtual void onMessage(const bithorde::BindWrite& msg);
@@ -52,6 +56,7 @@ private:
 	void informAssetStatusUpdate(bithorde::Asset::Handle h, const bithorded::IAsset::WeakPtr& asset);
 	void onReadResponse( const bithorde::Read::Request& req, int64_t offset, const std::string& data);
 	bithorde::Status assignAsset(bithorde::Asset::Handle handle, const bithorded::IAsset::Ptr& a);
+	void clearAssets();
 	void clearAsset(bithorde::Asset::Handle handle);
 	IAsset::Ptr& getAsset(bithorde::Asset::Handle handle);
 };

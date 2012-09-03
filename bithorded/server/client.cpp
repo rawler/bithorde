@@ -197,6 +197,19 @@ bithorde::Status Client::assignAsset(bithorde::Asset::Handle handle_, const IAss
 	return a->status;
 }
 
+void Client::onDisconnected()
+{
+	clearAssets();
+	bithorde::Client::onDisconnected();
+}
+
+void Client::clearAssets()
+{
+	for (size_t h=0; h < _assets.size(); h++)
+		clearAsset(h);
+	_assets.clear();
+}
+
 void Client::clearAsset(bithorde::Asset::Handle handle_)
 {
 	size_t handle = handle_;

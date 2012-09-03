@@ -100,7 +100,7 @@ protected:
 
 	void sayHello();
 
-	void onDisconnected();
+	virtual void onDisconnected();
 	void onIncomingMessage(Connection::MessageType type, ::google::protobuf::Message& msg);
 
 	virtual void onMessage(const bithorde::HandShake & msg);
