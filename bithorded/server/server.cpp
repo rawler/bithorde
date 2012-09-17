@@ -22,11 +22,12 @@
 #include <boost/make_shared.hpp>
 #include <iostream>
 
-#include "client.hpp"
-#include "config.hpp"
-
 #include <log4cplus/logger.h>
 #include <log4cplus/loggingmacros.h>
+
+#include "buildconf.hpp"
+#include "client.hpp"
+#include "config.hpp"
 
 using namespace std;
 
@@ -79,6 +80,8 @@ Server::Server(asio::io_service& ioSvc, Config& cfg) :
 		
 		waitForLocalConnection();
 	}
+
+	LOG4CPLUS_INFO(serverLog, "Server started, version " << bithorde::build_version);
 }
 
 asio::io_service& Server::ioService()
