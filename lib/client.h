@@ -28,6 +28,7 @@ class AssetBinding {
 	boost::asio::deadline_timer _statusTimer;
 public:
 	AssetBinding(Client* client, Asset* asset, Asset::Handle handle);
+	virtual ~AssetBinding();
 
 	Asset* asset() const;
 

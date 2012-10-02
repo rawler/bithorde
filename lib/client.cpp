@@ -27,6 +27,11 @@ AssetBinding::AssetBinding(Client* client, Asset* asset, Asset::Handle handle) :
 	setTimer(DEFAULT_ASSET_TIMEOUT*2); // TODO: Get from actual timeout value
 }
 
+AssetBinding::~AssetBinding()
+{
+	clearTimer();
+}
+
 Asset* AssetBinding::asset() const
 {
 	return _asset;
