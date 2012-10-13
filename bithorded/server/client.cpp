@@ -157,6 +157,8 @@ void Client::informAssetStatusUpdate(bithorde::Asset::Handle h, const bithorded:
 	resp.set_handle(h);
 
 	if (auto asset = asset_.lock()) {
+		if (asset->status == bithorde::NONE)
+			return;
 		resp.set_status(asset->status);
 		if (asset->status == bithorde::SUCCESS) {
 			resp.set_availability(1000);
