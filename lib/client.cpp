@@ -24,12 +24,6 @@ AssetBinding::AssetBinding(Client* client, Asset* asset, Asset::Handle handle) :
 	_handle(handle),
 	_statusTimer(client->_ioSvc)
 {
-	setTimer(DEFAULT_ASSET_TIMEOUT*2); // TODO: Get from actual timeout value
-}
-
-AssetBinding::~AssetBinding()
-{
-	clearTimer();
 }
 
 Asset* AssetBinding::asset() const
@@ -45,13 +39,13 @@ ReadAsset* AssetBinding::readAsset() const
 void AssetBinding::close()
 {
 	_asset = NULL;
-	setTimer(DEFAULT_ASSET_TIMEOUT*2); // TODO: Get from actual timeout value
+	setTimer(DEFAULT_ASSET_TIMEOUT); // TODO: Get from actual timeout value
 }
 
 void AssetBinding::setTimer(const boost::posix_time::time_duration& timeout)
 {
 	_statusTimer.expires_from_now(timeout);
-	_statusTimer.async_wait(boost::bind(&AssetBinding::onTimeout, this, boost::asio::placeholders::error));
+	_statusTimer.async_wait(boost::bind(&AssetBinding::onTimeout, shared_from_this(), boost::asio::placeholders::error));
 }
 
 void AssetBinding::clearTimer()
@@ -69,6 +63,7 @@ void AssetBinding::onTimeout(const boost::system::error_code& error)
 		_asset->handleMessage(msg);
 	} else {
 		_client->informBound(*this, rand64(), DEFAULT_ASSET_TIMEOUT.total_milliseconds());
+		setTimer(DEFAULT_ASSET_TIMEOUT);
 	}
 }
 
@@ -286,7 +281,9 @@ bool Client::bind(ReadAsset& asset, uint64_t uuid, int timeout) {
 		asset._handle = _handleAllocator.allocate();
 		BOOST_ASSERT(asset._handle > 0);
 		BOOST_ASSERT(_assetMap.count(asset._handle) == 0);
-		_assetMap[asset._handle].reset(new AssetBinding(this, &asset, asset._handle));
+		auto& bind = _assetMap[asset._handle];
+		bind = boost::make_shared<AssetBinding>(this, &asset, asset._handle);
+		bind->setTimer(boost::posix_time::millisec(timeout));
 	}
 
 	return informBound(*_assetMap[asset._handle], uuid, timeout);
@@ -298,7 +295,9 @@ bool Client::bind(UploadAsset & asset)
 	BOOST_ASSERT(asset._handle < 0);
 	BOOST_ASSERT(asset.size() > 0);
 	asset._handle = _handleAllocator.allocate();
-	_assetMap[asset._handle].reset(new AssetBinding(this, &asset, asset._handle));
+	auto& bind = _assetMap[asset._handle];
+	bind = boost::make_shared<AssetBinding>(this, &asset, asset._handle);
+	bind->setTimer(DEFAULT_ASSET_TIMEOUT);
 	bithorde::BindWrite msg;
 	msg.set_handle(asset._handle);
 	msg.set_size(asset.size());
@@ -311,7 +310,7 @@ bool Client::bind(UploadAsset & asset)
 bool Client::release(Asset & asset)
 {
 	BOOST_ASSERT(asset.isBound());
-	BOOST_ASSERT(_assetMap[asset._handle]);
+	BOOST_ASSERT(_assetMap.find(asset._handle) != _assetMap.end());
 
 	auto& binding = *_assetMap[asset._handle];
 

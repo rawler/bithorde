@@ -19,7 +19,7 @@ namespace bithorde {
 
 class Client;
 
-class AssetBinding {
+class AssetBinding : public boost::enable_shared_from_this<AssetBinding> {
 	friend class Client;
 
 	Client* _client;
@@ -28,7 +28,6 @@ class AssetBinding {
 	boost::asio::deadline_timer _statusTimer;
 public:
 	AssetBinding(Client* client, Asset* asset, Asset::Handle handle);
-	virtual ~AssetBinding();
 
 	Asset* asset() const;
 
@@ -51,7 +50,7 @@ class Client
 	friend class Asset;
 	friend class ReadAsset;
 
-	typedef std::unique_ptr<AssetBinding> AssetPtr;
+	typedef boost::shared_ptr<AssetBinding> AssetPtr;
 
 	boost::asio::io_service& _ioSvc;
 	Connection::Pointer _connection;
