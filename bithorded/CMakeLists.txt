@@ -1,22 +1,27 @@
 INCLUDE_DIRECTORIES (${PROTOC_OUT_DIR}) # For generated protobuf headers.
 
 ADD_EXECUTABLE(bithorded
-	lib/threadpool.cpp lib/threadpool.hpp
-	lib/hashtree.cpp lib/hashtree.hpp
-	lib/randomaccessfile.cpp lib/randomaccessfile.hpp
-	lib/treestore.cpp lib/treestore.hpp
 
-	router/asset.cpp router/asset.hpp
-	router/router.cpp router/router.hpp
+	lib/threadpool.cpp
+	lib/hashtree.cpp
+	lib/randomaccessfile.cpp
+	lib/rounding.cpp
+	lib/treestore.cpp
 
-	server/asset.cpp server/asset.hpp
-	server/client.cpp server/client.hpp
-	server/config.cpp server/config.hpp
-	server/server.cpp server/server.hpp
+	router/asset.cpp
+	router/router.cpp
 
-	source/asset.cpp source/asset.hpp
-	source/store.cpp source/store.hpp
-	store/assetmeta.cpp store/assetmeta.hpp
+	server/asset.cpp
+	server/client.cpp
+	server/config.cpp
+	server/server.cpp
+
+	source/asset.cpp
+	source/store.cpp
+
+	store/asset.cpp
+	store/assetmeta.cpp
+	store/assetstore.cpp
 
 	main.cpp
 

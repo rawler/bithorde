@@ -26,7 +26,7 @@
 #include "bithorded/lib/hashtree.hpp"
 #include "lib/types.h"
 
-namespace bithorded {
+namespace bithorded { namespace store {
 
 typedef HashNode<CryptoPP::Tiger> TigerNode;
 
@@ -53,5 +53,5 @@ private:
 	size_t _slice_size;
 };
 
-}
+} }
 #endif // BITHORDED_ASSETMETA_H

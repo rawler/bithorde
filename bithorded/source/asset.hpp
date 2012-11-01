@@ -21,84 +21,31 @@
 #include <boost/filesystem/path.hpp>
 #include <boost/shared_ptr.hpp>
 
-#include "../store/assetmeta.hpp"
-
 #include "../server/asset.hpp"
-#include "../lib/hashtree.hpp"
-#include "../lib/randomaccessfile.hpp"
+#include "../store/asset.hpp"
 
 #include "bithorde.pb.h"
 
 namespace bithorded {
 	namespace source {
 
-class SourceAsset : public IAsset
+class SourceAsset : public store::StoredAsset
 {
 public:
-	typedef HashTree<TigerNode, AssetMeta> Hasher;
 	typedef boost::shared_ptr<SourceAsset> Ptr;
 	typedef boost::weak_ptr<SourceAsset> WeakPtr;
 
 	/**
-	 * All writes must be aligned on this BLOCKSIZE, or the data might be trimmed in the ends.
+	 * The /metaFolder/ is a special control-folder for a single-asset. It has file
+	 *  "data" which is an actual data-file or symlink to the data-file, and
+	 *  "meta" which holds info about blocks indexed, hashtree indexes etc.
 	 */
-	const static int BLOCKSIZE = Hasher::BLOCKSIZE;
-
 	SourceAsset(const boost::filesystem::path& metaFolder);
-
-	/**
-	 * Will read up to /size/ bytes from underlying file, and send to callback.
-	 */
-	virtual void async_read(uint64_t offset, size_t& size, ReadCallback cb);
-
-	/**
-	 * The size of the asset, in bytes
-	 */
-	virtual uint64_t size();
-
-	/**
-	 * Returns the amount readable, starting at /offset/, and up to size.
-	 *
-	 * @return the amount of data available, or null if no data can be read
-	 */
-	virtual size_t can_read(uint64_t offset, size_t size);
-
-	/**
-	 * Notify that given range of the file is available for hashing. Should respect BLOCKSIZE
-	 */
-	void notifyValidRange(uint64_t offset, uint64_t size);
 
 	/**
 	 * Writes up to /size/ from buf into asset, updating amount written in hasher
 	 */
 	size_t write(uint64_t offset, const void* buf, size_t size);
-
-	/**
-	 * Is the root hash known yet?
-	 */
-	bool hasRootHash();
-
-	/**
-	 * Writes the root hash of the asset into /buf/. Buf is assumed to have capacity for Hasher::DIGESTSIZE
-	 */
-	virtual bool getIds(BitHordeIds& ids);
-
-	/**
-	 * Get the path to the folder containing file data + metadata
-	 */
-	boost::filesystem::path folder();
-
-	/**
-	 * Checks current status, possibly changing it if necessary
-	 */
-	void updateStatus();
-private:
-	void updateHash(uint64_t offset, uint64_t end);
-
-	boost::filesystem::path _metaFolder;
-	RandomAccessFile _file;
-	AssetMeta _metaStore;
-	Hasher _hasher;
 };
 
 	}

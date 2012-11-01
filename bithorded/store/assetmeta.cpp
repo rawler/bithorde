@@ -22,7 +22,7 @@
 #include <netinet/in.h>
 
 using namespace std;
-using namespace bithorded;
+using namespace bithorded::store;
 
 const static size_t MAP_PAGE = 1024*1024;
 

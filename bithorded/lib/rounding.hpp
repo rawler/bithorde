@@ -1,5 +1,5 @@
 /*
-    Copyright 2012 Ulrik Mikaelsson <ulrik.mikaelsson@gmail.com>
+    Copyright 2012 <copyright holder> <email>
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -15,21 +15,12 @@
 */
 
 
-#include "asset.hpp"
+#ifndef ROUNDING_HPP
+#define ROUNDING_HPP
 
-using namespace std;
+#include <stdint.h>
 
-using namespace bithorded;
-using namespace bithorded::source;
+uint64_t roundUp(uint64_t val, uint64_t block);
+uint64_t roundDown(uint64_t val, uint64_t block);
 
-SourceAsset::SourceAsset(const boost::filesystem3::path& metaFolder) :
-	StoredAsset(metaFolder)
-{
-	setStatus(bithorde::SUCCESS);
-}
-
-size_t SourceAsset::write(uint64_t offset, const void* buf, size_t size)
-{
-	// TODO
-	return 0;
-}
+#endif // ROUNDING_HPP
