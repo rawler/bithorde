@@ -60,6 +60,9 @@ struct Config
 
 	std::string nodeName;
 
+	std::string cacheDir;
+	int cacheSizeMB;
+
 	uint16_t tcpPort;
 	std::string unixSocket;
 

@@ -32,6 +32,15 @@ StoredAsset::StoredAsset(const boost::filesystem3::path& metaFolder) :
 
 }
 
+StoredAsset::StoredAsset(const boost::filesystem3::path& metaFolder, uint64_t size) :
+	_metaFolder(metaFolder),
+	_file(metaFolder/"data", RandomAccessFile::READWRITE, size),
+	_metaStore(metaFolder/"meta", _file.blocks(BLOCKSIZE)),
+	_hasher(_metaStore)
+{
+
+}
+
 void StoredAsset::async_read(uint64_t offset, size_t& size, bithorded::IAsset::ReadCallback cb)
 {
 	byte buf[MAX_CHUNK];
@@ -88,9 +97,8 @@ bool StoredAsset::hasRootHash()
 void StoredAsset::notifyValidRange(uint64_t offset, uint64_t size)
 {
 	uint64_t filesize = StoredAsset::size();
-
-	offset = roundUp(offset, BLOCKSIZE);
 	uint64_t end = offset + size;
+	offset = roundUp(offset, BLOCKSIZE);
 	if (end != filesize)
 		end = roundDown(end, BLOCKSIZE);
 

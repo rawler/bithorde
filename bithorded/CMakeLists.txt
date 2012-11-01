@@ -1,6 +1,8 @@
 INCLUDE_DIRECTORIES (${PROTOC_OUT_DIR}) # For generated protobuf headers.
 
 ADD_EXECUTABLE(bithorded
+	cache/asset.cpp
+	cache/manager.cpp
 
 	lib/threadpool.cpp
 	lib/hashtree.cpp

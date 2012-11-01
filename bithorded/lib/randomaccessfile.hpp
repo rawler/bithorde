@@ -26,14 +26,13 @@ class RandomAccessFile {
 	int _fd;
 	const boost::filesystem::path _path;
 public:
-	const static size_t WINDOW_SIZE = 65536;
-        enum Mode {
-          READ = 1,
-          WRITE = 2,
-          READWRITE = 3,
-        };
+	enum Mode {
+	READ = 1,
+	WRITE = 2,
+	READWRITE = 3,
+	};
 
-	RandomAccessFile(const boost::filesystem3::path& path, Mode mode=READ);
+	RandomAccessFile(const boost::filesystem3::path& path, RandomAccessFile::Mode mode = READ, uint64_t size = 0);
 	~RandomAccessFile();
 
 	/**
@@ -58,7 +57,7 @@ public:
 	/**
 	 * Writes up to /size/ bytes to file beginning at /offset/.
 	 */
-	ssize_t write(uint64_t offset, void* src, size_t size);
+	ssize_t write(uint64_t offset, const void* src, size_t size);
 
 	/**
 	 * Return the path used to open the file

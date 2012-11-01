@@ -33,7 +33,7 @@ using namespace std;
 namespace asio = boost::asio;
 namespace po = boost::program_options;
 
-po::options_description cmdline_options;
+po::options_description cli_options("Command-Line Options");
 
 class OptionGroup {
 	std::string _name;
@@ -96,7 +96,6 @@ public:
 
 bithorded::Config::Config(int argc, char* argv[])
 {
-	po::options_description cli_options("Command-Line Options");
 	cli_options.add_options()
 		("version,v", "print version string")
 		("help", "produce help message")
@@ -104,8 +103,8 @@ bithorded::Config::Config(int argc, char* argv[])
 			"Path to config-file")
 	;
 
-	po::options_description config_options("Config Options");
-	config_options.add_options()
+	po::options_description server_options("Server Options");
+	server_options.add_options()
 		("server.name", po::value<string>(&nodeName)->default_value(asio::ip::host_name()),
 			"Name of this node, defaults to hostname")
 		("server.tcpPort", po::value<uint16_t>(&tcpPort)->default_value(1337),
@@ -114,16 +113,26 @@ bithorded::Config::Config(int argc, char* argv[])
 			"Path to UNIX-socket to listen on")
 	;
 
-	cmdline_options.add(cli_options).add(config_options);
+	po::options_description cache_options("Cache Options");
+	cache_options.add_options()
+		("cache.dir", po::value<string>(&cacheDir)->default_value("/var/cache/bithorde"),
+			"Directory for the cache. Set to empty to disable.")
+		("cache.size", po::value<int>(&cacheSizeMB)->default_value(1024),
+			"Max size of the cache, in MB.")
+	;
+
+	cli_options.add(server_options).add(cache_options);
 
 	DynamicMap vm;
-	vm.store(po::parse_command_line(argc, argv, cmdline_options));
+	vm.store(po::parse_command_line(argc, argv, cli_options));
 	notify(vm);
 
 	if (vm.count("version"))
 		throw VersionExit();
 
 	if (!configPath.empty()) {
+		po::options_description config_options;
+		config_options.add(server_options).add(cache_options);
 		std::ifstream cfg(configPath);
 		vm.store(po::parse_config_file(cfg, config_options, true));
 		notify(vm);
@@ -155,12 +164,12 @@ bithorded::Config::Config(int argc, char* argv[])
 		friends.push_back(f);
 	}
 
-	if (friends.empty() && sources.empty()) {
+	if (friends.empty() && sources.empty() && cacheDir.empty()) {
 		throw ArgumentError("Needs at least one friend or source root to receive assets.");
 	}
 }
 
 void bithorded::Config::print_usage(ostream& stream)
 {
-	stream << cmdline_options << endl;
+	stream << cli_options << endl;
 }

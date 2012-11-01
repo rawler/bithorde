@@ -28,6 +28,7 @@ namespace bithorded { namespace store {
 typedef HashTree<TigerNode, AssetMeta> Hasher;
 
 class StoredAsset : public IAsset {
+protected:
 	const boost::filesystem::path _assetFolder;
 	boost::filesystem::path _metaFolder;
 	RandomAccessFile _file;
@@ -40,6 +41,7 @@ public:
 	const static int BLOCKSIZE = Hasher::BLOCKSIZE;
 
 	StoredAsset(const boost::filesystem::path& metaFolder);
+	StoredAsset(const boost::filesystem::path& metaFolder, uint64_t size);
 
 	/**
 	 * Will read up to /size/ bytes from underlying file, and send to callback.

@@ -98,7 +98,7 @@ LinkStatus validateData(const fs::path& assetDataPath) {
 
 	const char* c_path = assetDataPath.c_str();
 	if (lstat(c_path, &linkStat) ||
-	    !S_ISLNK(linkStat.st_mode) ||
+	    !(S_ISLNK(linkStat.st_mode) || S_ISREG(linkStat.st_mode)) ||
 	    stat(c_path, &dataStat) ||
 	    !S_ISREG(dataStat.st_mode))
 		return BROKEN;

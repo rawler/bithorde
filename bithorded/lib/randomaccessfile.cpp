@@ -18,23 +18,32 @@
 #include "randomaccessfile.hpp"
 
 #include <boost/assert.hpp>
-#include <boost/filesystem/path.hpp>
+#include <boost/filesystem.hpp>
 #include <fcntl.h>
 #include <ios>
 #include <sys/stat.h>
 
-RandomAccessFile::RandomAccessFile(const boost::filesystem::path& path, RandomAccessFile::Mode mode)
+namespace fs = boost::filesystem;
+
+RandomAccessFile::RandomAccessFile(const boost::filesystem3::path& path, RandomAccessFile::Mode mode, uint64_t size)
 	: _path(path)
 {
-        int m;
-        switch (mode) {
-          case READ: m = O_RDONLY; break;
-          case WRITE: m = O_WRONLY; break;
-          case READWRITE: m = O_RDWR; break;
-        }
-	_fd = open(path.c_str(), m);
+	int m;
+	switch (mode) {
+		case READ: m = O_RDONLY; break;
+		case WRITE: m = O_WRONLY|O_CREAT; break;
+		case READWRITE: m = O_RDWR|O_CREAT; break;
+		default: throw std::ios_base::failure("Unknown open-mode");
+	}
+	if (size > 0 && fs::exists(_path) && fs::file_size(_path) != size) {
+		throw std::ios_base::failure(path.string() + " exists with mismatching size.");
+	}
+
+	_fd = open(path.c_str(), m, S_IRUSR|S_IWUSR);
 	if (_fd < 0)
 		throw std::ios_base::failure("Failed opening "+path.string());
+	else if (size > 0)
+		ftruncate(_fd, size);
 }
 
 RandomAccessFile::~RandomAccessFile()
@@ -58,8 +67,7 @@ uint RandomAccessFile::blocks(size_t blockSize) const
 
 byte* RandomAccessFile::read(uint64_t offset, size_t& size, byte* buf)
 {
-	BOOST_ASSERT( size <= WINDOW_SIZE );
-	ssize_t read = pread64(_fd, buf, size, offset);
+	ssize_t read = pread(_fd, buf, size, offset);
 	if ( read > 0 ) {
 		size = read;
 		return buf;
@@ -69,10 +77,9 @@ byte* RandomAccessFile::read(uint64_t offset, size_t& size, byte* buf)
 	}
 }
 
-ssize_t RandomAccessFile::write(uint64_t offset, void* src, size_t size)
+ssize_t RandomAccessFile::write(uint64_t offset, const void* src, size_t size)
 {
-	BOOST_ASSERT( size <= WINDOW_SIZE );
-	ssize_t written = pwrite64(_fd, src, size, offset);
+	ssize_t written = pwrite(_fd, src, size, offset);
 	if ((size_t)written != size)
 		throw std::ios_base::failure("Failed to write");
 	return written;
