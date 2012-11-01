@@ -67,8 +67,7 @@ void Client::onMessage(const bithorde::BindWrite& msg)
 	if (msg.has_linkpath()) {
 		fs::path path(msg.linkpath());
 		if (path.is_absolute()) {
-			auto asset = _server.async_linkAsset(path);
-			if (asset) {
+			if (auto asset = _server.async_linkAsset(path)) {
 				LOG4CPLUS_INFO(clientLogger, "Linking " << path);
 				assignAsset(msg.handle(), asset);
 			} else {
