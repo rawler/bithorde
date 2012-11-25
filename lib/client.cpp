@@ -241,9 +241,13 @@ void Client::onMessage(const bithorde::Read::Response & msg) {
 		releaseRPCRequest(msg.reqid());
 		if (_assetMap.count(assetHandle)) {
 			Asset* a = _assetMap[assetHandle]->asset();
-			a->handleMessage(msg);
+			if (a) {
+				a->handleMessage(msg);
+			} else {
+				cerr << "WARNING: ReadResponse " << msg.reqid() << " for handle being closed " << assetHandle << endl;
+			}
 		} else {
-			cerr << "WARNING: ReadResponse " << msg.reqid() << msg.has_reqid() << " for unmapped handle" << endl;
+			cerr << "WARNING: ReadResponse " << msg.reqid() << " for unmapped handle " << assetHandle << endl;
 		}
 	} else {
 		cerr << "WARNING: ReadResponse with unknown requestId" << endl;
