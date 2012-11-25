@@ -25,6 +25,7 @@
 
 class Task {
 public:
+	virtual ~Task() {};
 	virtual void operator()() = 0;
 };
 
