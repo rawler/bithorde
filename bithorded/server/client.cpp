@@ -176,7 +176,7 @@ bithorde::Status Client::assignAsset(bithorde::Asset::Handle handle_, const IAss
 {
 	size_t handle = handle_;
 	if (handle >= _assets.size()) {
-		if (handle > MAX_ASSETS) {
+		if (handle >= MAX_ASSETS) {
 			LOG4CPLUS_ERROR(clientLogger, peerName() << ": handle larger than allowed limit (" << handle << " < " << MAX_ASSETS << ")");
 			return bithorde::INVALID_HANDLE;
 		}
