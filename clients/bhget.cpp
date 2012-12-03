@@ -68,11 +68,8 @@ private:
 BHGet::BHGet(po::variables_map& args) :
 	optMyName(args["name"].as<string>()),
 	optQuiet(args.count("quiet")),
-	optConnectUrl(args["url"].as<string>()),
-	_ioSvc(),
-	_asset(NULL)
-{
-}
+	optConnectUrl(args["url"].as<string>())
+{}
 
 int BHGet::main(const std::vector<std::string>& args) {
 	std::vector<std::string>::const_iterator iter;
@@ -120,8 +117,7 @@ bool BHGet::queueAsset(const std::string& _uri) {
 void BHGet::nextAsset() {
 	if (_asset) {
 		_asset->close();
-		delete _asset;
-		_asset = NULL;
+		_asset.reset();
 	}
 
 	BitHordeIds ids;
@@ -135,7 +131,7 @@ void BHGet::nextAsset() {
 		return;
 	}
 
-	_asset = new ReadAsset(_client, ids);
+	_asset.reset(new ReadAsset(_client, ids));
 	_asset->statusUpdate.connect(boost::bind(&BHGet::onStatusUpdate, this, _1));
 	_asset->dataArrived.connect(boost::bind(&BHGet::onDataChunk, this, _1, _2, _3));
 	_client->bind(*_asset);
@@ -149,6 +145,7 @@ void BHGet::onStatusUpdate(const bithorde::AssetStatus& status)
 	switch (status.status()) {
 	case bithorde::SUCCESS:
 		if (status.size() > 0 ) {
+			if (status.handle())
 			cerr << "Downloading ..." << endl;
 			requestMore();
 		} else {

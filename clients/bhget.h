@@ -3,6 +3,7 @@
 #define BHGET_H
 
 #include <list>
+#include <memory>
 #include <string>
 
 #include <boost/asio.hpp>
@@ -22,7 +23,7 @@ class BHGet {
 	std::list<MagnetURI> _assets;
 	bithorde::Client::Pointer _client;
 	boost::asio::io_service _ioSvc;
-	bithorde::ReadAsset * _asset;
+	std::unique_ptr<bithorde::ReadAsset> _asset;
 	uint64_t _currentOffset;
 	OutQueue * _outQueue;
 public:
