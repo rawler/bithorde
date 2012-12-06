@@ -18,6 +18,7 @@
 #include "manager.hpp"
 
 #include <boost/filesystem.hpp>
+#include <ctime>
 
 using namespace bithorded;
 using namespace bithorded::cache;
@@ -26,11 +27,12 @@ namespace fs = boost::filesystem;
 
 CacheManager::CacheManager(boost::asio::io_service& ioSvc,
                            bithorded::router::Router& router,
-                           const boost::filesystem3::path& baseDir, int64_t size) :
+                           const boost::filesystem3::path& baseDir, intmax_t size) :
 	_baseDir(baseDir),
 	_ioSvc(ioSvc),
 	_router(router),
-	_store(baseDir)
+	_store(baseDir),
+	_maxSize(size)
 {
 	if (!baseDir.empty())
 		_store.open();
@@ -59,16 +61,44 @@ IAsset::Ptr CacheManager::findAsset(const BitHordeIds& ids)
 
 IAsset::Ptr CacheManager::prepareUpload(uint64_t size)
 {
-	if (_baseDir.empty()) {
-		return IAsset::Ptr();
-	} else {
+	if ((!_baseDir.empty()) && makeRoom(size)) {
 		fs::path assetFolder(_store.newAssetDir());
 		fs::create_directory(assetFolder);
 
 		auto asset = boost::make_shared<CachedAsset>(assetFolder,size);
 		asset->statusChange.connect(boost::bind(&CacheManager::linkAsset, this, asset.get()));
 		return asset;
+	} else {
+		return IAsset::Ptr();
 	}
+}
+
+bool CacheManager::makeRoom(uint64_t size)
+{
+	while ((_store.size()+size) > _maxSize) {
+		auto looser = pickLooser();
+		if (looser.empty())
+			return false;
+		else
+			_store.removeAsset(looser);
+	}
+	return true;
+}
+
+fs::path CacheManager::pickLooser() {
+	// TODO: update mtime on access (support both FIFO and LRU?)
+	fs::path looser;
+	std::time_t oldest=-1;
+	fs::directory_iterator end;
+	for (auto iter=_store.assetIterator(); iter != end; iter++) {
+		auto age = fs::last_write_time(iter->path());
+		if ((oldest == -1) || (age < oldest)) {
+			oldest = age;
+			looser = iter->path();
+		}
+	}
+
+	return looser;
 }
 
 void CacheManager::linkAsset(CachedAsset* asset)

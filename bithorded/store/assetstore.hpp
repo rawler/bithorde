@@ -19,6 +19,7 @@
 #define BITHORDED_STORE_ASSETSTORE_HPP
 
 #include <boost/filesystem/path.hpp>
+#include <boost/filesystem/operations.hpp>
 
 #include "../../lib/hashes.h"
 
@@ -39,6 +40,22 @@ public:
 
 	boost::filesystem::path resolveIds(const BitHordeIds& ids);
 
+	/**
+	 * Returns iterator allowing iterating over the assets in the store.
+	 */
+	boost::filesystem::directory_iterator assetIterator();
+
+	/**
+	 * Calculates used store-size. Can be smaller than the sum of the file-sizes due to sparse allocation
+	 */
+	uintmax_t size();
+
+	/**
+	 * Returns the "full" size of the asset, that is the size of the asset and it's metadata
+	 */
+	uintmax_t assetFullSize(const boost::filesystem3::path& path);
+
+	static void removeAsset(const boost::filesystem::path& assetPath);
 	static void unlink(const boost::filesystem::path& linkPath);
 	static void unlinkAndRemove(const boost::filesystem::path& linkPath);
 };

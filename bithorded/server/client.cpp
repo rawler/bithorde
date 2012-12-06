@@ -83,7 +83,7 @@ void Client::onMessage(const bithorde::BindWrite& msg)
 			LOG4CPLUS_INFO(clientLogger, "Ready for upload");
 			assignAsset(msg.handle(), asset);
 		} else {
-			informAssetStatus(msg.handle(), bithorde::ERROR);
+			informAssetStatus(msg.handle(), bithorde::NORESOURCES);
 		}
 	}
 }

@@ -52,7 +52,7 @@ Server::Server(asio::io_service& ioSvc, Config& cfg) :
 	_tcpListener(ioSvc),
 	_localListener(ioSvc),
 	_router(*this),
-	_cache(ioSvc, _router, cfg.cacheDir, cfg.cacheSizeMB)
+	_cache(ioSvc, _router, cfg.cacheDir, static_cast<intmax_t>(cfg.cacheSizeMB)*1024*1024)
 {
 	for (auto iter=_cfg.sources.begin(); iter != _cfg.sources.end(); iter++)
 		_assetStores.push_back( unique_ptr<source::Store>(new source::Store(ioSvc, iter->root)) );

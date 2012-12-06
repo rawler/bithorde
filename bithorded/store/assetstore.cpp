@@ -143,6 +143,39 @@ boost::filesystem::path AssetStore::resolveIds(const BitHordeIds& ids)
 	return fs::path();
 }
 
+boost::filesystem3::directory_iterator AssetStore::assetIterator()
+{
+	return fs::directory_iterator(_assetsFolder);
+}
+
+uintmax_t AssetStore::size()
+{
+	uintmax_t res=0;
+	fs::directory_iterator end;
+	for (auto iter=assetIterator(); iter != end; iter++) {
+		res += assetFullSize(iter->path());
+	}
+	return res;
+}
+
+uintmax_t AssetStore::assetFullSize(const boost::filesystem3::path& path)
+{
+	uintmax_t res=0;
+	fs::directory_iterator end;
+	for (fs::directory_iterator iter(path); iter != end; iter++) {
+		res += fs::file_size(iter->path());
+	}
+	return res;
+}
+
+void AssetStore::removeAsset(const boost::filesystem3::path& assetPath)
+{
+	if (fs::is_directory(assetPath)) {
+		LOG4CPLUS_WARN(bithorded::storeLog, "removing asset " << assetPath.filename());
+		fs::remove_all(assetPath);
+	}
+}
+
 void AssetStore::unlink(const fs::path& linkPath)
 {
 	fs::remove(linkPath);
@@ -153,8 +186,8 @@ void AssetStore::unlinkAndRemove(const boost::filesystem3::path& linkPath)
 	boost::system::error_code e;
 	auto asset = fs::read_symlink(linkPath, e);
 	unlink(linkPath);
-	if (!e && fs::is_directory(asset))
-		fs::remove_all(asset);
+	if (!e)
+		removeAsset(asset);
 }
 
 

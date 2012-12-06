@@ -33,9 +33,9 @@ class CacheManager
 	bithorded::router::Router& _router;
 	bithorded::store::AssetStore _store;
 
-	int64_t _maxSize;
+	intmax_t _maxSize;
 public:
-	CacheManager(boost::asio::io_service& ioSvc, bithorded::router::Router& router, const boost::filesystem::path& baseDir, int64_t size);
+	CacheManager(boost::asio::io_service& ioSvc, bithorded::router::Router& router, const boost::filesystem::path& baseDir, intmax_t size);
 
 	/**
 	 * Finds an asset by bithorde HashId. (Only the tiger-hash is actually used)
@@ -52,7 +52,12 @@ public:
 	 */
 	IAsset::Ptr prepareUpload(uint64_t size);
 private:
+	bool makeRoom(uint64_t size);
 	void linkAsset(bithorded::cache::CachedAsset* asset);
+	/**
+	 * Figures out which tiger-id hasn't been accessed recently.
+	 */
+	boost::filesystem::path pickLooser();
 };
 } }
 
