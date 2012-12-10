@@ -24,6 +24,8 @@
 #include <log4cplus/logger.h>
 #include <log4cplus/loggingmacros.h>
 
+#include "../../lib/random.h"
+
 using namespace bithorded::store;
 namespace fs = boost::filesystem;
 using namespace std;
@@ -33,20 +35,6 @@ const fs::path TIGER_DIR = "tiger";
 
 namespace bithorded {
 	log4cplus::Logger storeLog = log4cplus::Logger::getInstance("store");
-}
-
-string random_string(size_t len) {
-	static const char alphanum[] =
-		"0123456789"
-		"ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-		"abcdefghijklmnopqrstuvwxyz";
-
-	string s(len, ' ');
-	for (size_t i = 0; i < len; ++i) {
-		s[i] = alphanum[rand() % (sizeof(alphanum) - 1)];
-	}
-
-	return s;
 }
 
 AssetStore::AssetStore(const boost::filesystem::path& baseDir) :
@@ -61,14 +49,13 @@ void AssetStore::open()
 		fs::create_directories(_assetsFolder);
 	if (!fs::exists(_tigerFolder))
 		fs::create_directories(_tigerFolder);
-	srand(time(NULL));
 }
 
 boost::filesystem::path AssetStore::newAssetDir()
 {
 	fs::path assetFolder;
 	do {
-		assetFolder = _assetsFolder / random_string(20);
+		assetFolder = _assetsFolder / randomAlphaNumeric(20);
 	} while (fs::exists(assetFolder));
 	return assetFolder;
 }
