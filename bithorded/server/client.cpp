@@ -160,7 +160,10 @@ void Client::onReadResponse(const bithorde::Read::Request& req, int64_t offset, 
 	} else {
 		resp.set_status(bithorde::NOTFOUND);
 	}
-	sendMessage(bithorde::Connection::ReadResponse, resp);
+	if (!sendMessage(bithorde::Connection::ReadResponse, resp)) {
+		//TODO: retry
+		LOG4CPLUS_WARN(clientLogger, "Failed to write data chunk, (offset " << offset << ')');
+	}
 }
 
 void Client::informAssetStatus(bithorde::Asset::Handle h, bithorde::Status s)
