@@ -39,6 +39,7 @@ public:
 	virtual ~Asset();
 
 	bool isBound();
+	std::string label();
 	uint64_t size();
 
 	typedef boost::signals2::signal<void (const bithorde::AssetStatus&)> StatusSignal;

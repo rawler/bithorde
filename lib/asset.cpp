@@ -38,6 +38,15 @@ bool Asset::isBound()
 	return _handle >= 0;
 }
 
+string Asset::label()
+{
+	ostringstream buf;
+	if (_client)
+		buf << _client->_peerName;
+	buf << ':' << _handle;
+	return buf.str();
+}
+
 void Asset::close()
 {
 	BOOST_ASSERT(_client && isBound());
