@@ -1,0 +1,54 @@
+#!/bin/bash
+#
+# Copyright (C) 2009-2010 Ulrik Mikaelsson. All rights reserved
+#
+#   License:
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+cd $(dirname $0)
+
+source ../common.sh
+TESTFILE=testfile
+TESTSIZE=4
+
+function clean() {
+    rm -rf cache? *.log "$TESTFILE"{,.new}
+}
+
+function setup() {
+    mkdir cachea cacheb
+}
+
+clean && setup || exit_error "Failed setup"
+
+echo "Starting up Nodes..."
+trap stop_children EXIT
+bithorded_start a && DAEMON1=$DAEMONPID
+bithorded_start b && DAEMON2=$DAEMONPID
+
+echo "Preparing testfile..."
+create_testfile $TESTFILE $TESTSIZE
+
+echo "Uploading to A..."
+MAGNETURL=$("$BHUPLOAD" -u/tmp/bithorde-rta "$TESTFILE"|grep '^magnet:')
+verify_equal cachea/assets/?????*/data "$TESTFILE" || exit_error "Uploaded file did not match upload source"
+VERIFICATION=$("$BHUPLOAD" -u/tmp/bithorde-rta "$TESTFILE"|grep '^magnet:')
+[ "$MAGNETURL" == "$VERIFICATION" ] || exit_error "Re-upload with different magnet-link".
+
+echo "Getting (2 in parallel) from B..."
+"$BHGET" -nbhget1 -u/tmp/bithorde-rtb "$MAGNETURL" | verify_equal $TESTFILE & DL1=$!
+"$BHGET" -nbhget2 -u/tmp/bithorde-rtb "$MAGNETURL" | verify_equal $TESTFILE & DL2=$!
+wait $DL1 || exit_error "Download 1 file did not match upload source"
+wait $DL2 || exit_error "Download 2 file did not match upload source"
+
+exit_success
