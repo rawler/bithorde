@@ -120,7 +120,8 @@ void Client::onMessage(const bithorde::Read::Request& msg)
 			size = MAX_CHUNK;
 
 		// Raw pointer to this should be fine here, since asset has ownership of this. (Through member Ptr client)
-		asset->async_read(offset, size, boost::bind(&Client::onReadResponse, this, msg, _1, _2));
+		auto onComplete = boost::bind(&Client::onReadResponse, this, msg, _1, _2, bithorde::Message::in(msg.timeout()));
+		asset->async_read(offset, size, onComplete);
 	} else {
 		bithorde::Read::Response resp;
 		resp.set_reqid(msg.reqid());
@@ -129,7 +130,7 @@ void Client::onMessage(const bithorde::Read::Request& msg)
 	}
 }
 
-void Client::onReadResponse(const bithorde::Read::Request& req, int64_t offset, const std::string& data) {
+void Client::onReadResponse(const bithorde::Read::Request& req, int64_t offset, const std::string& data, bithorde::Message::Deadline t) {
 	bithorde::Read::Response resp;
 	resp.set_reqid(req.reqid());
 	if ((offset >= 0) && (data.size() > 0)) {
@@ -139,7 +140,9 @@ void Client::onReadResponse(const bithorde::Read::Request& req, int64_t offset, 
 	} else {
 		resp.set_status(bithorde::NOTFOUND);
 	}
-	sendMessage(bithorde::Connection::ReadResponse, resp);
+	if (!sendMessage(bithorde::Connection::ReadResponse, resp, t)) {
+		LOG4CPLUS_WARN(clientLogger, "Failed to write data chunk, (offset " << offset << ')');
+	}
 }
 
 void Client::informAssetStatus(bithorde::Asset::Handle h, bithorde::Status s)
