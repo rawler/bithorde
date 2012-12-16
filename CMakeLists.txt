@@ -62,10 +62,12 @@ ADD_DEFINITIONS(-D_FILE_OFFSET_BITS=64)
 set(Boost_USE_STATIC_LIBS        ON)
 set(Boost_USE_MULTITHREADED      ON)
 set(Boost_USE_STATIC_RUNTIME    OFF)
-find_package( Boost REQUIRED COMPONENTS filesystem iostreams program_options regex signals system thread unit_test_framework )
+find_package( Boost REQUIRED COMPONENTS chrono filesystem iostreams program_options regex signals system thread unit_test_framework )
 if(Boost_FOUND)
 	include_directories(${Boost_INCLUDE_DIRS})
+	find_library(Boost_LIBRARY_DEPENDENCIES rt)
 endif()
+
 
 INCLUDE_DIRECTORIES (${CMAKE_SOURCE_DIR})
 

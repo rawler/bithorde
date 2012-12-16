@@ -55,7 +55,7 @@ protected:
 private:
 	void informAssetStatus(bithorde::Asset::Handle h, bithorde::Status s);
 	void informAssetStatusUpdate(bithorde::Asset::Handle h, const bithorded::IAsset::WeakPtr& asset);
-	void onReadResponse( const bithorde::Read::Request& req, int64_t offset, const std::string& data);
+	void onReadResponse( const bithorde::Read::Request& req, int64_t offset, const std::string& data, bithorde::Message::Deadline t);
 	bithorde::Status assignAsset(bithorde::Asset::Handle handle, const bithorded::IAsset::Ptr& a);
 	void clearAssets();
 	void clearAsset(bithorde::Asset::Handle handle);
