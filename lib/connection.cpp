@@ -10,13 +10,16 @@
 #include <google/protobuf/io/coded_stream.h>
 #include <google/protobuf/io/zero_copy_stream_impl.h>
 
-const size_t MAX_MSG = 256*1024;
+const size_t K = 1024;
+const size_t M = 1024*K;
+const size_t MAX_MSG = 256*K;
 const size_t READ_BLOCK = MAX_MSG*2;
-const size_t SEND_BUF = 1024*1024;
-const size_t SEND_BUF_EMERGENCY = 2*SEND_BUF;
-const size_t SEND_BUF_LOW_WATER_MARK = MAX_MSG;
+const size_t SEND_BUF = 16*M;
+const size_t SEND_BUF_EMERGENCY = 18*M;
+const size_t SEND_BUF_LOW_WATER_MARK = 2*MAX_MSG;
 
 namespace asio = boost::asio;
+namespace chrono = boost::chrono;
 using namespace std;
 
 using namespace bithorde;
@@ -45,8 +48,9 @@ public:
 	}
 
 	void trySend() {
-		if (_sendBuf.size) {
-			_socket->async_write_some(asio::buffer(_sendBuf.ptr, _sendBuf.size),
+		auto buf = _sndQueue.firstMessage();
+		if (buf.size() > 0) {
+			_socket->async_write_some(asio::buffer(buf),
 				boost::bind(&Connection::onWritten, shared_from_this(),
 							asio::placeholders::error, asio::placeholders::bytes_transferred)
 			);
@@ -69,11 +73,66 @@ public:
 	}
 };
 
+Message::Deadline Message::NEVER(Message::Deadline::max());
+Message::Deadline Message::in(int msec)
+{
+	return Clock::now()+chrono::milliseconds(msec);
+}
+
+
+std::string MessageQueue::_empty;
+
+bool MessageQueue::empty() const
+{
+	return _queue.empty();
+}
+
+string& MessageQueue::enqueue(const Message::Deadline& expires)
+{
+	_queue.push_back(Message());
+	auto& newMsg = _queue.back();
+	newMsg.expires = expires;
+	return newMsg.buf;
+}
+
+const string& MessageQueue::firstMessage()
+{
+	auto now = chrono::steady_clock::now();
+	while (_queue.size() && _queue.front().expires < now) {
+		_queue.pop_front();
+	}
+	if (_queue.size()) {
+		_queue.front().expires = chrono::steady_clock::time_point::max();
+		return _queue.front().buf;
+	} else {
+		return _empty;
+	}
+}
+
+void MessageQueue::pop(size_t amount)
+{
+	BOOST_ASSERT(_queue.size() > 0);
+	auto& msg = _queue.front();
+	BOOST_ASSERT(amount <= msg.buf.size());
+	if (amount == msg.buf.size())
+		_queue.pop_front();
+	else
+		msg.buf = msg.buf.substr(amount);
+}
+
+size_t MessageQueue::size() const
+{
+	size_t res = 0;
+	for (auto iter=_queue.begin(); iter != _queue.end(); iter++) {
+		res += iter->buf.size();
+	}
+	return res;
+}
+
 Connection::Connection(asio::io_service & ioSvc) :
 	_state(Connected),
 	_ioSvc(ioSvc)
 {
-	_sendBuf.allocate(SEND_BUF_EMERGENCY); // Prepare so we don't have to move it later during async send.
 }
 
 Connection::Pointer Connection::create(asio::io_service& ioSvc, const boost::asio::ip::tcp::endpoint& addr)  {
@@ -183,41 +242,35 @@ bool Connection::dequeue(MessageType type, ::google::protobuf::io::CodedInputStr
 	return res;
 }
 
-bool Connection::encode(Connection::MessageType type, const google::protobuf::Message &msg) {
-	byte* buf = _sendBuf.allocate(MAX_MSG);
-	::google::protobuf::io::ArrayOutputStream of(buf, MAX_MSG);
-	::google::protobuf::io::CodedOutputStream stream(&of);
-	stream.WriteTag(::google::protobuf::internal::WireFormatLite::MakeTag(type, ::google::protobuf::internal::WireFormatLite::WIRETYPE_LENGTH_DELIMITED));
-	stream.WriteVarint32(msg.ByteSize());
-	bool res = msg.SerializeToCodedStream(&stream);
-	if (res)
-		_sendBuf.charge(stream.ByteCount());
-	return res;
-}
-
-bool Connection::sendMessage(Connection::MessageType type, const::google::protobuf::Message &msg, bool prioritized)
+bool Connection::sendMessage(Connection::MessageType type, const google::protobuf::Message& msg, const Message::Deadline& expires, bool prioritized)
 {
 	size_t bufLimit = prioritized ? SEND_BUF_EMERGENCY : SEND_BUF;
-	if (_sendBuf.size > bufLimit)
+	if (_sndQueue.size() > bufLimit)
 		return false;
-	bool prevQueued = _sendBuf.size;
+	bool wasEmpty = _sndQueue.empty();
 
-	bool queued = encode(type, msg);
-	if (queued) {
-		if (!prevQueued)
-			trySend();
-		return true;
-	} else {
-		cerr << "Failed to serialize Message." << endl;
-		return false;
+	// Encode
+	{
+		auto& buf = _sndQueue.enqueue(expires);
+		::google::protobuf::io::StringOutputStream of(&buf);
+		::google::protobuf::io::CodedOutputStream stream(&of);
+		stream.WriteTag(::google::protobuf::internal::WireFormatLite::MakeTag(type, ::google::protobuf::internal::WireFormatLite::WIRETYPE_LENGTH_DELIMITED));
+		stream.WriteVarint32(msg.ByteSize());
+		bool encoded = msg.SerializeToCodedStream(&stream);
+		BOOST_ASSERT(encoded);
 	}
+
+	// Push out at once unless _queued;
+	if (wasEmpty)
+		trySend();
+	return true;
 }
 
 void Connection::onWritten(const boost::system::error_code& err, size_t written) {
 	if ((!err) && (written > 0)) {
-		_sendBuf.pop(written);
+		_sndQueue.pop(written);
 		trySend();
-		if (_sendBuf.size < SEND_BUF_LOW_WATER_MARK)
+		if (_sndQueue.size() < SEND_BUF_LOW_WATER_MARK)
 			writable();
 	} else {
 		cerr << "Failed to write. Disconnecting..." << endl;

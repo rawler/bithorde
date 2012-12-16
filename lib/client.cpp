@@ -39,7 +39,7 @@ ReadAsset* AssetBinding::readAsset() const
 void AssetBinding::close()
 {
 	_asset = NULL;
-	setTimer(DEFAULT_ASSET_TIMEOUT); // TODO: Get from actual timeout value
+	setTimer(DEFAULT_ASSET_TIMEOUT);
 }
 
 void AssetBinding::setTimer(const boost::posix_time::time_duration& timeout)
@@ -143,11 +143,11 @@ const std::string& Client::peerName()
 	return _peerName;
 }
 
-bool Client::sendMessage(Connection::MessageType type, const::google::protobuf::Message &msg)
+bool Client::sendMessage(Connection::MessageType type, const google::protobuf::Message& msg, const Message::Deadline& expires)
 {
 	BOOST_ASSERT(_connection);
 
-	return _connection->sendMessage(type, msg);
+	return _connection->sendMessage(type, msg, expires, false);
 }
 
 void Client::sayHello() {
@@ -155,21 +155,21 @@ void Client::sayHello() {
 	h.set_protoversion(2);
 	h.set_name(_myName);
 
-	sendMessage(Connection::HandShake, h);
+	sendMessage(Connection::MessageType::HandShake, h);
 }
 
 void Client::onIncomingMessage(Connection::MessageType type, ::google::protobuf::Message& msg)
 {
 	switch (type) {
-	case Connection::HandShake: return onMessage((bithorde::HandShake&) msg);
-	case Connection::BindRead: return onMessage((bithorde::BindRead&) msg);
-	case Connection::AssetStatus: return onMessage((bithorde::AssetStatus&) msg);
-	case Connection::ReadRequest: return onMessage((bithorde::Read::Request&) msg);
-	case Connection::ReadResponse: return onMessage((bithorde::Read::Response&) msg);
-	case Connection::BindWrite: return onMessage((bithorde::BindWrite&) msg);
-	case Connection::DataSegment: return onMessage((bithorde::DataSegment&) msg);
-	case Connection::HandShakeConfirmed: return onMessage((bithorde::HandShakeConfirmed&) msg);
-	case Connection::Ping: return onMessage((bithorde::Ping&) msg);
+	case Connection::MessageType::HandShake: return onMessage((bithorde::HandShake&) msg);
+	case Connection::MessageType::BindRead: return onMessage((bithorde::BindRead&) msg);
+	case Connection::MessageType::AssetStatus: return onMessage((bithorde::AssetStatus&) msg);
+	case Connection::MessageType::ReadRequest: return onMessage((bithorde::Read::Request&) msg);
+	case Connection::MessageType::ReadResponse: return onMessage((bithorde::Read::Response&) msg);
+	case Connection::MessageType::BindWrite: return onMessage((bithorde::BindWrite&) msg);
+	case Connection::MessageType::DataSegment: return onMessage((bithorde::DataSegment&) msg);
+	case Connection::MessageType::HandShakeConfirmed: return onMessage((bithorde::HandShakeConfirmed&) msg);
+	case Connection::MessageType::Ping: return onMessage((bithorde::Ping&) msg);
 	}
 }
 
@@ -204,7 +204,7 @@ void Client::onMessage(bithorde::BindRead & msg) {
 	bithorde::AssetStatus resp;
 	resp.set_handle(msg.handle());
 	resp.set_status(ERROR);
-	sendMessage(bithorde::Connection::AssetStatus, resp);
+	sendMessage(Connection::MessageType::AssetStatus, resp);
 }
 
 void Client::onMessage(const bithorde::AssetStatus & msg) {
@@ -232,7 +232,7 @@ void Client::onMessage(const bithorde::Read::Request & msg) {
 	bithorde::Read::Response resp;
 	resp.set_reqid(msg.reqid());
 	resp.set_status(ERROR);
-	sendMessage(bithorde::Connection::ReadResponse, resp);
+	sendMessage(Connection::MessageType::ReadResponse, resp);
 }
 
 void Client::onMessage(const bithorde::Read::Response & msg) {
@@ -259,7 +259,7 @@ void Client::onMessage(const bithorde::BindWrite & msg) {
 	bithorde::AssetStatus resp;
 	resp.set_handle(msg.handle());
 	resp.set_status(ERROR);
-	sendMessage(bithorde::Connection::AssetStatus, resp);
+	sendMessage(Connection::MessageType::AssetStatus, resp);
 }
 void Client::onMessage(const bithorde::DataSegment & msg) {
 	cerr << "unsupported: handling DataSegment-pushes" << endl;
@@ -271,14 +271,14 @@ void Client::onMessage(const bithorde::HandShakeConfirmed & msg) {
 }
 void Client::onMessage(const bithorde::Ping & msg) {
 	bithorde::Ping reply;
-	_connection->sendMessage(Connection::Ping, reply);
+	_connection->sendMessage(Connection::MessageType::Ping, reply, Message::NEVER, false);
 }
 
 bool Client::bind(ReadAsset &asset) {
 	return bind(asset, rand64(), DEFAULT_ASSET_TIMEOUT.total_milliseconds());
 }
 
-bool Client::bind(ReadAsset& asset, uint64_t uuid, int timeout) {
+bool Client::bind(ReadAsset& asset, uint64_t uuid, int timeout_ms) {
 	if (!asset.isBound()) {
 		BOOST_ASSERT(asset._handle < 0);
 		BOOST_ASSERT(asset.requestIds().size() > 0);
@@ -287,10 +287,10 @@ bool Client::bind(ReadAsset& asset, uint64_t uuid, int timeout) {
 		BOOST_ASSERT(_assetMap.count(asset._handle) == 0);
 		auto& bind = _assetMap[asset._handle];
 		bind = boost::make_shared<AssetBinding>(this, &asset, asset._handle);
-		bind->setTimer(boost::posix_time::millisec(timeout));
+		bind->setTimer(boost::posix_time::millisec(timeout_ms));
 	}
 
-	return informBound(*_assetMap[asset._handle], uuid, timeout);
+	return informBound(*_assetMap[asset._handle], uuid, timeout_ms);
 }
 
 bool Client::bind(UploadAsset & asset)
@@ -308,7 +308,7 @@ bool Client::bind(UploadAsset & asset)
 	const auto& link = asset.link();
 	if (!link.empty())
 		msg.set_linkpath(link.string());
-	return _connection->sendMessage(Connection::BindWrite, msg);
+	return _connection->sendMessage(Connection::MessageType::BindWrite, msg, Message::NEVER, false);
 }
 
 bool Client::release(Asset & asset)
@@ -328,7 +328,7 @@ bool Client::release(Asset & asset)
 		return true; // Since connection is down, other side should not have the bound state as it is.
 }
 
-bool Client::informBound(const AssetBinding& asset, uint64_t uuid, int timeout)
+bool Client::informBound(const AssetBinding& asset, uint64_t uuid, int timeout_ms)
 {
 	BOOST_ASSERT(asset._handle >= 0);
 
@@ -341,10 +341,10 @@ bool Client::informBound(const AssetBinding& asset, uint64_t uuid, int timeout)
 	ReadAsset * readAsset = asset.readAsset();
 	if (readAsset)
 		msg.mutable_ids()->CopyFrom(readAsset->requestIds());
-	msg.set_timeout(timeout);
+	msg.set_timeout(timeout_ms);
 	msg.set_uuid(uuid);
 
-	return _connection->sendMessage(Connection::BindRead, msg);
+	return _connection->sendMessage(Connection::MessageType::BindRead, msg, Message::in(timeout_ms), true);
 }
 
 int Client::allocRPCRequest(Asset::Handle asset)

@@ -15,6 +15,7 @@ using namespace std;
 using namespace bithorde;
 
 const static size_t BLOCK_SIZE = (64*1024);
+const static size_t PARALLELL_BLOCKS = (8);
 
 struct OutQueue {
 	typedef pair<uint64_t, string> Chunk;
@@ -162,7 +163,7 @@ void BHGet::onStatusUpdate(const bithorde::AssetStatus& status)
 
 void BHGet::requestMore()
 {
-	while (_currentOffset < (_outQueue->position + (BLOCK_SIZE*10)) &&
+	while (_currentOffset < (_outQueue->position + (BLOCK_SIZE*PARALLELL_BLOCKS)) &&
 		_currentOffset < _asset->size()) {
 		_asset->aSyncRead(_currentOffset, BLOCK_SIZE);
 		_currentOffset += BLOCK_SIZE;

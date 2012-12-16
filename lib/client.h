@@ -86,10 +86,10 @@ public:
 	const std::string& peerName();
 
 	bool bind(ReadAsset & asset);
-	bool bind(ReadAsset & asset, uint64_t uuid, int timeout);
+	bool bind(ReadAsset & asset, uint64_t uuid, int timeout_ms);
 	bool bind(UploadAsset & asset);
 
-	bool sendMessage(Connection::MessageType type, const ::google::protobuf::Message & msg);
+	bool sendMessage(bithorde::Connection::MessageType type, const google::protobuf::Message& msg, const bithorde::Message::Deadline& expires=Message::NEVER );
 
 	boost::signals2::signal<void (std::string&)> authenticated;
 	boost::signals2::signal<void ()> writable;

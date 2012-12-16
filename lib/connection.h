@@ -1,18 +1,40 @@
 #ifndef BITHORDE_CONNECTION_H
 #define BITHORDE_CONNECTION_H
 
-#include <queue>
 
 #include <boost/asio/io_service.hpp>
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/local/stream_protocol.hpp>
+#include <boost/chrono/system_clocks.hpp>
 #include <boost/signals2.hpp>
 #include <boost/smart_ptr/enable_shared_from_this.hpp>
+#include <list>
 
 #include "bithorde.pb.h"
 #include "types.h"
 
 namespace bithorde {
+
+struct Message {
+	typedef boost::chrono::steady_clock Clock;
+	typedef Clock::time_point Deadline;
+	static Deadline NEVER;
+	static Deadline in(int msec);
+	
+	std::string buf; // TODO: test if ostringstream faster
+	boost::chrono::steady_clock::time_point expires;
+};
+
+class MessageQueue {
+	std::list<Message> _queue;
+	static std::string _empty;
+public:
+	bool empty() const;
+	std::string& enqueue(const Message::Deadline& expires);
+	const std::string& firstMessage();
+	void pop(size_t amount);
+	std::size_t size() const;
+};
 
 class Connection
 	: public boost::enable_shared_from_this<Connection>
@@ -49,7 +71,7 @@ public:
 	MessageSignal message;
 	VoidSignal writable;
 
-	bool sendMessage(MessageType type, const ::google::protobuf::Message & msg, bool prioritized=false);
+	bool sendMessage(MessageType type, const ::google::protobuf::Message & msg, const Message::Deadline& expires, bool prioritized);
 
 	virtual void close() = 0;
 
@@ -62,15 +84,13 @@ protected:
 	void onRead(const boost::system::error_code& err, size_t count);
 	void onWritten(const boost::system::error_code& err, size_t count);
 
-	bool encode(Connection::MessageType type, const::google::protobuf::Message &msg);
-
 protected:
 	State _state;
 
 	boost::asio::io_service& _ioSvc;
 
 	Buffer _rcvBuf;
-	Buffer _sendBuf;
+	MessageQueue _sndQueue;
 
 private:
 	template <class T> bool dequeue(MessageType type, ::google::protobuf::io::CodedInputStream &stream);
