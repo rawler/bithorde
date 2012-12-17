@@ -69,10 +69,12 @@ private:
 BHGet::BHGet(po::variables_map& args) :
 	optMyName(args["name"].as<string>()),
 	optQuiet(args.count("quiet")),
-	optConnectUrl(args["url"].as<string>())
+	optConnectUrl(args["url"].as<string>()),
+	_res(0)
 {}
 
 int BHGet::main(const std::vector<std::string>& args) {
+	_res = 0;
 	std::vector<std::string>::const_iterator iter;
 	for (iter = args.begin(); iter != args.end(); iter++) {
 		if (!queueAsset(*iter))
@@ -85,7 +87,7 @@ int BHGet::main(const std::vector<std::string>& args) {
 
 	_ioSvc.run();
 
-	return 0;
+	return _res;
 }
 
 bool resolvePath(MagnetURI& uri, const std::string &path_) {
@@ -156,6 +158,7 @@ void BHGet::onStatusUpdate(const bithorde::AssetStatus& status)
 		break;
 	default:
 		cerr << "Failed (" << bithorde::Status_Name(status.status()) << ") ..." << endl;
+		_res += 1;
 		nextAsset();
 		break;
 	}
@@ -222,9 +225,13 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 
-	BHGet app(vm);
-
-	int res = app.main(vm["magnet-url"].as< vector<string> >());
+	int res = -1;
+	try {
+		BHGet app(vm);
+		res = app.main(vm["magnet-url"].as< vector<string> >());
+	} catch (std::string err) {
+		cerr << err << endl;
+	}
 	cerr.flush();
 	return res;
 }

@@ -22,12 +22,14 @@ BHUpload::BHUpload(boost::program_options::variables_map &args) :
 	optLink(args.count("link")),
 	optMyName(args["name"].as<string>()),
 	optQuiet(args.count("quiet")),
-	_currentAsset(NULL)
+	_currentAsset(NULL),
+	_res(0)
 {
 	_readBuf.allocate(BLOCK_SIZE);
 }
 
 int BHUpload::main(const std::vector<std::string>& args) {
+	_res = 0;
 	std::vector<std::string>::const_iterator iter;
 	for (iter = args.begin(); iter != args.end(); iter++) {
 		if (!queueFile(*iter))
@@ -40,7 +42,7 @@ int BHUpload::main(const std::vector<std::string>& args) {
 
 	_ioSvc.run();
 
-	return 0;
+	return _res;
 }
 
 bool BHUpload::queueFile(const std::string& path) {
@@ -99,6 +101,7 @@ void BHUpload::onStatusUpdate(const bithorde::AssetStatus& status)
 		break;
 	default:
 		cerr << "Failed ..." << endl;
+		_res += 1;
 		nextAsset();
 		break;
 	}
@@ -175,9 +178,13 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 
-	BHUpload app(vm);
-
-	int res = app.main(vm["file"].as< vector<string> >());
+	int res = -1;
+	try {
+		BHUpload app(vm);
+		res = app.main(vm["file"].as< vector<string> >());
+	} catch (std::string err) {
+		cerr << err << endl;
+	}
 	cerr.flush();
 	return res;
 }
