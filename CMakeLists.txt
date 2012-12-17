@@ -106,6 +106,9 @@ SET_TESTS_PROPERTIES(UnitTests PROPERTIES TIMEOUT 60)
 ADD_TEST(RoundtripTest ${CMAKE_SOURCE_DIR}/tests/roundtrip/test_roundtrip.sh)
 SET_TESTS_PROPERTIES(RoundtripTest PROPERTIES TIMEOUT 60 ENVIRONMENT "BH_BINDIR=${CMAKE_CURRENT_BINARY_DIR}/bin")
 
+ADD_TEST(LinkSourceTest ${CMAKE_SOURCE_DIR}/tests/link_source/test_links.sh)
+SET_TESTS_PROPERTIES(LinkSourceTest PROPERTIES TIMEOUT 60 ENVIRONMENT "BH_BINDIR=${CMAKE_CURRENT_BINARY_DIR}/bin")
+
 # CPack packaging
 INCLUDE(InstallRequiredSystemLibraries)
 SET(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Caching friend2friend oriented content-distribution.")
