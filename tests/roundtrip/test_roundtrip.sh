@@ -15,9 +15,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cd $(dirname $0)
+CODE_DIR=$(dirname $0)
+CODE_ROOT=$(dirname $CODE_DIR)
+source $CODE_ROOT/common.sh
 
-source ../common.sh
+A_SOCK=$(readlink -f rta.sock)
+B_SOCK=$(readlink -f rtb.sock)
 TESTFILE=testfile
 TESTSIZE=4
 
@@ -33,21 +36,21 @@ clean && setup || exit_error "Failed setup"
 
 echo "Starting up Nodes..."
 trap stop_children EXIT
-bithorded_start a && DAEMON1=$DAEMONPID
-bithorded_start b && DAEMON2=$DAEMONPID
+bithorded_start a
+bithorded_start b
 
 echo "Preparing testfile..."
 create_testfile $TESTFILE $TESTSIZE
 
 echo "Uploading to A..."
-MAGNETURL=$("$BHUPLOAD" -u/tmp/bithorde-rta "$TESTFILE"|grep '^magnet:')
+MAGNETURL=$("$BHUPLOAD" -u$A_SOCK "$TESTFILE"|grep '^magnet:')
 verify_equal cachea/assets/?????*/data "$TESTFILE" || exit_error "Uploaded file did not match upload source"
-VERIFICATION=$("$BHUPLOAD" -u/tmp/bithorde-rta "$TESTFILE"|grep '^magnet:')
+VERIFICATION=$("$BHUPLOAD" -u$A_SOCK "$TESTFILE"|grep '^magnet:')
 [ "$MAGNETURL" == "$VERIFICATION" ] || exit_error "Re-upload with different magnet-link".
 
 echo "Getting (2 in parallel) from B..."
-"$BHGET" -nbhget1 -u/tmp/bithorde-rtb "$MAGNETURL" | verify_equal $TESTFILE & DL1=$!
-"$BHGET" -nbhget2 -u/tmp/bithorde-rtb "$MAGNETURL" | verify_equal $TESTFILE & DL2=$!
+"$BHGET" -nbhget1 -u$B_SOCK "$MAGNETURL" | verify_equal $TESTFILE & DL1=$!
+"$BHGET" -nbhget2 -u$B_SOCK "$MAGNETURL" | verify_equal $TESTFILE & DL2=$!
 wait $DL1 || exit_error "Download 1 file did not match upload source"
 wait $DL2 || exit_error "Download 2 file did not match upload source"
 

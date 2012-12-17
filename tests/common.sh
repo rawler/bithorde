@@ -69,11 +69,10 @@ function bithorded_start() {
     # Start a daemon by name.
     # $1 - daemon name, which maps to <name>.config and <name>.log
     # #2... is passed to bithorded
-    config="$1.config"
+    config="$CODE_DIR/$1.config"
     logfile="$1.log"
     shift
 
-    touch "$config" # Make it exist
     stdbuf -o0 -e0 "$SERVER" -c "$config" "$@" &> "$logfile" &
     DAEMONPID=$!
     wait_until_found "$logfile" "Server started"
