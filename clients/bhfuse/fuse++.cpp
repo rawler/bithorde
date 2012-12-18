@@ -14,8 +14,11 @@ using namespace std;
 namespace asio = boost::asio;
 
 extern "C" {
-    // D-wrappers to map fuse_userdata to a specific FileSystem. Also ensures fuse gets
+    // C++-wrappers to map fuse_userdata to a specific FileSystem. Also ensures fuse gets
     // an error if an Exception aborts control.
+    static void _op_init(void *userdata, struct fuse_conn_info *conn) {
+        static_cast<BoostAsioFilesystem*>(userdata)->fuse_init(conn);
+    }
     static void _op_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
         int res = ((BoostAsioFilesystem*)fuse_req_userdata(req))->fuse_lookup(req, parent, name);
         if (res)

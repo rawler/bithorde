@@ -35,6 +35,11 @@ public:
 	~BoostAsioFilesystem();
 
 	/************************************************************************************
+	* Initialize FUSE filesystem
+	************************************************************************************/
+	virtual void fuse_init(fuse_conn_info* conn) = 0;
+
+	/************************************************************************************
 	* FUSE-hook for mapping a name in a directory to an inode.
 	***********************************************************************************/
 	virtual int fuse_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) = 0;

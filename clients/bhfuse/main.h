@@ -13,6 +13,7 @@ class BHFuse : public BoostAsioFilesystem {
 public:
 	BHFuse(boost::asio::io_service & ioSvc, std::string bithorded, BoostAsioFilesystem_Options & opts);
 
+    virtual void fuse_init(fuse_conn_info* conn);
 	virtual int fuse_lookup(fuse_req_t req, fuse_ino_t parent, const char *name);
 	virtual void fuse_forget(fuse_ino_t ino, u_long nlookup);
 	virtual int fuse_getattr(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi);

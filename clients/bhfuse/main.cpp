@@ -7,6 +7,7 @@
 #include <log4cplus/logger.h>
 #include <log4cplus/loggingmacros.h>
 #include <log4cplus/configurator.h>
+#include <fuse/fuse_common.h>
 
 #include "buildconf.hpp"
 
@@ -18,6 +19,7 @@ namespace asio = boost::asio;
 namespace po = boost::program_options;
 
 static asio::io_service ioSvc;
+static int readAheadKB = -1;
 
 using namespace bithorde;
 
@@ -59,6 +61,8 @@ int main(int argc, char *argv[])
 			"Where to connect to bithorde. Either host:port, or /path/socket")
 		("mountpoint", po::value< string >(&opts.mountpoint), 
 			"Where to mount filesystem")
+		("readahead", po::value< int >(&readAheadKB)->default_value(-1),
+			"Amount to let the kernel pre-load, in KB. -1 means use automatic value")
 	;
 	po::positional_options_description p;
 	p.add("mountpoint", 1);
@@ -118,6 +122,12 @@ void BHFuse::reconnect()
 
 void BHFuse::onConnected(std::string remoteName) {
 	(cout << "Connected to " << remoteName << endl).flush();
+}
+
+void BHFuse::fuse_init(fuse_conn_info* conn)
+{
+	if (readAheadKB >= 0)
+		conn->max_readahead = readAheadKB<<10;
 }
 
 int BHFuse::fuse_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
