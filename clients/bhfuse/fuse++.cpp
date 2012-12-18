@@ -95,16 +95,17 @@ BoostAsioFilesystem::BoostAsioFilesystem(asio::io_service & ioSvc, BoostAsioFile
 	/************************************************************************************
 	* FUSE_lowlevel_ops struct, pointing to the C++-class-wrappers.
 	***********************************************************************************/
-	static fuse_lowlevel_ops qfs_ops;
-	bzero(&qfs_ops, sizeof(qfs_ops));
-	qfs_ops.lookup =  _op_lookup;
-	qfs_ops.forget =  _op_forget;
-	qfs_ops.getattr = _op_getattr;
-	qfs_ops.open =    _op_open;
-	qfs_ops.read =    _op_read;
-	qfs_ops.release = _op_release;
+	static fuse_lowlevel_ops bfs_ops;
+	bzero(&bfs_ops, sizeof(bfs_ops));
+	bfs_ops.init =    _op_init;
+	bfs_ops.lookup =  _op_lookup;
+	bfs_ops.forget =  _op_forget;
+	bfs_ops.getattr = _op_getattr;
+	bfs_ops.open =    _op_open;
+	bfs_ops.read =    _op_read;
+	bfs_ops.release = _op_release;
 
-	_fuse_session = fuse_lowlevel_new(&f_args, &qfs_ops, sizeof(qfs_ops), this);
+	_fuse_session = fuse_lowlevel_new(&f_args, &bfs_ops, sizeof(bfs_ops), this);
 	// scope(failure)fuse_session_destroy(s);
 
 	fuse_session_add_chan(_fuse_session, _fuse_chan);
