@@ -134,6 +134,8 @@ bithorded::Config::Config(int argc, char* argv[])
 		po::options_description config_options;
 		config_options.add(server_options).add(cache_options);
 		std::ifstream cfg(configPath);
+		if (!cfg.is_open())
+			throw ArgumentError("Failed to read config-file");
 		vm.store(po::parse_config_file(cfg, config_options, true));
 		notify(vm);
 	}
