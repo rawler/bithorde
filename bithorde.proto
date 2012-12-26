@@ -28,8 +28,8 @@ enum Status {
 }
 
 message Identifier {
-    required HashType type = 1;   // Name of the other side
-    required bytes    id   = 2;   // Version of the protocol this client supports
+    required HashType type = 1;   // Type of hashId
+    required bytes    id   = 2;   // Raw Hash-Digest of type.
 }
 
 message HandShake { // Must be first message in stream
