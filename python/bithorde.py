@@ -129,7 +129,7 @@ class Client(Connection):
             self.transport.loseConnection()
 
     def allocateHandle(self, asset):
-        '''Allocates a handle for the provided implementation, and assign it a handle'''
+        '''Assigns a newly allocated handle for the provided asset'''
         assert(asset.handle is None)
         asset.client = self
         asset.handle = handle = self._handles.allocate()
@@ -250,7 +250,7 @@ class AssetIterator(object):
             self.whenDone()
 
 class ClientWrapper(protocol.ClientFactory):
-    '''!Twisted-API! Twisted-factory wrapping a pre-connected Client, and dispatching
+    '''!Twisted-API! Twisted-factory wrapping a pre-constructed Client, and dispatching
     connection-events to the Client.
     '''
     def __init__(self, client):
