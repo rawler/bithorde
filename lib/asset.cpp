@@ -97,10 +97,13 @@ void ReadAsset::handleMessage(const bithorde::Read::Response &msg) {
 	}
 }
 
-int ReadAsset::aSyncRead(uint64_t offset, ssize_t size)
+int ReadAsset::aSyncRead(uint64_t offset, ssize_t size, int32_t timeout)
 {
 	if (!_client || !_client->isConnected())
 		return -1;
+    timeout -= 100; // Assume 100ms latency on each link
+    if (timeout <= 0)
+        return -1;
 	int reqId = _client->allocRPCRequest(_handle);
 	int64_t maxSize = _size - offset;
 	if (size > maxSize)
@@ -110,7 +113,7 @@ int ReadAsset::aSyncRead(uint64_t offset, ssize_t size)
 	req.set_reqid(reqId);
 	req.set_offset(offset);
 	req.set_size(size);
-	req.set_timeout(4000);
+	req.set_timeout(timeout); // Assume 100ms latency on each link.
 	_client->sendMessage(Connection::ReadRequest, req);
 	return reqId;
 }

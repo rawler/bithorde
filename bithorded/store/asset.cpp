@@ -41,7 +41,7 @@ StoredAsset::StoredAsset(const boost::filesystem3::path& metaFolder, uint64_t si
 
 }
 
-void StoredAsset::async_read(uint64_t offset, size_t& size, bithorded::IAsset::ReadCallback cb)
+void StoredAsset::async_read(uint64_t offset, size_t& size, uint32_t timeout, bithorded::IAsset::ReadCallback cb)
 {
 	byte buf[MAX_CHUNK];
 	const byte* data = _file.read(offset, size, buf);

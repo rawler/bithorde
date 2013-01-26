@@ -61,7 +61,7 @@ public:
 
 	virtual size_t can_read(uint64_t offset, size_t size);
 	virtual bool getIds(BitHordeIds& ids);
-	virtual void async_read(uint64_t offset, size_t& size, ReadCallback cb);
+	virtual void async_read(uint64_t offset, size_t& size, uint32_t timeout, bithorded::IAsset::ReadCallback cb);
 	virtual uint64_t size();
 private:
 	void onUpstreamStatus(const std::string& peername, const bithorde::AssetStatus& status);

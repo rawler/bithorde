@@ -72,7 +72,7 @@ public:
 
 	explicit ReadAsset(const bithorde::ReadAsset::ClientPointer& client, const BitHordeIds& requestIds);
 
-	int aSyncRead(uint64_t offset, ssize_t size);
+	int aSyncRead(uint64_t offset, ssize_t size, int32_t timeout=10000);
 	const BitHordeIds & requestIds() const;
 
 	typedef boost::signals2::signal<void (uint64_t offset, const std::string& data, int tag)> DataSignal;

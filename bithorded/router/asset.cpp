@@ -96,7 +96,7 @@ bool bithorded::router::ForwardedAsset::getIds(BitHordeIds& ids)
 	return true;
 }
 
-void bithorded::router::ForwardedAsset::async_read(uint64_t offset, size_t& size, ReadCallback cb)
+void bithorded::router::ForwardedAsset::async_read(uint64_t offset, size_t& size, uint32_t timeout, ReadCallback cb)
 {
 	auto selector = _upstream.begin(); // TODO: Actually select the least loaded connection
 	if (selector == _upstream.end())
@@ -106,7 +106,7 @@ void bithorded::router::ForwardedAsset::async_read(uint64_t offset, size_t& size
 	read.size = size;
 	read.cb = cb;
 	_pendingReads.push_back(read); // TODO: timeout
-	selector->second->aSyncRead(offset, size);
+	selector->second->aSyncRead(offset, size, timeout);
 }
 
 void bithorded::router::ForwardedAsset::onData(uint64_t offset, const std::string& data, int tag) {

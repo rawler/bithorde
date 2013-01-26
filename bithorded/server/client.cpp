@@ -125,7 +125,7 @@ void Client::onMessage(const bithorde::Read::Request& msg)
 
 		// Raw pointer to this should be fine here, since asset has ownership of this. (Through member Ptr client)
 		auto onComplete = boost::bind(&Client::onReadResponse, this, msg, _1, _2, bithorde::Message::in(msg.timeout()));
-		asset->async_read(offset, size, onComplete);
+		asset->async_read(offset, size, msg.timeout(), onComplete);
 	} else {
 		bithorde::Read::Response resp;
 		resp.set_reqid(msg.reqid());
