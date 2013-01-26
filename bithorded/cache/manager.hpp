@@ -33,7 +33,7 @@ class CacheManager
 	bithorded::router::Router& _router;
 	bithorded::store::AssetStore _store;
 
-	intmax_t _maxSize;
+	uintmax_t _maxSize;
 public:
 	CacheManager(boost::asio::io_service& ioSvc, bithorded::router::Router& router, const boost::filesystem::path& baseDir, intmax_t size);
 
