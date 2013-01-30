@@ -60,7 +60,7 @@ boost::filesystem::path AssetStore::newAssetDir()
 	return assetFolder;
 }
 
-void AssetStore::link(const BitHordeIds& ids, const boost::filesystem3::path& assetPath)
+void AssetStore::link(const BitHordeIds& ids, const boost::filesystem::path& assetPath)
 {
 	for (auto iter=ids.begin(); iter != ids.end(); iter++) {
 		if (iter->type() == bithorde::HashType::TREE_TIGER) {
@@ -130,7 +130,7 @@ boost::filesystem::path AssetStore::resolveIds(const BitHordeIds& ids)
 	return fs::path();
 }
 
-boost::filesystem3::directory_iterator AssetStore::assetIterator()
+boost::filesystem::directory_iterator AssetStore::assetIterator()
 {
 	return fs::directory_iterator(_assetsFolder);
 }
@@ -145,7 +145,7 @@ uintmax_t AssetStore::size()
 	return res;
 }
 
-uintmax_t AssetStore::assetFullSize(const boost::filesystem3::path& path)
+uintmax_t AssetStore::assetFullSize(const boost::filesystem::path& path)
 {
 	uintmax_t res=0;
 	fs::directory_iterator end;
@@ -155,7 +155,7 @@ uintmax_t AssetStore::assetFullSize(const boost::filesystem3::path& path)
 	return res;
 }
 
-void AssetStore::removeAsset(const boost::filesystem3::path& assetPath)
+void AssetStore::removeAsset(const boost::filesystem::path& assetPath)
 {
 	if (fs::is_directory(assetPath)) {
 		LOG4CPLUS_WARN(bithorded::storeLog, "removing asset " << assetPath.filename());
@@ -168,7 +168,7 @@ void AssetStore::unlink(const fs::path& linkPath)
 	fs::remove(linkPath);
 }
 
-void AssetStore::unlinkAndRemove(const boost::filesystem3::path& linkPath)
+void AssetStore::unlinkAndRemove(const boost::filesystem::path& linkPath)
 {
 	boost::system::error_code e;
 	auto asset = fs::read_symlink(linkPath, e);

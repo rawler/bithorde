@@ -39,7 +39,7 @@ namespace bithorded {
 	log4cplus::Logger sourceLog = log4cplus::Logger::getInstance("source");
 }
 
-Store::Store(boost::asio::io_service& ioSvc, const boost::filesystem3::path& baseDir) :
+Store::Store(boost::asio::io_service& ioSvc, const boost::filesystem::path& baseDir) :
 	_threadPool(THREADPOOL_CONCURRENCY),
 	_ioSvc(ioSvc),
 	_baseDir(baseDir),
@@ -73,7 +73,7 @@ bool path_is_in(const fs::path& path, const fs::path& folder) {
 	return boost::starts_with(path_, folder_);
 }
 
-IAsset::Ptr Store::addAsset(const boost::filesystem3::path& file)
+IAsset::Ptr Store::addAsset(const boost::filesystem::path& file)
 {
 	if (!path_is_in(file, _baseDir)) {
 		return ASSET_NONE;

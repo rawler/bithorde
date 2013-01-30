@@ -33,7 +33,7 @@ typedef HashNode<CryptoPP::Tiger> TigerNode;
 class AssetMeta
 {
 public:
-	AssetMeta(const boost::filesystem3::path& path, uint leafBlocks);
+	AssetMeta(const boost::filesystem::path& path, uint leafBlocks);
 
 	TigerNode& operator[](const size_t offset);
 	size_t size();

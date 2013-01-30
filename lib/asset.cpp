@@ -124,7 +124,7 @@ UploadAsset::UploadAsset(const bithorde::Asset::ClientPointer& client, uint64_t 
 	_size = size;
 }
 
-UploadAsset::UploadAsset(const bithorde::Asset::ClientPointer& client, const boost::filesystem3::path& path)
+UploadAsset::UploadAsset(const bithorde::Asset::ClientPointer& client, const boost::filesystem::path& path)
 	: Asset(client), _linkPath(fs::absolute(path))
 {
 	_size = fs::file_size(_linkPath);

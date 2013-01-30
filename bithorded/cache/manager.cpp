@@ -27,7 +27,7 @@ namespace fs = boost::filesystem;
 
 CacheManager::CacheManager(boost::asio::io_service& ioSvc,
                            bithorded::router::Router& router,
-                           const boost::filesystem3::path& baseDir, intmax_t size) :
+                           const boost::filesystem::path& baseDir, intmax_t size) :
 	_baseDir(baseDir),
 	_ioSvc(ioSvc),
 	_router(router),

@@ -34,8 +34,8 @@ public:
 	typedef boost::shared_ptr<CachedAsset> Ptr;
 	typedef boost::weak_ptr<CachedAsset> WeakPtr;
 
-	CachedAsset(const boost::filesystem3::path& metaFolder);
-	CachedAsset(const boost::filesystem3::path& metaFolder, uint64_t size);
+	CachedAsset(const boost::filesystem::path& metaFolder);
+	CachedAsset(const boost::filesystem::path& metaFolder, uint64_t size);
 
 	/**
 	 * Writes up to /size/ from buf into asset, updating amount written in hasher

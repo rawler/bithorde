@@ -17,13 +17,13 @@
 
 #include "asset.hpp"
 
-bithorded::cache::CachedAsset::CachedAsset(const boost::filesystem3::path& metaFolder) :
+bithorded::cache::CachedAsset::CachedAsset(const boost::filesystem::path& metaFolder) :
 	StoredAsset(metaFolder)
 {
 	setStatus(bithorde::SUCCESS);
 }
 
-bithorded::cache::CachedAsset::CachedAsset(const boost::filesystem3::path& metaFolder, uint64_t size) :
+bithorded::cache::CachedAsset::CachedAsset(const boost::filesystem::path& metaFolder, uint64_t size) :
 	StoredAsset(metaFolder, size)
 {
 	setStatus(bithorde::SUCCESS);

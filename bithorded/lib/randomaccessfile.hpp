@@ -32,7 +32,7 @@ public:
 	READWRITE = 3,
 	};
 
-	RandomAccessFile(const boost::filesystem3::path& path, RandomAccessFile::Mode mode = READ, uint64_t size = 0);
+	RandomAccessFile(const boost::filesystem::path& path, RandomAccessFile::Mode mode = READ, uint64_t size = 0);
 	~RandomAccessFile();
 
 	/**

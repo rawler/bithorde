@@ -49,7 +49,7 @@ public:
 	 *
 	 * @returns a valid asset if file is within acceptable path, NULL otherwise
 	 */
-	IAsset::Ptr addAsset(const boost::filesystem3::path& file);
+	IAsset::Ptr addAsset(const boost::filesystem::path& file);
 
 	/**
 	 * Finds an asset by bithorde HashId. (Only the tiger-hash is actually used)

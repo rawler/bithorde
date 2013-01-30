@@ -118,7 +118,7 @@ size_t AssetMeta::size()
 	return (_file_size - _nodes_offset) / sizeof(TigerNode);
 }
 
-const boost::filesystem3::path& AssetMeta::path() const
+const boost::filesystem::path& AssetMeta::path() const
 {
 	return _path;
 }

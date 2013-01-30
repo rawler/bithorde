@@ -53,7 +53,7 @@ public:
 	/**
 	 * Returns the "full" size of the asset, that is the size of the asset and it's metadata
 	 */
-	uintmax_t assetFullSize(const boost::filesystem3::path& path);
+	uintmax_t assetFullSize(const boost::filesystem::path& path);
 
 	static void removeAsset(const boost::filesystem::path& assetPath);
 	static void unlink(const boost::filesystem::path& linkPath);

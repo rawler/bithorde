@@ -25,7 +25,7 @@
 
 namespace fs = boost::filesystem;
 
-RandomAccessFile::RandomAccessFile(const boost::filesystem3::path& path, RandomAccessFile::Mode mode, uint64_t size)
+RandomAccessFile::RandomAccessFile(const boost::filesystem::path& path, RandomAccessFile::Mode mode, uint64_t size)
 	: _path(path)
 {
 	int m;
@@ -85,7 +85,7 @@ ssize_t RandomAccessFile::write(uint64_t offset, const void* src, size_t size)
 	return written;
 }
 
-const boost::filesystem3::path& RandomAccessFile::path() const
+const boost::filesystem::path& RandomAccessFile::path() const
 {
 	return _path;
 }
