@@ -1,11 +1,11 @@
 #include "client.h"
 
+#include <boost/algorithm/string.hpp>
 #include <boost/asio/placeholders.hpp>
 #include <boost/assert.hpp>
 #include <boost/bind.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/lexical_cast.hpp>
-#include <boost/regex.hpp>
 #include <iostream>
 #include <string.h>
 
@@ -99,14 +99,13 @@ void Client::connect(asio::local::stream_protocol::endpoint& ep) {
 }
 
 void Client::connect(string spec) {
-	static const boost::regex host_port_regex("(\\w+):(\\d+)");
-        boost::smatch res;
+	vector<string> host_port;
 	if (spec[0] == '/') {
 		asio::local::stream_protocol::endpoint ep(spec);
 		connect(ep);
-	} else if (boost::regex_match(spec, res, host_port_regex)) {
+	} else if (boost::algorithm::split(host_port, spec, boost::algorithm::is_any_of(":"), boost::algorithm::token_compress_on).size() == 2) {
 		asio::ip::tcp::resolver resolver(_ioSvc);
-		asio::ip::tcp::resolver::query q(res[1], res[2]);
+		asio::ip::tcp::resolver::query q(host_port[0], host_port[1]);
 		asio::ip::tcp::resolver::iterator iter = resolver.resolve(q);
 		if (iter != asio::ip::tcp::resolver::iterator()) {
 			asio::ip::tcp::endpoint ep(iter->endpoint());
