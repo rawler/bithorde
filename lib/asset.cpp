@@ -1,6 +1,7 @@
 
 #include "asset.h"
 
+#include <boost/asio/placeholders.hpp>
 #include <boost/filesystem.hpp>
 #include <iostream>
 
@@ -24,6 +25,7 @@ bool bithorde::idsOverlap(const BitHordeIds& a, const BitHordeIds& b) {
 Asset::Asset(const bithorde::Asset::ClientPointer& client) :
 	status(Status::NONE),
 	_client(client),
+	_ioSvc(client->_ioSvc),
 	_handle(-1),
 	_size(-1)
 {}
@@ -33,9 +35,24 @@ Asset::~Asset() {
 		close();
 }
 
+const Asset::ClientPointer& Asset::client()
+{
+	return _client;
+}
+
+boost::asio::io_service& Asset::io_service()
+{
+	return _ioSvc;
+}
+
 bool Asset::isBound()
 {
 	return _handle >= 0;
+}
+
+Asset::Handle Asset::handle()
+{
+	return _handle;
 }
 
 string Asset::label()
@@ -65,10 +82,76 @@ void Asset::handleMessage(const bithorde::AssetStatus & msg)
 	statusUpdate(msg);
 }
 
+ReadRequestContext::ReadRequestContext(ReadAsset* asset, uint64_t offset, size_t size, int32_t timeout) :
+	_asset(asset),
+	_client(asset->client()),
+	_timer(asset->io_service())
+{
+	set_handle(asset->handle());
+	set_reqid(_client->allocRPCRequest(handle()));
+	set_offset(offset);
+	set_size(size);
+	set_timeout(timeout); // Assume 100ms latency on each link.
+}
+ReadRequestContext::~ReadRequestContext() {
+	if (_asset)
+		_client->releaseRPCRequest(reqid());
+}
+
+void ReadRequestContext::armTimer(int32_t timeout)
+{
+	_timer.expires_from_now(boost::posix_time::millisec(timeout));
+	_timer.async_wait(boost::bind(&ReadRequestContext::timer_callback, shared_from_this(), boost::asio::placeholders::error));
+}
+
+void ReadRequestContext::cancel()
+{
+	if (_asset) {
+		auto asset = _asset;
+		_asset = NULL;
+		asset->dataArrived(offset(), string(), reqid());
+	}
+	_timer.cancel();
+}
+
+void ReadRequestContext::callback(const Read::Response& msg)
+{
+	if (!_asset) // Cancelled
+		return;
+	auto asset = _asset;
+	_asset = NULL; // Handle circular triggers
+	if (msg.status() == bithorde::SUCCESS) {
+		asset->dataArrived(msg.offset(), msg.content(), msg.reqid());
+	} else {
+		cerr << "Error: failed read, " << msg.status() << endl;
+		asset->dataArrived(msg.offset(), string(), msg.reqid());
+	}
+}
+
+void ReadRequestContext::timer_callback(const boost::system::error_code& error)
+{
+	if (!error) {
+		// Timeout occurred
+		if (_asset) {
+			auto asset = _asset;
+			_asset = NULL;
+			asset->dataArrived(offset(), string(), reqid());
+			asset->clearOffset(offset(), reqid());
+		}
+	}
+}
+
 ReadAsset::ReadAsset(const bithorde::ReadAsset::ClientPointer& client, const BitHordeIds& requestIds) :
 	Asset(client),
 	_requestIds(requestIds)
 {}
+
+ReadAsset::~ReadAsset()
+{
+	for (auto iter = _requestMap.begin(); iter != _requestMap.end(); iter++) {
+		iter->second->cancel();
+	}
+}
 
 const BitHordeIds& ReadAsset::requestIds() const
 {
@@ -88,34 +171,49 @@ void ReadAsset::handleMessage(const bithorde::AssetStatus &msg)
 }
 
 void ReadAsset::handleMessage(const bithorde::Read::Response &msg) {
-	if (msg.status() == bithorde::SUCCESS) {
-		dataArrived(msg.offset(), msg.content(), msg.reqid());
-	} else {
-		cerr << "Error: failed read, " << msg.status() << endl;
-		string nil;
-		dataArrived(msg.offset(), nil, msg.reqid());
+	auto it = _requestMap.lower_bound(msg.offset());
+	auto end = _requestMap.upper_bound(msg.offset());
+	while (it != end) {
+		auto next = it;
+		next++;
+		auto ctx = it->second;
+		_requestMap.erase(it);
+		ctx->callback(msg);
+		it = next;
 	}
 }
 
-int ReadAsset::aSyncRead(uint64_t offset, ssize_t size, int32_t timeout)
+void ReadAsset::clearOffset(ReadAsset::off_t offset, uint32_t reqid)
+{
+	auto it = _requestMap.lower_bound(offset);
+	auto end = _requestMap.upper_bound(offset);
+	while (it != end) {
+		auto next = it;
+		next++;
+		if (it->second->reqid() == reqid)
+			_requestMap.erase(it);
+		it = next;
+	}
+}
+
+int ReadAsset::aSyncRead(ReadAsset::off_t offset, ssize_t size, int32_t timeout)
 {
 	if (!_client || !_client->isConnected())
 		return -1;
-    timeout -= 100; // Assume 100ms latency on each link
-    if (timeout <= 0)
-        return -1;
-	int reqId = _client->allocRPCRequest(_handle);
+	auto _timeout = timeout - 100; // Assume 100ms latency on each link
+	if (_timeout <= 0)
+		return -1;
 	int64_t maxSize = _size - offset;
 	if (size > maxSize)
 		size = maxSize;
-	bithorde::Read_Request req;
-	req.set_handle(_handle);
-	req.set_reqid(reqId);
-	req.set_offset(offset);
-	req.set_size(size);
-	req.set_timeout(timeout); // Assume 100ms latency on each link.
-	_client->sendMessage(Connection::ReadRequest, req);
-	return reqId;
+	auto req = boost::make_shared<ReadRequestContext>(this, offset, size, _timeout);
+	if (_client->sendMessage(Connection::ReadRequest, *req)) {
+		req->armTimer(timeout);
+		_requestMap.insert(RequestMap::value_type(offset, req));
+	} else {
+		req->cancel();
+	}
+	return req->reqid();
 }
 
 UploadAsset::UploadAsset(const bithorde::Asset::ClientPointer& client, uint64_t size)
