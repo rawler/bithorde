@@ -1,5 +1,5 @@
 /*
-    Copyright 2012 Ulrik Mikaelsson <ulrik.mikaelsson@gmail.com>
+    Copyright 2012 <copyright holder> <email>
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -17,13 +17,22 @@
 
 #include "asset.hpp"
 
-using namespace std;
-
-using namespace bithorded;
-using namespace bithorded::source;
-
-SourceAsset::SourceAsset(const boost::filesystem::path& metaFolder) :
+bithorded::cache::CachedAsset::CachedAsset(const boost::filesystem::path& metaFolder) :
 	StoredAsset(metaFolder)
 {
 	setStatus(bithorde::SUCCESS);
+}
+
+bithorded::cache::CachedAsset::CachedAsset(const boost::filesystem::path& metaFolder, uint64_t size) :
+	StoredAsset(metaFolder, size)
+{
+	setStatus(bithorde::SUCCESS);
+}
+
+size_t bithorded::cache::CachedAsset::write(uint64_t offset, const std::string& data)
+{
+	_file.write(offset, data.data(), data.length());
+	notifyValidRange(offset, data.length());
+	updateStatus();
+	return 0;
 }

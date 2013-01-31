@@ -49,6 +49,7 @@ class Client
 	friend class AssetBinding;
 	friend class Asset;
 	friend class ReadAsset;
+	friend class ReadRequestContext;
 
 	typedef boost::shared_ptr<AssetBinding> AssetPtr;
 

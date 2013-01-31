@@ -22,7 +22,7 @@
 #include <netinet/in.h>
 
 using namespace std;
-using namespace bithorded;
+using namespace bithorded::store;
 
 const static size_t MAP_PAGE = 1024*1024;
 
@@ -118,7 +118,7 @@ size_t AssetMeta::size()
 	return (_file_size - _nodes_offset) / sizeof(TigerNode);
 }
 
-const boost::filesystem3::path& AssetMeta::path() const
+const boost::filesystem::path& AssetMeta::path() const
 {
 	return _path;
 }

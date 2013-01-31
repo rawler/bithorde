@@ -50,6 +50,7 @@ protected:
 	virtual void onMessage(const bithorde::BindWrite& msg);
 	virtual void onMessage(bithorde::BindRead& msg);
 	virtual void onMessage(const bithorde::Read::Request& msg);
+	virtual void onMessage(const bithorde::DataSegment& msg);
 
 private:
 	void informAssetStatus(bithorde::Asset::Handle h, bithorde::Status s);

@@ -30,6 +30,7 @@ class BHUpload {
 	std::ifstream _currentFile;
 	uint64_t _currentOffset;
 	Buffer _readBuf;
+	int _res;
 public:
 	BHUpload(boost::program_options::variables_map &map);
 	bool queueFile(const std::string& path);

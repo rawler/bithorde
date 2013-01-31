@@ -27,6 +27,7 @@
 #include <boost/asio/local/stream_protocol.hpp>
 #include <boost/filesystem/path.hpp>
 
+#include "../cache/manager.hpp"
 #include "../router/router.hpp"
 #include "../source/store.hpp"
 #include "bithorde.pb.h"
@@ -52,6 +53,7 @@ class Server
 
 	std::vector< std::unique_ptr<bithorded::source::Store> > _assetStores;
 	router::Router _router;
+	cache::CacheManager _cache;
 public:
 	Server(boost::asio::io_service& ioSvc, Config& cfg);
 
@@ -60,13 +62,14 @@ public:
 
 	IAsset::Ptr async_linkAsset(const boost::filesystem::path& filePath);
 	IAsset::Ptr async_findAsset(const bithorde::BindRead& req);
+    IAsset::Ptr prepareUpload(uint64_t size);
 
 	void onTCPConnected(boost::shared_ptr<boost::asio::ip::tcp::socket>& socket);
 private:
 	void clientConnected(const bithorded::Client::Ptr& client);
 	void clientAuthenticated(const bithorded::Client::WeakPtr& client);
 	void clientDisconnected(bithorded::Client::Ptr& client);
-	
+
 	void waitForTCPConnection();
 	void waitForLocalConnection();
 	void onTCPConnected(boost::shared_ptr< boost::asio::ip::tcp::socket >& socket, const boost::system::error_code& ec);

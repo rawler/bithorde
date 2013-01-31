@@ -1,5 +1,5 @@
 /*
-    Copyright 2012 Ulrik Mikaelsson <ulrik.mikaelsson@gmail.com>
+    Copyright 2012 <copyright holder> <email>
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -15,51 +15,50 @@
 */
 
 
-#ifndef BITHORDED_SOURCE_STORE_HPP
-#define BITHORDED_SOURCE_STORE_HPP
+#ifndef BITHORDED_CACHE_MANAGER_HPP
+#define BITHORDED_CACHE_MANAGER_HPP
 
 #include <boost/asio/io_service.hpp>
-#include <boost/filesystem/path.hpp>
-#include <boost/function.hpp>
-#include <map>
 
 #include "asset.hpp"
-#include "bithorde.pb.h"
-#include "../lib/threadpool.hpp"
+#include "../router/router.hpp"
 #include "../store/assetstore.hpp"
 
-namespace bithorded {
-	namespace source {
+namespace bithorded { namespace cache {
 
-class Store
+class CacheManager
 {
-	ThreadPool _threadPool;
-	boost::asio::io_service& _ioSvc;
 	boost::filesystem::path _baseDir;
+	boost::asio::io_service& _ioSvc;
+	bithorded::router::Router& _router;
 	bithorded::store::AssetStore _store;
-	std::map<std::string, SourceAsset::WeakPtr> _tigerMap;
+
+	uintmax_t _maxSize;
 public:
-	Store(boost::asio::io_service& ioSvc, const boost::filesystem::path& baseDir);
+	CacheManager(boost::asio::io_service& ioSvc, bithorded::router::Router& router, const boost::filesystem::path& baseDir, intmax_t size);
 
 	/**
-	 * Add an asset to the idx, creating a hash in the background. When hashing is done,
+	 * Finds an asset by bithorde HashId. (Only the tiger-hash is actually used)
+	 */
+	IAsset::Ptr findAsset(const BitHordeIds& ids);
+
+	/**
+	 * Add an asset to the idx, allocating space for
 	 * the status of the asset will be updated to reflect it.
 	 *
 	 * If function returns true, /handler/ will be called on a thread running ioSvc.run()
 	 *
 	 * @returns a valid asset if file is within acceptable path, NULL otherwise
 	 */
-	IAsset::Ptr addAsset(const boost::filesystem::path& file);
-
-	/**
-	 * Finds an asset by bithorde HashId. (Only the tiger-hash is actually used)
-	 */
-	IAsset::Ptr findAsset(const BitHordeIds& ids);
+	IAsset::Ptr prepareUpload(uint64_t size);
 private:
-	SourceAsset::Ptr _openTiger(const std::string& tigerId);
-	void _addAsset( bithorded::source::SourceAsset* asset);
+	bool makeRoom(uint64_t size);
+	void linkAsset(bithorded::cache::CachedAsset* asset);
+	/**
+	 * Figures out which tiger-id hasn't been accessed recently.
+	 */
+	boost::filesystem::path pickLooser();
 };
+} }
 
-	}
-}
-#endif // BITHORDED_SOURCE_STORE_HPP
+#endif // BITHORDED_CACHE_STORE_HPP

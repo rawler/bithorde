@@ -1,5 +1,5 @@
 /*
-    Copyright 2012 Ulrik Mikaelsson <ulrik.mikaelsson@gmail.com>
+    Copyright 2012 <copyright holder> <email>
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -15,15 +15,20 @@
 */
 
 
-#include "asset.hpp"
+#include "rounding.hpp"
 
-using namespace std;
+#include <stddef.h>
 
-using namespace bithorded;
-using namespace bithorded::source;
-
-SourceAsset::SourceAsset(const boost::filesystem::path& metaFolder) :
-	StoredAsset(metaFolder)
-{
-	setStatus(bithorde::SUCCESS);
+uint64_t roundUp(uint64_t val, uint64_t block) {
+	size_t overflow = val % block;
+	if (overflow)
+		return val - overflow;
+	else
+		return val;
 }
+
+uint64_t roundDown(uint64_t val, uint64_t block) {
+	return (val / block) * block;
+}
+
+

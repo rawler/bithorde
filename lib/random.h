@@ -18,8 +18,11 @@
 #ifndef BITHORDE_RANDOM_H
 #define BITHORDE_RANDOM_H
 
+#include <cstring>
 #include <stdint.h>
+#include <string>
 
 uint64_t rand64();
+std::string randomAlphaNumeric(size_t len);
 
 #endif // RANDOM_HPP

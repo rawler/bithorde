@@ -1,5 +1,5 @@
 /*
-    Copyright 2012 Ulrik Mikaelsson <ulrik.mikaelsson@gmail.com>
+    Copyright 2012 <copyright holder> <email>
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -14,35 +14,35 @@
     limitations under the License.
 */
 
-
-#ifndef BITHORDED_SOURCE_ASSET_H
-#define BITHORDED_SOURCE_ASSET_H
+#ifndef BITHORDED_CACHE_ASSET_HPP
+#define BITHORDED_CACHE_ASSET_HPP
 
 #include <boost/filesystem/path.hpp>
-#include <boost/shared_ptr.hpp>
 
+#include "../lib/hashtree.hpp"
 #include "../server/asset.hpp"
 #include "../store/asset.hpp"
-
-#include "bithorde.pb.h"
+#include "../router/asset.hpp"
 
 namespace bithorded {
-	namespace source {
+	namespace cache {
 
-class SourceAsset : public store::StoredAsset
+class CachedAsset : public store::StoredAsset
 {
+	router::ForwardedAsset::Ptr _upstream;
 public:
-	typedef boost::shared_ptr<SourceAsset> Ptr;
-	typedef boost::weak_ptr<SourceAsset> WeakPtr;
+	typedef boost::shared_ptr<CachedAsset> Ptr;
+	typedef boost::weak_ptr<CachedAsset> WeakPtr;
+
+	CachedAsset(const boost::filesystem::path& metaFolder);
+	CachedAsset(const boost::filesystem::path& metaFolder, uint64_t size);
 
 	/**
-	 * The /metaFolder/ is a special control-folder for a single-asset. It has file
-	 *  "data" which is an actual data-file or symlink to the data-file, and
-	 *  "meta" which holds info about blocks indexed, hashtree indexes etc.
+	 * Writes up to /size/ from buf into asset, updating amount written in hasher
 	 */
-	SourceAsset(const boost::filesystem::path& metaFolder);
+	size_t write(uint64_t offset, const std::string& data);
 };
-
 	}
 }
-#endif // BITHORDED_SOURCE_ASSET_H
+
+#endif // BITHORDED_CACHE_ASSET_HPP

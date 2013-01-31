@@ -51,7 +51,8 @@ Server::Server(asio::io_service& ioSvc, Config& cfg) :
 	_ioSvc(ioSvc),
 	_tcpListener(ioSvc),
 	_localListener(ioSvc),
-	_router(*this)
+	_router(*this),
+	_cache(ioSvc, _router, cfg.cacheDir, static_cast<intmax_t>(cfg.cacheSizeMB)*1024*1024)
 {
 	for (auto iter=_cfg.sources.begin(); iter != _cfg.sources.end(); iter++)
 		_assetStores.push_back( unique_ptr<source::Store>(new source::Store(ioSvc, iter->root)) );
@@ -65,7 +66,7 @@ Server::Server(asio::io_service& ioSvc, Config& cfg) :
 		_tcpListener.set_option(boost::asio::ip::tcp::acceptor::reuse_address(true));
 		_tcpListener.bind(tcpPort);
 		_tcpListener.listen();
-		
+
 		waitForTCPConnection();
 	}
 
@@ -77,7 +78,7 @@ Server::Server(asio::io_service& ioSvc, Config& cfg) :
 		_localListener.set_option(boost::asio::local::stream_protocol::acceptor::reuse_address(true));
 		_localListener.bind(localPort);
 		_localListener.listen(4);
-		
+
 		waitForLocalConnection();
 	}
 
@@ -148,7 +149,7 @@ void Server::clientDisconnected(bithorded::Client::Ptr& client)
 	client.reset();
 }
 
-IAsset::Ptr Server::async_linkAsset(const boost::filesystem3::path& filePath)
+IAsset::Ptr Server::async_linkAsset(const boost::filesystem::path& filePath)
 {
 	for (auto iter=_assetStores.begin(); iter != _assetStores.end(); iter++) {
 		auto res = (*iter)->addAsset(filePath);
@@ -166,5 +167,14 @@ IAsset::Ptr Server::async_findAsset(const bithorde::BindRead& req)
 			return asset;
 	}
 
-	return _router.findAsset(req);
+	if (auto asset = _cache.findAsset(req.ids()))
+		return asset;
+	else
+		return _router.findAsset(req);
 }
+
+IAsset::Ptr Server::prepareUpload(uint64_t size)
+{
+	return _cache.prepareUpload(size);
+}
+

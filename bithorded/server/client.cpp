@@ -79,8 +79,12 @@ void Client::onMessage(const bithorde::BindWrite& msg)
 			informAssetStatus(msg.handle(), bithorde::ERROR);
 		}
 	} else {
-		LOG4CPLUS_ERROR(clientLogger, "Sorry, upload isn't supported yet");
-		informAssetStatus(msg.handle(), bithorde::ERROR);
+		if (auto asset = _server.prepareUpload(msg.size())) {
+			LOG4CPLUS_INFO(clientLogger, "Ready for upload");
+			assignAsset(msg.handle(), asset);
+		} else {
+			informAssetStatus(msg.handle(), bithorde::NORESOURCES);
+		}
 	}
 }
 
@@ -121,13 +125,30 @@ void Client::onMessage(const bithorde::Read::Request& msg)
 
 		// Raw pointer to this should be fine here, since asset has ownership of this. (Through member Ptr client)
 		auto onComplete = boost::bind(&Client::onReadResponse, this, msg, _1, _2, bithorde::Message::in(msg.timeout()));
-		asset->async_read(offset, size, onComplete);
+		asset->async_read(offset, size, msg.timeout(), onComplete);
 	} else {
 		bithorde::Read::Response resp;
 		resp.set_reqid(msg.reqid());
 		resp.set_status(bithorde::INVALID_HANDLE);
 		sendMessage(bithorde::Connection::ReadResponse, resp);
 	}
+}
+
+void Client::onMessage(const bithorde::DataSegment& msg)
+{
+	IAsset::Ptr& asset_ = getAsset(msg.handle());
+	if (asset_) {
+		bithorded::cache::CachedAsset::Ptr asset = dynamic_pointer_cast<bithorded::cache::CachedAsset>(asset_);
+		if (asset) {
+			asset->write(msg.offset(), msg.content());
+		} else {
+			LOG4CPLUS_INFO(clientLogger, peerName() << ':' << msg.handle() << " is not an upload-asset");
+		}
+	} else {
+		LOG4CPLUS_INFO(clientLogger, peerName() << ':' << msg.handle() << " is not bound to any asset");
+	}
+
+	return;
 }
 
 void Client::onReadResponse(const bithorde::Read::Request& req, int64_t offset, const std::string& data, bithorde::Message::Deadline t) {
