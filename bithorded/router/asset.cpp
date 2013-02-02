@@ -57,19 +57,19 @@ void bithorded::router::ForwardedAsset::bindUpstreams(const std::map< string, bi
 void bithorded::router::ForwardedAsset::onUpstreamStatus(const string& peername, const bithorde::AssetStatus& status)
 {
 	if (status.status() == bithorde::Status::SUCCESS) {
-		LOG4CPLUS_DEBUG(assetLogger, "Found upstream " << peername);
+		LOG4CPLUS_DEBUG(assetLogger, _ids << " Found upstream " << peername);
 		if (status.has_size()) {
 			if (_size == -1) {
 				_size = status.size();
 			} else if (_size != (int64_t)status.size()) {
-				LOG4CPLUS_WARN(assetLogger, peername << " responded with mismatching size, ignoring...");
+				LOG4CPLUS_WARN(assetLogger, peername << " " << _ids << " responded with mismatching size, ignoring...");
 				_upstream.erase(peername);
 			}
 		} else {
-			LOG4CPLUS_WARN(assetLogger, peername << " SUCCESS response not accompanied with asset-size.");
+			LOG4CPLUS_WARN(assetLogger, peername << " " << _ids << " SUCCESS response not accompanied with asset-size.");
 		}
 	} else {
-		LOG4CPLUS_DEBUG(assetLogger, "Failed upstream " << peername);
+		LOG4CPLUS_DEBUG(assetLogger, _ids << "Failed upstream " << peername);
 		_upstream.erase(peername);
 	}
 	updateStatus();
