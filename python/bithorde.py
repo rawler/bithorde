@@ -54,8 +54,24 @@ class AssetMap(list):
             self.extend((None,)*((k-l)+2))
         return list.__setitem__(self, k, v)
 
+def decodeMessage(buf):
+    '''Decodes a single message from buffer
+    @return (msg, bytesConsumed)
+    @raises IndexError if buffer did not contain complete message
+    '''
+    id, newpos = decoder._DecodeVarint32(buf,0)
+    size, newpos = decoder._DecodeVarint32(buf,newpos)
+    id = id >> 3
+    msgend = newpos+size
+    if msgend > len(buf):
+        raise IndexError, 'Incomplete message'
+    msg = MSGMAP[id].message_type._concrete_class()
+    msg.ParseFromString(buf[newpos:msgend])
+    return msg, msgend
+
 class Connection(protocol.Protocol):
     '''Twisted-driven connection to BitHorde'''
+
     def connectionMade(self):
         '''!Twisted-API! Once connected, send a handshake and wait for the other
         side.'''
@@ -66,25 +82,13 @@ class Connection(protocol.Protocol):
         BitHorde-messages'''
         self.buf += data
 
-        dataleft = True
-        while dataleft:
-            buf = self.buf
+        while True:
             try:
-                id, newpos = decoder._DecodeVarint32(buf,0)
-                size, newpos = decoder._DecodeVarint32(buf,newpos)
-                id = id >> 3
-                msgend = newpos+size
-                if msgend > len(buf):
-                    dataleft = False
+                msg, consumed = decodeMessage(self.buf)
             except IndexError:
-                dataleft = False
-
-            if dataleft:
-                self.buf = buf[msgend:]
-                msg = MSGMAP[id].message_type._concrete_class()
-                msg.ParseFromString(buf[newpos:msgend])
-
-                self.msgHandler(msg)
+                break
+            self.buf = self.buf[consumed:]
+            self.msgHandler(msg)
 
     def writeMsg(self, msg):
         '''Serialize a BitHorde-message and write to the underlying Twisted-transport.'''
