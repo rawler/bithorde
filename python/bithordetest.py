@@ -1,112 +1,86 @@
-import sys,types
+import socket, sys,types
 
-from bithorde import Connection, message as Message, connectUNIX, reactor
-from twisted.internet.protocol import Factory, ProcessProtocol
-from twisted.internet.endpoints import UNIXClientEndpoint
-from twisted.internet import defer
+from bithorde import decodeMessage, encoder, MSG_REV_MAP, message
 
-class AsyncMessageQueue(object):
-    def __init__(self):
-        object.__init__(self)
-        self.msgs = list()
-        self.waiting = list()
+import eventlet
+from eventlet.processes import Process
+from google.protobuf.message import Message
 
-    def __call__(self, msg):
-        if self.waiting:
-            self.waiting.pop(0).callback(msg)
+class TestConnection:
+    def __init__(self, tgt, name=None):
+        if isinstance(tgt, tuple):
+            family = socket.AF_INET
         else:
-            self.msgs.append(msg)
+            family = socket.AF_UNIX
+        self._socket = eventlet.connect(tgt, family)
+        self.buf = ""
+        if name:
+            self.auth(name)
 
-    def get(self):
-        d = defer.Deferred()
-        if (self.msgs):
-            d.callback(self.msgs.pop(0))
+    def send(self, msg):
+        enc = encoder.MessageEncoder(MSG_REV_MAP[type(msg)], False, False)
+        enc(self._socket.send, msg)
+
+    def __iter__(self):
+        return self
+
+    def next(self):
+        while True:
+            try:
+                msg, consumed = decodeMessage(self.buf)
+                self.buf = self.buf[consumed:]
+                return msg
+            except IndexError:
+                new = self._socket.recv(4096)
+                if not new:
+                    raise StopIteration
+                self.buf += new
+
+    @classmethod
+    def _matches(cls, msg, criteria):
+        if isinstance(criteria, type):
+            return isinstance(msg, criteria)
         else:
-            self.waiting.append(d)
-        return d
+            assert False, "Criteria %s not supported" % criteria
 
-    def expect(self, crit):
-        def test_class(x):
-          if not isinstance(x, crit):
-              raise "Error, object was not of type %s" % crit
-          return x
-        d = self.get()
-        if isinstance(crit, (type, types.ClassType)):
-          d.addCallback(test_class)
-        else:
-          raise ArgumentError, "Unknown criteria-type"
-        return d
-
-class TestConnection(Connection):
-
-    def connectionMade(self):
-        Connection.connectionMade(self)
-        self.msgHandler=AsyncMessageQueue()
+    def expect(self, criteria):
+        assert self._matches(self.next(), criteria)
 
     def auth(self, name="bhtest"):
-        self.writeMsg(Message.HandShake(name=name, protoversion=2))
-        d = self.msgHandler.expect(Message.HandShake)
-        return d
+        self.send(message.HandShake(name=name, protoversion=2))
+        self.expect(message.HandShake)
 
-class BithordeConnectionFactory(Factory):
-    def buildProtocol(self, addr):
-        return TestConnection()
 
-    def connect(self, addr):
-      point = UNIXClientEndpoint(reactor, addr)
-      return point.connect(self)
-
-    def connectAndAuth(self, addr):
-      res = defer.Deferred()
-      d = self.connect(addr) \
-              .addCallbacks(lambda c: c.auth().addCallback(res.callback), res.errback)
-      return res
-
-class BithordeD(ProcessProtocol):
-    @classmethod
-    def launch(cls, label='bithorded', bithorded='bin/bithorded', config=''):
-        self = cls()
-        self.onStarted = defer.Deferred()
+class BithordeD(Process):
+    def __init__(self, label='bithorded', bithorded='bithorded', config=''):
         self.config = config
         self.label = label
-        reactor.spawnProcess(self, 'stdbuf', ['stdbuf', '-o0', '-e0', bithorded, '-c', '/dev/stdin'])
-        return self.onStarted
-    def connectionMade(self):
-        self.exitTrigger = reactor.addSystemEventTrigger('before', 'shutdown', self.stop)
-        self.transport.write(self.config)
-        self.transport.closeStdin()
-    def outReceived(self, data):
-        self.onStarted.callback(self)
-        print self.label, 'OUT:', data
-    def errReceived(self, data):
-        print >>sys.stderr, self.label, 'ERR:', data
-    def stop(self):
-        self.exitTrigger = None
-        self.transport.signalProcess('KILL')
-    def outConnectionLost(self):
-        if self.exitTrigger:
-            reactor.removeSystemEventTrigger(self.exitTrigger)
+        Process.__init__(self, 'stdbuf', ['-o0', '-e0', bithorded, '-c', '/dev/stdin'])
+    def run(self):
+        Process.run(self)
+        self.write(self.config)
+        self.close_stdin()
+        for line in self.child_stdout_stderr:
+            if self.label:
+                print "%s: %s" % (self.label, line)
+            if line.find('Server started') >= 0:
+                break
+        eventlet.spawn(self._run)
+    def _run(self):
+        for line in self.child_stdout_stderr:
+            pass
 
 if __name__ == '__main__':
     from os import path
-    TEST_SOCKET = path.abspath('bithorde-test')
+    TEST_SOCKET = path.abspath('test-bithorde-sock')
 
-    def authSuccess(x):
-        print x
-        reactor.stop()
-
-    def authFail(err):
-        print err
-        reactor.stop()
-
-    def bithordeStarted(process):
-        BithordeConnectionFactory() \
-            .connectAndAuth(TEST_SOCKET) \
-            .addCallbacks(authSuccess, authFail)
-
-    BithordeD.launch(config='''
+    bithorde = BithordeD(bithorded='bin/bithorded', config='''
+        server.tcpPort=0
         server.unixSocket=%s
         cache.dir=/tmp
-    '''%TEST_SOCKET).addCallback(bithordeStarted)
+    '''%TEST_SOCKET)
 
-    reactor.run()
+    conn = TestConnection(TEST_SOCKET, name='test-python')
+    conn.send(message.BindRead(handle=1, ids=[message.Identifier(type=message.TREE_TIGER, id='NON-EXISTANT')]))
+    for msg in conn:
+        print msg
