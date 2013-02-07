@@ -1,4 +1,4 @@
-import socket, sys,types
+import os, socket, sys,types
 
 from bithorde import decodeMessage, encoder, MSG_REV_MAP, message
 
@@ -8,11 +8,14 @@ from google.protobuf.message import Message
 
 class TestConnection:
     def __init__(self, tgt, name=None):
-        if isinstance(tgt, tuple):
-            family = socket.AF_INET
+        if isinstance(tgt, eventlet.greenio.GreenSocket):
+            self._socket = tgt
         else:
-            family = socket.AF_UNIX
-        self._socket = eventlet.connect(tgt, family)
+            if isinstance(tgt, tuple):
+                family = socket.AF_INET
+            else:
+                family = socket.AF_UNIX
+            self._socket = eventlet.connect(tgt, family)
         self.buf = ""
         if name:
             self.auth(name)
@@ -40,21 +43,37 @@ class TestConnection:
     def _matches(cls, msg, criteria):
         if isinstance(criteria, type):
             return isinstance(msg, criteria)
+        elif isinstance(criteria, message.message.Message):
+            for field, value in criteria.ListFields():
+                if getattr(msg, field.name) != value:
+                    return False
+            return True
         else:
             assert False, "Criteria %s not supported" % criteria
 
     def expect(self, criteria):
-        assert self._matches(self.next(), criteria)
+        next = self.next()
+        assert self._matches(next, criteria), "Next message %s did not match expected %s" % (next, criteria)
 
     def auth(self, name="bhtest"):
         self.send(message.HandShake(name=name, protoversion=2))
         self.expect(message.HandShake)
 
+class TestServer:
+    def __init__(self, addr, name='bithorded-test'):
+        self.name = name
+        eventlet.serve(eventlet.listen(addr), self.run, concurrenct=1)
+    def run(self, socket, addr):
+        conn = TestConnection(socket, 'bithorded-test')
+        for msg in conn:
+            pass
 
 class BithordeD(Process):
-    def __init__(self, label='bithorded', bithorded='bithorded', config=''):
+    def __init__(self, label='bithorded', bithorded=os.environ.get('BITHORDED', 'bithorded'), config=''):
         self.config = config
         self.label = label
+        self.started = False
+        self.queue = eventlet.Queue()
         Process.__init__(self, 'stdbuf', ['-o0', '-e0', bithorded, '-c', '/dev/stdin'])
     def run(self):
         Process.run(self)
@@ -64,11 +83,21 @@ class BithordeD(Process):
             if self.label:
                 print "%s: %s" % (self.label, line)
             if line.find('Server started') >= 0:
+                self.started = True
                 break
+        assert self.started
         eventlet.spawn(self._run)
     def _run(self):
         for line in self.child_stdout_stderr:
-            pass
+            if self.label:
+                print "%s: %s" % (self.label, line)
+            self.queue.put(line)
+    def wait_for(self, crit):
+        while True:
+            line = self.queue.get()
+            if line.find(crit) >= 0:
+                return True
+        assert False, "%s: did not find expected '%s'" % (self.label, crit)
 
 if __name__ == '__main__':
     from os import path
