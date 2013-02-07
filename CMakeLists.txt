@@ -104,14 +104,23 @@ INSTALL(FILES template.config
 
 # Test Setup
 ENABLE_TESTING()
+
 ADD_TEST(NAME UnitTests COMMAND unittests)
 SET_TESTS_PROPERTIES(UnitTests PROPERTIES TIMEOUT 60)
 
-ADD_TEST(RoundtripTest ${CMAKE_SOURCE_DIR}/tests/roundtrip/test_roundtrip.sh)
-SET_TESTS_PROPERTIES(RoundtripTest PROPERTIES TIMEOUT 60 ENVIRONMENT "BH_BINDIR=${CMAKE_CURRENT_BINARY_DIR}/bin")
 
-ADD_TEST(LinkSourceTest ${CMAKE_SOURCE_DIR}/tests/link_source/test_links.sh)
-SET_TESTS_PROPERTIES(LinkSourceTest PROPERTIES TIMEOUT 60 ENVIRONMENT "BH_BINDIR=${CMAKE_CURRENT_BINARY_DIR}/bin")
+
+MACRO(ADD_TEST_SCRIPT name)
+  ADD_TEST(${name} ${ARGN})
+  SET_TESTS_PROPERTIES(${name}
+    PROPERTIES
+        TIMEOUT 60
+        ENVIRONMENT "BH_BINDIR=${CMAKE_BINARY_DIR}/bin;PYTHONPATH=${CMAKE_BINARY_DIR}:${CMAKE_SOURCE_DIR}/python"
+  )
+ENDMACRO(ADD_TEST_SCRIPT)
+
+ADD_TEST_SCRIPT(RoundtripTest ${CMAKE_SOURCE_DIR}/tests/roundtrip/test_roundtrip.sh)
+ADD_TEST_SCRIPT(LinkSourceTest ${CMAKE_SOURCE_DIR}/tests/link_source/test_links.sh)
 
 # CPack packaging
 INCLUDE(InstallRequiredSystemLibraries)
