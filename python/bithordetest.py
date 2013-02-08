@@ -1,4 +1,5 @@
-import os, socket, sys,types
+import os, socket, sys, types
+from time import time
 
 from bithorde import decodeMessage, encoder, MSG_REV_MAP, message
 
@@ -10,15 +11,20 @@ class TestConnection:
     def __init__(self, tgt, name=None):
         if isinstance(tgt, eventlet.greenio.GreenSocket):
             self._socket = tgt
+        elif isinstance(tgt, BithordeD):
+            server_cfg = tgt.config['server']
+            self._connect(server_cfg.get('unixSocket') or ('localhost', server_cfg.get('tcpPort')))
         else:
-            if isinstance(tgt, tuple):
-                family = socket.AF_INET
-            else:
-                family = socket.AF_UNIX
-            self._socket = eventlet.connect(tgt, family)
+            _connect(tgt)
         self.buf = ""
         if name:
             self.auth(name)
+    def _connect(self, tgt):
+        if isinstance(tgt, tuple):
+            family = socket.AF_INET
+        else:
+            family = socket.AF_UNIX
+        self._socket = eventlet.connect(tgt, family)
 
     def send(self, msg):
         enc = encoder.MessageEncoder(MSG_REV_MAP[type(msg)], False, False)
@@ -69,7 +75,18 @@ class TestServer:
             pass
 
 class BithordeD(Process):
-    def __init__(self, label='bithorded', bithorded=os.environ.get('BITHORDED', 'bithorded'), config=''):
+    def __init__(self, label='bithorded', bithorded=os.environ.get('BITHORDED', 'bithorded'), config={}):
+        if hasattr(config, 'setdefault'):
+            suffix = (time(), os.getpid())
+            server_cfg = config.setdefault('server', {})
+            server_cfg.setdefault('tcpPort', 0)
+            server_cfg.setdefault('unixSocket', "bhtest-sock-%d-%d" % suffix)
+            cache_cfg = config.setdefault('cache', {})
+            if not cache_cfg.get('dir'):
+                d = 'bhtest-cache-%d-%d' % suffix
+                os.mkdir(d)
+                cache_cfg['dir'] = d
+
         self.config = config
         self.label = label
         self.started = False
@@ -77,7 +94,14 @@ class BithordeD(Process):
         Process.__init__(self, 'stdbuf', ['-o0', '-e0', bithorded, '-c', '/dev/stdin'])
     def run(self):
         Process.run(self)
-        self.write(self.config)
+        def gen_config(value, key=[]):
+            if hasattr(value, 'iteritems'):
+                return "\n".join(gen_config(value, key+[ikey]) for ikey, value in value.iteritems())
+            elif key:
+                return "%s=%s" % ('.'.join(key), value)
+            else:
+                return value
+        self.write(gen_config(self.config))
         self.close_stdin()
         for line in self.child_stdout_stderr:
             if self.label:
