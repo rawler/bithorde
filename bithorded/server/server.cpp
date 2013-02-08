@@ -66,6 +66,7 @@ Server::Server(asio::io_service& ioSvc, Config& cfg) :
 		_tcpListener.set_option(boost::asio::ip::tcp::acceptor::reuse_address(true));
 		_tcpListener.bind(tcpPort);
 		_tcpListener.listen();
+		LOG4CPLUS_INFO(serverLog, "Listening on tcp port " << _cfg.tcpPort);
 
 		waitForTCPConnection();
 	}
@@ -78,6 +79,7 @@ Server::Server(asio::io_service& ioSvc, Config& cfg) :
 		_localListener.set_option(boost::asio::local::stream_protocol::acceptor::reuse_address(true));
 		_localListener.bind(localPort);
 		_localListener.listen(4);
+		LOG4CPLUS_INFO(serverLog, "Listening on local socket " << localPort);
 
 		waitForLocalConnection();
 	}
