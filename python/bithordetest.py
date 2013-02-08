@@ -60,6 +60,7 @@ class TestConnection:
     def expect(self, criteria):
         next = self.next()
         assert self._matches(next, criteria), "Next message %s did not match expected %s" % (next, criteria)
+        return next
 
     def auth(self, name="bhtest"):
         self.send(message.HandShake(name=name, protoversion=2))
