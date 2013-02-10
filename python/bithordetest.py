@@ -30,6 +30,9 @@ class TestConnection:
         enc = encoder.MessageEncoder(MSG_REV_MAP[type(msg)], False, False)
         enc(self._socket.send, msg)
 
+    def close(self):
+        self._socket.close()
+
     def __iter__(self):
         return self
 
