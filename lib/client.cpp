@@ -119,14 +119,18 @@ void Client::connect(string spec) {
 void Client::onDisconnected() {
 	_connection.reset();
 	for (auto iter=_assetMap.begin(); iter != _assetMap.end(); iter++) {
-		ReadAsset* asset = iter->second->readAsset();
-		if (asset) {
-			bithorde::AssetStatus s;
-			s.set_status(bithorde::DISCONNECTED);
-			asset->statusUpdate(s);
-		} else {
-			_handleAllocator.free(iter->first);
-			_assetMap.erase(iter);
+		auto binding = iter->second;
+		if (binding) {
+			binding->clearTimer();
+			auto asset = binding->readAsset();
+			if (asset) {
+				bithorde::AssetStatus s;
+				s.set_status(bithorde::DISCONNECTED);
+				asset->statusUpdate(s);
+			} else {
+				_handleAllocator.free(iter->first);
+				_assetMap.erase(iter);
+			}
 		}
 	}
 	disconnected();
