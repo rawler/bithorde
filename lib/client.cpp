@@ -210,7 +210,9 @@ void Client::onMessage(const bithorde::HandShake &msg)
 		// Setup encryption
 	} else {
 		for (auto iter = _assetMap.begin(); iter != _assetMap.end(); iter++) {
-			BOOST_ASSERT(iter->second->readAsset());
+			auto binding = iter->second;
+			BOOST_ASSERT(binding && binding->readAsset());
+			binding->setTimer(DEFAULT_ASSET_TIMEOUT);
 			informBound(*iter->second, rand64(), DEFAULT_ASSET_TIMEOUT.total_milliseconds());
 		}
 			
