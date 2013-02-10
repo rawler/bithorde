@@ -53,6 +53,12 @@ void AssetBinding::clearTimer()
 	_statusTimer.cancel();
 }
 
+void AssetBinding::orphaned()
+{
+	_client = NULL;
+	clearTimer();
+}
+
 void AssetBinding::onTimeout(const boost::system::error_code& error)
 {
 	if (error)
@@ -61,7 +67,7 @@ void AssetBinding::onTimeout(const boost::system::error_code& error)
 		bithorde::AssetStatus msg;
 		msg.set_status(bithorde::Status::TIMEOUT);
 		_asset->handleMessage(msg);
-	} else {
+	} else if (_client) {
 		_client->informBound(*this, rand64(), DEFAULT_ASSET_TIMEOUT.total_milliseconds());
 		setTimer(DEFAULT_ASSET_TIMEOUT);
 	}
@@ -75,6 +81,13 @@ Client::Client(asio::io_service& ioSvc, string myName) :
 	_rpcIdAllocator(1),
 	_protoVersion(0)
 {
+}
+
+Client::~Client()
+{
+	for (auto iter = _assetMap.begin(); iter != _assetMap.end(); iter++) {
+		iter->second->orphaned();
+	}
 }
 
 void Client::connect(Connection::Pointer newConn) {

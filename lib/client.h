@@ -41,6 +41,7 @@ public:
 private:
 	void setTimer(const boost::posix_time::time_duration& timeout);
 	void clearTimer();
+	void orphaned();
 	void onTimeout(const boost::system::error_code& error);
 };
 
@@ -72,7 +73,7 @@ public:
 	static Pointer create(boost::asio::io_service& ioSvc, std::string myName) {
 		return Pointer(new Client(ioSvc, myName));
 	}
-	virtual ~Client() {}
+	virtual ~Client();
 
 	/**
 	 * Tries to parse spec either as HOST:PORT, or as /absolute/socket/path and connect to it. 
