@@ -44,12 +44,14 @@ void AssetBinding::close()
 
 void AssetBinding::setTimer(const boost::posix_time::time_duration& timeout)
 {
+	_timerCancelled = false;
 	_statusTimer.expires_from_now(timeout);
 	_statusTimer.async_wait(boost::bind(&AssetBinding::onTimeout, shared_from_this(), boost::asio::placeholders::error));
 }
 
 void AssetBinding::clearTimer()
 {
+	_timerCancelled = true;
 	_statusTimer.cancel();
 }
 
@@ -61,7 +63,7 @@ void AssetBinding::orphaned()
 
 void AssetBinding::onTimeout(const boost::system::error_code& error)
 {
-	if (error)
+	if (error || _timerCancelled)
 		return;
 	if (_asset) {
 		bithorde::AssetStatus msg;

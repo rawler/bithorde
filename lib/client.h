@@ -26,6 +26,7 @@ class AssetBinding : public boost::enable_shared_from_this<AssetBinding> {
 	Asset* _asset;
 	Asset::Handle _handle;
 	boost::asio::deadline_timer _statusTimer;
+	bool _timerCancelled;
 public:
 	AssetBinding(Client* client, Asset* asset, Asset::Handle handle);
 
