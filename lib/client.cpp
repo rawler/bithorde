@@ -11,7 +11,8 @@
 
 #include "random.h"
 
-const static boost::posix_time::millisec DEFAULT_ASSET_TIMEOUT(500);
+const static boost::posix_time::millisec DEFAULT_ASSET_TIMEOUT(1500);
+const static boost::posix_time::millisec CLOSE_TIMEOUT(300);
 
 using namespace std;
 namespace asio = boost::asio;
@@ -39,7 +40,7 @@ ReadAsset* AssetBinding::readAsset() const
 void AssetBinding::close()
 {
 	_asset = NULL;
-	setTimer(DEFAULT_ASSET_TIMEOUT);
+	setTimer(CLOSE_TIMEOUT);
 }
 
 void AssetBinding::setTimer(const boost::posix_time::time_duration& timeout)
@@ -70,8 +71,8 @@ void AssetBinding::onTimeout(const boost::system::error_code& error)
 		msg.set_status(bithorde::Status::TIMEOUT);
 		_asset->handleMessage(msg);
 	} else if (_client) {
-		_client->informBound(*this, rand64(), DEFAULT_ASSET_TIMEOUT.total_milliseconds());
-		setTimer(DEFAULT_ASSET_TIMEOUT);
+		_client->informBound(*this, rand64(), CLOSE_TIMEOUT.total_milliseconds());
+		setTimer(CLOSE_TIMEOUT);
 	}
 }
 
