@@ -177,7 +177,7 @@ void Client::onMessage(const bithorde::HandShake &msg)
 	if (msg.protoversion() >= 2) {
 		_protoVersion = 2;
 	} else {
-		cerr << "Only Protocol-version 2 or higer supported" << endl;
+		cerr << "Only Protocol-version 2 or higher supported" << endl;
 		_connection->close();
 		_connection.reset();
 		return;
