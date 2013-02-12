@@ -55,9 +55,10 @@ public:
 	 */
 	uintmax_t assetFullSize(const boost::filesystem::path& path);
 
-	static void removeAsset(const boost::filesystem::path& assetPath);
-	static void unlink(const boost::filesystem::path& linkPath);
-	static void unlinkAndRemove(const boost::filesystem::path& linkPath);
+	static void removeAsset(const boost::filesystem::path& assetPath) noexcept;
+	static void unlink(const boost::filesystem::path& linkPath) noexcept;
+	static void unlinkAndRemove(const boost::filesystem::path& linkPath) noexcept;
+	void unlinkAndRemove(const BitHordeIds& ids) noexcept;
 };
 } }
 

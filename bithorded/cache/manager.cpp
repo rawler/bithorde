@@ -20,10 +20,19 @@
 #include <boost/filesystem.hpp>
 #include <ctime>
 
+#include <log4cplus/logger.h>
+#include <log4cplus/loggingmacros.h>
+
 using namespace bithorded;
 using namespace bithorded::cache;
 
 namespace fs = boost::filesystem;
+
+namespace bithorded {
+	namespace cache {
+		log4cplus::Logger log = log4cplus::Logger::getInstance("source");
+	}
+}
 
 CacheManager::CacheManager(boost::asio::io_service& ioSvc,
                            bithorded::router::Router& router,
@@ -45,15 +54,21 @@ IAsset::Ptr CacheManager::findAsset(const BitHordeIds& ids)
 
 	auto path = _store.resolveIds(ids);
 	if (!path.empty()) {
-		auto asset = boost::make_shared<CachedAsset>(path);
-		if (asset->hasRootHash()) {
-// 			if (tigerId.size())
-// 				_tigerMap[tigerId] = asset;
-			return asset;
-		} else {
-			// TODO
-//			LOG4CPLUS_WARN(sourceLog, "Incomplete asset detected, TODO");
-// 			_threadPool.post(*new HashTask(asset, _ioSvc));
+		try {
+			auto asset = boost::make_shared<CachedAsset>(path);
+			if (asset->hasRootHash()) {
+	// 			if (tigerId.size())
+	// 				_tigerMap[tigerId] = asset;
+				return asset;
+			} else {
+				// TODO
+	//			LOG4CPLUS_WARN(sourceLog, "Incomplete asset detected, TODO");
+	// 			_threadPool.post(*new HashTask(asset, _ioSvc));
+			}
+		} catch (const std::ios::failure& e) {
+			LOG4CPLUS_ERROR(log, "Failed to open " << path << ". Purging...");
+			_store.unlinkAndRemove(ids);
+			return IAsset::Ptr();
 		}
 	}
 	return IAsset::Ptr();
@@ -63,11 +78,16 @@ IAsset::Ptr CacheManager::prepareUpload(uint64_t size)
 {
 	if ((!_baseDir.empty()) && makeRoom(size)) {
 		fs::path assetFolder(_store.newAssetDir());
-		fs::create_directory(assetFolder);
 
-		auto asset = boost::make_shared<CachedAsset>(assetFolder,size);
-		asset->statusChange.connect(boost::bind(&CacheManager::linkAsset, this, asset.get()));
-		return asset;
+		try {
+			auto asset = boost::make_shared<CachedAsset>(assetFolder,size);
+			asset->statusChange.connect(boost::bind(&CacheManager::linkAsset, this, asset.get()));
+			return asset;
+		} catch (const std::ios::failure& e) {
+			LOG4CPLUS_ERROR(log, "Failed to create " << assetFolder << " for upload. Purging...");
+			_store.removeAsset(assetFolder);
+			return IAsset::Ptr();
+		}
 	} else {
 		return IAsset::Ptr();
 	}

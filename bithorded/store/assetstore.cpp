@@ -57,6 +57,7 @@ boost::filesystem::path AssetStore::newAssetDir()
 	do {
 		assetFolder = _assetsFolder / randomAlphaNumeric(20);
 	} while (fs::exists(assetFolder));
+	fs::create_directory(assetFolder);
 	return assetFolder;
 }
 
@@ -155,7 +156,7 @@ uintmax_t AssetStore::assetFullSize(const boost::filesystem::path& path)
 	return res;
 }
 
-void AssetStore::removeAsset(const boost::filesystem::path& assetPath)
+void AssetStore::removeAsset(const boost::filesystem::path& assetPath) noexcept
 {
 	if (fs::is_directory(assetPath)) {
 		LOG4CPLUS_WARN(bithorded::storeLog, "removing asset " << assetPath.filename());
@@ -163,12 +164,12 @@ void AssetStore::removeAsset(const boost::filesystem::path& assetPath)
 	}
 }
 
-void AssetStore::unlink(const fs::path& linkPath)
+void AssetStore::unlink(const fs::path& linkPath) noexcept
 {
 	fs::remove(linkPath);
 }
 
-void AssetStore::unlinkAndRemove(const boost::filesystem::path& linkPath)
+void AssetStore::unlinkAndRemove(const boost::filesystem::path& linkPath) noexcept
 {
 	boost::system::error_code e;
 	auto asset = fs::read_symlink(linkPath, e);
@@ -176,6 +177,17 @@ void AssetStore::unlinkAndRemove(const boost::filesystem::path& linkPath)
 	if (!e)
 		removeAsset(asset);
 }
+
+void AssetStore::unlinkAndRemove(const BitHordeIds& ids) noexcept
+{
+	for (auto iter=ids.begin(); iter != ids.end(); iter++) {
+		if (iter->type() == bithorde::HashType::TREE_TIGER) {
+			fs::path hashLink = _tigerFolder / base32encode(iter->id());
+			unlinkAndRemove(hashLink);
+		}
+	}
+}
+
 
 
 

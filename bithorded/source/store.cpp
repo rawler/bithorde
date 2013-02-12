@@ -36,7 +36,9 @@ const int THREADPOOL_CONCURRENCY = 4;
 const fs::path META_DIR = ".bh_meta";
 
 namespace bithorded {
-	log4cplus::Logger sourceLog = log4cplus::Logger::getInstance("source");
+	namespace source {
+		log4cplus::Logger log = log4cplus::Logger::getInstance("source");
+	}
 }
 
 Store::Store(boost::asio::io_service& ioSvc, const boost::filesystem::path& baseDir) :
@@ -80,14 +82,19 @@ IAsset::Ptr Store::addAsset(const boost::filesystem::path& file)
 	} else {
 		fs::path assetFolder(_store.newAssetDir());
 
-		fs::create_directory(assetFolder);
 		fs::create_symlink(file, assetFolder/"data");
 
-		SourceAsset::Ptr asset = boost::make_shared<SourceAsset>(assetFolder);
-		asset->statusChange.connect(boost::bind(&Store::_addAsset, this, asset.get()));
-		HashTask* task = new HashTask(asset, _ioSvc);
-		_threadPool.post(*task);
-		return asset;
+		try {
+			SourceAsset::Ptr asset = boost::make_shared<SourceAsset>(assetFolder);
+			asset->statusChange.connect(boost::bind(&Store::_addAsset, this, asset.get()));
+			HashTask* task = new HashTask(asset, _ioSvc);
+			_threadPool.post(*task);
+			return asset;
+		} catch (const std::ios::failure& e) {
+			LOG4CPLUS_ERROR(log, "Failed to create " << assetFolder << " for hashing " << file << ". Purging...");
+			_store.removeAsset(assetFolder);
+			return IAsset::Ptr();
+		}
 	}
 }
 
@@ -124,14 +131,21 @@ IAsset::Ptr Store::findAsset(const BitHordeIds& ids)
 
 	auto path = _store.resolveIds(ids);
 	if (!path.empty()) {
-		auto asset = boost::make_shared<SourceAsset>(path);
-		if (asset->hasRootHash()) {
-			if (tigerId.size())
-				_tigerMap[tigerId] = asset;
-			return asset;
-		} else {
-			LOG4CPLUS_WARN(sourceLog, "Unhashed asset detected, hashing");
-			_threadPool.post(*new HashTask(asset, _ioSvc));
+		try {
+			auto asset = boost::make_shared<SourceAsset>(path);
+			if (asset->hasRootHash()) {
+				if (tigerId.size())
+					_tigerMap[tigerId] = asset;
+				return asset;
+			} else {
+				LOG4CPLUS_WARN(log, "Unhashed asset detected, hashing");
+				_threadPool.post(*new HashTask(asset, _ioSvc));
+			}
+		} catch (const std::ios::failure& e) {
+			LOG4CPLUS_ERROR(log, "Failed to open " << path << ". Purging...");
+			_store.unlink(tigerId);
+			_store.removeAsset(path);
+			return IAsset::Ptr();
 		}
 	}
 	return IAsset::Ptr();
