@@ -160,13 +160,21 @@ void AssetStore::removeAsset(const boost::filesystem::path& assetPath) noexcept
 {
 	if (fs::is_directory(assetPath)) {
 		LOG4CPLUS_WARN(bithorded::storeLog, "removing asset " << assetPath.filename());
-		fs::remove_all(assetPath);
+		boost::system::error_code err;
+		fs::remove_all(assetPath, err);
+		if (err && (err.value() != boost::system::errc::no_such_file_or_directory)) {
+			LOG4CPLUS_WARN(bithorded::storeLog, "error removing asset " << assetPath << "; " << err);
+		}
 	}
 }
 
 void AssetStore::unlink(const fs::path& linkPath) noexcept
 {
-	fs::remove(linkPath);
+	boost::system::error_code err;
+	fs::remove(linkPath, err);
+	if (err && (err.value() != boost::system::errc::no_such_file_or_directory)) {
+		LOG4CPLUS_WARN(bithorded::storeLog, "error removing asset-link " << linkPath << "; " << err);
+	}
 }
 
 void AssetStore::unlinkAndRemove(const boost::filesystem::path& linkPath) noexcept
