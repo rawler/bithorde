@@ -26,21 +26,15 @@
 
 namespace bithorded { namespace cache {
 
-class CacheManager
+class CacheManager : private bithorded::store::AssetStore
 {
 	boost::filesystem::path _baseDir;
 	boost::asio::io_service& _ioSvc;
 	bithorded::router::Router& _router;
-	bithorded::store::AssetStore _store;
 
 	uintmax_t _maxSize;
 public:
 	CacheManager(boost::asio::io_service& ioSvc, bithorded::router::Router& router, const boost::filesystem::path& baseDir, intmax_t size);
-
-	/**
-	 * Finds an asset by bithorde HashId. (Only the tiger-hash is actually used)
-	 */
-	IAsset::Ptr findAsset(const BitHordeIds& ids);
 
 	/**
 	 * Add an asset to the idx, allocating space for
@@ -51,6 +45,18 @@ public:
 	 * @returns a valid asset if file is within acceptable path, NULL otherwise
 	 */
 	IAsset::Ptr prepareUpload(uint64_t size);
+
+	/**
+	 * Finds an asset by bithorde HashId. (Only the tiger-hash is actually used)
+	 */
+	IAsset::Ptr findAsset(const BitHordeIds& ids);
+
+protected:
+	/**
+	 * Finds an asset by bithorde HashId. (Only the tiger-hash is actually used)
+	 */
+	IAsset::Ptr openAsset(const boost::filesystem::path& assetPath);
+	
 private:
 	bool makeRoom(uint64_t size);
 	void linkAsset(bithorded::cache::CachedAsset* asset);

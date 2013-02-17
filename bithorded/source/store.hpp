@@ -26,18 +26,17 @@
 #include "asset.hpp"
 #include "bithorde.pb.h"
 #include "../lib/threadpool.hpp"
+#include "../lib/weakmap.hpp"
 #include "../store/assetstore.hpp"
 
 namespace bithorded {
 	namespace source {
 
-class Store
+class Store : private bithorded::store::AssetStore
 {
 	ThreadPool _threadPool;
 	boost::asio::io_service& _ioSvc;
 	boost::filesystem::path _baseDir;
-	bithorded::store::AssetStore _store;
-	std::map<std::string, SourceAsset::WeakPtr> _tigerMap;
 public:
 	Store(boost::asio::io_service& ioSvc, const boost::filesystem::path& baseDir);
 
@@ -55,8 +54,13 @@ public:
 	 * Finds an asset by bithorde HashId. (Only the tiger-hash is actually used)
 	 */
 	IAsset::Ptr findAsset(const BitHordeIds& ids);
+
+protected:
+	/**
+	 * Finds an asset by bithorde HashId. (Only the tiger-hash is actually used)
+	 */
+	IAsset::Ptr openAsset(const boost::filesystem::path& assetPath);
 private:
-	SourceAsset::Ptr _openTiger(const std::string& tigerId);
 	void _addAsset( bithorded::source::SourceAsset* asset);
 };
 

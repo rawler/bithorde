@@ -37,47 +37,30 @@ namespace bithorded {
 CacheManager::CacheManager(boost::asio::io_service& ioSvc,
                            bithorded::router::Router& router,
                            const boost::filesystem::path& baseDir, intmax_t size) :
+	bithorded::store::AssetStore(baseDir),
 	_baseDir(baseDir),
 	_ioSvc(ioSvc),
 	_router(router),
-	_store(baseDir),
 	_maxSize(size)
 {
 	if (!baseDir.empty())
-		_store.open();
+		AssetStore::openOrCreate();
 }
 
-IAsset::Ptr CacheManager::findAsset(const BitHordeIds& ids)
+IAsset::Ptr CacheManager::openAsset(const boost::filesystem::path& assetPath)
 {
-	if (_baseDir.empty())
+	auto asset = boost::make_shared<CachedAsset>(assetPath);
+	if (asset->hasRootHash()) {
+		return asset;
+	} else {
 		return IAsset::Ptr();
-
-	auto path = _store.resolveIds(ids);
-	if (!path.empty()) {
-		try {
-			auto asset = boost::make_shared<CachedAsset>(path);
-			if (asset->hasRootHash()) {
-	// 			if (tigerId.size())
-	// 				_tigerMap[tigerId] = asset;
-				return asset;
-			} else {
-				// TODO
-	//			LOG4CPLUS_WARN(sourceLog, "Incomplete asset detected, TODO");
-	// 			_threadPool.post(*new HashTask(asset, _ioSvc));
-			}
-		} catch (const std::ios::failure& e) {
-			LOG4CPLUS_ERROR(log, "Failed to open " << path << ". Purging...");
-			_store.unlinkAndRemove(ids);
-			return IAsset::Ptr();
-		}
 	}
-	return IAsset::Ptr();
 }
 
 IAsset::Ptr CacheManager::prepareUpload(uint64_t size)
 {
 	if ((!_baseDir.empty()) && makeRoom(size)) {
-		fs::path assetFolder(_store.newAssetDir());
+		fs::path assetFolder(AssetStore::newAssetDir());
 
 		try {
 			auto asset = boost::make_shared<CachedAsset>(assetFolder,size);
@@ -85,7 +68,7 @@ IAsset::Ptr CacheManager::prepareUpload(uint64_t size)
 			return asset;
 		} catch (const std::ios::failure& e) {
 			LOG4CPLUS_ERROR(log, "Failed to create " << assetFolder << " for upload. Purging...");
-			_store.removeAsset(assetFolder);
+			AssetStore::removeAsset(assetFolder);
 			return IAsset::Ptr();
 		}
 	} else {
@@ -93,14 +76,19 @@ IAsset::Ptr CacheManager::prepareUpload(uint64_t size)
 	}
 }
 
+IAsset::Ptr CacheManager::findAsset(const BitHordeIds& ids)
+{
+	return AssetStore::findAsset(ids);
+}
+
 bool CacheManager::makeRoom(uint64_t size)
 {
-	while ((_store.size()+size) > _maxSize) {
+	while ((store::AssetStore::size()+size) > _maxSize) {
 		auto looser = pickLooser();
 		if (looser.empty())
 			return false;
 		else
-			_store.removeAsset(looser);
+			AssetStore::removeAsset(looser);
 	}
 	return true;
 }
@@ -110,7 +98,7 @@ fs::path CacheManager::pickLooser() {
 	fs::path looser;
 	std::time_t oldest=-1;
 	fs::directory_iterator end;
-	for (auto iter=_store.assetIterator(); iter != end; iter++) {
+	for (auto iter=AssetStore::assetIterator(); iter != end; iter++) {
 		auto age = fs::last_write_time(iter->path());
 		if ((oldest == -1) || (age < oldest)) {
 			oldest = age;
@@ -129,7 +117,7 @@ void CacheManager::linkAsset(CachedAsset* asset)
 		const char *data_path = (asset->folder()/"data").c_str();
 		lutimes(data_path, NULL);
 
-		_store.link(ids, asset->folder());
+		AssetStore::link(ids, asset->folder());
 	}
 }
 

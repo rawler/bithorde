@@ -26,6 +26,7 @@
 
 #include "../../lib/random.h"
 
+using namespace bithorded;
 using namespace bithorded::store;
 namespace fs = boost::filesystem;
 using namespace std;
@@ -38,12 +39,12 @@ namespace bithorded {
 }
 
 AssetStore::AssetStore(const boost::filesystem::path& baseDir) :
-	_assetsFolder(baseDir/ASSETS_DIR),
-	_tigerFolder(baseDir/TIGER_DIR)
+	_assetsFolder(baseDir.empty() ? fs::path() : (baseDir/ASSETS_DIR)),
+	_tigerFolder(baseDir.empty() ? fs::path() : (baseDir/TIGER_DIR))
 {
 }
 
-void AssetStore::open()
+void AssetStore::openOrCreate()
 {
 	if (!fs::exists(_assetsFolder))
 		fs::create_directories(_assetsFolder);
@@ -114,21 +115,53 @@ bool checkAssetFolder(const fs::path& referrer, const fs::path& assetFolder) {
 	return false;
 }
 
+std::string findTigerId(const BitHordeIds& ids) {
+	for (auto iter=ids.begin(); iter != ids.end(); iter++) {
+		if (iter->type() == bithorde::HashType::TREE_TIGER)
+			return iter->id();
+	}
+	return "";
+}
+
 boost::filesystem::path AssetStore::resolveIds(const BitHordeIds& ids)
 {
-	for (auto iter=ids.begin(); iter != ids.end(); iter++) {
-		if (iter->type() == bithorde::HashType::TREE_TIGER) {
-			fs::path hashLink = _tigerFolder / base32encode(iter->id());
-			boost::system::error_code e;
-			auto assetFolder = fs::read_symlink(hashLink, e);
-			if (e || !fs::is_directory(assetFolder)) {
-				unlink(hashLink);
-			} else if (checkAssetFolder(hashLink, assetFolder)) {
-				return assetFolder;
-			}
+	if (_tigerFolder.empty())
+		fs::path();
+	auto tigerId = findTigerId(ids);
+	if (tigerId.size() >= 0) {
+		fs::path hashLink = _tigerFolder / base32encode(tigerId);
+		boost::system::error_code e;
+		auto assetFolder = fs::read_symlink(hashLink, e);
+		if (e || !fs::is_directory(assetFolder)) {
+			unlink(hashLink);
+		} else if (checkAssetFolder(hashLink, assetFolder)) {
+			return assetFolder;
 		}
 	}
 	return fs::path();
+}
+
+IAsset::Ptr AssetStore::findAsset(const BitHordeIds& ids)
+{
+	std::string tigerId = findTigerId(ids);
+	if (tigerId.empty())
+		return IAsset::Ptr();
+	if (auto active = _tigerCache[tigerId])
+		return active;
+
+	auto assetPath = resolveIds(ids);
+	if (assetPath.empty())
+		return IAsset::Ptr();
+	try {
+		auto res = openAsset(assetPath);
+		if (res)
+			_tigerCache.set(tigerId, res);
+		return res;
+	} catch (const std::ios::failure& e) {
+		LOG4CPLUS_ERROR(storeLog, "Failed to open " << assetPath << " with error " << e.what() << ". Purging...");
+		unlinkAndRemove(ids);
+		return IAsset::Ptr();
+	}
 }
 
 boost::filesystem::directory_iterator AssetStore::assetIterator()

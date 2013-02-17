@@ -42,14 +42,14 @@ namespace bithorded {
 }
 
 Store::Store(boost::asio::io_service& ioSvc, const boost::filesystem::path& baseDir) :
+	bithorded::store::AssetStore(baseDir.empty() ? fs::path() : (baseDir/META_DIR)),
 	_threadPool(THREADPOOL_CONCURRENCY),
 	_ioSvc(ioSvc),
-	_baseDir(baseDir),
-	_store(baseDir/META_DIR)
+	_baseDir(baseDir)
 {
 	if (!fs::exists(_baseDir))
 		throw ios_base::failure("LinkedAssetStore: baseDir does not exist");
-	_store.open();
+	AssetStore::openOrCreate();
 }
 
 struct HashTask : public Task {
@@ -80,7 +80,7 @@ IAsset::Ptr Store::addAsset(const boost::filesystem::path& file)
 	if (!path_is_in(file, _baseDir)) {
 		return ASSET_NONE;
 	} else {
-		fs::path assetFolder(_store.newAssetDir());
+		fs::path assetFolder(AssetStore::newAssetDir());
 
 		fs::create_symlink(file, assetFolder/"data");
 
@@ -92,10 +92,15 @@ IAsset::Ptr Store::addAsset(const boost::filesystem::path& file)
 			return asset;
 		} catch (const std::ios::failure& e) {
 			LOG4CPLUS_ERROR(log, "Failed to create " << assetFolder << " for hashing " << file << ". Purging...");
-			_store.removeAsset(assetFolder);
+			AssetStore::removeAsset(assetFolder);
 			return IAsset::Ptr();
 		}
 	}
+}
+
+IAsset::Ptr Store::findAsset(const BitHordeIds& ids)
+{
+	return AssetStore::findAsset(ids);
 }
 
 void Store::_addAsset(SourceAsset* asset)
@@ -105,48 +110,19 @@ void Store::_addAsset(SourceAsset* asset)
 		const char *data_path = (asset->folder()/"data").c_str();
 		lutimes(data_path, NULL);
 
-		_store.link(ids, asset->folder());
+		AssetStore::link(ids, asset->folder());
 	}
 }
 
 
-std::string findTigerId(const BitHordeIds& ids) {
-	for (auto iter=ids.begin(); iter != ids.end(); iter++) {
-		if (iter->type() == bithorde::HashType::TREE_TIGER)
-			return iter->id();
-	}
-	return "";
-}
-
-IAsset::Ptr Store::findAsset(const BitHordeIds& ids)
+IAsset::Ptr Store::openAsset(const boost::filesystem::path& assetPath)
 {
-	std::string tigerId = findTigerId(ids);
-
-	if (_tigerMap.count(tigerId)) {
-		if (auto asset = _tigerMap[tigerId].lock())
-			return asset;
-		else
-			_tigerMap.erase(tigerId);
+	auto asset = boost::make_shared<SourceAsset>(assetPath);
+	if (asset->hasRootHash()) {
+		return asset;
+	} else {
+		LOG4CPLUS_WARN(log, "Unhashed asset detected, hashing");
+		_threadPool.post(*new HashTask(asset, _ioSvc));
+		return IAsset::Ptr();
 	}
-
-	auto path = _store.resolveIds(ids);
-	if (!path.empty()) {
-		try {
-			auto asset = boost::make_shared<SourceAsset>(path);
-			if (asset->hasRootHash()) {
-				if (tigerId.size())
-					_tigerMap[tigerId] = asset;
-				return asset;
-			} else {
-				LOG4CPLUS_WARN(log, "Unhashed asset detected, hashing");
-				_threadPool.post(*new HashTask(asset, _ioSvc));
-			}
-		} catch (const std::ios::failure& e) {
-			LOG4CPLUS_ERROR(log, "Failed to open " << path << ". Purging...");
-			_store.unlink(tigerId);
-			_store.removeAsset(path);
-			return IAsset::Ptr();
-		}
-	}
-	return IAsset::Ptr();
 }
