@@ -164,8 +164,7 @@ IAsset::Ptr Server::async_linkAsset(const boost::filesystem::path& filePath)
 IAsset::Ptr Server::async_findAsset(const bithorde::BindRead& req)
 {
 	for (auto iter=_assetStores.begin(); iter != _assetStores.end(); iter++) {
-		IAsset::Ptr asset((*iter)->findAsset(req.ids()));
-		if (asset)
+		if (auto asset = (*iter)->findAsset(req))
 			return asset;
 	}
 
