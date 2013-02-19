@@ -91,6 +91,10 @@ void Client::onMessage(const bithorde::BindWrite& msg)
 void Client::onMessage(bithorde::BindRead& msg)
 {
 	bithorde::Asset::Handle h = msg.handle();
+	if (((int)_assets.size() > h) && _assets[h]) {
+		LOG4CPLUS_INFO(clientLogger, peerName() << ':' << h << " closed");
+		clearAsset(h);
+	}
 	if (msg.ids_size() > 0) {
 		// Trying to open
 		LOG4CPLUS_INFO(clientLogger, peerName() << ':' << h << " requested: " << MagnetURI(msg));
@@ -108,8 +112,6 @@ void Client::onMessage(bithorde::BindRead& msg)
 		}
 	} else {
 		// Trying to close
-		LOG4CPLUS_INFO(clientLogger, peerName() << ':' << h << " closed");
-		clearAsset(h);
 		informAssetStatus(h, bithorde::NOTFOUND);
 	}
 }
@@ -239,10 +241,12 @@ void Client::clearAsset(bithorde::Asset::Handle handle_)
 {
 	size_t handle = handle_;
 	if (handle < _assets.size()) {
-		if (auto& a=_assets[handle])
+		if (auto& a=_assets[handle]) {
 			a->statusChange.disconnect(boost::bind(&Client::informAssetStatusUpdate, this, handle_, IAsset::WeakPtr(a)));
-		_assets[handle].reset();
+			_assets[handle].reset();
+		}
 	}
+	LOG4CPLUS_INFO(clientLogger, peerName() << ':' << handle_ << " released");
 }
 
 IAsset::Ptr& Client::getAsset(bithorde::Asset::Handle handle_)
