@@ -22,8 +22,10 @@
 #include <boost/function.hpp>
 #include <boost/shared_ptr.hpp>
 #include <map>
+#include <unordered_set>
 #include <vector>
 
+#include "../lib/weakmap.hpp"
 #include "../server/config.hpp"
 #include "../server/client.hpp"
 #include "asset.hpp"
@@ -42,7 +44,7 @@ class Router
 	std::map<std::string, boost::shared_ptr<FriendConnector> > _connectors;
 	std::map<std::string, Client::Ptr > _connectedFriends;
 
-	std::map< uint64_t, ForwardedAsset::WeakPtr > _sessionMap;
+	std::unordered_set< uint64_t > _sessionFilter;
 public:
 	Router(Server& server);
 
@@ -54,6 +56,8 @@ public:
 	void onDisconnected(const bithorded::Client::Ptr& client);
 
 	bithorded::IAsset::Ptr findAsset(const bithorde::BindRead& req);
+private:
+	void clearSessionId(uint64_t id, boost::shared_ptr<boost::asio::deadline_timer> _);
 };
 
 }}
