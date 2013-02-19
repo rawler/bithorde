@@ -198,16 +198,16 @@ void AssetStore::unlinkAndRemove(const BitHordeIds& ids) noexcept
 	}
 }
 
-IAsset::Ptr AssetStore::openAsset(const BitHordeIds& ids)
+IAsset::Ptr AssetStore::openAsset(const bithorde::BindRead& req)
 {
-	auto assetPath = resolveIds(ids);
+	auto assetPath = resolveIds(req.ids());
 	if (assetPath.empty())
 		return IAsset::Ptr();
 	else try {
 		return openAsset(assetPath);
 	} catch (const std::ios::failure& e) {
 		LOG4CPLUS_ERROR(storeLog, "Failed to open " << assetPath << " with error " << e.what() << ". Purging...");
-		unlinkAndRemove(ids);
+		unlinkAndRemove(req.ids());
 		return IAsset::Ptr();
 	}
 }

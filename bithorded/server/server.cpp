@@ -168,7 +168,7 @@ IAsset::Ptr Server::async_findAsset(const bithorde::BindRead& req)
 			return asset;
 	}
 
-	if (auto asset = _cache.findAsset(req.ids()))
+	if (auto asset = _cache.findAsset(req))
 		return asset;
 	else
 		return _router.findAsset(req);

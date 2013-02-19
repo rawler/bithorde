@@ -27,9 +27,9 @@ class AssetSessions
 {
 	bithorded::WeakMap<std::string, IAsset> _tigerCache;
 public:
-	IAsset::Ptr findAsset(const BitHordeIds& ids);
+	IAsset::Ptr findAsset(const bithorde::BindRead& req);
 protected:
-	virtual IAsset::Ptr openAsset(const BitHordeIds& ids) = 0;
+	virtual IAsset::Ptr openAsset(const bithorde::BindRead& req) = 0;
 };
 
 }

@@ -126,7 +126,13 @@ void Router::onDisconnected(const bithorded::Client::Ptr& client)
 		_connectors[peerName] = FriendConnector::create(_server, _friends[peerName]);
 }
 
-bithorded::IAsset::Ptr bithorded::router::Router::findAsset(const bithorde::BindRead& req)
+IAsset::Ptr Router::findAsset(const bithorde::BindRead& req)
+{
+	// TODO; make sure returned asset isn't stale
+	return AssetSessions::findAsset(req);
+}
+
+bithorded::IAsset::Ptr bithorded::router::Router::openAsset(const bithorde::BindRead& req)
 {
 	BOOST_ASSERT(req.has_uuid());
 	int timeout = req.has_timeout() ? req.timeout()-20 : 500; // TODO: Find actual reasonable time message has been in air. Use DEFAULT_ASSET_TIMEOUT from library.

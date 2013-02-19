@@ -25,6 +25,7 @@
 #include <unordered_set>
 #include <vector>
 
+#include "../lib/assetsessions.hpp"
 #include "../lib/weakmap.hpp"
 #include "../server/config.hpp"
 #include "../server/client.hpp"
@@ -37,7 +38,7 @@ namespace router {
 
 class FriendConnector;
 
-class Router
+class Router : public AssetSessions
 {
 	Server& _server;
 	std::map<std::string, Friend> _friends;
@@ -55,7 +56,9 @@ public:
 	void onConnected(const bithorded::Client::Ptr& client);
 	void onDisconnected(const bithorded::Client::Ptr& client);
 
-	bithorded::IAsset::Ptr findAsset(const bithorde::BindRead& req);
+	IAsset::Ptr findAsset(const bithorde::BindRead& req);
+protected:
+	virtual bithorded::IAsset::Ptr openAsset(const bithorde::BindRead& req);
 private:
 	void clearSessionId(uint64_t id, boost::shared_ptr<boost::asio::deadline_timer> _);
 };

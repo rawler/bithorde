@@ -53,7 +53,7 @@ public:
 	/**
 	 * Finds an asset by bithorde HashId. (Only the tiger-hash is actually used)
 	 */
-	IAsset::Ptr findAsset(const BitHordeIds& ids);
+	IAsset::Ptr findAsset(const bithorde::BindRead& req);
 
 protected:
 	/**

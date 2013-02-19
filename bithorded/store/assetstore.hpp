@@ -68,7 +68,7 @@ public:
 	void unlinkAndRemove(const BitHordeIds& ids) noexcept;
 
 protected:
-    virtual IAsset::Ptr openAsset(const BitHordeIds& ids);
+    virtual IAsset::Ptr openAsset(const bithorde::BindRead& req);
 	virtual IAsset::Ptr openAsset(const boost::filesystem::path& assetPath) = 0;
 };
 } }

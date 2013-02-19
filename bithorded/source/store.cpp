@@ -98,9 +98,9 @@ IAsset::Ptr Store::addAsset(const boost::filesystem::path& file)
 	}
 }
 
-IAsset::Ptr Store::findAsset(const BitHordeIds& ids)
+IAsset::Ptr Store::findAsset(const bithorde::BindRead& req)
 {
-	return AssetSessions::findAsset(ids);
+	return AssetSessions::findAsset(req);
 }
 
 void Store::_addAsset(SourceAsset* asset)

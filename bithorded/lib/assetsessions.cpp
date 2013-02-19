@@ -19,15 +19,15 @@
 
 #include "../../lib/hashes.h"
 
-bithorded::IAsset::Ptr bithorded::AssetSessions::findAsset(const BitHordeIds& ids)
+bithorded::IAsset::Ptr bithorded::AssetSessions::findAsset(const bithorde::BindRead& req)
 {
-	std::string tigerId = findBithordeId(ids, bithorde::HashType::TREE_TIGER);
+	std::string tigerId = findBithordeId(req.ids(), bithorde::HashType::TREE_TIGER);
 	if (tigerId.empty())
 		return IAsset::Ptr();
 	if (auto active = _tigerCache[tigerId])
 		return active;
 
-	auto res = openAsset(ids);
+	auto res = openAsset(req);
 	if (res)
 		_tigerCache.set(tigerId, res);
 	return res;

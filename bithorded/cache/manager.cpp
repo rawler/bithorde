@@ -76,9 +76,9 @@ IAsset::Ptr CacheManager::prepareUpload(uint64_t size)
 	}
 }
 
-IAsset::Ptr CacheManager::findAsset(const BitHordeIds& ids)
+IAsset::Ptr CacheManager::findAsset(const bithorde::BindRead& req)
 {
-	return AssetSessions::findAsset(ids);
+	return AssetSessions::findAsset(req);
 }
 
 bool CacheManager::makeRoom(uint64_t size)
