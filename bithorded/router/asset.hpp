@@ -56,6 +56,8 @@ public:
 		_pendingReads()
 	{}
 
+	virtual ~ForwardedAsset();
+
 	bool hasUpstream(const std::string peername);
 	void bindUpstreams(const std::map< std::string, bithorded::Client::Ptr >& friends, uint64_t uuid, int timeout);
 
@@ -67,6 +69,7 @@ private:
 	void onUpstreamStatus(const std::string& peername, const bithorde::AssetStatus& status);
 	void updateStatus();
 	void onData(uint64_t offset, const std::string& data, int tag);
+	void dropUpstream(const std::string& peername);
 };
 
 }

@@ -31,6 +31,14 @@ namespace bithorded { namespace router {
 	log4cplus::Logger assetLogger = log4cplus::Logger::getInstance("router");
 } }
 
+ForwardedAsset::~ForwardedAsset()
+{
+	for (auto upstream = _upstream.begin(); upstream != _upstream.end(); upstream++) {
+		upstream->second->statusUpdate.disconnect(boost::bind(&ForwardedAsset::onUpstreamStatus, this, upstream->first, bithorde::ASSET_ARG_STATUS));
+		upstream->second->dataArrived.disconnect(boost::bind(&ForwardedAsset::onData, this, bithorde::ASSET_ARG_OFFSET, bithorde::ASSET_ARG_DATA, bithorde::ASSET_ARG_TAG));
+	}
+}
+
 bool bithorded::router::ForwardedAsset::hasUpstream(const std::string peername)
 {
 	return _upstream.count(peername);
@@ -63,14 +71,14 @@ void bithorded::router::ForwardedAsset::onUpstreamStatus(const string& peername,
 				_size = status.size();
 			} else if (_size != (int64_t)status.size()) {
 				LOG4CPLUS_WARN(assetLogger, peername << " " << _ids << " responded with mismatching size, ignoring...");
-				_upstream.erase(peername);
+				dropUpstream(peername);
 			}
 		} else {
 			LOG4CPLUS_WARN(assetLogger, peername << " " << _ids << " SUCCESS response not accompanied with asset-size.");
 		}
 	} else {
 		LOG4CPLUS_DEBUG(assetLogger, _ids << "Failed upstream " << peername);
-		_upstream.erase(peername);
+		dropUpstream(peername);
 	}
 	updateStatus();
 }
@@ -123,4 +131,15 @@ void bithorded::router::ForwardedAsset::onData(uint64_t offset, const std::strin
 uint64_t bithorded::router::ForwardedAsset::size()
 {
 	return _size;
+}
+
+void ForwardedAsset::dropUpstream(const string& peername)
+{
+	auto upstream = _upstream.find(peername);
+	if (upstream != _upstream.end()) {
+		upstream->second->statusUpdate.disconnect(boost::bind(&ForwardedAsset::onUpstreamStatus, this, peername, bithorde::ASSET_ARG_STATUS));
+		upstream->second->dataArrived.disconnect(boost::bind(&ForwardedAsset::onData, this,
+			bithorde::ASSET_ARG_OFFSET, bithorde::ASSET_ARG_DATA, bithorde::ASSET_ARG_TAG));
+		_upstream.erase(upstream);
+	}
 }
