@@ -109,7 +109,7 @@ class BithordeD(Process):
         self.close_stdin()
         for line in self.child_stdout_stderr:
             if self.label:
-                print "%s: %s" % (self.label, line)
+                print "%s: %s" % (self.label, line.rstrip())
             if line.find('Server started') >= 0:
                 self.started = True
                 break
@@ -118,7 +118,7 @@ class BithordeD(Process):
     def _run(self):
         for line in self.child_stdout_stderr:
             if self.label:
-                print "%s: %s" % (self.label, line)
+                print "%s: %s" % (self.label, line.rstrip())
             self.queue.put(line)
     def wait_for(self, crit):
         while True:
