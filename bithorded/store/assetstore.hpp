@@ -22,16 +22,15 @@
 #include <boost/filesystem/operations.hpp>
 
 #include "../../lib/hashes.h"
-#include "../lib/weakmap.hpp"
+#include "../lib/assetsessions.hpp"
 #include "../server/asset.hpp"
 
 namespace bithorded { namespace store {
 
-class AssetStore
+class AssetStore : public AssetSessions
 {
 	boost::filesystem::path _assetsFolder;
 	boost::filesystem::path _tigerFolder;
-	WeakMap<std::string, IAsset> _tigerCache;
 public:
 	AssetStore(const boost::filesystem::path& baseDir);
 
@@ -69,6 +68,7 @@ public:
 	void unlinkAndRemove(const BitHordeIds& ids) noexcept;
 
 protected:
+    virtual IAsset::Ptr openAsset(const BitHordeIds& ids);
 	virtual IAsset::Ptr openAsset(const boost::filesystem::path& assetPath) = 0;
 };
 } }

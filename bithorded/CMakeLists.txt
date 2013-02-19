@@ -4,10 +4,11 @@ ADD_EXECUTABLE(bithorded
 	cache/asset.cpp
 	cache/manager.cpp
 
-	lib/threadpool.cpp
+	lib/assetsessions.cpp
 	lib/hashtree.cpp
 	lib/randomaccessfile.cpp
 	lib/rounding.cpp
+	lib/threadpool.cpp
 	lib/treestore.cpp
 
 	router/asset.cpp

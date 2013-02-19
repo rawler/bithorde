@@ -100,7 +100,7 @@ IAsset::Ptr Store::addAsset(const boost::filesystem::path& file)
 
 IAsset::Ptr Store::findAsset(const BitHordeIds& ids)
 {
-	return AssetStore::findAsset(ids);
+	return AssetSessions::findAsset(ids);
 }
 
 void Store::_addAsset(SourceAsset* asset)

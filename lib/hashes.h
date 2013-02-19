@@ -42,4 +42,6 @@ private:
 
 std::ostream& operator<<(std::ostream& str, const BitHordeIds& ids);
 
+std::string findBithordeId(const BitHordeIds& ids, bithorde::HashType type);
+
 #endif // BITHORDE_HASHES_H

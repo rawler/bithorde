@@ -115,19 +115,11 @@ bool checkAssetFolder(const fs::path& referrer, const fs::path& assetFolder) {
 	return false;
 }
 
-std::string findTigerId(const BitHordeIds& ids) {
-	for (auto iter=ids.begin(); iter != ids.end(); iter++) {
-		if (iter->type() == bithorde::HashType::TREE_TIGER)
-			return iter->id();
-	}
-	return "";
-}
-
 boost::filesystem::path AssetStore::resolveIds(const BitHordeIds& ids)
 {
 	if (_tigerFolder.empty())
 		fs::path();
-	auto tigerId = findTigerId(ids);
+	auto tigerId = findBithordeId(ids, bithorde::HashType::TREE_TIGER);
 	if (tigerId.size() >= 0) {
 		fs::path hashLink = _tigerFolder / base32encode(tigerId);
 		boost::system::error_code e;
@@ -139,29 +131,6 @@ boost::filesystem::path AssetStore::resolveIds(const BitHordeIds& ids)
 		}
 	}
 	return fs::path();
-}
-
-IAsset::Ptr AssetStore::findAsset(const BitHordeIds& ids)
-{
-	std::string tigerId = findTigerId(ids);
-	if (tigerId.empty())
-		return IAsset::Ptr();
-	if (auto active = _tigerCache[tigerId])
-		return active;
-
-	auto assetPath = resolveIds(ids);
-	if (assetPath.empty())
-		return IAsset::Ptr();
-	try {
-		auto res = openAsset(assetPath);
-		if (res)
-			_tigerCache.set(tigerId, res);
-		return res;
-	} catch (const std::ios::failure& e) {
-		LOG4CPLUS_ERROR(storeLog, "Failed to open " << assetPath << " with error " << e.what() << ". Purging...");
-		unlinkAndRemove(ids);
-		return IAsset::Ptr();
-	}
 }
 
 boost::filesystem::directory_iterator AssetStore::assetIterator()
@@ -228,6 +197,21 @@ void AssetStore::unlinkAndRemove(const BitHordeIds& ids) noexcept
 		}
 	}
 }
+
+IAsset::Ptr AssetStore::openAsset(const BitHordeIds& ids)
+{
+	auto assetPath = resolveIds(ids);
+	if (assetPath.empty())
+		return IAsset::Ptr();
+	else try {
+		return openAsset(assetPath);
+	} catch (const std::ios::failure& e) {
+		LOG4CPLUS_ERROR(storeLog, "Failed to open " << assetPath << " with error " << e.what() << ". Purging...");
+		unlinkAndRemove(ids);
+		return IAsset::Ptr();
+	}
+}
+
 
 
 
