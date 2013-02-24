@@ -64,6 +64,10 @@ void Client::onMessage(const bithorde::HandShake& msg)
 
 void Client::onMessage(const bithorde::BindWrite& msg)
 {
+	auto h = msg.handle();
+	if ((_assets.size() > h) && _assets[h]) {
+		clearAsset(h);
+	}
 	if (msg.has_linkpath()) {
 		fs::path path(msg.linkpath());
 		if (path.is_absolute()) {
@@ -90,8 +94,8 @@ void Client::onMessage(const bithorde::BindWrite& msg)
 
 void Client::onMessage(bithorde::BindRead& msg)
 {
-	bithorde::Asset::Handle h = msg.handle();
-	if (((int)_assets.size() > h) && _assets[h]) {
+	auto h = msg.handle();
+	if ((_assets.size() > h) && _assets[h]) {
 		clearAsset(h);
 	}
 	if (msg.ids_size() > 0) {
