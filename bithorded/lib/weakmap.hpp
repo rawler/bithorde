@@ -19,6 +19,8 @@
 #define WEAKMAP_HPP
 
 #include <unordered_map>
+#include <boost/thread/pthread/mutex.hpp>
+#include <boost/thread/locks.hpp>
 #include <boost/weak_ptr.hpp>
 
 namespace bithorded {
@@ -29,6 +31,8 @@ class WeakMap
 	std::unordered_map<KeyType, boost::weak_ptr<LinkType> > _map;
 	uint _scrubThreshold; // Will automatically perform a complete scrubbing after this amount of changes
 	uint _dirtiness; // The amount of changes made since last scrubbing
+	boost::mutex _m;
+	typedef boost::lock_guard<boost::mutex> lock_guard;
 public:
 	typedef boost::shared_ptr<LinkType> Link;
 	WeakMap(int scrubThreshold=sizeof(KeyType) / 10000) :
@@ -40,6 +44,7 @@ public:
 	 * Clears all keys
 	 */
 	void clear() {
+		lock_guard lock(_m);
 		_map.clear();
 	}
 
@@ -47,6 +52,7 @@ public:
 	 * Clears the given key in map
 	 */
 	void clear(const KeyType& key) {
+		lock_guard lock(_m);
 		_map.erase(key);
 	}
 
@@ -56,6 +62,7 @@ public:
 	 *          An invalid link otherwise.
 	 */
 	Link operator[](const KeyType& key) {
+		lock_guard lock(_m);
 		auto iter = _map.find(key);
 		if (iter == _map.end()) {
 			return Link();
@@ -72,6 +79,26 @@ public:
 	 * Walks through all links in the map, purging any found inactive ones.
 	 */
 	void scrub() {
+		lock_guard lock(_m);
+		doScrub();
+	}
+
+	/**
+	 * Will store the provided link as a weak link, available through get.
+	 */
+	void set(const KeyType& key, const Link& link) {
+		lock_guard lock(_m);
+
+		BOOST_ASSERT(link);
+		_map[key] = link;
+		if (++_dirtiness >= _scrubThreshold)
+			doScrub();
+	}
+private:
+	/**
+	 * Caller MUST hold lock on _m.
+	 */
+	void doScrub() {
 		auto iter = _map.begin();
 		auto end = _map.end();
 		while (iter != end) {
@@ -81,16 +108,6 @@ public:
 				iter = _map.erase(iter);
 		}
 		_dirtiness = 0;
-	}
-
-	/**
-	 * Will store the provided link as a weak link, available through get.
-	 */
-	void set(const KeyType& key, const Link& link) {
-		BOOST_ASSERT(link);
-		_map[key] = link;
-		if (++_dirtiness >= _scrubThreshold)
-			scrub();
 	}
 };
 
