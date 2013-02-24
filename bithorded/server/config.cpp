@@ -20,6 +20,7 @@
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/asio/ip/host_name.hpp>
 #include <boost/assert.hpp>
+#include <boost/filesystem.hpp>
 #include <boost/foreach.hpp>
 #include <boost/tokenizer.hpp>
 #include <boost/program_options.hpp>
@@ -135,8 +136,13 @@ bithorded::Config::Config(int argc, char* argv[])
 		config_options.add(server_options).add(cache_options);
 		std::ifstream cfg(configPath);
 		if (!cfg.is_open())
-			throw ArgumentError("Failed to read config-file");
+			throw ArgumentError("Failed to open config-file");
 		vm.store(po::parse_config_file(cfg, config_options, true));
+		if (cfg.bad()) {
+			ostringstream buf;
+			buf << "Failed to read config-file: " << configPath;
+			throw ArgumentError(buf.str());
+		}
 		notify(vm);
 	}
 
