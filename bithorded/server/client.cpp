@@ -92,7 +92,6 @@ void Client::onMessage(bithorde::BindRead& msg)
 {
 	bithorde::Asset::Handle h = msg.handle();
 	if (((int)_assets.size() > h) && _assets[h]) {
-		LOG4CPLUS_INFO(clientLogger, peerName() << ':' << h << " closed");
 		clearAsset(h);
 	}
 	if (msg.ids_size() > 0) {
