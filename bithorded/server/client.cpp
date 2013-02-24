@@ -192,7 +192,7 @@ void Client::informAssetStatusUpdate(bithorde::Asset::Handle h, const bithorded:
 	} else {
 		resp.set_status(bithorde::NOTFOUND);
 	}
-	LOG4CPLUS_INFO(clientLogger, peerName() << ':' << h << " new state " << bithorde::Status_Name(resp.status()));
+	LOG4CPLUS_INFO(clientLogger, peerName() << ':' << h << " new state " << bithorde::Status_Name(resp.status()) << " (" << resp.ids() << ")");
 
 	sendMessage(bithorde::Connection::AssetStatus, resp);
 }

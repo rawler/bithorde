@@ -59,7 +59,7 @@ std::ostream& operator<<(std::ostream& str, const BitHordeIds& ids)
 				new CryptoPP::FileSink(str)
 			)
 		);
-		str << ", ";
+		str << ",";
 	}
 	return str;
 }
