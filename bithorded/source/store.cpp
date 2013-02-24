@@ -52,7 +52,7 @@ Store::Store(boost::asio::io_service& ioSvc, const boost::filesystem::path& base
 	AssetStore::openOrCreate();
 }
 
-struct HashTask : public Task {
+struct HashTask : public Task, private boost::noncopyable {
 	SourceAsset::Ptr asset;
 	asio::io_service& io_svc;
 	asio::io_service::work _work;
