@@ -83,7 +83,7 @@ AssetMeta::AssetMeta(const boost::filesystem::path& path, uint leafBlocks)
 	}
 }
 
-TigerNode& AssetMeta::operator[](const size_t offset)
+AssetMeta::NodePtr AssetMeta::operator[](const size_t offset)
 {
 	int64_t f_offset = _nodes_offset + offset*sizeof(TigerNode);
 	if (f_offset < _fp.offset)
@@ -91,7 +91,7 @@ TigerNode& AssetMeta::operator[](const size_t offset)
 	else if (f_offset + sizeof(TigerNode) > _fp.offset + _slice_size)
 		repage(f_offset);
 	uint64_t rel_offset = f_offset - _fp.offset;
-	return *(TigerNode*)(_f.data()+rel_offset);
+	return (TigerNode*)(_f.data()+rel_offset);
 }
 
 void AssetMeta::repage(uint64_t offset)

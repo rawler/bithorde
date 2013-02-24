@@ -76,12 +76,12 @@ size_t StoredAsset::can_read(uint64_t offset, size_t size)
 bool StoredAsset::getIds(BitHordeIds& ids)
 {
 	BOOST_ASSERT( ids.size() == 0 );
-	TigerNode& root = _hasher.getRoot();
+	auto root = _hasher.getRoot();
 
-	if (root.state == TigerNode::State::SET) {
+	if (root->state == TigerNode::State::SET) {
 		auto tigerId = ids.Add();
 		tigerId->set_type(bithorde::TREE_TIGER);
-		tigerId->set_id(root.digest, TigerNode::DigestSize);
+		tigerId->set_id(root->digest, TigerNode::DigestSize);
 		return true;
 	} else {
 		return false;
@@ -90,8 +90,8 @@ bool StoredAsset::getIds(BitHordeIds& ids)
 
 bool StoredAsset::hasRootHash()
 {
-	TigerNode& root = _hasher.getRoot();
-	return (root.state == TigerNode::State::SET);
+	auto root = _hasher.getRoot();
+	return (root->state == TigerNode::State::SET);
 }
 
 void StoredAsset::notifyValidRange(uint64_t offset, uint64_t size)

@@ -31,7 +31,7 @@ BOOST_AUTO_TEST_CASE( assetmeta_random_sequence )
 	byte block[TigerTree::BLOCKSIZE];
 	bzero(block, sizeof(block));
 
-	auto& root = tree.getRoot();
+	auto root = tree.getRoot();
 
 	tree.setData(0, block, sizeof(block));
 	tree.setData(1, block, sizeof(block));
@@ -42,17 +42,17 @@ BOOST_AUTO_TEST_CASE( assetmeta_random_sequence )
 	tree.setData(5, block, sizeof(block));
 	tree.setData(3, block, sizeof(block));
 
-	BOOST_CHECK_EQUAL( root.state, MyNode::State::EMPTY);
+	BOOST_CHECK_EQUAL( root->state, MyNode::State::EMPTY);
 
 	tree.setData(2, block, sizeof(block));
 
-	BOOST_CHECK_EQUAL( root.state, MyNode::State::SET );
-	BOOST_CHECK_EQUAL( root.base32Digest(), "FPSZ35773WS4WGBVXM255KWNETQZXMTEJGFMLTA" );
+	BOOST_CHECK_EQUAL( root->state, MyNode::State::SET );
+	BOOST_CHECK_EQUAL( root->base32Digest(), "FPSZ35773WS4WGBVXM255KWNETQZXMTEJGFMLTA" );
 
 	AssetMeta secondStore(TEST_FILE, LEAVES);
 	TigerTree secondTree(secondStore);
 	root = secondTree.getRoot();
 
-	BOOST_CHECK_EQUAL( root.state, MyNode::State::SET );
-	BOOST_CHECK_EQUAL( root.base32Digest(), "FPSZ35773WS4WGBVXM255KWNETQZXMTEJGFMLTA" );
+	BOOST_CHECK_EQUAL( root->state, MyNode::State::SET );
+	BOOST_CHECK_EQUAL( root->base32Digest(), "FPSZ35773WS4WGBVXM255KWNETQZXMTEJGFMLTA" );
 }

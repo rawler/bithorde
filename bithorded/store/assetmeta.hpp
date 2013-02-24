@@ -33,9 +33,10 @@ typedef HashNode<CryptoPP::Tiger> TigerNode;
 class AssetMeta
 {
 public:
+	typedef typename bithorded::store::TigerNode* NodePtr;
 	AssetMeta(const boost::filesystem::path& path, uint leafBlocks);
 
-	TigerNode& operator[](const size_t offset);
+	NodePtr operator[](const std::size_t offset);
 	size_t size();
 
 	const boost::filesystem::path& path() const;
