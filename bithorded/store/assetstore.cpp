@@ -167,7 +167,7 @@ void AssetStore::removeAsset(const boost::filesystem::path& assetPath) noexcept
 	if (fs::is_directory(assetPath)) {
 		LOG4CPLUS_WARN(bithorded::storeLog, "removing asset " << assetPath.filename());
 		boost::system::error_code err;
-		fs::remove_all(assetPath, err);
+		fs::remove(assetPath, err);
 		if (err && (err.value() != boost::system::errc::no_such_file_or_directory)) {
 			LOG4CPLUS_WARN(bithorded::storeLog, "error removing asset " << assetPath << "; " << err);
 		}
