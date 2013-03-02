@@ -17,14 +17,16 @@
 #include "assetmeta.hpp"
 
 #include <algorithm>
+#include <sstream>
 
 #include <boost/filesystem.hpp>
+#include <boost/smart_ptr/make_shared.hpp>
 #include <netinet/in.h>
 
 using namespace std;
 using namespace bithorded::store;
 
-const static size_t MAP_PAGE = 1024*1024;
+const static size_t MAP_PAGE = 128*1024;
 
 namespace io = boost::iostreams;
 namespace fs = boost::filesystem;
@@ -45,80 +47,87 @@ struct Header {
 };
 #pragma pack(pop)
 
-AssetMeta::AssetMeta(const boost::filesystem::path& path, uint leafBlocks)
-	: _path(path), _fp(path.string()), _f()
+bithorded::store::TigerNode::TigerNode(AssetMeta& metaFile, size_t offset) :
+	TigerBaseNode(metaFile.read(offset)),
+	_metaFile(metaFile),
+	_offset(offset)
 {
-	_fp.flags = io::mapped_file::mapmode::readwrite;
-	_fp.offset = 0;
-	_fp.length = MAP_PAGE;
 
-	_leafBlocks = leafBlocks;
-	_nodes_offset = sizeof(Header);
-	_file_size = _nodes_offset + treesize(leafBlocks)*sizeof(TigerNode);
+}
 
-	auto status = fs::status(path);
-	uint64_t size;
+bithorded::store::TigerNode::~TigerNode()
+{
+	_metaFile.write(_offset, *this);
+}
 
-	if (fs::exists(status)) {
-		size = fs::file_size(path);
+AssetMeta::AssetMeta(const boost::filesystem::path& path, uint leafBlocks)
+	: _leafBlocks(leafBlocks), _nodes_offset(sizeof(Header))
+{
+	uint64_t expectedSize = _nodes_offset + treesize(leafBlocks)*sizeof(TigerBaseNode);
+	bool wasPresent = fs::exists(path);
+	_file.open(path, RandomAccessFile::READWRITE, expectedSize);
+
+	Header hdr;
+	if (wasPresent) {
+		auto hdr_size = sizeof(Header);
+		_file.read(0, hdr_size, (byte*)&hdr);
+		if (hdr_size != sizeof(Header))
+			throw ios_base::failure("Failed to read header from "+path.string());
+		if (hdr.format != 0x01)
+			throw ios_base::failure("Unknown format of file "+path.string());
+		if (hdr.leafBlocks() != _leafBlocks)
+			throw ios_base::failure("Mismatching number of blocks in file"+path.string());
 	} else {
-		size = 0;
-		_fp.new_file_size = _file_size;
-	}
-
-	_slice_size = std::min(_file_size, (uint64_t)MAP_PAGE);
-	_f.open(_fp);
-	Header* hdr = (Header*) _f.data();
-	if (size > 0) {
-		if (hdr->format != 0x01)
-			throw ios_base::failure("Unknown format of file");
-		if (hdr->leafBlocks() != _leafBlocks)
-			throw ios_base::failure("Mismatching number of blocks in file");
-		if (size != _file_size)
-			throw ios_base::failure("Existing file had wrong size");
-	} else {
-		hdr->format = 0x01;
-		hdr->leafBlocks(_leafBlocks);
-		_fp.new_file_size = 0;
+		hdr.format = 0x01;
+		hdr.leafBlocks(_leafBlocks);
+		if (_file.write(0, &hdr, sizeof(Header)) != sizeof(Header))
+			throw ios_base::failure("Failed to write header to "+path.string());
 	}
 }
 
 AssetMeta::NodePtr AssetMeta::operator[](const size_t offset)
 {
-	int64_t f_offset = _nodes_offset + offset*sizeof(TigerNode);
-	if (f_offset < _fp.offset)
-		repage(f_offset);
-	else if (f_offset + sizeof(TigerNode) > _fp.offset + _slice_size)
-		repage(f_offset);
-	uint64_t rel_offset = f_offset - _fp.offset;
-	return (TigerNode*)(_f.data()+rel_offset);
-}
-
-void AssetMeta::repage(uint64_t offset)
-{
-	int physpagesize = getpagesize();
-
-	int64_t pageStart = offset - (MAP_PAGE / 4);
-	if ((uint64_t)(pageStart + MAP_PAGE) > _file_size)
-		pageStart = _file_size - (MAP_PAGE - physpagesize);
-
-	// Align on correct pages
-	pageStart = pageStart & ~(physpagesize-1);
-
-	if (pageStart < 0)
-		pageStart = 0;
-	_fp.offset = pageStart;
-	_f.close();
-	_f.open(_fp);
-	_slice_size = std::min(_file_size - pageStart, (uint64_t)MAP_PAGE);
+	if (auto node = _nodeMap[offset]) {
+		return node;
+	} else {
+		auto res = boost::make_shared<TigerNode>(*this, offset);
+		_nodeMap.set(offset, res);
+		return res;
+	}
 }
 
 size_t AssetMeta::size()
 {
-	return (_file_size - _nodes_offset) / sizeof(TigerNode);
+	return (_file.size() - _nodes_offset) / sizeof(TigerBaseNode);
 }
 
-const boost::filesystem::path& AssetMeta::path() const
+TigerBaseNode AssetMeta::read(size_t offset)
 {
-	return _path;
+	uint64_t f_offset = _nodes_offset + offset*sizeof(TigerBaseNode);
+	TigerBaseNode res;
+	size_t node_size = sizeof(TigerBaseNode);
+	_file.read(f_offset, node_size, (byte*)&res);
+	if (node_size != sizeof(TigerBaseNode)) {
+		ostringstream buf;
+		buf << "Failed reading node at offset " << offset;
+		throw ios_base::failure(buf.str());
+	}
+	return res;
 }
+
+void AssetMeta::write(size_t offset, const TigerBaseNode& node)
+{
+	uint64_t f_offset = _nodes_offset + offset*sizeof(TigerBaseNode);
+	auto written = _file.write(f_offset, (byte*)&node, sizeof(TigerBaseNode));
+	if (written != sizeof(TigerBaseNode)) {
+		ostringstream buf;
+		buf << "Failed writing node at offset " << offset;
+		throw ios_base::failure(buf.str());
+	}
+}
+
+
+// const boost::filesystem::path& AssetMeta::path() const
+// {
+// 	return _path;
+// }

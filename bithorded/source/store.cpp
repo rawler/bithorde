@@ -86,7 +86,7 @@ IAsset::Ptr Store::addAsset(const boost::filesystem::path& file)
 
 		try {
 			SourceAsset::Ptr asset = boost::make_shared<SourceAsset>(assetFolder);
-			asset->statusChange.connect(boost::bind(&Store::_addAsset, this, asset.get()));
+			asset->statusChange.connect(boost::bind(&Store::_addAsset, this, SourceAsset::WeakPtr(asset)));
 			HashTask* task = new HashTask(asset, _ioSvc);
 			_threadPool.post(*task);
 			return asset;
@@ -103,14 +103,15 @@ IAsset::Ptr Store::findAsset(const bithorde::BindRead& req)
 	return AssetSessions::findAsset(req);
 }
 
-void Store::_addAsset(SourceAsset* asset)
+void Store::_addAsset(SourceAsset::WeakPtr asset_)
 {
+	auto asset = asset_.lock();
 	BitHordeIds ids;
 	if (asset && asset->getIds(ids)) {
 		const char *data_path = (asset->folder()/"data").c_str();
 		lutimes(data_path, NULL);
 
-		AssetStore::link(ids, asset->folder());
+		AssetStore::link(ids, asset);
 	}
 }
 

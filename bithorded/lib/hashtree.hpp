@@ -74,11 +74,8 @@ public:
 		computeLeaf(input, length, current->digest);
 		current->state = Node::State::SET;
 
-		Node currentCpy = *current;
-
 		while (not currentIdx.isRoot()) {
 			NodeIdx siblingIdx = currentIdx.sibling();
-			Node siblingCpy = *_store[siblingIdx];
 
 			NodeIdx parentIdx = currentIdx.parent();
 			NodePtr parent = _store[parentIdx];
@@ -86,21 +83,22 @@ public:
 				break;
 
 			if (siblingIdx.isValid()) {
-				if (siblingCpy.state != Node::State::SET) {
+				NodePtr sibling = _store[siblingIdx];
+				if (sibling->state != Node::State::SET) {
 					break;
 				} else {
 					BOOST_ASSERT(!(currentIdx == siblingIdx));
 					if (siblingIdx < currentIdx)
-						computeInternal(siblingCpy, currentCpy, *parent);
+						computeInternal(*sibling, *current, *parent);
 					else
-						computeInternal(currentCpy, siblingCpy, *parent);
+						computeInternal(*current, *sibling, *parent);
 				}
 			} else {
-				memcpy(parent->digest, currentCpy.digest, DigestSize);
+				memcpy(parent->digest, current->digest, DigestSize);
 			}
 			parent->state = Node::State::SET;
 			currentIdx = parentIdx;
-			currentCpy = *parent;
+			current = parent;
 		}
 	}
 

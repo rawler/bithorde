@@ -1,6 +1,7 @@
 
 ADD_EXECUTABLE( unittests
 	test_main.cpp
+	../bithorded/lib/randomaccessfile.cpp
 	../bithorded/lib/hashtree.cpp test_hashtree.cpp
 	../bithorded/lib/threadpool.cpp test_threadpool.cpp
 	../bithorded/lib/treestore.cpp test_treestore.cpp

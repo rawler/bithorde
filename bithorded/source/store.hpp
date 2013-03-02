@@ -61,7 +61,7 @@ protected:
 	 */
 	IAsset::Ptr openAsset(const boost::filesystem::path& assetPath);
 private:
-	void _addAsset( bithorded::source::SourceAsset* asset);
+	void _addAsset( bithorded::source::SourceAsset::WeakPtr asset);
 };
 
 	}

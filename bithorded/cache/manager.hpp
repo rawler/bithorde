@@ -59,7 +59,7 @@ protected:
 	
 private:
 	bool makeRoom(uint64_t size);
-	void linkAsset(bithorded::cache::CachedAsset* asset);
+	void linkAsset(bithorded::cache::CachedAsset::WeakPtr asset_);
 	/**
 	 * Figures out which tiger-id hasn't been accessed recently.
 	 */

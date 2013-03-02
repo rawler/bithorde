@@ -30,6 +30,7 @@ public:
 	IAsset::Ptr findAsset(const bithorde::BindRead& req);
 protected:
 	virtual IAsset::Ptr openAsset(const bithorde::BindRead& req) = 0;
+	void add(const std::string& tigerId, const IAsset::Ptr& asset);
 };
 
 }

@@ -24,7 +24,8 @@
 
 class RandomAccessFile {
 	int _fd;
-	const boost::filesystem::path _path;
+	boost::filesystem::path _path;
+	uint64_t _size;
 public:
 	enum Mode {
 	READ = 1,
@@ -32,8 +33,24 @@ public:
 	READWRITE = 3,
 	};
 
+	RandomAccessFile();
 	RandomAccessFile(const boost::filesystem::path& path, RandomAccessFile::Mode mode = READ, uint64_t size = 0);
 	~RandomAccessFile();
+
+	/**
+	 * Open the given file. May throw std::ios_base::failure.
+	 */
+	void open(const boost::filesystem::path& path, RandomAccessFile::Mode mode = READ, uint64_t size = 0);
+
+	/**
+	 * Close the underlying file
+	 */
+	void close();
+
+	/**
+	 * See if file is currently open
+	 */
+	   bool is_open() const;
 
 	/**
 	 * The number of bytes in the open file
@@ -52,7 +69,7 @@ public:
 	 * @arg size - will be updated with actual read amount
 	 * @returns pointer to data, may or may not be pointer to /buf/
 	 */
-	byte* read(uint64_t offset, size_t& size, byte *buf);
+	byte* read(uint64_t offset, size_t& size, byte* buf) const;
 
 	/**
 	 * Writes up to /size/ bytes to file beginning at /offset/.

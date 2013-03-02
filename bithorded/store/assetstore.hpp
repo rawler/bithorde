@@ -27,6 +27,8 @@
 
 namespace bithorded { namespace store {
 
+class StoredAsset;
+
 class AssetStore : public AssetSessions
 {
 	boost::filesystem::path _assetsFolder;
@@ -38,7 +40,7 @@ public:
 
 	boost::filesystem::path newAssetDir();
 
-	void link(const BitHordeIds& ids, const boost::filesystem::path& assetPath);
+	void link(const BitHordeIds& ids, const boost::shared_ptr<StoredAsset>& asset);
 
 	boost::filesystem::path resolveIds(const BitHordeIds& ids);
 
