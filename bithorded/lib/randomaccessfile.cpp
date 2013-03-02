@@ -22,12 +22,33 @@
 #include <fcntl.h>
 #include <ios>
 #include <sys/stat.h>
+#include <sstream>
+
+using namespace std;
 
 namespace fs = boost::filesystem;
 
-RandomAccessFile::RandomAccessFile(const boost::filesystem::path& path, RandomAccessFile::Mode mode, uint64_t size)
-	: _path(path)
+RandomAccessFile::RandomAccessFile() :
+	_fd(-1), _path(""), _size(0)
+{}
+
+RandomAccessFile::RandomAccessFile(const boost::filesystem::path& path, RandomAccessFile::Mode mode, uint64_t size) :
+	_fd(-1), _path(""), _size(0)
 {
+	open(path, mode, size);
+}
+
+RandomAccessFile::~RandomAccessFile()
+{
+	close();
+}
+
+void RandomAccessFile::open(const boost::filesystem::path& path, RandomAccessFile::Mode mode, uint64_t size)
+{
+	if (!size)
+		size = fs::file_size(path);
+	_path = path;
+	_size = size;
 	int m;
 	switch (mode) {
 		case READ: m = O_RDONLY; break;
@@ -36,27 +57,35 @@ RandomAccessFile::RandomAccessFile(const boost::filesystem::path& path, RandomAc
 		default: throw std::ios_base::failure("Unknown open-mode");
 	}
 	if (size > 0 && fs::exists(_path) && fs::file_size(_path) != size) {
-		throw std::ios_base::failure(path.string() + " exists with mismatching size.");
+		ostringstream buf;
+		buf << path << " exists with mismatching size, (" << size << " : " << fs::file_size(_path) << ")";
+		throw std::ios_base::failure(buf.str());
 	}
 
-	_fd = open(path.c_str(), m, S_IRUSR|S_IWUSR);
+	_fd = ::open(path.c_str(), m, S_IRUSR|S_IWUSR);
 	if (_fd < 0)
 		throw std::ios_base::failure("Failed opening "+path.string());
 	else if (size > 0)
 		ftruncate(_fd, size);
 }
 
-RandomAccessFile::~RandomAccessFile()
+void RandomAccessFile::close()
 {
-	if (_fd >= 0)
-		close(_fd);
+	if (is_open()) {
+		::close(_fd);
+		_fd = -1;
+		_path == "";
+	}
+}
+
+bool RandomAccessFile::is_open() const
+{
+	return _fd != -1;
 }
 
 uint64_t RandomAccessFile::size() const
 {
-	struct stat s;
-	fstat(_fd, &s);
-	return s.st_size;
+	return _size;
 }
 
 uint RandomAccessFile::blocks(size_t blockSize) const
@@ -65,7 +94,7 @@ uint RandomAccessFile::blocks(size_t blockSize) const
 	return (size() + blockSize - 1) / blockSize;
 }
 
-byte* RandomAccessFile::read(uint64_t offset, size_t& size, byte* buf)
+byte* RandomAccessFile::read(uint64_t offset, size_t& size, byte* buf) const
 {
 	ssize_t read = pread(_fd, buf, size, offset);
 	if ( read > 0 ) {

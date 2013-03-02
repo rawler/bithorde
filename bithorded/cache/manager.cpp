@@ -64,7 +64,7 @@ IAsset::Ptr CacheManager::prepareUpload(uint64_t size)
 
 		try {
 			auto asset = boost::make_shared<CachedAsset>(assetFolder,size);
-			asset->statusChange.connect(boost::bind(&CacheManager::linkAsset, this, asset.get()));
+			asset->statusChange.connect(boost::bind(&CacheManager::linkAsset, this, CachedAsset::WeakPtr(asset)));
 			return asset;
 		} catch (const std::ios::failure& e) {
 			LOG4CPLUS_ERROR(log, "Failed to create " << assetFolder << " for upload. Purging...");
@@ -109,15 +109,16 @@ fs::path CacheManager::pickLooser() {
 	return looser;
 }
 
-void CacheManager::linkAsset(CachedAsset* asset)
+void CacheManager::linkAsset(CachedAsset::WeakPtr asset_)
 {
+	auto asset = asset_.lock();
 	BitHordeIds ids;
 	if (asset && asset->getIds(ids)) {
 		std::cerr << "Linking" << std::endl;
 		const char *data_path = (asset->folder()/"data").c_str();
 		lutimes(data_path, NULL);
 
-		AssetStore::link(ids, asset->folder());
+		AssetStore::link(ids, asset);
 	}
 }
 

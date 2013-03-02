@@ -6,10 +6,12 @@
 #include "bithorded/lib/treestore.hpp"
 #include "bithorded/lib/hashtree.hpp"
 
+#include "test_storage.hpp"
+
 using namespace std;
 
 typedef HashNode< CryptoPP::Tiger > MyNode;
-typedef vector< MyNode > Storage;
+typedef TestStorage< MyNode > Storage;
 typedef HashTree< MyNode, Storage > TigerTree;
 
 BOOST_AUTO_TEST_CASE( hashtree_random_sequence )
@@ -21,7 +23,7 @@ BOOST_AUTO_TEST_CASE( hashtree_random_sequence )
 	byte block[TigerTree::BLOCKSIZE];
 	bzero(block, sizeof(block));
 
-	auto& root = tree.getRoot();
+	auto root = tree.getRoot();
 
 	tree.setData(0, block, sizeof(block));
 	tree.setData(1, block, sizeof(block));
@@ -32,12 +34,12 @@ BOOST_AUTO_TEST_CASE( hashtree_random_sequence )
 	tree.setData(5, block, sizeof(block));
 	tree.setData(3, block, sizeof(block));
 
-	BOOST_CHECK_EQUAL( root.state, MyNode::State::EMPTY);
+	BOOST_CHECK_EQUAL( root->state, MyNode::State::EMPTY);
 
 	tree.setData(2, block, sizeof(block));
 
-	BOOST_CHECK_EQUAL( root.state, MyNode::State::SET );
-	BOOST_CHECK_EQUAL( root.base32Digest(), "FPSZ35773WS4WGBVXM255KWNETQZXMTEJGFMLTA" );
+	BOOST_CHECK_EQUAL( root->state, MyNode::State::SET );
+	BOOST_CHECK_EQUAL( root->base32Digest(), "FPSZ35773WS4WGBVXM255KWNETQZXMTEJGFMLTA" );
 }
 
 string rootBase32(std::string input) {
@@ -53,10 +55,10 @@ string rootBase32(std::string input) {
 		tree.setData(i/TigerTree::BLOCKSIZE, data+i, bl);
 	}
 
-	auto& root = tree.getRoot();
+	auto root = tree.getRoot();
 
-	BOOST_CHECK_EQUAL( root.state, MyNode::State::SET );
-	return root.base32Digest();
+	BOOST_CHECK_EQUAL( root->state, MyNode::State::SET );
+	return root->base32Digest();
 }
 
 BOOST_AUTO_TEST_CASE( test_vectors )

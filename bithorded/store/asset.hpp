@@ -35,6 +35,8 @@ protected:
 	AssetMeta _metaStore;
 	Hasher _hasher;
 public:
+	typedef typename boost::shared_ptr<StoredAsset> Ptr;
+
 	/**
 	 * All writes must be aligned on this BLOCKSIZE, or the data might be trimmed in the ends.
 	 */

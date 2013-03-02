@@ -25,6 +25,7 @@
 #include <ostream>
 
 #include <boost/assert.hpp>
+#include <boost/shared_ptr.hpp>
 
 inline uint parentlayersize(uint nodes) {
 	if (nodes > 1)
@@ -85,6 +86,8 @@ template <typename Node, typename BackingStore>
 class TreeStore
 {
 public:
+	typedef typename BackingStore::NodePtr NodePtr;
+
 	TreeStore(BackingStore& backingStore) 
 		: _storage(backingStore), _leaves(calc_leaves(backingStore.size()))
 	{
@@ -95,7 +98,7 @@ public:
 		return NodeIdx(i, _leaves);
 	};
 
-	Node& operator[](const NodeIdx& idx) {
+	NodePtr operator[](const NodeIdx& idx) {
 		int layer_offset = treesize(parentlayersize(idx.layerSize));
 		return _storage[layer_offset + idx.nodeIdx];
 	}

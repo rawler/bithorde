@@ -20,37 +20,45 @@
 
 #include <boost/filesystem/path.hpp>
 #include <boost/iostreams/device/mapped_file.hpp>
+#include <boost/noncopyable.hpp>
 
 #include <crypto++/tiger.h>
 
 #include "bithorded/lib/hashtree.hpp"
+#include "bithorded/lib/randomaccessfile.hpp"
+#include <bithorded/lib/weakmap.hpp>
 #include "lib/types.h"
 
 namespace bithorded { namespace store {
 
-typedef HashNode<CryptoPP::Tiger> TigerNode;
+typedef HashNode<CryptoPP::Tiger> TigerBaseNode;
 
-class AssetMeta
-{
+class AssetMeta;
+
+class TigerNode : public TigerBaseNode, private boost::noncopyable {
+	AssetMeta& _metaFile;
+	size_t _offset;
 public:
-	AssetMeta(const boost::filesystem::path& path, uint leafBlocks);
+	TigerNode(AssetMeta& metaFile, size_t offset);
+	virtual ~TigerNode();
+};
 
-	TigerNode& operator[](const size_t offset);
-	size_t size();
-
-	const boost::filesystem::path& path() const;
-private:
-	void repage(uint64_t offset);
-
-	boost::filesystem::path _path;
-
-	boost::iostreams::mapped_file_params _fp;
-	boost::iostreams::mapped_file _f;
+class AssetMeta {
+	RandomAccessFile _file;
+	WeakMap<std::size_t, TigerNode> _nodeMap;
 
 	size_t _leafBlocks;
 	size_t _nodes_offset;
 	uint64_t _file_size;
-	size_t _slice_size;
+public:
+	typedef typename boost::shared_ptr<TigerNode> NodePtr;
+	AssetMeta(const boost::filesystem::path& path, uint leafBlocks);
+
+	NodePtr operator[](const std::size_t offset);
+	size_t size();
+
+	TigerBaseNode read(size_t offset);
+	void write(size_t offset, const TigerBaseNode& node);
 };
 
 } }

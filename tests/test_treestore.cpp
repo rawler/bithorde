@@ -6,8 +6,7 @@
 
 using namespace std;
 
-typedef int MyNode;
-typedef vector<int> MyStorage;
+#include "test_storage.hpp"
 
 BOOST_AUTO_TEST_CASE( function_test )
 {
@@ -32,11 +31,11 @@ BOOST_AUTO_TEST_CASE( function_test )
 
 BOOST_AUTO_TEST_CASE( idx_test )
 {
-	MyStorage store(treesize(6));
+	TestStorage<int> store(treesize(6));
 	for (uint i=0; i < store.size(); i++)
-		store[i] = i;
+		*store[i] = i;
 
-	TreeStore<MyNode, MyStorage> tree(store);
+	TreeStore<int, TestStorage<int>> tree(store);
 	NodeIdx idx(0,1);
 
 	BOOST_CHECK( NodeIdx(0,1).isValid() );
@@ -46,8 +45,8 @@ BOOST_AUTO_TEST_CASE( idx_test )
 	BOOST_CHECK_EQUAL( tree.leaf(0), NodeIdx(0,6) );
 	BOOST_CHECK_EQUAL( tree.leaf(5), NodeIdx(5,6) );
 
-	idx = tree.leaf(0); BOOST_CHECK_EQUAL( tree[idx], 6 );
-	idx = tree.leaf(5); BOOST_CHECK_EQUAL( tree[idx], 11 );
+	idx = tree.leaf(0); BOOST_CHECK_EQUAL( *tree[idx], 6 );
+	idx = tree.leaf(5); BOOST_CHECK_EQUAL( *tree[idx], 11 );
 
 	BOOST_CHECK_EQUAL( NodeIdx(0,2).parent(), NodeIdx(0,1) );
 	BOOST_CHECK_EQUAL( NodeIdx(1,2).parent(), NodeIdx(0,1) );

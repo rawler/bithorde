@@ -52,6 +52,7 @@ class HashTree
 {
 public:
 	typedef HashNode Node;
+	typedef typename BackingStore::NodePtr NodePtr;
 	typedef typename HashNode::HashAlgorithm HashAlgorithm;
 	const static size_t DigestSize = HashNode::DigestSize;
 	const static size_t BLOCKSIZE = 1024;
@@ -62,50 +63,48 @@ public:
 		_leaves(calc_leaves(store.size()))
 	{}
 
-	Node& getRoot() {
+	NodePtr getRoot() {
 		return _store[TREE_ROOT_NODE];
 	}
 
 	void setData(uint offset, const byte* input, size_t length) {
 		BOOST_ASSERT((length == BLOCKSIZE) || (offset == (_leaves-1)));
 		NodeIdx currentIdx = _store.leaf(offset);
-		Node& current = _store[currentIdx];
-		computeLeaf(input, length, current.digest);
-		current.state = Node::State::SET;
-
-		Node currentCpy = current;
+		NodePtr current = _store[currentIdx];
+		computeLeaf(input, length, current->digest);
+		current->state = Node::State::SET;
 
 		while (not currentIdx.isRoot()) {
 			NodeIdx siblingIdx = currentIdx.sibling();
-			Node siblingCpy = _store[siblingIdx];
 
 			NodeIdx parentIdx = currentIdx.parent();
-			Node& parent = _store[parentIdx];
-			if (parent.state == Node::State::SET) // TODO: Should probably verify it?
+			NodePtr parent = _store[parentIdx];
+			if (parent->state == Node::State::SET) // TODO: Should probably verify it?
 				break;
 
 			if (siblingIdx.isValid()) {
-				if (siblingCpy.state != Node::State::SET) {
+				NodePtr sibling = _store[siblingIdx];
+				if (sibling->state != Node::State::SET) {
 					break;
 				} else {
 					BOOST_ASSERT(!(currentIdx == siblingIdx));
 					if (siblingIdx < currentIdx)
-						computeInternal(siblingCpy, currentCpy, parent);
+						computeInternal(*sibling, *current, *parent);
 					else
-						computeInternal(currentCpy, siblingCpy, parent);
+						computeInternal(*current, *sibling, *parent);
 				}
 			} else {
-				memcpy(parent.digest, currentCpy.digest, DigestSize);
+				memcpy(parent->digest, current->digest, DigestSize);
 			}
-			parent.state = Node::State::SET;
+			parent->state = Node::State::SET;
 			currentIdx = parentIdx;
-			currentCpy = parent;
+			current = parent;
 		}
 	}
 
 	bool isBlockSet(uint idx) {
 		NodeIdx block = _store.leaf(idx);
-		return _store[block].state == HashNode::State::SET;
+		return _store[block]->state == HashNode::State::SET;
 	}
 
 private:

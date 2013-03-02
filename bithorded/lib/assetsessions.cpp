@@ -28,8 +28,14 @@ bithorded::IAsset::Ptr bithorded::AssetSessions::findAsset(const bithorde::BindR
 		return active;
 
 	auto res = openAsset(req);
-	if (res)
-		_tigerCache.set(tigerId, res);
+	add(tigerId, res);
 	return res;
 }
+
+void bithorded::AssetSessions::add(const std::string& tigerId, const bithorded::IAsset::Ptr& asset)
+{
+	if (asset)
+		_tigerCache.set(tigerId, asset);
+}
+
 

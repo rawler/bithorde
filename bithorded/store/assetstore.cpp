@@ -24,6 +24,8 @@
 #include <log4cplus/logger.h>
 #include <log4cplus/loggingmacros.h>
 
+#include "asset.hpp"
+#include "../../lib/hashes.h"
 #include "../../lib/random.h"
 
 using namespace bithorded;
@@ -62,18 +64,20 @@ boost::filesystem::path AssetStore::newAssetDir()
 	return assetFolder;
 }
 
-void AssetStore::link(const BitHordeIds& ids, const boost::filesystem::path& assetPath)
+void AssetStore::link(const BitHordeIds& ids, const boost::shared_ptr<StoredAsset>& asset)
 {
-	for (auto iter=ids.begin(); iter != ids.end(); iter++) {
-		if (iter->type() == bithorde::HashType::TREE_TIGER) {
-			fs::path link = _tigerFolder / base32encode(iter->id());
-			if (fs::exists(fs::symlink_status(link)))
-				fs::remove(link);
+	auto tigerId = findBithordeId(ids, bithorde::HashType::TREE_TIGER);
+	if (tigerId.empty())
+		return;
 
-			// TODO: make links relative instead, so storage can be moved around a little.
-			fs::create_symlink(fs::absolute(assetPath), link);
-		}
-	}
+	AssetSessions::add(tigerId, asset);
+
+	fs::path link = _tigerFolder / base32encode(tigerId);
+	if (fs::exists(fs::symlink_status(link)))
+		fs::remove(link);
+
+	// TODO: make links relative instead, so storage can be moved around a little.
+	fs::create_symlink(fs::absolute(asset->folder()), link);
 }
 
 enum LinkStatus{
