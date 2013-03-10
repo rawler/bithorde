@@ -26,6 +26,7 @@
 #include <vector>
 
 #include "../lib/assetsessions.hpp"
+#include "../lib/managementnode.hpp"
 #include "../lib/weakmap.hpp"
 #include "../server/config.hpp"
 #include "../server/client.hpp"
@@ -38,7 +39,7 @@ namespace router {
 
 class FriendConnector;
 
-class Router : public AssetSessions
+class Router : public AssetSessions, public ManagementNode
 {
 	Server& _server;
 	std::map<std::string, Friend> _friends;
@@ -53,10 +54,15 @@ public:
 
 	Server& server() { return _server; }
 
+	std::size_t friends() const;
+	std::size_t upstreams() const;
+
 	void onConnected(const bithorded::Client::Ptr& client);
 	void onDisconnected(const bithorded::Client::Ptr& client);
 
 	IAsset::Ptr findAsset(const bithorde::BindRead& req);
+
+    virtual void inspect(ManagementInfoList& target) const;
 protected:
 	virtual bithorded::IAsset::Ptr openAsset(const bithorde::BindRead& req);
 private:

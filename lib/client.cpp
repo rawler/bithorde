@@ -161,6 +161,11 @@ const std::string& Client::peerName()
 	return _peerName;
 }
 
+size_t Client::clientAssets()
+{
+	return _assetMap.size();
+}
+
 bool Client::sendMessage(Connection::MessageType type, const google::protobuf::Message& msg, const Message::Deadline& expires)
 {
 	BOOST_ASSERT(_connection);

@@ -107,6 +107,16 @@ void bithorded::router::Router::addFriend(const bithorded::Friend& f)
 	_friends[f.name] = f;
 }
 
+size_t Router::friends() const
+{
+	return _friends.size();
+}
+
+size_t Router::upstreams() const
+{
+	return _connectedFriends.size();
+}
+
 void Router::onConnected(const bithorded::Client::Ptr& client )
 {
 	string peerName = client->peerName();
@@ -130,6 +140,20 @@ IAsset::Ptr Router::findAsset(const bithorde::BindRead& req)
 {
 	// TODO; make sure returned asset isn't stale
 	return AssetSessions::findAsset(req);
+}
+
+void Router::inspect(ManagementInfoList& target) const
+{
+	for (auto iter=_friends.begin(); iter!=_friends.end(); iter++) {
+		auto name = iter->first;
+		auto connectedIter = _connectedFriends.find(iter->first);
+		if (connectedIter != _connectedFriends.end()) {
+			auto& f = connectedIter->second;
+			target.append(NULL, name+'*') << '+' << f->clientAssets() << '-' << f->serverAssets();;
+		} else {
+			target.append(NULL, name) << iter->second.addr << ':' << iter->second.port;
+		}
+	}
 }
 
 bithorded::IAsset::Ptr bithorded::router::Router::openAsset(const bithorde::BindRead& req)

@@ -39,6 +39,8 @@ public:
 	}
 	bool requestsAsset(const BitHordeIds& ids);
 
+	size_t serverAssets();
+
 	~Client() { clearAssets(); }
 
 protected:

@@ -46,6 +46,10 @@ public:
 	explicit BindError(bithorde::Status status);
 };
 
+class ConnectionList : public WeakMap<std::string, bithorded::Client>, public ManagementNode {
+    virtual void inspect(ManagementInfoList& target) const;
+};
+
 class Server : ManagementNode
 {
 	Config &_cfg;
@@ -54,10 +58,12 @@ class Server : ManagementNode
 	boost::asio::ip::tcp::acceptor _tcpListener;
 	boost::asio::local::stream_protocol::acceptor _localListener;
 
+	ConnectionList _connections;
+
 	std::vector< std::unique_ptr<bithorded::source::Store> > _assetStores;
 	router::Router _router;
 	cache::CacheManager _cache;
-	boost::scoped_ptr<http::server::server> _httpInterface;
+	std::unique_ptr<http::server::server> _httpInterface;
 public:
 	Server(boost::asio::io_service& ioSvc, Config& cfg);
 

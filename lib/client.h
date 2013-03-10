@@ -87,6 +87,7 @@ public:
 
 	bool isConnected();
 	const std::string& peerName();
+	size_t clientAssets();
 
 	bool bind(ReadAsset & asset);
 	bool bind(ReadAsset & asset, uint64_t uuid, int timeout_ms);

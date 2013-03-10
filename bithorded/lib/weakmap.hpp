@@ -28,7 +28,8 @@ namespace bithorded {
 template <typename KeyType, typename LinkType>
 class WeakMap
 {
-	std::unordered_map<KeyType, boost::weak_ptr<LinkType> > _map;
+	typedef boost::weak_ptr<LinkType> WeakPtr;
+	std::unordered_map<KeyType, WeakPtr> _map;
 	uint _scrubThreshold; // Will automatically perform a complete scrubbing after this amount of changes
 	uint _dirtiness; // The amount of changes made since last scrubbing
 	boost::mutex _m;
@@ -39,6 +40,11 @@ public:
 		_scrubThreshold(scrubThreshold),
 		_dirtiness(0)
 	{}
+
+	typename std::unordered_map<KeyType, WeakPtr>::iterator begin() { return _map.begin(); }
+	typename std::unordered_map<KeyType, WeakPtr>::const_iterator begin() const { return _map.begin(); }
+	typename std::unordered_map<KeyType, WeakPtr>::iterator end() { return _map.end(); }
+	typename std::unordered_map<KeyType, WeakPtr>::const_iterator end() const { return _map.end(); }
 
 	/**
 	 * Clears all keys
@@ -76,11 +82,24 @@ public:
 	}
 
 	/**
+	 * Counts active link in map
+	 */
+	size_t size() const {
+		size_t res = 0;
+		for (auto iter=_map.begin(); iter != _map.end(); iter++) {
+			if (iter->second.lock())
+				res++;
+		}
+		return res;
+	}
+
+	/**
 	 * Walks through all links in the map, purging any found inactive ones.
 	 */
-	void scrub() {
+	size_t scrub() {
 		lock_guard lock(_m);
 		doScrub();
+		return _map.size();
 	}
 
 	/**

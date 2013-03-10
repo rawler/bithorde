@@ -44,6 +44,16 @@ Client::Client( Server& server) :
 {
 }
 
+size_t Client::serverAssets()
+{
+	size_t res = 0;
+	for (auto iter = _assets.begin(); iter != _assets.end(); iter++) {
+		if (*iter)
+			res++;
+	}
+	return res;
+}
+
 bool Client::requestsAsset(const BitHordeIds& ids) {
 	for (auto iter=_assets.begin(); iter!=_assets.end(); iter++) {
 		auto asset = *iter;
