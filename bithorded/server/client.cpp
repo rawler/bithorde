@@ -44,7 +44,7 @@ Client::Client( Server& server) :
 {
 }
 
-size_t Client::serverAssets()
+size_t Client::serverAssets() const
 {
 	size_t res = 0;
 	for (auto iter = _assets.begin(); iter != _assets.end(); iter++) {
@@ -52,6 +52,11 @@ size_t Client::serverAssets()
 			res++;
 	}
 	return res;
+}
+
+void Client::describe(management::Info& target) const
+{
+	target << '+' << clientAssets() << '-' << serverAssets();
 }
 
 bool Client::requestsAsset(const BitHordeIds& ids) {

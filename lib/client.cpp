@@ -161,7 +161,7 @@ const std::string& Client::peerName()
 	return _peerName;
 }
 
-size_t Client::clientAssets()
+size_t Client::clientAssets() const
 {
 	return _assetMap.size();
 }

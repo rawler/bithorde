@@ -50,7 +50,7 @@ void ConnectionList::inspect(management::InfoList& target) const
 {
 	for (auto iter=begin(); iter != end(); iter++) {
 		if (auto conn = iter->second.lock()) {
-			target.append(NULL, iter->first) << '+' << conn->clientAssets() << '-' << conn->serverAssets();
+			target.append(*conn, iter->first);
 		}
 	}
 }

@@ -20,6 +20,7 @@
 
 #include <boost/smart_ptr/enable_shared_from_this.hpp>
 
+#include "../lib/management.hpp"
 #include "lib/allocator.h"
 #include "lib/client.h"
 #include "asset.hpp"
@@ -27,7 +28,7 @@
 namespace bithorded {
 
 class Server;
-class Client : public bithorde::Client, public boost::enable_shared_from_this<Client>
+class Client : public bithorde::Client, public boost::enable_shared_from_this<Client>, public management::Leaf
 {
 	Server& _server;
 	std::vector< IAsset::Ptr > _assets;
@@ -39,7 +40,9 @@ public:
 	}
 	bool requestsAsset(const BitHordeIds& ids);
 
-	size_t serverAssets();
+	size_t serverAssets() const;
+
+	virtual void describe(management::Info& target) const;
 
 	~Client() { clearAssets(); }
 
