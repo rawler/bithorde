@@ -15,8 +15,8 @@
 */
 
 
-#ifndef MANAGEMENTNODE_HPP
-#define MANAGEMENTNODE_HPP
+#ifndef MANAGEMENT_HPP
+#define MANAGEMENT_HPP
 
 #include <sstream>
 
@@ -24,31 +24,42 @@
 
 namespace bithorded {
 
-struct ManagementInfo : public std::stringstream {
+namespace management {
+
+struct Info : public std::stringstream {
 	const http::server::RequestRouter* child;
 	std::string name;
 
-	ManagementInfo(const ManagementInfo& other);
-	ManagementInfo(const http::server::RequestRouter* child, const std::string& name);
+	Info(const Info& other);
+	Info(const http::server::RequestRouter* child, const std::string& name);
 
-	ManagementInfo& operator=(const ManagementInfo& other);
+	Info& operator=(const Info& other);
 
 	std::ostream& render_text(std::ostream& output) const;
 	std::ostream& render_html(std::ostream& output) const;
 };
 
-struct ManagementInfoList : public std::vector<ManagementInfo> {
-	ManagementInfo& append(const http::server::RequestRouter* child, const std::string& name);
+class Leaf {
+public:
+	virtual void describe(Info& target) const = 0;
 };
 
-class ManagementNode : public http::server::RequestRouter
+class DescriptiveDirectory;
+struct InfoList : public std::vector<Info> {
+	Info& append(const http::server::RequestRouter* child, const std::string& name, const Leaf* renderer=NULL);
+	Info& append(const DescriptiveDirectory& dir, const std::string& name);
+	Info& append(const Leaf& leaf, const std::string& name);
+};
+
+class Directory : public http::server::RequestRouter
 {
 public:
 	virtual bool handle(const path& path, const http::server::request& req, http::server::reply& reply) const;
 protected:
-	virtual void inspect(ManagementInfoList& target) const = 0;
+	virtual void inspect(InfoList& target) const = 0;
 };
 
-}
+class DescriptiveDirectory : public Leaf, public Directory {};
+}}
 
-#endif // MANAGEMENTNODE_HPP
+#endif // MANAGEMENT_HPP

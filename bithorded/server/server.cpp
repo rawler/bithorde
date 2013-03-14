@@ -46,13 +46,18 @@ BindError::BindError(bithorde::Status status):
 {
 }
 
-void ConnectionList::inspect(ManagementInfoList& target) const
+void ConnectionList::inspect(management::InfoList& target) const
 {
 	for (auto iter=begin(); iter != end(); iter++) {
 		if (auto conn = iter->second.lock()) {
 			target.append(NULL, iter->first) << '+' << conn->clientAssets() << '-' << conn->serverAssets();
 		}
 	}
+}
+
+void ConnectionList::describe(management::Info& target) const
+{
+	target << size() << " connections";
 }
 
 Server::Server(asio::io_service& ioSvc, Config& cfg) :
@@ -143,10 +148,10 @@ void Server::onLocalConnected(boost::shared_ptr< boost::asio::local::stream_prot
 	}
 }
 
-void Server::inspect(ManagementInfoList& target) const
+void Server::inspect(management::InfoList& target) const
 {
-	target.append(&_router, "router") << _router.upstreams() << " upstreams (" << _router.friends() << " configured)";
-	target.append(&_connections, "connections") << _connections.size() << " connections";
+	target.append(_router, "router");
+	target.append(_connections, "connections");
 }
 
 void Server::clientConnected(const bithorded::Client::Ptr& client)

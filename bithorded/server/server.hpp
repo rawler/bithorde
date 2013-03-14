@@ -30,7 +30,7 @@
 
 #include "../cache/manager.hpp"
 #include "../http_server/server.hpp"
-#include "../lib/managementnode.hpp"
+#include "../lib/management.hpp"
 #include "../router/router.hpp"
 #include "../source/store.hpp"
 #include "bithorde.pb.h"
@@ -46,11 +46,12 @@ public:
 	explicit BindError(bithorde::Status status);
 };
 
-class ConnectionList : public WeakMap<std::string, bithorded::Client>, public ManagementNode {
-    virtual void inspect(ManagementInfoList& target) const;
+class ConnectionList : public WeakMap<std::string, bithorded::Client>, public management::DescriptiveDirectory {
+	virtual void inspect(management::InfoList& target) const;
+	virtual void describe(management::Info& target) const;
 };
 
-class Server : ManagementNode
+class Server : public management::Directory
 {
 	Config &_cfg;
 	boost::asio::io_service& _ioSvc;
@@ -76,7 +77,7 @@ public:
 
 	void onTCPConnected(boost::shared_ptr<boost::asio::ip::tcp::socket>& socket);
 
-	virtual void inspect(ManagementInfoList& target) const;
+	virtual void inspect(management::InfoList& target) const;
 private:
 	void clientConnected(const bithorded::Client::Ptr& client);
 	void clientAuthenticated(const bithorded::Client::WeakPtr& client);

@@ -15,22 +15,24 @@
 */
 
 
-#include "managementnode.hpp"
+#include "management.hpp"
 
 #include <sstream>
 #include <iostream>
 
 using namespace std;
 
-bithorded::ManagementInfo::ManagementInfo(const http::server::RequestRouter* child, const string& name) :
+using namespace bithorded::management;
+
+Info::Info(const http::server::RequestRouter* child, const string& name) :
 	child(child), name(name)
 {}
 
-bithorded::ManagementInfo::ManagementInfo(const bithorded::ManagementInfo& other) :
+Info::Info(const Info& other) :
 	std::stringstream(other.str()), child(other.child), name(other.name)
 {}
 
-bithorded::ManagementInfo& bithorded::ManagementInfo::operator=(const bithorded::ManagementInfo& other)
+Info& Info::operator=(const Info& other)
 {
 	std::stringstream(other.str());
 	child = other.child;
@@ -38,7 +40,7 @@ bithorded::ManagementInfo& bithorded::ManagementInfo::operator=(const bithorded:
 	return *this;
 }
 
-std::ostream& bithorded::ManagementInfo::render_text(std::ostream& output) const
+std::ostream& Info::render_text(std::ostream& output) const
 {
 	if (child)
 		output << "@";
@@ -46,7 +48,7 @@ std::ostream& bithorded::ManagementInfo::render_text(std::ostream& output) const
 	return output;
 }
 
-ostream& bithorded::ManagementInfo::render_html(ostream& output) const
+ostream& Info::render_html(ostream& output) const
 {
 	output << "<tr><td>";
 	if (child)
@@ -57,15 +59,27 @@ ostream& bithorded::ManagementInfo::render_html(ostream& output) const
 	return output;
 }
 
-bithorded::ManagementInfo& bithorded::ManagementInfoList::append(const http::server::RequestRouter* child, const string& name)
+Info& InfoList::append(const http::server::RequestRouter* child, const string& name, const Leaf* renderer)
 {
-	push_back(ManagementInfo(child, name));
+	push_back(Info(child, name));
+	if (renderer)
+		renderer->describe(back());
 	return back();
 }
 
-bool bithorded::ManagementNode::handle(const http::server::RequestRouter::path& path, const http::server::request& req, http::server::reply& reply) const
+Info& InfoList::append(const DescriptiveDirectory& dir, const string& name)
 {
-	ManagementInfoList table;
+	return append(&dir, name, &dir);
+}
+
+Info& InfoList::append(const Leaf& leaf, const string& name)
+{
+	return append(NULL, name, &leaf);
+}
+
+bool Directory::handle(const http::server::RequestRouter::path& path, const http::server::request& req, http::server::reply& reply) const
+{
+	InfoList table;
 	inspect(table);
 	if (path.empty()) {
 		std::ostringstream buf;

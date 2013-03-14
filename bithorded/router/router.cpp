@@ -142,7 +142,7 @@ IAsset::Ptr Router::findAsset(const bithorde::BindRead& req)
 	return AssetSessions::findAsset(req);
 }
 
-void Router::inspect(ManagementInfoList& target) const
+void Router::inspect(management::InfoList& target) const
 {
 	for (auto iter=_friends.begin(); iter!=_friends.end(); iter++) {
 		auto name = iter->first;
@@ -154,6 +154,11 @@ void Router::inspect(ManagementInfoList& target) const
 			target.append(NULL, name) << iter->second.addr << ':' << iter->second.port;
 		}
 	}
+}
+
+void Router::describe(management::Info& target) const
+{
+	target << upstreams() << " upstreams (" << friends() << " configured)";
 }
 
 bithorded::IAsset::Ptr bithorded::router::Router::openAsset(const bithorde::BindRead& req)
