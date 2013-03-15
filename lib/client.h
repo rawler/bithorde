@@ -54,6 +54,7 @@ class Client
 	friend class ReadRequestContext;
 
 	typedef boost::shared_ptr<AssetBinding> AssetPtr;
+	typedef std::map<Asset::Handle, AssetPtr> AssetMap;
 
 	boost::asio::io_service& _ioSvc;
 	Connection::Pointer _connection;
@@ -61,7 +62,7 @@ class Client
 	std::string _myName;
 	std::string _peerName;
 
-	std::map<Asset::Handle, AssetPtr> _assetMap;
+	AssetMap _assetMap;
 	std::map<int, Asset::Handle> _requestIdMap;
 	CachedAllocator<Asset::Handle> _handleAllocator;
 	CachedAllocator<int> _rpcIdAllocator;
@@ -87,7 +88,7 @@ public:
 
 	bool isConnected();
 	const std::string& peerName();
-	size_t clientAssets() const;
+	const AssetMap& clientAssets() const;
 
 	bool bind(ReadAsset & asset);
 	bool bind(ReadAsset & asset, uint64_t uuid, int timeout_ms);

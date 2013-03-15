@@ -161,9 +161,9 @@ const std::string& Client::peerName()
 	return _peerName;
 }
 
-size_t Client::clientAssets() const
+const Client::AssetMap& Client::clientAssets() const
 {
-	return _assetMap.size();
+	return _assetMap;
 }
 
 bool Client::sendMessage(Connection::MessageType type, const google::protobuf::Message& msg, const Message::Deadline& expires)

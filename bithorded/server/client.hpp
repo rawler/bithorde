@@ -28,7 +28,7 @@
 namespace bithorded {
 
 class Server;
-class Client : public bithorde::Client, public boost::enable_shared_from_this<Client>, public management::Leaf
+class Client : public bithorde::Client, public boost::enable_shared_from_this<Client>, public management::DescriptiveDirectory
 {
 	Server& _server;
 	std::vector< IAsset::Ptr > _assets;
@@ -43,6 +43,7 @@ public:
 	size_t serverAssets() const;
 
 	virtual void describe(management::Info& target) const;
+	virtual void inspect(management::InfoList& target) const;
 
 	~Client() { clearAssets(); }
 

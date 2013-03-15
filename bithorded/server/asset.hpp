@@ -24,11 +24,12 @@
 
 #include <lib/hashes.h>
 #include <lib/types.h>
+#include "../lib/management.hpp"
 
 namespace bithorded
 {
 
-class IAsset
+class IAsset : public management::Leaf
 {
 public:
 	typedef boost::function<void(int64_t offset, const std::string& data)> ReadCallback;
@@ -45,6 +46,8 @@ public:
 	virtual uint64_t size() = 0;
 	virtual size_t can_read(uint64_t offset, size_t size) = 0;
 	virtual bool getIds(BitHordeIds& ids) const = 0;
+
+	virtual void describe(management::Info& target) const;
 
 protected:
 	void setStatus(bithorde::Status newStatus);

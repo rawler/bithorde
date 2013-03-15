@@ -24,3 +24,11 @@ void IAsset::setStatus(bithorde::Status newStatus)
 	status = newStatus;
 	statusChange(newStatus);
 }
+
+void IAsset::describe(bithorded::management::Info& target) const
+{
+	BitHordeIds ids;
+	target << bithorde::Status_Name(status);
+	if (getIds(ids))
+		target << ", " << ids;
+}

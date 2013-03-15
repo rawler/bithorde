@@ -56,7 +56,24 @@ size_t Client::serverAssets() const
 
 void Client::describe(management::Info& target) const
 {
-	target << '+' << clientAssets() << '-' << serverAssets();
+	target << '+' << clientAssets().size() << '-' << serverAssets();
+}
+void Client::inspect(management::InfoList& target) const
+{
+	for (auto iter=clientAssets().begin(); iter != clientAssets().end(); iter++) {
+		if (auto asset = iter->second->readAsset()) {
+			ostringstream name;
+			name << '+' << iter->first;
+			target.append(NULL, name.str()) << bithorde::Status_Name(asset->status) << ", " << asset->requestIds();
+		}
+	}
+	for (size_t i=0; i < _assets.size(); i++) {
+		if (auto& asset = _assets[i]) {
+			ostringstream name;
+			name << '-' << i;
+			target.append(*asset, name.str());
+		}
+	}
 }
 
 bool Client::requestsAsset(const BitHordeIds& ids) {
