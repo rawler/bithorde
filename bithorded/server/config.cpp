@@ -110,6 +110,8 @@ bithorded::Config::Config(int argc, char* argv[])
 			"Name of this node, defaults to hostname")
 		("server.tcpPort", po::value<uint16_t>(&tcpPort)->default_value(1337),
 			"TCP port to listen on for incoming connections")
+		("server.inspectPort", po::value<uint16_t>(&inspectPort)->default_value(5000),
+			"HTTP port to serve up inspection interface on")
 		("server.unixSocket", po::value<string>(&unixSocket)->default_value("/tmp/bithorde"),
 			"Path to UNIX-socket to listen on")
 	;

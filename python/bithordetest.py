@@ -84,6 +84,7 @@ class BithordeD(Process):
             suffix = (time(), os.getpid())
             server_cfg = config.setdefault('server', {})
             server_cfg.setdefault('tcpPort', 0)
+            server_cfg.setdefault('inspectPort', 0)
             server_cfg.setdefault('unixSocket', "bhtest-sock-%d-%d" % suffix)
             cache_cfg = config.setdefault('cache', {})
             if not cache_cfg.get('dir'):

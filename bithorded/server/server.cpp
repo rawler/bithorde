@@ -84,6 +84,11 @@ Server::Server(asio::io_service& ioSvc, Config& cfg) :
 		waitForLocalConnection();
 	}
 
+	if (_cfg.inspectPort) {
+		_httpInterface.reset(new http::server::server(_ioSvc, "127.0.0.1", _cfg.inspectPort, *this));
+		LOG4CPLUS_INFO(serverLog, "Inspection interface listening on port " << _cfg.inspectPort);
+	}
+
 	LOG4CPLUS_INFO(serverLog, "Server started, version " << bithorde::build_version);
 }
 
@@ -127,6 +132,12 @@ void Server::onLocalConnected(boost::shared_ptr< boost::asio::local::stream_prot
 		clientConnected(c);
 		waitForLocalConnection();
 	}
+}
+
+bool Server::handle(const http::server::RequestRouter::path& path, const http::server::request& req, http::server::reply& reply) const
+{
+	reply.fill("Hello world\n");
+	return true;
 }
 
 void Server::clientConnected(const bithorded::Client::Ptr& client)

@@ -73,7 +73,7 @@ function bithorded_start() {
     logfile="$1.log"
     shift
 
-    stdbuf -o0 -e0 "$SERVER" -c "$config" "$@" &> "$logfile" &
+    stdbuf -o0 -e0 "$SERVER" -c "$config" --server.inspectPort 0 "$@" &> "$logfile" &
     DAEMONPID=$!
     wait_until_found "$logfile" "Server started"
 }

@@ -26,8 +26,10 @@
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/local/stream_protocol.hpp>
 #include <boost/filesystem/path.hpp>
+#include <boost/smart_ptr/scoped_ptr.hpp>
 
 #include "../cache/manager.hpp"
+#include "../http_server/server.hpp"
 #include "../router/router.hpp"
 #include "../source/store.hpp"
 #include "bithorde.pb.h"
@@ -43,7 +45,7 @@ public:
 	explicit BindError(bithorde::Status status);
 };
 
-class Server
+class Server : http::server::RequestRouter
 {
 	Config &_cfg;
 	boost::asio::io_service& _ioSvc;
@@ -54,6 +56,7 @@ class Server
 	std::vector< std::unique_ptr<bithorded::source::Store> > _assetStores;
 	router::Router _router;
 	cache::CacheManager _cache;
+	boost::scoped_ptr<http::server::server> _httpInterface;
 public:
 	Server(boost::asio::io_service& ioSvc, Config& cfg);
 
@@ -65,6 +68,8 @@ public:
     IAsset::Ptr prepareUpload(uint64_t size);
 
 	void onTCPConnected(boost::shared_ptr<boost::asio::ip::tcp::socket>& socket);
+
+	virtual bool handle(const path& path, const http::server::request& req, http::server::reply& reply) const;
 private:
 	void clientConnected(const bithorded::Client::Ptr& client);
 	void clientAuthenticated(const bithorded::Client::WeakPtr& client);
