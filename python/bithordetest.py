@@ -1,4 +1,4 @@
-import os, socket, sys, types
+import atexit, os, socket, sys, types
 from time import time
 
 from bithorde import decodeMessage, encoder, MSG_REV_MAP, message
@@ -98,6 +98,7 @@ class BithordeD(Process):
         Process.__init__(self, 'stdbuf', ['-o0', '-e0', bithorded, '-c', '/dev/stdin'])
     def run(self):
         Process.run(self)
+        atexit.register(self.kill)
         def gen_config(value, key=[]):
             if hasattr(value, 'iteritems'):
                 return "\n".join(gen_config(value, key+[ikey]) for ikey, value in value.iteritems())
