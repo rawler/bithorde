@@ -98,7 +98,7 @@ size_t bithorded::router::ForwardedAsset::can_read(uint64_t offset, size_t size)
 	return size;
 }
 
-bool bithorded::router::ForwardedAsset::getIds(BitHordeIds& ids)
+bool bithorded::router::ForwardedAsset::getIds(BitHordeIds& ids) const
 {
 	ids = _ids;
 	return true;

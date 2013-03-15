@@ -62,7 +62,7 @@ public:
 	void bindUpstreams(const std::map< std::string, bithorded::Client::Ptr >& friends, uint64_t uuid, int timeout);
 
 	virtual size_t can_read(uint64_t offset, size_t size);
-	virtual bool getIds(BitHordeIds& ids);
+	virtual bool getIds(BitHordeIds& ids) const;
 	virtual void async_read(uint64_t offset, size_t& size, uint32_t timeout, bithorded::IAsset::ReadCallback cb);
 	virtual uint64_t size();
 private:

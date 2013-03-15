@@ -94,7 +94,7 @@ public:
 		BOOST_ASSERT(backingStore.size() >= treesize(_leaves));
 	}
 
-	NodeIdx leaf(uint i) {
+	NodeIdx leaf(uint i) const {
 		return NodeIdx(i, _leaves);
 	};
 
@@ -102,8 +102,12 @@ public:
 		int layer_offset = treesize(parentlayersize(idx.layerSize));
 		return _storage[layer_offset + idx.nodeIdx];
 	}
+	const NodePtr operator[](const NodeIdx& idx) const {
+		int layer_offset = treesize(parentlayersize(idx.layerSize));
+		return _storage[layer_offset + idx.nodeIdx];
+	}
 
-	uint leaves() {
+	uint leaves() const {
 		return _leaves;
 	}
 

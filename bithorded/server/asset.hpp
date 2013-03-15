@@ -44,7 +44,7 @@ public:
 	virtual void async_read(uint64_t offset, size_t& size, uint32_t timeout, ReadCallback cb) = 0;
 	virtual uint64_t size() = 0;
 	virtual size_t can_read(uint64_t offset, size_t size) = 0;
-	virtual bool getIds(BitHordeIds& ids) = 0;
+	virtual bool getIds(BitHordeIds& ids) const = 0;
 
 protected:
 	void setStatus(bithorde::Status newStatus);

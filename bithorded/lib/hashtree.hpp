@@ -67,6 +67,10 @@ public:
 		return _store[TREE_ROOT_NODE];
 	}
 
+	const NodePtr getRoot() const {
+		return _store[TREE_ROOT_NODE];
+	}
+
 	void setData(uint offset, const byte* input, size_t length) {
 		BOOST_ASSERT((length == BLOCKSIZE) || (offset == (_leaves-1)));
 		NodeIdx currentIdx = _store.leaf(offset);

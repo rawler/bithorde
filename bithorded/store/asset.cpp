@@ -73,7 +73,7 @@ size_t StoredAsset::can_read(uint64_t offset, size_t size)
 	return res;
 }
 
-bool StoredAsset::getIds(BitHordeIds& ids)
+bool StoredAsset::getIds(BitHordeIds& ids) const
 {
 	BOOST_ASSERT( ids.size() == 0 );
 	auto root = _hasher.getRoot();
