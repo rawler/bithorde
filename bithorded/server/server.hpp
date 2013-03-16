@@ -30,6 +30,7 @@
 
 #include "../cache/manager.hpp"
 #include "../http_server/server.hpp"
+#include "../lib/managementnode.hpp"
 #include "../router/router.hpp"
 #include "../source/store.hpp"
 #include "bithorde.pb.h"
@@ -45,7 +46,7 @@ public:
 	explicit BindError(bithorde::Status status);
 };
 
-class Server : http::server::RequestRouter
+class Server : ManagementNode
 {
 	Config &_cfg;
 	boost::asio::io_service& _ioSvc;
@@ -69,7 +70,7 @@ public:
 
 	void onTCPConnected(boost::shared_ptr<boost::asio::ip::tcp::socket>& socket);
 
-	virtual bool handle(const path& path, const http::server::request& req, http::server::reply& reply) const;
+	virtual void inspect(ManagementInfoList& target) const;
 private:
 	void clientConnected(const bithorded::Client::Ptr& client);
 	void clientAuthenticated(const bithorded::Client::WeakPtr& client);

@@ -30,10 +30,15 @@ void request_handler::handle_request(const request& req, reply& rep)
 	// Decode url to path.
 	std::list<std::string> request_path;
 	boost::split(request_path, req.uri, boost::is_any_of("/"), boost::algorithm::token_compress_on).size();
-	for (auto iter=request_path.begin(); iter != request_path.end(); iter++) {
-		std::string tmp;
-		url_decode(*iter, tmp);
-		*iter = tmp;
+	for (auto iter=request_path.begin(); iter != request_path.end();) {
+		auto current = iter++;
+		if (current->empty()) {
+			request_path.erase(current);
+		} else {
+			std::string tmp;
+			url_decode(*current, tmp);
+			*current = tmp;
+		}
 	}
 
 	if (!_root.handle(request_path, req, rep))

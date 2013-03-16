@@ -134,10 +134,8 @@ void Server::onLocalConnected(boost::shared_ptr< boost::asio::local::stream_prot
 	}
 }
 
-bool Server::handle(const http::server::RequestRouter::path& path, const http::server::request& req, http::server::reply& reply) const
+void Server::inspect(ManagementInfoList& target) const
 {
-	reply.fill("Hello world\n");
-	return true;
 }
 
 void Server::clientConnected(const bithorded::Client::Ptr& client)

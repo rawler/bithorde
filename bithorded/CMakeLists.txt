@@ -7,12 +7,14 @@ ADD_EXECUTABLE(bithorded
 	http_server/connection.cpp
 	http_server/connection_manager.cpp
 	http_server/reply.cpp
+	http_server/request.cpp
 	http_server/request_handler.cpp
 	http_server/request_parser.cpp
 	http_server/server.cpp
 
 	lib/assetsessions.cpp
 	lib/hashtree.cpp
+	lib/managementnode.cpp
 	lib/randomaccessfile.cpp
 	lib/rounding.cpp
 	lib/threadpool.cpp
