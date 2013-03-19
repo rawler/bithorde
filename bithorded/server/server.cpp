@@ -63,6 +63,7 @@ void ConnectionList::describe(management::Info& target) const
 Server::Server(asio::io_service& ioSvc, Config& cfg) :
 	_cfg(cfg),
 	_ioSvc(ioSvc),
+	_timerSvc(new TimerService(ioSvc)),
 	_tcpListener(ioSvc),
 	_localListener(ioSvc),
 	_router(*this),
@@ -128,7 +129,7 @@ void Server::onTCPConnected(boost::shared_ptr< asio::ip::tcp::socket >& socket, 
 void Server::onTCPConnected ( boost::shared_ptr< asio::ip::tcp::socket >& socket )
 {
 	bithorded::Client::Ptr c = bithorded::Client::create(*this);
-	c->connect(bithorde::Connection::create(_ioSvc, socket));
+	c->connect(bithorde::Connection::create(_ioSvc, boost::make_shared<bithorde::ConnectionStats>(_timerSvc), socket));
 	clientConnected(c);
 }
 
@@ -142,7 +143,7 @@ void Server::onLocalConnected(boost::shared_ptr< boost::asio::local::stream_prot
 {
 	if (!ec) {
 		bithorded::Client::Ptr c = bithorded::Client::create(*this);
-		c->connect(bithorde::Connection::create(_ioSvc, socket));
+		c->connect(bithorde::Connection::create(_ioSvc, boost::make_shared<bithorde::ConnectionStats>(_timerSvc), socket));
 		clientConnected(c);
 		waitForLocalConnection();
 	}

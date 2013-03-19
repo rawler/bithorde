@@ -8,6 +8,7 @@ ADD_LIBRARY(bithorde
 	bithorde.h
 	client.h client.cpp
 	cliprogressbar.h cliprogressbar.cpp
+	counter.cpp
 	connection.h connection.cpp
 	hashes.h hashes.cpp
 	magneturi.h magneturi.cpp

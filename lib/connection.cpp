@@ -31,14 +31,14 @@ class ConnectionImpl : public Connection {
 
 	boost::shared_ptr<Socket> _socket;
 public:
-	ConnectionImpl(boost::asio::io_service& ioSvc, const EndPoint& addr) 
-		: Connection(ioSvc), _socket(new Socket(ioSvc))
+	ConnectionImpl(boost::asio::io_service& ioSvc, const ConnectionStats::Ptr& stats, const EndPoint& addr)
+		: Connection(ioSvc, stats), _socket(new Socket(ioSvc))
 	{
 		_socket->connect(addr);
 	}
 
-	ConnectionImpl(boost::asio::io_service& ioSvc, boost::shared_ptr<Socket>& socket)
-		: Connection(ioSvc)
+	ConnectionImpl(boost::asio::io_service& ioSvc, const ConnectionStats::Ptr& stats, boost::shared_ptr<Socket>& socket)
+		: Connection(ioSvc, stats)
 	{
 		_socket = socket;
 	}
@@ -129,34 +129,48 @@ size_t MessageQueue::size() const
 	return res;
 }
 
-Connection::Connection(asio::io_service & ioSvc) :
+ConnectionStats::ConnectionStats(const TimerService::Ptr& ts) :
+	_ts(ts),
+	incomingMessagesCurrent(*_ts, "msgs/s", boost::posix_time::seconds(1), 0.2),
+	incomingBitrateCurrent(*_ts, "bit/s", boost::posix_time::seconds(1), 0.2),
+	outgoingMessagesCurrent(*_ts, "msgs/s", boost::posix_time::seconds(1), 0.2),
+	outgoingBitrateCurrent(*_ts, "bit/s", boost::posix_time::seconds(1), 0.2),
+	incomingMessages("msgs"),
+	incomingBytes("bytes"),
+	outgoingMessages("msgs"),
+	outgoingBytes("bytes")
+{
+}
+
+Connection::Connection(asio::io_service & ioSvc, const ConnectionStats::Ptr& stats) :
 	_state(Connected),
-	_ioSvc(ioSvc)
+	_ioSvc(ioSvc),
+	_stats(stats)
 {
 }
 
-Connection::Pointer Connection::create(asio::io_service& ioSvc, const boost::asio::ip::tcp::endpoint& addr)  {
-	Pointer c(new ConnectionImpl<asio::ip::tcp>(ioSvc, addr));
+Connection::Pointer Connection::create(asio::io_service& ioSvc, const ConnectionStats::Ptr& stats, const asio::ip::tcp::endpoint& addr)  {
+	Pointer c(new ConnectionImpl<asio::ip::tcp>(ioSvc, stats, addr));
 	c->tryRead();
 	return c;
 }
 
-Connection::Pointer Connection::create(asio::io_service& ioSvc, boost::shared_ptr<boost::asio::ip::tcp::socket>& socket)
+Connection::Pointer Connection::create(asio::io_service& ioSvc, const ConnectionStats::Ptr& stats, boost::shared_ptr< asio::ip::tcp::socket >& socket)
 {
-	Pointer c(new ConnectionImpl<asio::ip::tcp>(ioSvc, socket));
+	Pointer c(new ConnectionImpl<asio::ip::tcp>(ioSvc, stats, socket));
 	c->tryRead();
 	return c;
 }
 
-Connection::Pointer Connection::create(asio::io_service& ioSvc, const boost::asio::local::stream_protocol::endpoint& addr)  {
-	Pointer c(new ConnectionImpl<asio::local::stream_protocol>(ioSvc, addr));
+Connection::Pointer Connection::create(asio::io_service& ioSvc, const ConnectionStats::Ptr& stats, const asio::local::stream_protocol::endpoint& addr)  {
+	Pointer c(new ConnectionImpl<asio::local::stream_protocol>(ioSvc, stats, addr));
 	c->tryRead();
 	return c;
 }
 
-Connection::Pointer Connection::create(asio::io_service& ioSvc, boost::shared_ptr< asio::local::stream_protocol::socket >& socket)
+Connection::Pointer Connection::create(asio::io_service& ioSvc, const ConnectionStats::Ptr& stats, boost::shared_ptr< asio::local::stream_protocol::socket >& socket)
 {
-	Pointer c(new ConnectionImpl<asio::local::stream_protocol>(ioSvc, socket));
+	Pointer c(new ConnectionImpl<asio::local::stream_protocol>(ioSvc, stats, socket));
 	c->tryRead();
 	return c;
 }
@@ -168,6 +182,8 @@ void Connection::onRead(const boost::system::error_code& err, size_t count)
 		return;
 	} else {
 		_rcvBuf.charge(count);
+		_stats->incomingBitrateCurrent += count*8;
+		_stats->incomingBytes += count;
 	}
 
 	google::protobuf::io::CodedInputStream stream((::google::protobuf::uint8*)_rcvBuf.ptr, _rcvBuf.size);
@@ -233,6 +249,8 @@ bool Connection::dequeue(MessageType type, ::google::protobuf::io::CodedInputStr
 	uint32_t bytesLeft = stream.BytesUntilLimit();
 	if (length > bytesLeft) return false;
 
+	_stats->incomingMessages += 1;
+	_stats->incomingMessagesCurrent += 1;
 	::google::protobuf::io::CodedInputStream::Limit limit = stream.PushLimit(length);
 	if ((res = msg.MergePartialFromCodedStream(&stream))) {
 		message(type, msg);
@@ -240,6 +258,11 @@ bool Connection::dequeue(MessageType type, ::google::protobuf::io::CodedInputStr
 	stream.PopLimit(limit);
 
 	return res;
+}
+
+ConnectionStats::Ptr Connection::stats()
+{
+	return _stats;
 }
 
 bool Connection::sendMessage(Connection::MessageType type, const google::protobuf::Message& msg, const Message::Deadline& expires, bool prioritized)
@@ -259,6 +282,8 @@ bool Connection::sendMessage(Connection::MessageType type, const google::protobu
 		bool encoded = msg.SerializeToCodedStream(&stream);
 		BOOST_ASSERT(encoded);
 	}
+	_stats->outgoingMessages += 1;
+	_stats->outgoingMessagesCurrent += 1;
 
 	// Push out at once unless _queued;
 	if (wasEmpty)
@@ -268,6 +293,9 @@ bool Connection::sendMessage(Connection::MessageType type, const google::protobu
 
 void Connection::onWritten(const boost::system::error_code& err, size_t written) {
 	if ((!err) && (written > 0)) {
+		_stats->outgoingBitrateCurrent += written*8;
+		_stats->outgoingBytes += written;
+
 		_sndQueue.pop(written);
 		trySend();
 		if (_sndQueue.size() < SEND_BUF_LOW_WATER_MARK)

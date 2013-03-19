@@ -11,6 +11,8 @@
 #include <list>
 
 #include "bithorde.pb.h"
+#include "counter.h"
+#include "timer.h"
 #include "types.h"
 
 namespace bithorde {
@@ -34,6 +36,19 @@ public:
 	const std::string& firstMessage();
 	void pop(size_t amount);
 	std::size_t size() const;
+};
+
+class ConnectionStats {
+	TimerService::Ptr _ts;
+public:
+	typedef boost::shared_ptr<ConnectionStats> Ptr;
+
+	LazyCounter incomingMessagesCurrent, incomingBitrateCurrent;
+	LazyCounter outgoingMessagesCurrent, outgoingBitrateCurrent;
+	Counter incomingMessages, incomingBytes;
+	Counter outgoingMessages, outgoingBytes;
+
+	ConnectionStats(const TimerService::Ptr& ts);
 };
 
 class Connection
@@ -60,10 +75,10 @@ public:
 		Authenticated,
 	};
 
-	static Pointer create(boost::asio::io_service& ioSvc, const boost::asio::ip::tcp::endpoint& addr);
-	static Pointer create(boost::asio::io_service& ioSvc, boost::shared_ptr< boost::asio::ip::tcp::socket >& socket);
-	static Pointer create(boost::asio::io_service& ioSvc, const boost::asio::local::stream_protocol::endpoint& addr);
-	static Pointer create(boost::asio::io_service& ioSvc, boost::shared_ptr< boost::asio::local::stream_protocol::socket >& socket);
+	static Pointer create(boost::asio::io_service& ioSvc, const bithorde::ConnectionStats::Ptr& stats, const boost::asio::ip::tcp::endpoint& addr);
+	static Pointer create(boost::asio::io_service& ioSvc, const bithorde::ConnectionStats::Ptr& stats, boost::shared_ptr< boost::asio::ip::tcp::socket >& socket);
+	static Pointer create(boost::asio::io_service& ioSvc, const bithorde::ConnectionStats::Ptr& stats, const boost::asio::local::stream_protocol::endpoint& addr);
+	static Pointer create(boost::asio::io_service& ioSvc, const bithorde::ConnectionStats::Ptr& stats, boost::shared_ptr< boost::asio::local::stream_protocol::socket >& socket);
 
 	typedef boost::signals2::signal<void ()> VoidSignal;
 	typedef boost::signals2::signal<void (MessageType, ::google::protobuf::Message&)> MessageSignal;
@@ -71,12 +86,14 @@ public:
 	MessageSignal message;
 	VoidSignal writable;
 
+	ConnectionStats::Ptr stats();
+
 	bool sendMessage(MessageType type, const ::google::protobuf::Message & msg, const Message::Deadline& expires, bool prioritized);
 
 	virtual void close() = 0;
 
 protected:
-	Connection(boost::asio::io_service& ioSvc);
+	Connection(boost::asio::io_service& ioSvc, const bithorde::ConnectionStats::Ptr& stats);
 
 	virtual void trySend() = 0;
 	virtual void tryRead() = 0;
@@ -88,6 +105,7 @@ protected:
 	State _state;
 
 	boost::asio::io_service& _ioSvc;
+	ConnectionStats::Ptr _stats;
 
 	Buffer _rcvBuf;
 	MessageQueue _sndQueue;

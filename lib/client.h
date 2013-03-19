@@ -11,9 +11,10 @@
 #include <boost/make_shared.hpp>
 #include <boost/signals2.hpp>
 
+#include "allocator.h"
 #include "asset.h"
 #include "connection.h"
-#include "allocator.h"
+#include "timer.h"
 
 namespace bithorde {
 
@@ -57,6 +58,7 @@ class Client
 	typedef std::map<Asset::Handle, AssetPtr> AssetMap;
 
 	boost::asio::io_service& _ioSvc;
+	TimerService::Ptr _timerSvc;
 	Connection::Pointer _connection;
 
 	std::string _myName;
@@ -99,6 +101,8 @@ public:
 	boost::signals2::signal<void (std::string&)> authenticated;
 	boost::signals2::signal<void ()> writable;
 	boost::signals2::signal<void ()> disconnected;
+
+	ConnectionStats::Ptr stats;
 
 protected:
 	Client(boost::asio::io_service& ioSvc, std::string myName);

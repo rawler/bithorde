@@ -55,6 +55,7 @@ class Server : public management::Directory
 {
 	Config &_cfg;
 	boost::asio::io_service& _ioSvc;
+	TimerService::Ptr _timerSvc;
 
 	boost::asio::ip::tcp::acceptor _tcpListener;
 	boost::asio::local::stream_protocol::acceptor _localListener;

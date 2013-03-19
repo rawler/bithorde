@@ -54,24 +54,30 @@ size_t Client::serverAssets() const
 	return res;
 }
 
-void Client::describe(management::Info& target) const
+void Client::describe(management::Info& tgt) const
 {
-	target << '+' << clientAssets().size() << '-' << serverAssets();
+	tgt << '+' << clientAssets().size() << '-' << serverAssets()
+		<< ", incoming: " << stats->incomingBitrateCurrent
+		<< ", outgoing: " << stats->outgoingBitrateCurrent;
 }
-void Client::inspect(management::InfoList& target) const
+void Client::inspect(management::InfoList& tgt) const
 {
+	tgt.append(NULL, "incomingCurrent") << stats->incomingBitrateCurrent << ", " << stats->incomingMessagesCurrent;
+	tgt.append(NULL, "outgoingCurrent") << stats->outgoingBitrateCurrent << ", " << stats->outgoingMessagesCurrent;
+	tgt.append(NULL, "incomingTotal") << stats->incomingBytes << ", " << stats->incomingMessages;
+	tgt.append(NULL, "outgoingTotal") << stats->outgoingBytes << ", " << stats->outgoingMessages;
 	for (auto iter=clientAssets().begin(); iter != clientAssets().end(); iter++) {
 		if (auto asset = iter->second->readAsset()) {
 			ostringstream name;
 			name << '+' << iter->first;
-			target.append(NULL, name.str()) << bithorde::Status_Name(asset->status) << ", " << asset->requestIds();
+			tgt.append(NULL, name.str()) << bithorde::Status_Name(asset->status) << ", " << asset->requestIds();
 		}
 	}
 	for (size_t i=0; i < _assets.size(); i++) {
 		if (auto& asset = _assets[i]) {
 			ostringstream name;
 			name << '-' << i;
-			target.append(*asset, name.str());
+			tgt.append(*asset, name.str());
 		}
 	}
 }

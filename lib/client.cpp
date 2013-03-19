@@ -78,6 +78,7 @@ void AssetBinding::onTimeout(const boost::system::error_code& error)
 
 Client::Client(asio::io_service& ioSvc, string myName) :
 	_ioSvc(ioSvc),
+	_timerSvc(new TimerService(ioSvc)),
 	_connection(),
 	_myName(myName),
 	_handleAllocator(1),
@@ -96,6 +97,8 @@ Client::~Client()
 void Client::connect(Connection::Pointer newConn) {
 	BOOST_ASSERT(!_connection);
 
+	stats = newConn->stats();
+
 	_rpcIdAllocator.reset();
 	_connection = newConn;
 
@@ -107,11 +110,13 @@ void Client::connect(Connection::Pointer newConn) {
 }
 
 void Client::connect(asio::ip::tcp::endpoint& ep) {
-	connect(Connection::create(_ioSvc, ep));
+	stats.reset(new ConnectionStats(_timerSvc));
+	connect(Connection::create(_ioSvc, stats, ep));
 }
 
 void Client::connect(asio::local::stream_protocol::endpoint& ep) {
-	connect(Connection::create(_ioSvc, ep));
+	stats.reset(new ConnectionStats(_timerSvc));
+	connect(Connection::create(_ioSvc, stats, ep));
 }
 
 void Client::connect(string spec) {
