@@ -4,7 +4,6 @@
 #include <map>
 #include <string>
 
-#include <boost/asio/deadline_timer.hpp>
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/local/stream_protocol.hpp>
 #include <boost/bind.hpp>
@@ -20,14 +19,13 @@ namespace bithorde {
 
 class Client;
 
-class AssetBinding : public boost::enable_shared_from_this<AssetBinding> {
+class AssetBinding {
 	friend class Client;
 
 	Client* _client;
 	Asset* _asset;
 	Asset::Handle _handle;
-	boost::asio::deadline_timer _statusTimer;
-	bool _timerCancelled;
+	Timer _statusTimer;
 public:
 	AssetBinding(Client* client, Asset* asset, Asset::Handle handle);
 
@@ -44,7 +42,7 @@ private:
 	void setTimer(const boost::posix_time::time_duration& timeout);
 	void clearTimer();
 	void orphaned();
-	void onTimeout(const boost::system::error_code& error);
+	void onTimeout();
 };
 
 class Client

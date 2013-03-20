@@ -23,7 +23,7 @@ AssetBinding::AssetBinding(Client* client, Asset* asset, Asset::Handle handle) :
 	_client(client),
 	_asset(asset),
 	_handle(handle),
-	_statusTimer(client->_ioSvc)
+	_statusTimer(*client->_timerSvc, boost::bind(&AssetBinding::onTimeout, this))
 {
 }
 
@@ -45,27 +45,22 @@ void AssetBinding::close()
 
 void AssetBinding::setTimer(const boost::posix_time::time_duration& timeout)
 {
-	_timerCancelled = false;
-	_statusTimer.expires_from_now(timeout);
-	_statusTimer.async_wait(boost::bind(&AssetBinding::onTimeout, shared_from_this(), boost::asio::placeholders::error));
+	_statusTimer.arm(timeout);
 }
 
 void AssetBinding::clearTimer()
 {
-	_timerCancelled = true;
-	_statusTimer.cancel();
+	_statusTimer.clear();
 }
 
 void AssetBinding::orphaned()
 {
-	_client = NULL;
 	clearTimer();
+	_client = NULL;
 }
 
-void AssetBinding::onTimeout(const boost::system::error_code& error)
+void AssetBinding::onTimeout()
 {
-	if (error || _timerCancelled)
-		return;
 	if (_asset) {
 		bithorde::AssetStatus msg;
 		msg.set_status(bithorde::Status::TIMEOUT);

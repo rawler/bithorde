@@ -71,7 +71,7 @@ Timer::Timer(TimerService& ts, const Timer::Target& target)
 
 Timer::~Timer()
 {
-	_ts.clear(this);
+	clear();
 }
 
 void Timer::arm(boost::posix_time::ptime deadline)
@@ -82,6 +82,10 @@ void Timer::arm(boost::posix_time::ptime deadline)
 void Timer::arm(boost::posix_time::time_duration in)
 {
 	_ts.arm(boost::posix_time::microsec_clock::universal_time() + in, this);
+}
+
+void Timer::clear() {
+	_ts.clear(this);
 }
 
 void Timer::invoke(const boost::posix_time::ptime& scheduled_at, const boost::posix_time::ptime& now)
@@ -95,10 +99,16 @@ PeriodicTimer::PeriodicTimer(TimerService& ts, const Timer::Target& target, boos
 	arm(_interval);
 }
 
+void PeriodicTimer::rearm(boost::posix_time::time_duration interval) {
+	clear();
+	_interval = interval;
+	arm(_interval);
+}
+
 void PeriodicTimer::invoke(const boost::posix_time::ptime& scheduled_at, const boost::posix_time::ptime& now)
 {
-	Timer::invoke(scheduled_at, now);
 	arm(scheduled_at+_interval);
+	Timer::invoke(scheduled_at, now);
 }
 
 

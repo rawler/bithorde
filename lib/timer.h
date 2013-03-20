@@ -53,6 +53,7 @@ public:
 	virtual ~Timer();
 	void arm(boost::posix_time::ptime deadline);
 	void arm(boost::posix_time::time_duration in);
+	void clear();
 protected:
 	virtual void invoke(const boost::posix_time::ptime& scheduled_at, const boost::posix_time::ptime& now);
 };
@@ -61,6 +62,7 @@ class PeriodicTimer : public Timer {
 	boost::posix_time::time_duration _interval;
 public:
 	PeriodicTimer(TimerService& ts, const Target& target, boost::posix_time::time_duration interval);
+	void rearm(boost::posix_time::time_duration value);
 protected:
 	virtual void invoke(const boost::posix_time::ptime& scheduled_at, const boost::posix_time::ptime& now);
 };
