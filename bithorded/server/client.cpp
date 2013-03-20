@@ -67,11 +67,13 @@ void Client::inspect(management::InfoList& tgt) const
 	tgt.append(NULL, "incomingTotal") << stats->incomingBytes << ", " << stats->incomingMessages;
 	tgt.append(NULL, "outgoingTotal") << stats->outgoingBytes << ", " << stats->outgoingMessages;
 	for (auto iter=clientAssets().begin(); iter != clientAssets().end(); iter++) {
-		if (auto asset = iter->second->readAsset()) {
-			ostringstream name;
-			name << '+' << iter->first;
-			tgt.append(NULL, name.str()) << bithorde::Status_Name(asset->status) << ", " << asset->requestIds();
-		}
+		ostringstream name;
+		name << '+' << iter->first;
+		auto& node = tgt.append(NULL, name.str());
+		if (auto asset = iter->second->readAsset())
+			node << bithorde::Status_Name(asset->status) << ", " << asset->requestIds();
+		else
+			node << "<stale>";
 	}
 	for (size_t i=0; i < _assets.size(); i++) {
 		if (auto& asset = _assets[i]) {
