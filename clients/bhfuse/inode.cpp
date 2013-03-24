@@ -10,6 +10,7 @@ static const uint ATTR_TIMEOUT = 2;
 static const uint INODE_TIMEOUT = 4;
 static const size_t BLOCK_SIZE = 64*1024;
 static const uint REBIND_INTERVAL_MS = 1000;
+static const uint REBIND_RETRIES = 5;
 static const uint READ_RETRIES = 5;
 
 using namespace std;
@@ -81,7 +82,8 @@ FUSEAsset::FUSEAsset(BHFuse* fs, ino_t ino, boost::shared_ptr< ReadAsset > asset
 	_openCount(0),
 	_holdOpenTimer(fs->ioSvc),
 	_rebindTimer(fs->ioSvc),
-	_connected(true)
+	_connected(true),
+	_retries(0)
 {
 	size = asset->size();
 }
@@ -93,7 +95,6 @@ void FUSEAsset::init()
 		_holdOpenTimer.expires_from_now(boost::posix_time::milliseconds(200));
 		_holdOpenTimer.async_wait(boost::bind(&FUSEAsset::closeOne, shared_from_this()));
 	}
-
 	_statusConnection = asset->statusUpdate.connect(Asset::StatusSignal::slot_type(&FUSEAsset::onStatusChanged, this, ASSET_ARG_STATUS));
 	_dataConnection = asset->dataArrived.connect(ReadAsset::DataSignal::slot_type(&FUSEAsset::onDataArrived, this, ASSET_ARG_OFFSET, ASSET_ARG_DATA, ASSET_ARG_TAG));
 }
@@ -165,6 +166,7 @@ void FUSEAsset::onStatusChanged(const bithorde::AssetStatus& s)
 	case bithorde::SUCCESS:
 		if (!_connected) {
 			_connected = true;
+			_retries = 0;
 			map<off_t, BHReadOperation> oldReads = _readOperations;
 			_readOperations.clear();
 			for (auto iter = oldReads.begin(); iter != oldReads.end(); iter++) {
@@ -174,11 +176,10 @@ void FUSEAsset::onStatusChanged(const bithorde::AssetStatus& s)
 		break;
 	case bithorde::NOTFOUND:
 	case bithorde::INVALID_HANDLE:
-		if (fs->client->isConnected()) {
+		if (fs->client->isConnected() && (_retries++ < REBIND_RETRIES)) {
 			_rebindTimer.expires_from_now(boost::posix_time::milliseconds(REBIND_INTERVAL_MS));
 			_rebindTimer.async_wait(boost::bind(&FUSEAsset::tryRebind, shared_from_this()));
 		}
-
 	default:
 		_connected = false;
 	}

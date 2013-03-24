@@ -86,6 +86,7 @@ private:
 	boost::asio::deadline_timer _rebindTimer;
 	std::map<off_t, BHReadOperation> _readOperations;
 	bool _connected;
+	uint16_t _retries;
 
 	boost::signals2::scoped_connection _statusConnection;
 	boost::signals2::scoped_connection _dataConnection;
