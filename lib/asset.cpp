@@ -123,7 +123,7 @@ void ReadRequestContext::callback(const Read::Response& msg)
 	if (msg.status() == bithorde::SUCCESS) {
 		asset->dataArrived(msg.offset(), msg.content(), msg.reqid());
 	} else {
-		cerr << "Error: failed read, " << msg.status() << endl;
+		cerr << "Error: failed read, " << bithorde::Status_Name(msg.status()) << endl;
 		asset->dataArrived(msg.offset(), string(), msg.reqid());
 	}
 }
