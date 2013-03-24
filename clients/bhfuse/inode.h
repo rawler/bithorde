@@ -5,10 +5,8 @@
 #include <map>
 #include <sys/stat.h>
 
-#include <boost/asio/deadline_timer.hpp>
-#include <boost/smart_ptr/enable_shared_from_this2.hpp>
-
 #include "lib/asset.h"
+#include "lib/timer.h"
 #include "lib/types.h"
 
 #include "lookup.h"
@@ -55,9 +53,8 @@ struct BHReadOperation {
 	BHReadOperation(fuse_req_t req, off_t off, size_t size);
 };
 
-class FUSEAsset : public INode, public boost::enable_shared_from_this2<FUSEAsset> {
+class FUSEAsset : public INode, public boost::enable_shared_from_this<FUSEAsset> {
 	FUSEAsset(BHFuse* fs, ino_t ino, boost::shared_ptr< bithorde::ReadAsset > asset, LookupParams& lookup_params);
-	void init();
 public:
 	typedef boost::shared_ptr<FUSEAsset> Ptr;
 	virtual ~FUSEAsset();
@@ -82,8 +79,8 @@ private:
 private:
 	// Counter to determine whether the underlying asset needs to be held open.
 	std::atomic<int> _openCount;
-	boost::asio::deadline_timer _holdOpenTimer;
-	boost::asio::deadline_timer _rebindTimer;
+	Timer _holdOpenTimer;
+	Timer _rebindTimer;
 	std::map<off_t, BHReadOperation> _readOperations;
 	bool _connected;
 	uint16_t _retries;

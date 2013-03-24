@@ -95,6 +95,7 @@ BHFuse::BHFuse(asio::io_service & ioSvc, string bithorded, BoostAsioFilesystem_O
 	BoostAsioFilesystem(ioSvc, opts),
 	ioSvc(ioSvc),
 	bithorded(bithorded),
+	_timerSvc(boost::make_shared<TimerService>(ioSvc)),
 	_ino_allocator(2)
 {
 	client = Client::create(ioSvc, "bhfuse");
@@ -207,6 +208,11 @@ FUSEAsset * BHFuse::registerAsset(boost::shared_ptr< ReadAsset > asset, LookupPa
 	_inode_cache[ino] = a;
 	_lookup_cache[lookup_params] = a;
 	return static_cast<FUSEAsset*>(a.get());
+}
+
+TimerService& BHFuse::timerSvc()
+{
+	return *_timerSvc;
 }
 
 bool BHFuse::unrefInode(fuse_ino_t ino, int count)

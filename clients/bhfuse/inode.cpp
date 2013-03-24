@@ -80,20 +80,15 @@ FUSEAsset::FUSEAsset(BHFuse* fs, ino_t ino, boost::shared_ptr< ReadAsset > asset
 	INode(fs, ino, lookup_params),
 	asset(asset),
 	_openCount(0),
-	_holdOpenTimer(fs->ioSvc),
-	_rebindTimer(fs->ioSvc),
+	_holdOpenTimer(fs->timerSvc(), boost::bind(&FUSEAsset::closeOne, this)),
+	_rebindTimer(fs->timerSvc(), boost::bind(&FUSEAsset::tryRebind, this)),
 	_connected(true),
 	_retries(0)
 {
 	size = asset->size();
-}
-
-void FUSEAsset::init()
-{
 	if (asset->isBound()) { // Schedule a delayed close of the initial reference.
 		_openCount++;
-		_holdOpenTimer.expires_from_now(boost::posix_time::milliseconds(200));
-		_holdOpenTimer.async_wait(boost::bind(&FUSEAsset::closeOne, shared_from_this()));
+		_holdOpenTimer.arm(boost::posix_time::milliseconds(200));
 	}
 	_statusConnection = asset->statusUpdate.connect(Asset::StatusSignal::slot_type(&FUSEAsset::onStatusChanged, this, ASSET_ARG_STATUS));
 	_dataConnection = asset->dataArrived.connect(ReadAsset::DataSignal::slot_type(&FUSEAsset::onDataArrived, this, ASSET_ARG_OFFSET, ASSET_ARG_DATA, ASSET_ARG_TAG));
@@ -101,8 +96,6 @@ void FUSEAsset::init()
 
 FUSEAsset::~FUSEAsset()
 {
-	_holdOpenTimer.cancel();
-	_rebindTimer.cancel();
 	BOOST_ASSERT(_openCount == 0);
 }
 
@@ -110,7 +103,6 @@ FUSEAsset::Ptr FUSEAsset::create(BHFuse* fs, ino_t ino, boost::shared_ptr< ReadA
 {
 	FUSEAsset *a = new FUSEAsset(fs, ino, asset, lookup_params);
 	Ptr p(a);
-	a->init();
 	return p;
 }
 
@@ -177,8 +169,7 @@ void FUSEAsset::onStatusChanged(const bithorde::AssetStatus& s)
 	case bithorde::NOTFOUND:
 	case bithorde::INVALID_HANDLE:
 		if (fs->client->isConnected() && (_retries++ < REBIND_RETRIES)) {
-			_rebindTimer.expires_from_now(boost::posix_time::milliseconds(REBIND_INTERVAL_MS));
-			_rebindTimer.async_wait(boost::bind(&FUSEAsset::tryRebind, shared_from_this()));
+			_rebindTimer.arm(boost::posix_time::milliseconds(REBIND_INTERVAL_MS));
 		}
 	default:
 		_connected = false;
@@ -204,8 +195,7 @@ void FUSEAsset::tryRebind()
 	if (fs->client->isConnected()) {
 		fs->client->bind(*asset);
 	} else {
-		_rebindTimer.expires_from_now(boost::posix_time::milliseconds(REBIND_INTERVAL_MS));
-		_rebindTimer.async_wait(boost::bind(&FUSEAsset::tryRebind, shared_from_this()));
+		_rebindTimer.arm(boost::posix_time::milliseconds(REBIND_INTERVAL_MS));
 	}
 }
 
@@ -236,7 +226,7 @@ void FUSEAsset::onDataArrived(uint64_t offset, const std::string& data, int tag)
 void FUSEAsset::closeOne()
 {
 	if ((--_openCount) <= 0) {
-		_rebindTimer.cancel();
+		_rebindTimer.clear();
 		asset->close();
 		for (auto iter = _readOperations.begin(); iter != _readOperations.end(); iter++) {
 			fuse_reply_err(iter->second.req, EIO);

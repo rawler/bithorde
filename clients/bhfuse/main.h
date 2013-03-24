@@ -30,8 +30,13 @@ public:
 	FUSEAsset * registerAsset(boost::shared_ptr< bithorde::ReadAsset > asset, LookupParams& lookup_params);
 	void reconnect();
 
+	TimerService& timerSvc();
+
 private:
 	bool unrefInode(fuse_ino_t ino, int count);
+
+
+	boost::shared_ptr<TimerService> _timerSvc;
 
 	std::map<fuse_ino_t, INode::Ptr> _inode_cache;
 	std::map<LookupParams, INode::Ptr> _lookup_cache;
