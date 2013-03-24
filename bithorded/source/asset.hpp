@@ -41,6 +41,8 @@ public:
 	 *  "meta" which holds info about blocks indexed, hashtree indexes etc.
 	 */
 	SourceAsset(const boost::filesystem::path& metaFolder);
+
+	virtual void inspect(management::InfoList& target) const;
 };
 
 	}

@@ -29,6 +29,11 @@ bithorded::cache::CachedAsset::CachedAsset(const boost::filesystem::path& metaFo
 	setStatus(bithorde::SUCCESS);
 }
 
+void bithorded::cache::CachedAsset::inspect(bithorded::management::InfoList& target) const
+{
+	target.append("type") << "Cached";
+}
+
 size_t bithorded::cache::CachedAsset::write(uint64_t offset, const std::string& data)
 {
 	_file.write(offset, data.data(), data.length());

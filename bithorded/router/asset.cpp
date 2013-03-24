@@ -133,6 +133,16 @@ uint64_t bithorded::router::ForwardedAsset::size()
 	return _size;
 }
 
+void ForwardedAsset::inspect(bithorded::management::InfoList& target) const
+{
+	target.append("type") << "forwarded";
+	for (auto iter = _upstream.begin(); iter != _upstream.end(); iter++) {
+		ostringstream buf;
+		buf << "upstream_" << iter->first;
+		target.append(buf.str()) << bithorde::Status_Name(iter->second->status);
+	}
+}
+
 void ForwardedAsset::dropUpstream(const string& peername)
 {
 	auto upstream = _upstream.find(peername);

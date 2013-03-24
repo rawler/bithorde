@@ -27,3 +27,9 @@ SourceAsset::SourceAsset(const boost::filesystem::path& metaFolder) :
 {
 	setStatus(bithorde::SUCCESS);
 }
+
+void SourceAsset::inspect(management::InfoList& target) const
+{
+	target.append("type") << "SourceAsset";
+	target.append("path") << _file.path();
+}

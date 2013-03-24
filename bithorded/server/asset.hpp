@@ -29,7 +29,7 @@
 namespace bithorded
 {
 
-class IAsset : public management::Leaf
+class IAsset : public management::DescriptiveDirectory
 {
 public:
 	typedef boost::function<void(int64_t offset, const std::string& data)> ReadCallback;

@@ -37,6 +37,8 @@ public:
 	CachedAsset(const boost::filesystem::path& metaFolder);
 	CachedAsset(const boost::filesystem::path& metaFolder, uint64_t size);
 
+	virtual void inspect(management::InfoList& target) const;
+
 	/**
 	 * Writes up to /size/ from buf into asset, updating amount written in hasher
 	 */
