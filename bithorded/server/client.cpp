@@ -62,14 +62,14 @@ void Client::describe(management::Info& tgt) const
 }
 void Client::inspect(management::InfoList& tgt) const
 {
-	tgt.append(NULL, "incomingCurrent") << stats->incomingBitrateCurrent << ", " << stats->incomingMessagesCurrent;
-	tgt.append(NULL, "outgoingCurrent") << stats->outgoingBitrateCurrent << ", " << stats->outgoingMessagesCurrent;
-	tgt.append(NULL, "incomingTotal") << stats->incomingBytes << ", " << stats->incomingMessages;
-	tgt.append(NULL, "outgoingTotal") << stats->outgoingBytes << ", " << stats->outgoingMessages;
+	tgt.append("incomingCurrent") << stats->incomingBitrateCurrent << ", " << stats->incomingMessagesCurrent;
+	tgt.append("outgoingCurrent") << stats->outgoingBitrateCurrent << ", " << stats->outgoingMessagesCurrent;
+	tgt.append("incomingTotal") << stats->incomingBytes << ", " << stats->incomingMessages;
+	tgt.append("outgoingTotal") << stats->outgoingBytes << ", " << stats->outgoingMessages;
 	for (auto iter=clientAssets().begin(); iter != clientAssets().end(); iter++) {
 		ostringstream name;
 		name << '+' << iter->first;
-		auto& node = tgt.append(NULL, name.str());
+		auto& node = tgt.append(name.str());
 		if (auto asset = iter->second->readAsset())
 			node << bithorde::Status_Name(asset->status) << ", " << asset->requestIds();
 		else
@@ -79,7 +79,7 @@ void Client::inspect(management::InfoList& tgt) const
 		if (auto& asset = _assets[i]) {
 			ostringstream name;
 			name << '-' << i;
-			tgt.append(*asset, name.str());
+			tgt.append(name.str(), *asset);
 		}
 	}
 }

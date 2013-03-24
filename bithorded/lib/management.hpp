@@ -46,9 +46,9 @@ public:
 
 class DescriptiveDirectory;
 struct InfoList : public std::vector<Info> {
-	Info& append(const http::server::RequestRouter* child, const std::string& name, const Leaf* renderer=NULL);
-	Info& append(const DescriptiveDirectory& dir, const std::string& name);
-	Info& append(const Leaf& leaf, const std::string& name);
+	Info& append(const std::string& name, const http::server::RequestRouter* child=NULL, const Leaf* renderer=NULL);
+	Info& append(const std::string& name, const DescriptiveDirectory& dir);
+	Info& append(const std::string& name, const Leaf& leaf);
 };
 
 class Directory : public http::server::RequestRouter

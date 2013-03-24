@@ -50,7 +50,7 @@ void ConnectionList::inspect(management::InfoList& target) const
 {
 	for (auto iter=begin(); iter != end(); iter++) {
 		if (auto conn = iter->second.lock()) {
-			target.append(*conn, iter->first);
+			target.append(iter->first, *conn);
 		}
 	}
 }
@@ -151,8 +151,8 @@ void Server::onLocalConnected(boost::shared_ptr< boost::asio::local::stream_prot
 
 void Server::inspect(management::InfoList& target) const
 {
-	target.append(_router, "router");
-	target.append(_connections, "connections");
+	target.append("router", _router);
+	target.append("connections", _connections);
 }
 
 void Server::clientConnected(const bithorded::Client::Ptr& client)

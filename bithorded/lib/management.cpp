@@ -59,7 +59,7 @@ ostream& Info::render_html(ostream& output) const
 	return output;
 }
 
-Info& InfoList::append(const http::server::RequestRouter* child, const string& name, const Leaf* renderer)
+Info& InfoList::append(const string& name, const http::server::RequestRouter* child, const Leaf* renderer)
 {
 	push_back(Info(child, name));
 	if (renderer)
@@ -67,14 +67,14 @@ Info& InfoList::append(const http::server::RequestRouter* child, const string& n
 	return back();
 }
 
-Info& InfoList::append(const DescriptiveDirectory& dir, const string& name)
+Info& InfoList::append(const string& name, const DescriptiveDirectory& dir)
 {
-	return append(&dir, name, &dir);
+	return append(name, &dir, &dir);
 }
 
-Info& InfoList::append(const Leaf& leaf, const string& name)
+Info& InfoList::append(const string& name, const Leaf& leaf)
 {
-	return append(NULL, name, &leaf);
+	return append(name, NULL, &leaf);
 }
 
 bool Directory::handle(const http::server::RequestRouter::path& path, const http::server::request& req, http::server::reply& reply) const
