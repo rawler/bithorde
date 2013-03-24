@@ -12,6 +12,7 @@ ADD_LIBRARY(bithorde
 	hashes.h hashes.cpp
 	magneturi.h magneturi.cpp
 	random.h random.cpp
+	timer.cpp
 	types.h types.cpp
 )
 
