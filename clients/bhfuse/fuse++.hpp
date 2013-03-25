@@ -20,7 +20,7 @@ struct BoostAsioFilesystem_Options : public std::map<std::string, std::string> {
 
 	BoostAsioFilesystem_Options();
 
-	void format_ll_opts(std::vector<std::string>& target);
+	void format_ll_opts(std::vector<std::string>& target) const;
 };
 
 class BoostAsioFilesystem
@@ -31,7 +31,7 @@ class BoostAsioFilesystem
 	* method.
 	***************************************************************************************/
 public:
-	BoostAsioFilesystem(boost::asio::io_service& ioSvc, BoostAsioFilesystem_Options& options);
+	BoostAsioFilesystem(boost::asio::io_service& ioSvc, const BoostAsioFilesystem_Options& options);
 	~BoostAsioFilesystem();
 
 	/************************************************************************************

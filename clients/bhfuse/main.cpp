@@ -19,8 +19,6 @@ namespace asio = boost::asio;
 namespace po = boost::program_options;
 
 static asio::io_service ioSvc;
-static int readAheadKB = -1;
-int assetTimeoutMs;
 
 using namespace bithorde;
 
@@ -46,7 +44,7 @@ int main(int argc, char *argv[])
 	log4cplus::BasicConfigurator config;
 	config.configure();
 
-	BoostAsioFilesystem_Options opts;
+	BHFuseOptions opts;
 
 	po::options_description desc("Supported options");
 	desc.add_options()
@@ -62,9 +60,9 @@ int main(int argc, char *argv[])
 			"Where to connect to bithorde. Either host:port, or /path/socket")
 		("mountpoint", po::value< string >(&opts.mountpoint), 
 			"Where to mount filesystem")
-		("readahead", po::value< int >(&readAheadKB)->default_value(-1),
+		("readahead", po::value< int >(&opts.readAheadKB)->default_value(-1),
 			"Amount to let the kernel pre-load, in KB. -1 means use automatic value")
-		("timeout", po::value< int >(&assetTimeoutMs)->default_value(1000),
+		("timeout", po::value< int >(&opts.assetTimeoutMs)->default_value(1000),
 			"How many millisecond to wait for assets to be found.")
 	;
 	po::positional_options_description p;
@@ -106,10 +104,11 @@ FUSEAsset::Ptr INodeCache::lookup(const BitHordeIds& ids)
 	return FUSEAsset::Ptr();
 }
 
-BHFuse::BHFuse(asio::io_service & ioSvc, string bithorded, BoostAsioFilesystem_Options & opts) :
+BHFuse::BHFuse(asio::io_service& ioSvc, string bithorded, const BHFuseOptions& opts) :
 	BoostAsioFilesystem(ioSvc, opts),
 	ioSvc(ioSvc),
 	bithorded(bithorded),
+	opts(opts),
 	_timerSvc(boost::make_shared<TimerService>(ioSvc)),
 	_ino_allocator(2)
 {
@@ -142,8 +141,8 @@ void BHFuse::onConnected(std::string remoteName) {
 
 void BHFuse::fuse_init(fuse_conn_info* conn)
 {
-	if (readAheadKB >= 0)
-		conn->max_readahead = readAheadKB<<10;
+	if (opts.readAheadKB >= 0)
+		conn->max_readahead = opts.readAheadKB<<10;
 }
 
 int BHFuse::fuse_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {

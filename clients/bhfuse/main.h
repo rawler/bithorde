@@ -9,16 +9,19 @@
 #include "inode.h"
 #include "lookup.h"
 
-extern int assetTimeoutMs;
-
 class INodeCache : public std::map<fuse_ino_t, INode::Ptr> {
 public:
 	FUSEAsset::Ptr lookup(const BitHordeIds& ids);
 };
 
+struct BHFuseOptions : public BoostAsioFilesystem_Options {
+	int assetTimeoutMs;
+	int readAheadKB;
+};
+
 class BHFuse : public BoostAsioFilesystem {
 public:
-	BHFuse(boost::asio::io_service & ioSvc, std::string bithorded, BoostAsioFilesystem_Options & opts);
+	BHFuse(boost::asio::io_service & ioSvc, std::string bithorded, const BHFuseOptions & opts);
 
     virtual void fuse_init(fuse_conn_info* conn);
 	virtual int fuse_lookup(fuse_req_t req, fuse_ino_t parent, const char *name);
@@ -31,6 +34,7 @@ public:
 	bithorde::Client::Pointer client;
 	boost::asio::io_service& ioSvc;
 	std::string bithorded;
+	const BHFuseOptions opts;
 
 public:
 	void onConnected(std::string remoteName);
@@ -38,10 +42,8 @@ public:
 	void reconnect();
 
 	TimerService& timerSvc();
-
 private:
 	bool unrefInode(fuse_ino_t ino, int count);
-
 
 	boost::shared_ptr<TimerService> _timerSvc;
 

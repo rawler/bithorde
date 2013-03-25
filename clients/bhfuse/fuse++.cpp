@@ -58,15 +58,14 @@ BoostAsioFilesystem_Options::BoostAsioFilesystem_Options()
 	this->insert(value_type("allow_other", ""));
 }
 
-void BoostAsioFilesystem_Options::format_ll_opts(std::vector<std::string>& target) {
+void BoostAsioFilesystem_Options::format_ll_opts(vector< string >& target) const {
 	target.push_back(name);
 	target.push_back("-ofsname="+name);
 
 	if (debug) {
 		target.push_back("-d");
 	}
-	BoostAsioFilesystem_Options::iterator iter;
-	for (iter = begin(); iter != end(); iter++) {
+	for (auto iter = begin(); iter != end(); iter++) {
 		ostringstream oss;
 		oss << "-o" << iter->first;
 		if (iter->second.length())
@@ -76,7 +75,7 @@ void BoostAsioFilesystem_Options::format_ll_opts(std::vector<std::string>& targe
 	target.insert(target.end(), args.begin(), args.end());
 }
 
-BoostAsioFilesystem::BoostAsioFilesystem(asio::io_service & ioSvc, BoostAsioFilesystem_Options & options)
+BoostAsioFilesystem::BoostAsioFilesystem(asio::io_service& ioSvc, const BoostAsioFilesystem_Options& options)
 	: _channel(ioSvc), _mountpoint(options.mountpoint), _fuse_chan(0), _fuse_session(0)
 {
 	vector<string> opts;
