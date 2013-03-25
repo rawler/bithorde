@@ -9,6 +9,7 @@
 
 using namespace std;
 namespace fs = boost::filesystem;
+namespace ptime = boost::posix_time;
 
 using namespace bithorde;
 
@@ -85,7 +86,8 @@ void Asset::handleMessage(const bithorde::AssetStatus & msg)
 ReadRequestContext::ReadRequestContext(ReadAsset* asset, uint64_t offset, size_t size, int32_t timeout) :
 	_asset(asset),
 	_client(asset->client()),
-	_timer(asset->io_service())
+	_timer(asset->io_service()),
+	_requested_at(ptime::microsec_clock::universal_time())
 {
 	set_handle(asset->handle());
 	set_reqid(_client->allocRPCRequest(handle()));
@@ -120,6 +122,7 @@ void ReadRequestContext::callback(const Read::Response& msg)
 		return;
 	auto asset = _asset;
 	_asset = NULL; // Handle circular triggers
+	asset->readResponseTime.post((ptime::microsec_clock::universal_time() - _requested_at).total_milliseconds());
 	if (msg.status() == bithorde::SUCCESS) {
 		asset->dataArrived(msg.offset(), msg.content(), msg.reqid());
 	} else {
@@ -135,6 +138,7 @@ void ReadRequestContext::timer_callback(const boost::system::error_code& error)
 		if (_asset) {
 			auto asset = _asset;
 			_asset = NULL;
+			asset->readResponseTime.post((ptime::microsec_clock::universal_time() - _requested_at).total_milliseconds());
 			asset->dataArrived(offset(), string(), reqid());
 			asset->clearOffset(offset(), reqid());
 		}
@@ -143,6 +147,7 @@ void ReadRequestContext::timer_callback(const boost::system::error_code& error)
 
 ReadAsset::ReadAsset(const bithorde::ReadAsset::ClientPointer& client, const BitHordeIds& requestIds) :
 	Asset(client),
+	readResponseTime(0.1, "ms"),
 	_requestIds(requestIds)
 {}
 

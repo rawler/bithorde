@@ -139,7 +139,7 @@ void ForwardedAsset::inspect(bithorded::management::InfoList& target) const
 	for (auto iter = _upstream.begin(); iter != _upstream.end(); iter++) {
 		ostringstream buf;
 		buf << "upstream_" << iter->first;
-		target.append(buf.str()) << bithorde::Status_Name(iter->second->status);
+		target.append(buf.str()) << bithorde::Status_Name(iter->second->status) << ", responseTime: " << iter->second->readResponseTime;
 	}
 }
 

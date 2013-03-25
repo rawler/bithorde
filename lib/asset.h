@@ -14,8 +14,9 @@
 #include <boost/shared_ptr.hpp>
 #include <boost/smart_ptr/enable_shared_from_this2.hpp>
 
-#include "hashes.h"
 #include "bithorde.pb.h"
+#include "counter.h"
+#include "hashes.h"
 #include "types.h"
 
 namespace bithorde {
@@ -74,6 +75,7 @@ class ReadRequestContext : public bithorde::Read_Request, public boost::enable_s
 	ReadAsset* _asset;
 	Asset::ClientPointer _client;
 	boost::asio::deadline_timer _timer;
+	boost::posix_time::ptime _requested_at;
 public:
 	typedef boost::shared_ptr<ReadRequestContext> Ptr;
 	ReadRequestContext(bithorde::ReadAsset* asset, uint64_t offset, std::size_t size, int32_t timeout);
@@ -105,6 +107,7 @@ public:
 	typedef boost::signals2::signal<void (off_t offset, const std::string& data, int tag)> DataSignal;
 	DataSignal dataArrived;
 
+	InertialValue readResponseTime;
 protected:
 	virtual void handleMessage(const bithorde::AssetStatus &msg);
 	virtual void handleMessage(const bithorde::Read::Response &msg);
