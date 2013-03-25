@@ -9,6 +9,11 @@
 #include "inode.h"
 #include "lookup.h"
 
+class INodeCache : public std::map<fuse_ino_t, INode::Ptr> {
+public:
+	FUSEAsset::Ptr lookup(const BitHordeIds& ids);
+};
+
 class BHFuse : public BoostAsioFilesystem {
 public:
 	BHFuse(boost::asio::io_service & ioSvc, std::string bithorded, BoostAsioFilesystem_Options & opts);
@@ -27,7 +32,7 @@ public:
 
 public:
 	void onConnected(std::string remoteName);
-	FUSEAsset * registerAsset(boost::shared_ptr< bithorde::ReadAsset > asset, LookupParams& lookup_params);
+	FUSEAsset * registerAsset(boost::shared_ptr< bithorde::ReadAsset > asset);
 	void reconnect();
 
 	TimerService& timerSvc();
@@ -38,10 +43,11 @@ private:
 
 	boost::shared_ptr<TimerService> _timerSvc;
 
-	std::map<fuse_ino_t, INode::Ptr> _inode_cache;
-	std::map<LookupParams, INode::Ptr> _lookup_cache;
+	INodeCache _inode_cache;
 
 	CachedAllocator<fuse_ino_t> _ino_allocator;
+	protected:
+	void _lookup_cache(LookupParams lp);
 };
 
 #endif // MAIN_H

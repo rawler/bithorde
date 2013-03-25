@@ -100,6 +100,7 @@ public:
 
 	int aSyncRead(off_t offset, ssize_t size, int32_t timeout=10000);
 	const BitHordeIds & requestIds() const;
+	const BitHordeIds & confirmedIds() const;
 
 	typedef boost::signals2::signal<void (off_t offset, const std::string& data, int tag)> DataSignal;
 	DataSignal dataArrived;
@@ -111,6 +112,7 @@ protected:
 
 private:
 	BitHordeIds _requestIds;
+	BitHordeIds _confirmedIds;
 	typedef std::multimap<off_t, ReadRequestContext::Ptr> RequestMap;
 	RequestMap _requestMap;
 };

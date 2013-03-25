@@ -22,12 +22,10 @@ public:
 
 	BHFuse * fs;
 
-	LookupParams lookup_params;
-
 	fuse_ino_t nr;
 	uint64_t size;
 
-	INode(BHFuse* fs, ino_t ino, LookupParams& lookup_params);
+	INode(BHFuse* fs, ino_t ino);
 	virtual ~INode();
 
 	void takeRef();
@@ -54,12 +52,12 @@ struct BHReadOperation {
 };
 
 class FUSEAsset : public INode, public boost::enable_shared_from_this<FUSEAsset> {
-	FUSEAsset(BHFuse* fs, ino_t ino, boost::shared_ptr< bithorde::ReadAsset > asset, LookupParams& lookup_params);
+	FUSEAsset(BHFuse* fs, ino_t ino, boost::shared_ptr< bithorde::ReadAsset > asset);
 public:
 	typedef boost::shared_ptr<FUSEAsset> Ptr;
 	virtual ~FUSEAsset();
 
-	static Ptr create(BHFuse* fs, ino_t ino, boost::shared_ptr< bithorde::ReadAsset > asset, LookupParams& lookup_params);
+	static Ptr create(BHFuse* fs, ino_t ino, boost::shared_ptr< bithorde::ReadAsset > asset);
 
 	boost::shared_ptr<bithorde::ReadAsset> asset;
 

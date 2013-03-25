@@ -18,10 +18,9 @@ namespace asio = boost::asio;
 
 using namespace bithorde;
 
-INode::INode(BHFuse* fs, ino_t ino, LookupParams& lookup_params) :
+INode::INode(BHFuse* fs, ino_t ino) :
 	_refCount(0),
 	fs(fs),
-	lookup_params(lookup_params),
 	nr(ino),
 	size(0)
 {
@@ -76,8 +75,8 @@ BHReadOperation::BHReadOperation(fuse_req_t req, off_t off, size_t size) :
 	retries(0)
 {}
 
-FUSEAsset::FUSEAsset(BHFuse* fs, ino_t ino, boost::shared_ptr< ReadAsset > asset, LookupParams& lookup_params) :
-	INode(fs, ino, lookup_params),
+FUSEAsset::FUSEAsset(BHFuse* fs, ino_t ino, boost::shared_ptr< ReadAsset > asset) :
+	INode(fs, ino),
 	asset(asset),
 	_openCount(0),
 	_holdOpenTimer(fs->timerSvc(), boost::bind(&FUSEAsset::closeOne, this)),
@@ -99,9 +98,9 @@ FUSEAsset::~FUSEAsset()
 	BOOST_ASSERT(_openCount == 0);
 }
 
-FUSEAsset::Ptr FUSEAsset::create(BHFuse* fs, ino_t ino, boost::shared_ptr< ReadAsset > asset, LookupParams& lookup_params)
+FUSEAsset::Ptr FUSEAsset::create(BHFuse* fs, ino_t ino, boost::shared_ptr< ReadAsset > asset)
 {
-	FUSEAsset *a = new FUSEAsset(fs, ino, asset, lookup_params);
+	FUSEAsset *a = new FUSEAsset(fs, ino, asset);
 	Ptr p(a);
 	return p;
 }

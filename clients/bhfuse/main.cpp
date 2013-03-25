@@ -91,6 +91,18 @@ int main(int argc, char *argv[])
 	return ioSvc.run();
 }
 
+FUSEAsset::Ptr INodeCache::lookup(const BitHordeIds& ids)
+{
+	for (auto iter=begin(); iter != end(); iter++) {
+		if (auto asset=dynamic_pointer_cast<FUSEAsset>(iter->second)) {
+			if (idsOverlap(ids, asset->asset->confirmedIds())) {
+				return asset;
+			}
+		}
+	}
+	return FUSEAsset::Ptr();
+}
+
 BHFuse::BHFuse(asio::io_service & ioSvc, string bithorded, BoostAsioFilesystem_Options & opts) :
 	BoostAsioFilesystem(ioSvc, opts),
 	ioSvc(ioSvc),
@@ -136,15 +148,16 @@ int BHFuse::fuse_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
 		return ENOENT;
 
 	LookupParams lp(parent, name);
-	if (_lookup_cache.count(lp)) {
-		_lookup_cache[lp]->fuse_reply_lookup(req);
-		return 0;
-	}
 
 	MagnetURI uri;
 	if (uri.parse(name)) {
-		Lookup * lookup = new Lookup(this, req, uri, lp);
-		lookup->perform(client);
+		auto ids = uri.toIdList();
+		if (auto asset = _inode_cache.lookup(ids)) {
+			asset->fuse_reply_lookup(req);
+		} else {
+			Lookup * lookup = new Lookup(this, req, ids);
+			lookup->perform(client);
+		}
 		return 0;
 	} else {
 		return ENOENT;
@@ -201,12 +214,11 @@ int BHFuse::fuse_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, fu
 	}
 }
 
-FUSEAsset * BHFuse::registerAsset(boost::shared_ptr< ReadAsset > asset, LookupParams& lookup_params)
+FUSEAsset * BHFuse::registerAsset(boost::shared_ptr< ReadAsset > asset)
 {
 	fuse_ino_t ino = _ino_allocator.allocate();
-	FUSEAsset::Ptr a = FUSEAsset::create(this, ino, asset, lookup_params);
+	FUSEAsset::Ptr a = FUSEAsset::create(this, ino, asset);
 	_inode_cache[ino] = a;
-	_lookup_cache[lookup_params] = a;
 	return static_cast<FUSEAsset*>(a.get());
 }
 
@@ -221,7 +233,6 @@ bool BHFuse::unrefInode(fuse_ino_t ino, int count)
 	if (i) {
 		if (!i->dropRefs(count)) {
 			_inode_cache.erase(ino);
-			_lookup_cache.erase(i->lookup_params);
 			_ino_allocator.free(ino);
 		}
 		return true;

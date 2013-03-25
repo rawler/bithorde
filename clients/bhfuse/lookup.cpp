@@ -9,13 +9,10 @@ using namespace std;
 
 using namespace bithorde;
 
-Lookup::Lookup(BHFuse * fs, fuse_req_t req, MagnetURI & uri, LookupParams& p) :
+Lookup::Lookup(BHFuse* fs, fuse_req_t req, const BitHordeIds& ids) :
 	fs(fs),
-	req(req),
-	lookup_params(p)
+	req(req)
 {
-	BitHordeIds ids = uri.toIdList();
-
 	asset = boost::make_shared<ReadAsset>(fs->client, ids);
 }
 
@@ -38,7 +35,7 @@ void Lookup::onStatusUpdate(const bithorde::AssetStatus &msg)
 		if (fuseAsset) {
 			fuseAsset->fuse_reply_open(req);
 		} else {
-			FUSEAsset* f_asset = fs->registerAsset(asset, lookup_params);
+			FUSEAsset* f_asset = fs->registerAsset(asset);
 			f_asset->fuse_reply_lookup(req);
 		}
 	} else {

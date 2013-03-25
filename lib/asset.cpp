@@ -158,6 +158,11 @@ const BitHordeIds& ReadAsset::requestIds() const
 	return _requestIds;
 }
 
+const BitHordeIds& ReadAsset::confirmedIds() const
+{
+	return _confirmedIds;
+}
+
 void ReadAsset::handleMessage(const bithorde::AssetStatus &msg)
 {
 	if (msg.has_size()) {
