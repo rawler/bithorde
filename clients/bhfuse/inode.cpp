@@ -93,11 +93,6 @@ FUSEAsset::FUSEAsset(BHFuse* fs, ino_t ino, boost::shared_ptr< ReadAsset > asset
 	_dataConnection = asset->dataArrived.connect(ReadAsset::DataSignal::slot_type(&FUSEAsset::onDataArrived, this, ASSET_ARG_OFFSET, ASSET_ARG_DATA, ASSET_ARG_TAG));
 }
 
-FUSEAsset::~FUSEAsset()
-{
-	BOOST_ASSERT(_openCount == 0);
-}
-
 FUSEAsset::Ptr FUSEAsset::create(BHFuse* fs, ino_t ino, boost::shared_ptr< ReadAsset > asset)
 {
 	FUSEAsset *a = new FUSEAsset(fs, ino, asset);
