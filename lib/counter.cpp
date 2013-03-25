@@ -18,53 +18,69 @@
 
 #include <boost/bind.hpp>
 
-Counter::Counter(const std::string& unit)
-	: unit(unit)
+TypedValue::TypedValue(const std::string& unit)
+	: _value(0), unit(unit)
+{}
+
+uint64_t TypedValue::value() const
 {
-	reset();
+	return _value;
 }
+
+TypedValue TypedValue::autoScale() const
+{
+	std::string prefix;
+	auto value_ = value();
+	if (value_ >= 10*1000*1000*1000L) { value_ /= 1000000000; prefix = 'G'; }
+	if (value_ >= 10*1000*1000) { value_ /= 1000000; prefix = 'M'; }
+	if (value_ >= 10*1000) { value_ /= 1000; prefix = 'K'; }
+	TypedValue res(prefix+unit);
+	res._value = value_;
+	return res;
+}
+
+Counter::Counter(const std::string& unit)
+	: TypedValue(unit)
+{}
 
 uint64_t Counter::operator+=(uint64_t amount)
 {
-	return _counter += amount;
+	return _value += amount;
 }
 
-void Counter::reset()
+uint64_t Counter::reset()
 {
-	_counter = 0;
+	auto res = _value;
+	_value = 0;
+	return res;
 }
 
-uint64_t Counter::value() const
+InertialValue::InertialValue(float falloff, const std::string& unit)
+	: TypedValue(unit), _falloff(falloff)
+{}
+
+uint64_t InertialValue::post(uint64_t amount)
 {
-	return _counter;
+	return _value = (amount * _falloff) + (_value * (1.0-_falloff));
 }
 
 LazyCounter::LazyCounter(TimerService& ts, const std::string& unit, const boost::posix_time::time_duration& granularity, float falloff)
-	: Counter(unit), _timer(ts, boost::bind(&LazyCounter::tick, this), granularity), _current(0), _falloff(falloff)
+	: Counter(unit), _timer(ts, boost::bind(&LazyCounter::tick, this), granularity), _value(falloff, unit)
 {
 }
 
 uint64_t LazyCounter::value() const
 {
-	return _current;
+	return _value.value();
 }
 
 void LazyCounter::tick()
 {
-	_current = (_counter * _falloff) + (_current * (1.0-_falloff));
-	reset();
+	_value.post(reset());
 }
 
-std::ostream& operator<<(std::ostream& tgt, const Counter& c)
+std::ostream& operator<<(std::ostream& tgt, const TypedValue& v)
 {
-	auto value = c.value();
-	char prefix(0);
-	if (value >= 1000000000) { value /= 1000000000; prefix = 'G'; }
-	if (value >= 1000000) { value /= 1000000; prefix = 'M'; }
-	if (value >= 1000) { value /= 1000; prefix = 'K'; }
-	tgt << value;
-	if (prefix)
-		tgt << prefix;
-	tgt << c.unit;
+	tgt << v.value() << v.unit;
 	return tgt;
 }

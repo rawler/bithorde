@@ -22,24 +22,40 @@
 
 #include <ostream>
 
-class Counter
-{
+class TypedValue {
 protected:
-	uint64_t _counter;
+	uint64_t _value;
 public:
 	const std::string unit;
+	TypedValue(const std::string& unit);
+	virtual uint64_t value() const;
+	TypedValue autoScale() const;
+};
 
+class Counter : public TypedValue
+{
+public:
 	Counter(const std::string& unit);
 	uint64_t operator+=(uint64_t amount);
-	void reset();
-	virtual uint64_t value() const;
+	/**
+	 * Returns: value before reset
+	 */
+	uint64_t reset();
+};
+
+class InertialValue : public TypedValue {
+	uint64_t _current;
+	float _falloff; // How much is the current data wheighted
+	const std::string unit;
+public:
+	InertialValue(float falloff, const std::string& unit);
+	uint64_t post(uint64_t amount);
 };
 
 class LazyCounter : public Counter
 {
 	PeriodicTimer _timer;
-	uint64_t _current;
-	float _falloff; // How much is the current data wheighted
+	InertialValue _value;
 public:
 	LazyCounter(TimerService& ts, const std::string& unit, const boost::posix_time::time_duration& granularity, float falloff);
 	virtual uint64_t value() const;
@@ -47,6 +63,6 @@ private:
 	void tick();
 };
 
-std::ostream& operator<<(std::ostream& tgt, const Counter& c);
+std::ostream& operator<<(std::ostream& tgt, const TypedValue& c);
 
 #endif // COUNTER_H

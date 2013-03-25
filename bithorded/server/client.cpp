@@ -62,10 +62,10 @@ void Client::describe(management::Info& tgt) const
 }
 void Client::inspect(management::InfoList& tgt) const
 {
-	tgt.append("incomingCurrent") << stats->incomingBitrateCurrent << ", " << stats->incomingMessagesCurrent;
-	tgt.append("outgoingCurrent") << stats->outgoingBitrateCurrent << ", " << stats->outgoingMessagesCurrent;
-	tgt.append("incomingTotal") << stats->incomingBytes << ", " << stats->incomingMessages;
-	tgt.append("outgoingTotal") << stats->outgoingBytes << ", " << stats->outgoingMessages;
+	tgt.append("incomingCurrent") << stats->incomingBitrateCurrent.autoScale() << ", " << stats->incomingMessagesCurrent.autoScale();
+	tgt.append("outgoingCurrent") << stats->outgoingBitrateCurrent.autoScale() << ", " << stats->outgoingMessagesCurrent.autoScale();
+	tgt.append("incomingTotal") << stats->incomingBytes.autoScale() << ", " << stats->incomingMessages.autoScale();
+	tgt.append("outgoingTotal") << stats->outgoingBytes.autoScale() << ", " << stats->outgoingMessages.autoScale();
 	for (auto iter=clientAssets().begin(); iter != clientAssets().end(); iter++) {
 		ostringstream name;
 		name << '+' << iter->first;
