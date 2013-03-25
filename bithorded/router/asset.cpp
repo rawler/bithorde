@@ -106,15 +106,23 @@ bool bithorded::router::ForwardedAsset::getIds(BitHordeIds& ids) const
 
 void bithorded::router::ForwardedAsset::async_read(uint64_t offset, size_t& size, uint32_t timeout, ReadCallback cb)
 {
-	auto selector = _upstream.begin(); // TODO: Actually select the least loaded connection
-	if (selector == _upstream.end())
+	if (_upstream.empty())
 		return cb(-1, string());
+	auto chosen = _upstream.begin();
+	uint32_t current_best = 1000*60*60*24;
+	for (auto iter = _upstream.begin(); iter != _upstream.end(); iter++) {
+		auto& a = iter->second;
+		if (current_best > a->readResponseTime.value()) {
+			current_best = a->readResponseTime.value();
+			chosen = iter;
+		}
+	}
 	PendingRead read;
 	read.offset = offset;
 	read.size = size;
 	read.cb = cb;
-	_pendingReads.push_back(read); // TODO: timeout
-	selector->second->aSyncRead(offset, size, timeout);
+	_pendingReads.push_back(read);
+	chosen->second->aSyncRead(offset, size, timeout);
 }
 
 void bithorded::router::ForwardedAsset::onData(uint64_t offset, const std::string& data, int tag) {
