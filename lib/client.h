@@ -92,7 +92,8 @@ public:
 	const AssetMap& clientAssets() const;
 
 	bool bind(ReadAsset & asset);
-	bool bind(ReadAsset & asset, uint64_t uuid, int timeout_ms);
+	bool bind(ReadAsset & asset, int timeout_ms);
+	bool bind(ReadAsset & asset, int timeout_ms, uint64_t uuid);
 	bool bind(UploadAsset & asset);
 
 	bool sendMessage(bithorde::Connection::MessageType type, const google::protobuf::Message& msg, const bithorde::Message::Deadline& expires=Message::NEVER );

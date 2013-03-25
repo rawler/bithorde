@@ -20,6 +20,7 @@ namespace po = boost::program_options;
 
 static asio::io_service ioSvc;
 static int readAheadKB = -1;
+int assetTimeoutMs;
 
 using namespace bithorde;
 
@@ -63,6 +64,8 @@ int main(int argc, char *argv[])
 			"Where to mount filesystem")
 		("readahead", po::value< int >(&readAheadKB)->default_value(-1),
 			"Amount to let the kernel pre-load, in KB. -1 means use automatic value")
+		("timeout", po::value< int >(&assetTimeoutMs)->default_value(1000),
+			"How many millisecond to wait for assets to be found.")
 	;
 	po::positional_options_description p;
 	p.add("mountpoint", 1);

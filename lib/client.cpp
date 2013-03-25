@@ -305,10 +305,15 @@ void Client::onMessage(const bithorde::Ping & msg) {
 }
 
 bool Client::bind(ReadAsset &asset) {
-	return bind(asset, rand64(), DEFAULT_ASSET_TIMEOUT.total_milliseconds());
+	return bind(asset, DEFAULT_ASSET_TIMEOUT.total_milliseconds());
 }
 
-bool Client::bind(ReadAsset& asset, uint64_t uuid, int timeout_ms) {
+bool Client::bind(ReadAsset& asset, int timeout_ms)
+{
+	return bind(asset, timeout_ms, rand64());
+}
+
+bool Client::bind(ReadAsset& asset, int timeout_ms, uint64_t uuid) {
 	if (!asset.isBound()) {
 		BOOST_ASSERT(asset._handle < 0);
 		BOOST_ASSERT(asset.requestIds().size() > 0);

@@ -9,6 +9,8 @@
 #include "inode.h"
 #include "lookup.h"
 
+extern int assetTimeoutMs;
+
 class INodeCache : public std::map<fuse_ino_t, INode::Ptr> {
 public:
 	FUSEAsset::Ptr lookup(const BitHordeIds& ids);

@@ -57,7 +57,7 @@ void bithorded::router::ForwardedAsset::bindUpstreams(const std::map< string, bi
 			bithorde::ASSET_ARG_OFFSET, bithorde::ASSET_ARG_DATA, bithorde::ASSET_ARG_TAG));
 		auto& upstream_ = _upstream[peername];
 		upstream_.reset(upstream);
-		f->bind(*upstream_, uuid, timeout);
+		f->bind(*upstream_, timeout, uuid);
 	}
 	updateStatus();
 }

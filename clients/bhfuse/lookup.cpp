@@ -26,7 +26,7 @@ Lookup::Lookup( BHFuse* fs, boost::shared_ptr< FUSEAsset >& asset, fuse_req_t re
 void Lookup::perform(Client::Pointer& c)
 {
 	statusConnection = asset->statusUpdate.connect(Asset::StatusSignal::slot_type(&Lookup::onStatusUpdate, this, _1));
-	c->bind(*asset);
+	c->bind(*asset, assetTimeoutMs);
 }
 
 void Lookup::onStatusUpdate(const bithorde::AssetStatus &msg)
