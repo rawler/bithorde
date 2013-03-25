@@ -8,7 +8,6 @@
 
 static const uint ATTR_TIMEOUT = 2;
 static const uint INODE_TIMEOUT = 4;
-static const size_t BLOCK_SIZE = 64*1024;
 static const uint REBIND_INTERVAL_MS = 1000;
 static const uint REBIND_RETRIES = 5;
 static const uint READ_RETRIES = 5;
@@ -137,7 +136,7 @@ void FUSEAsset::read(fuse_req_t req, off_t off, size_t size)
 
 void FUSEAsset::fill_stat_t(struct stat &s) {
 	s.st_mode = S_IFREG | 0555;
-	s.st_blksize = BLOCK_SIZE;
+	s.st_blksize = fs->opts.blockSize * 1024;
 	s.st_ino = nr;
 	s.st_size = size;
 	s.st_nlink = 1;

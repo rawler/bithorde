@@ -60,6 +60,8 @@ int main(int argc, char *argv[])
 			"Where to connect to bithorde. Either host:port, or /path/socket")
 		("mountpoint", po::value< string >(&opts.mountpoint), 
 			"Where to mount filesystem")
+		("blocksize", po::value< int >(&opts.blockSize)->default_value(32),
+			"Blocksize in KB.")
 		("readahead", po::value< int >(&opts.readAheadKB)->default_value(-1),
 			"Amount to let the kernel pre-load, in KB. -1 means use automatic value")
 		("timeout", po::value< int >(&opts.assetTimeoutMs)->default_value(1000),

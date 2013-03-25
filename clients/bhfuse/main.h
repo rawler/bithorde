@@ -17,6 +17,7 @@ public:
 struct BHFuseOptions : public BoostAsioFilesystem_Options {
 	int assetTimeoutMs;
 	int readAheadKB;
+	int blockSize;
 };
 
 class BHFuse : public BoostAsioFilesystem {
