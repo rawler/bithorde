@@ -26,6 +26,7 @@ class AssetBinding {
 	Asset* _asset;
 	Asset::Handle _handle;
 	Timer _statusTimer;
+	boost::posix_time::ptime _opened_at;
 public:
 	AssetBinding(Client* client, Asset* asset, Asset::Handle handle);
 
@@ -101,6 +102,7 @@ public:
 	boost::signals2::signal<void ()> disconnected;
 
 	ConnectionStats::Ptr stats;
+	InertialValue assetResponseTime;
 
 protected:
 	Client(boost::asio::io_service& ioSvc, std::string myName);

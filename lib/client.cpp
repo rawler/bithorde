@@ -16,6 +16,7 @@ const static boost::posix_time::millisec CLOSE_TIMEOUT(300);
 
 using namespace std;
 namespace asio = boost::asio;
+namespace ptime = boost::posix_time;
 
 using namespace bithorde;
 
@@ -25,6 +26,7 @@ AssetBinding::AssetBinding(Client* client, Asset* asset, Asset::Handle handle) :
 	_handle(handle),
 	_statusTimer(*client->_timerSvc, boost::bind(&AssetBinding::onTimeout, this))
 {
+	_opened_at = boost::posix_time::microsec_clock::universal_time();
 }
 
 Asset* AssetBinding::asset() const
@@ -78,7 +80,8 @@ Client::Client(asio::io_service& ioSvc, string myName) :
 	_myName(myName),
 	_handleAllocator(1),
 	_rpcIdAllocator(1),
-	_protoVersion(0)
+	_protoVersion(0),
+	assetResponseTime(0.2, "ms")
 {
 }
 
@@ -240,6 +243,8 @@ void Client::onMessage(const bithorde::AssetStatus & msg) {
 		AssetBinding& a = *_assetMap[handle];
 		a.clearTimer();
 		if (a) {
+			if (a->status == bithorde::Status::NONE)
+				assetResponseTime.post((ptime::microsec_clock::universal_time() - a._opened_at).total_milliseconds());
 			a->handleMessage(msg);
 		} else if (msg.status() != bithorde::Status::SUCCESS) {
 			_assetMap.erase(handle);
