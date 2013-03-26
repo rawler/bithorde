@@ -33,12 +33,14 @@ namespace bithorded { namespace router {
 	log4cplus::Logger assetLogger = log4cplus::Logger::getInstance("router");
 } }
 
-ForwardedAsset::~ForwardedAsset()
+UpstreamAsset::UpstreamAsset(const bithorde::ReadAsset::ClientPointer& client, const BitHordeIds& requestIds)
+	: ReadAsset(client, requestIds)
+{}
+
+void UpstreamAsset::handleMessage(const bithorde::Read::Response& resp)
 {
-	for (auto upstream = _upstream.begin(); upstream != _upstream.end(); upstream++) {
-		upstream->second->statusUpdate.disconnect(boost::bind(&ForwardedAsset::onUpstreamStatus, this, upstream->first, bithorde::ASSET_ARG_STATUS));
-		upstream->second->dataArrived.disconnect(boost::bind(&ForwardedAsset::onData, this, bithorde::ASSET_ARG_OFFSET, bithorde::ASSET_ARG_DATA, bithorde::ASSET_ARG_TAG));
-	}
+	auto self_ref = shared_from_this();
+	bithorde::ReadAsset::handleMessage(resp);
 }
 
 bool bithorded::router::ForwardedAsset::hasUpstream(const std::string peername)
@@ -52,15 +54,13 @@ void bithorded::router::ForwardedAsset::bindUpstreams(const std::map< string, bi
 		auto f = f_.second;
 		if (f->requestsAsset(_ids)) // This path surely doesn't have the asset.
 			continue;
-		auto upstream = new bithorde::ReadAsset(f, _ids);
 		auto peername = f->peerName();
+		auto& upstream = _upstream[peername] = make_shared<UpstreamAsset>(f, _ids);
 		auto self = boost::weak_ptr<ForwardedAsset>(shared_from_this());
 		upstream->statusUpdate.connect(boost::bind(boost::weak_fn(&ForwardedAsset::onUpstreamStatus, self), peername, bithorde::ASSET_ARG_STATUS));
 		upstream->dataArrived.connect(boost::bind(boost::weak_fn(&ForwardedAsset::onData, self),
 			bithorde::ASSET_ARG_OFFSET, bithorde::ASSET_ARG_DATA, bithorde::ASSET_ARG_TAG));
-		auto& upstream_ = _upstream[peername];
-		upstream_.reset(upstream);
-		if (!f->bind(*upstream_, timeout, uuid))
+		if (!f->bind(*upstream, timeout, uuid))
 			dropUpstream(peername);
 	}
 	updateStatus();
