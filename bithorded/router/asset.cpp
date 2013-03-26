@@ -21,6 +21,8 @@
 #include <boost/smart_ptr/make_shared.hpp>
 #include <utility>
 
+#include <lib/weak_fn.hpp>
+
 #include <log4cplus/logger.h>
 #include <log4cplus/loggingmacros.h>
 
@@ -52,8 +54,9 @@ void bithorded::router::ForwardedAsset::bindUpstreams(const std::map< string, bi
 			continue;
 		auto upstream = new bithorde::ReadAsset(f, _ids);
 		auto peername = f->peerName();
-		upstream->statusUpdate.connect(boost::bind(&ForwardedAsset::onUpstreamStatus, this, peername, bithorde::ASSET_ARG_STATUS));
-		upstream->dataArrived.connect(boost::bind(&ForwardedAsset::onData, this,
+		auto self = boost::weak_ptr<ForwardedAsset>(shared_from_this());
+		upstream->statusUpdate.connect(boost::bind(boost::weak_fn(&ForwardedAsset::onUpstreamStatus, self), peername, bithorde::ASSET_ARG_STATUS));
+		upstream->dataArrived.connect(boost::bind(boost::weak_fn(&ForwardedAsset::onData, self),
 			bithorde::ASSET_ARG_OFFSET, bithorde::ASSET_ARG_DATA, bithorde::ASSET_ARG_TAG));
 		auto& upstream_ = _upstream[peername];
 		upstream_.reset(upstream);

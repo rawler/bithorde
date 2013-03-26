@@ -35,7 +35,7 @@ struct PendingRead {
 	IAsset::ReadCallback cb;
 };
 
-class ForwardedAsset : public bithorded::IAsset
+class ForwardedAsset : public bithorded::IAsset, public boost::noncopyable, public boost::enable_shared_from_this<ForwardedAsset>
 {
 	typedef bithorde::ReadAsset UpstreamAsset;
 
