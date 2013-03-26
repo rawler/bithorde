@@ -31,7 +31,7 @@ TypedValue TypedValue::autoScale() const
 {
 	std::string prefix;
 	auto value_ = value();
-	if (value_ >= 10*1000*1000*1000L) { value_ /= 1000000000; prefix = 'G'; }
+	if (value_ >= 10*1000*1000*1000LL) { value_ /= 1000000000; prefix = 'G'; }
 	if (value_ >= 10*1000*1000) { value_ /= 1000000; prefix = 'M'; }
 	if (value_ >= 10*1000) { value_ /= 1000; prefix = 'K'; }
 	TypedValue res(prefix+unit);
