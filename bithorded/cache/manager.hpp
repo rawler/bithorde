@@ -44,13 +44,12 @@ public:
 	 *
 	 * @returns a valid asset if file is within acceptable path, NULL otherwise
 	 */
-	IAsset::Ptr prepareUpload(uint64_t size);
+	CachedAsset::Ptr prepareUpload(uint64_t size);
 
 	/**
 	 * Finds an asset by bithorde HashId. (Only the tiger-hash is actually used)
 	 */
 	IAsset::Ptr findAsset(const bithorde::BindRead& req);
-
 protected:
 	/**
 	 * Finds an asset by bithorde HashId. (Only the tiger-hash is actually used)

@@ -49,21 +49,24 @@ CacheManager::CacheManager(boost::asio::io_service& ioSvc,
 
 IAsset::Ptr CacheManager::openAsset(const boost::filesystem::path& assetPath)
 {
-	auto asset = boost::make_shared<CachedAsset>(assetPath);
-	if (asset->hasRootHash()) {
-		return asset;
-	} else {
-		return IAsset::Ptr();
-	}
+	return boost::make_shared<CachedAsset>(assetPath);
 }
 
 IAsset::Ptr CacheManager::openAsset(const bithorde::BindRead& req)
 {
-	return bithorded::store::AssetStore::openAsset(req);
+	auto stored = boost::dynamic_pointer_cast<CachedAsset>(bithorded::store::AssetStore::openAsset(req));
+	if (stored && (stored->status == bithorde::Status::SUCCESS)) {
+		return stored;
+	} else {
+		auto upstream = _router.findAsset(req);
+		if (auto upstream_ = boost::dynamic_pointer_cast<router::ForwardedAsset>(upstream))
+			return boost::make_shared<CachingAsset>(*this, upstream_, stored);
+		else
+			return upstream;
+	}
 }
 
-
-IAsset::Ptr CacheManager::prepareUpload(uint64_t size)
+CachedAsset::Ptr CacheManager::prepareUpload(uint64_t size)
 {
 	if ((!_baseDir.empty()) && makeRoom(size)) {
 		fs::path assetFolder(AssetStore::newAssetDir());
@@ -75,10 +78,10 @@ IAsset::Ptr CacheManager::prepareUpload(uint64_t size)
 		} catch (const std::ios::failure& e) {
 			LOG4CPLUS_ERROR(log, "Failed to create " << assetFolder << " for upload. Purging...");
 			AssetStore::removeAsset(assetFolder);
-			return IAsset::Ptr();
+			return CachedAsset::Ptr();
 		}
 	} else {
-		return IAsset::Ptr();
+		return CachedAsset::Ptr();
 	}
 }
 
