@@ -30,7 +30,7 @@ namespace fs = boost::filesystem;
 
 namespace bithorded {
 	namespace cache {
-		log4cplus::Logger log = log4cplus::Logger::getInstance("source");
+		log4cplus::Logger log = log4cplus::Logger::getInstance("cache");
 	}
 }
 
@@ -123,7 +123,7 @@ void CacheManager::linkAsset(CachedAsset::WeakPtr asset_)
 	auto asset = asset_.lock();
 	BitHordeIds ids;
 	if (asset && asset->getIds(ids)) {
-		std::cerr << "Linking" << std::endl;
+		LOG4CPLUS_DEBUG(log, "Linking " << ids << " to " << asset->folder());
 		const char *data_path = (asset->folder()/"data").c_str();
 		lutimes(data_path, NULL);
 
