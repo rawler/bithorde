@@ -57,7 +57,8 @@ bithorded::cache::CachingAsset::~CachingAsset()
 void bithorded::cache::CachingAsset::inspect(bithorded::management::InfoList& target) const
 {
 	target.append("type") << "caching";
-	target.append("upstream", _upstream.get());
+	if (_upstream)
+		_upstream->inspect_upstreams(target);
 }
 
 void bithorded::cache::CachingAsset::async_read(uint64_t offset, size_t& size, uint32_t timeout, bithorded::IAsset::ReadCallback cb)

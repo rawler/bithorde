@@ -70,6 +70,7 @@ public:
 	virtual uint64_t size();
 
 	virtual void inspect(management::InfoList& target) const;
+	void inspect_upstreams(management::InfoList& target) const;
 private:
 	void onUpstreamStatus(const std::string& peername, const bithorde::AssetStatus& status);
 	void updateStatus();
