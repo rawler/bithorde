@@ -27,6 +27,7 @@
 #include "asset.hpp"
 #include "../../lib/hashes.h"
 #include "../../lib/random.h"
+#include "../lib/relativepath.hpp"
 
 using namespace bithorded;
 using namespace bithorded::store;
@@ -76,8 +77,7 @@ void AssetStore::link(const BitHordeIds& ids, const boost::shared_ptr<StoredAsse
 	if (fs::exists(fs::symlink_status(link)))
 		fs::remove(link);
 
-	// TODO: make links relative instead, so storage can be moved around a little.
-	fs::create_symlink(fs::absolute(asset->folder()), link);
+	fs::create_relative_symlink(asset->folder(), link);
 }
 
 enum LinkStatus{
@@ -127,7 +127,7 @@ boost::filesystem::path AssetStore::resolveIds(const BitHordeIds& ids)
 	if (tigerId.size() >= 0) {
 		fs::path hashLink = _tigerFolder / base32encode(tigerId);
 		boost::system::error_code e;
-		auto assetFolder = fs::read_symlink(hashLink, e);
+		auto assetFolder = fs::canonical(hashLink, e);
 		if (e || !fs::is_directory(assetFolder)) {
 			unlink(hashLink);
 		} else if (checkAssetFolder(hashLink, assetFolder)) {
@@ -186,7 +186,7 @@ void AssetStore::unlink(const fs::path& linkPath) noexcept
 void AssetStore::unlinkAndRemove(const boost::filesystem::path& linkPath) noexcept
 {
 	boost::system::error_code e;
-	auto asset = fs::read_symlink(linkPath, e);
+	auto asset = fs::canonical(linkPath, e);
 	unlink(linkPath);
 	if (!e)
 		removeAsset(asset);

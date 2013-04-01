@@ -24,6 +24,8 @@
 #include <log4cplus/logger.h>
 #include <log4cplus/loggingmacros.h>
 
+#include "../lib/relativepath.hpp"
+
 using namespace std;
 
 namespace asio = boost::asio;
@@ -82,7 +84,7 @@ IAsset::Ptr Store::addAsset(const boost::filesystem::path& file)
 	} else {
 		fs::path assetFolder(AssetStore::newAssetDir());
 
-		fs::create_symlink(file, assetFolder/"data");
+		fs::create_relative_symlink(file, assetFolder/"data");
 
 		try {
 			SourceAsset::Ptr asset = boost::make_shared<SourceAsset>(assetFolder);

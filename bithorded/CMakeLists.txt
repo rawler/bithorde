@@ -16,6 +16,7 @@ ADD_EXECUTABLE(bithorded
 	lib/hashtree.cpp
 	lib/management.cpp
 	lib/randomaccessfile.cpp
+	lib/relativepath.cpp
 	lib/rounding.cpp
 	lib/threadpool.cpp
 	lib/treestore.cpp

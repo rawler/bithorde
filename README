@@ -34,7 +34,7 @@ POSIX-systems).
 Build requirements (Ubuntu Package Names)
 
   cmake
-  libboost-all-dev (>= 1.46, might work with earlier, may not need all modules)
+  libboost-all-dev (>= 1.48, might work with earlier, may not need all modules)
   libcrypto++-dev
   libfuse-dev
   liblog4cplus-dev
