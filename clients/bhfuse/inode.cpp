@@ -196,16 +196,20 @@ void FUSEAsset::onDataArrived(uint64_t offset, const std::string& data, int tag)
 	if (_readOperations.count(tag)) {
 		BHReadOperation &op = _readOperations[tag];
 		if (_connected) {
-			if (data.empty()) {
+			op.res += data;
+			if ((data.size() < op.size) && ((op.off + data.size()) < (off_t)asset->size())) {
 				BHReadOperation opCopy = op;
 				_readOperations.erase(tag);
-				if (op.retries < READ_RETRIES)
+				if (op.retries < READ_RETRIES) {
+					opCopy.off += data.size();
+					opCopy.size -= data.size();
 					queueRead(opCopy);
-				else
-					fuse_reply_err(op.req, EIO);
+				} else {
+					fuse_reply_err(opCopy.req, EIO);
+				}
 			} else {
 				if ((off_t)offset == op.off)
-					fuse_reply_buf(op.req, (const char*)data.data(), data.size());
+					fuse_reply_buf(op.req, (const char*)op.res.data(), op.res.size());
 				else
 					fuse_reply_err(op.req, EIO);
 				_readOperations.erase(tag);

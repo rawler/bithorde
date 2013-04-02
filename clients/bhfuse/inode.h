@@ -46,6 +46,7 @@ struct BHReadOperation {
 	off_t off;
 	size_t size;
 	uint retries;
+	std::string res;
 
 	BHReadOperation();
 	BHReadOperation(fuse_req_t req, off_t off, size_t size);

@@ -58,7 +58,7 @@ int main(int argc, char *argv[])
 			"Show fuse-commands, for debugging purposes")
 		("url,u", po::value< string >()->default_value("/tmp/bithorde"),
 			"Where to connect to bithorde. Either host:port, or /path/socket")
-		("mountpoint", po::value< string >(&opts.mountpoint), 
+		("mountpoint", po::value< string >(&opts.mountpoint),
 			"Where to mount filesystem")
 		("blocksize", po::value< int >(&opts.blockSize)->default_value(32),
 			"Blocksize in KB.")
