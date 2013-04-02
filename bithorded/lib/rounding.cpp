@@ -22,7 +22,7 @@
 uint64_t roundUp(uint64_t val, uint64_t block) {
 	size_t overflow = val % block;
 	if (overflow)
-		return val - overflow;
+		return val + (block - overflow);
 	else
 		return val;
 }
