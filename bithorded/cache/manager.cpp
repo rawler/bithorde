@@ -127,7 +127,7 @@ void CacheManager::linkAsset(CachedAsset::WeakPtr asset_)
 		const char *data_path = (asset->folder()/"data").c_str();
 		lutimes(data_path, NULL);
 
-		AssetStore::link(ids, asset);
+		AssetStore::update_links(ids, asset);
 	}
 }
 
