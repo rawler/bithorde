@@ -37,10 +37,10 @@ void bithorded::cache::CachedAsset::inspect(bithorded::management::InfoList& tar
 
 size_t bithorded::cache::CachedAsset::write(uint64_t offset, const std::string& data)
 {
-	_file.write(offset, data.data(), data.length());
+	auto res = _file.write(offset, data.data(), data.length());
 	notifyValidRange(offset, data.length());
 	updateStatus();
-	return 0;
+	return res;
 }
 
 bithorded::cache::CachingAsset::CachingAsset(bithorded::cache::CacheManager& mgr, bithorded::router::ForwardedAsset::Ptr upstream, bithorded::cache::CachedAsset::Ptr cached)
