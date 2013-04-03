@@ -31,9 +31,9 @@ function verify_equal() {
     # $2 - testfile, or skip to test stdin
 
     if [ -z "$2" ]; then
-        cmp - "$1"
+        cmp "$1" -
     elif [ -e "$2" ]; then
-        cmp "$2" "$1"
+        cmp "$1" "$2"
     else
         return 1;
     fi
