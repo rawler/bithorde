@@ -56,7 +56,9 @@ protected:
 	 * Finds an asset by bithorde HashId. (Only the tiger-hash is actually used)
 	 */
 	IAsset::Ptr openAsset(const boost::filesystem::path& assetPath);
-	
+
+	virtual IAsset::Ptr openAsset(const bithorde::BindRead& req);
+
 private:
 	bool makeRoom(uint64_t size);
 	void linkAsset(bithorded::cache::CachedAsset::WeakPtr asset_);

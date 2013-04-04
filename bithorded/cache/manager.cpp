@@ -57,6 +57,12 @@ IAsset::Ptr CacheManager::openAsset(const boost::filesystem::path& assetPath)
 	}
 }
 
+IAsset::Ptr CacheManager::openAsset(const bithorde::BindRead& req)
+{
+	return bithorded::store::AssetStore::openAsset(req);
+}
+
+
 IAsset::Ptr CacheManager::prepareUpload(uint64_t size)
 {
 	if ((!_baseDir.empty()) && makeRoom(size)) {

@@ -143,6 +143,6 @@ IAsset::Ptr Store::openAsset(const boost::filesystem::path& assetPath)
 	} else {
 		LOG4CPLUS_WARN(log, "Unhashed asset detected, hashing");
 		_threadPool.post(*new HashTask(asset, _ioSvc));
-		return IAsset::Ptr();
+		return store::StoredAsset::Ptr();
 	}
 }
