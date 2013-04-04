@@ -182,7 +182,7 @@ void BHGet::requestMore()
 void BHGet::onDataChunk(uint64_t offset, const string& data, int tag)
 {
 	if ((data.size() < BLOCK_SIZE) && ((offset+data.size()) < _asset->size())) {
-		 cerr << "ERROR: got unexpectedly small data-block" << endl;
+		 cerr << "ERROR: got unexpectedly small data-block " << data.size() << " vs. " << BLOCK_SIZE << endl;
 	}
 	_outQueue->send(offset, data);
 	if (_outQueue->position < _asset->size()) {
@@ -194,7 +194,7 @@ void BHGet::onDataChunk(uint64_t offset, const string& data, int tag)
 
 void BHGet::onAuthenticated(string& peerName) {
 	if (optDebug)
-		cerr << "DEBUG: Connected to "+peerName << endl;
+		cerr << "DEBUG: Connected to " << peerName << endl;
 	cerr.flush();
 	nextAsset();
 }
