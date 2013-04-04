@@ -62,7 +62,7 @@ private:
 		if (write(1, data.data(), datasize) == datasize)
 			position += datasize;
 		else
-			(cerr << "Error: failed to write block" << endl).flush();
+			(cerr << "ERROR: failed to write block" << endl).flush();
 	}
 };
 
@@ -70,7 +70,8 @@ BHGet::BHGet(po::variables_map& args) :
 	optMyName(args["name"].as<string>()),
 	optQuiet(args.count("quiet")),
 	optConnectUrl(args["url"].as<string>()),
-	_res(0)
+	_res(0),
+	optDebug(false)
 {}
 
 int BHGet::main(const std::vector<std::string>& args) {
@@ -104,7 +105,7 @@ bool resolvePath(MagnetURI& uri, const std::string &path_) {
 bool BHGet::queueAsset(const std::string& _uri) {
 	MagnetURI uri;
 	if (!uri.parse(_uri) && !resolvePath(uri, _uri)) {
-		cerr << "Only magnet-links and symlinks to magnet-links supported, not '" << _uri << "'" << endl;
+		cerr << "ERROR: Only magnet-links and symlinks to magnet-links supported, not '" << _uri << "'" << endl;
 		return false;
 	}
 
@@ -112,7 +113,7 @@ bool BHGet::queueAsset(const std::string& _uri) {
 		_assets.push_back(uri);
 		return true;
 	} else {
-		cerr << "No hash-Identifiers in '" << _uri << "'" << endl;
+		cerr << "ERROR: No hash-Identifiers in '" << _uri << "'" << endl;
 		return false;
 	}
 }
@@ -147,17 +148,22 @@ void BHGet::onStatusUpdate(const bithorde::AssetStatus& status)
 {
 	switch (status.status()) {
 	case bithorde::SUCCESS:
-		if (status.size() > 0 ) {
-			if (status.handle())
-			cerr << "Downloading ..." << endl;
-			requestMore();
+		if (status.size() > 0) {
+			if (status.handle()) {
+				if (optDebug)
+					cerr << "DEBUG: Downloading ..." << endl;
+				requestMore();
+			} else {
+				cerr << "WARNING: Broken response" << endl;
+				nextAsset();
+			}
 		} else {
-			cerr << "Zero-sized asset, skipping ..." << endl;
+			cerr << "DEBUG: Zero-sized asset, skipping ..." << endl;
 			nextAsset();
 		}
 		break;
 	default:
-		cerr << "Failed (" << bithorde::Status_Name(status.status()) << ") ..." << endl;
+		cerr << "ERROR: Failed (" << bithorde::Status_Name(status.status()) << ") ..." << endl;
 		_res += 1;
 		nextAsset();
 		break;
@@ -175,10 +181,10 @@ void BHGet::requestMore()
 
 void BHGet::onDataChunk(uint64_t offset, const string& data, int tag)
 {
-	_outQueue->send(offset, data);
 	if ((data.size() < BLOCK_SIZE) && ((offset+data.size()) < _asset->size())) {
-		 cerr << "Error: got unexpectedly small data-block" << endl;
+		 cerr << "ERROR: got unexpectedly small data-block" << endl;
 	}
+	_outQueue->send(offset, data);
 	if (_outQueue->position < _asset->size()) {
 		requestMore();
 	} else {
@@ -187,7 +193,8 @@ void BHGet::onDataChunk(uint64_t offset, const string& data, int tag)
 }
 
 void BHGet::onAuthenticated(string& peerName) {
-	cerr << "Connected to "+peerName << endl;
+	if (optDebug)
+		cerr << "DEBUG: Connected to "+peerName << endl;
 	cerr.flush();
 	nextAsset();
 }
@@ -197,6 +204,8 @@ int main(int argc, char *argv[]) {
 	desc.add_options()
 		("help,h",
 			"Show help")
+		("debug,d",
+			"Activate debug-logging")
 		("version,v",
 			"Show version")
 		("name,n", po::value< string >()->default_value("bhget"),
@@ -228,6 +237,7 @@ int main(int argc, char *argv[]) {
 	int res = -1;
 	try {
 		BHGet app(vm);
+		app.optDebug = vm.count("debug");
 		res = app.main(vm["magnet-url"].as< vector<string> >());
 	} catch (std::string err) {
 		cerr << err << endl;

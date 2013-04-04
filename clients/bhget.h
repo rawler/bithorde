@@ -32,6 +32,8 @@ public:
 	bool queueAsset(const std::string& uri);
 
 	int main(const std::vector<std::string>& args);
+
+	bool optDebug;
 private:
 	void onAuthenticated(std::string& peerName);
 	void onStatusUpdate(const bithorde::AssetStatus&);
