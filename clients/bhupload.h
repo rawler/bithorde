@@ -35,6 +35,8 @@ public:
 	BHUpload(boost::program_options::variables_map &map);
 	bool queueFile(const std::string& path);
 
+	bool optDebug;
+
 	int main(const std::vector<std::string>& args);
 private:
 	void onAuthenticated(std::string& peerName);

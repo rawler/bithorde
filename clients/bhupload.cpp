@@ -23,7 +23,8 @@ BHUpload::BHUpload(boost::program_options::variables_map &args) :
 	optMyName(args["name"].as<string>()),
 	optQuiet(args.count("quiet")),
 	_currentAsset(NULL),
-	_res(0)
+	_res(0),
+	optDebug(false)
 {
 	_readBuf.allocate(BLOCK_SIZE);
 }
@@ -48,11 +49,11 @@ int BHUpload::main(const std::vector<std::string>& args) {
 bool BHUpload::queueFile(const std::string& path) {
 	fs::path p(path);
 	if (!fs::exists(p)) {
-		cerr << "Non-existing file '" << path << "'" << endl;
+		cerr << "ERROR: Non-existing file '" << path << "'" << endl;
 		return false;
 	}
 	if (!(fs::is_regular_file(p) || fs::is_symlink(p))) {
-		cerr <<  "Path is not regular file '" << path << "'" << endl;
+		cerr <<  "ERROR: Path is not regular file '" << path << "'" << endl;
 		return false;
 	}
 
@@ -94,13 +95,14 @@ void BHUpload::onStatusUpdate(const bithorde::AssetStatus& status)
 			cout << MagnetURI(status) << endl;
 			nextAsset();
 		} else if (!optLink) {
-			cerr << "Uploading ..." << endl;
+			if (optDebug)
+				cerr << "DEBUG: Uploading ..." << endl;
 			_writeConnection = _client->writable.connect(boost::bind(&BHUpload::onWritable, this));
 			onWritable();
 		}
 		break;
 	default:
-		cerr << "Failed ..." << endl;
+		cerr << "ERROR: Failed ..." << endl;
 		_res += 1;
 		nextAsset();
 		break;
@@ -122,7 +124,8 @@ ssize_t BHUpload::readNext()
 
 bool BHUpload::tryWrite() {
 	if (!_readBuf.size && !readNext()) {
-		cerr << "Done, awaiting asset-ids..." << endl;
+		if (optDebug)
+			cerr << "DEBUG: Done, awaiting asset-ids..." << endl;
 		// File reading done. Don't try to write before next is ready for upload.
 		_writeConnection.disconnect();
 		return false;
@@ -139,7 +142,8 @@ bool BHUpload::tryWrite() {
 }
 
 void BHUpload::onAuthenticated(string& peerName) {
-	cerr << "Connected to " << peerName << endl;
+	if (optDebug)
+		cerr << "DEBUG: Connected to " << peerName << endl;
 	nextAsset();
 }
 
@@ -148,6 +152,8 @@ int main(int argc, char *argv[]) {
 	desc.add_options()
 		("help,h",
 			"Show help")
+		("debug,d",
+			"Activate debug-logging")
 		("version,v",
 			"Show version")
 		("name,n", po::value< string >()->default_value("bhupload"),
@@ -181,6 +187,7 @@ int main(int argc, char *argv[]) {
 	int res = -1;
 	try {
 		BHUpload app(vm);
+		app.optDebug = vm.count("debug");
 		res = app.main(vm["file"].as< vector<string> >());
 	} catch (std::string err) {
 		cerr << err << endl;
