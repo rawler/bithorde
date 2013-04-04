@@ -96,9 +96,7 @@ bool path_is_in(const fs::path& path, const fs::path& folder) {
 
 IAsset::Ptr Store::addAsset(const boost::filesystem::path& file)
 {
-	if (!path_is_in(file, _baseDir)) {
-		return ASSET_NONE;
-	} else {
+	if (path_is_in(file, _baseDir)) {
 		fs::path assetFolder(AssetStore::newAssetDir());
 
 		fs::create_relative_symlink(file, assetFolder/"data");
@@ -114,6 +112,8 @@ IAsset::Ptr Store::addAsset(const boost::filesystem::path& file)
 			AssetStore::removeAsset(assetFolder);
 			return IAsset::Ptr();
 		}
+	} else {
+		return ASSET_NONE;
 	}
 }
 
