@@ -63,8 +63,9 @@ void bithorded::cache::CachingAsset::inspect(bithorded::management::InfoList& ta
 
 void bithorded::cache::CachingAsset::async_read(uint64_t offset, size_t& size, uint32_t timeout, bithorded::IAsset::ReadCallback cb)
 {
-	if (_cached && _cached->can_read(offset, size)) {
-		_cached->async_read(offset, size, timeout, cb);
+	size_t trimmed_size;
+	if (_cached && (trimmed_size = _cached->can_read(offset, size))) {
+		_cached->async_read(offset, trimmed_size, timeout, cb);
 	} else if (_upstream) {
 		_upstream->async_read(offset, size, timeout, boost::bind(&CachingAsset::upstreamDataArrived, shared_from_this(), cb, _1, _2));
 	} else {
