@@ -108,7 +108,10 @@ public:
 
 	bool isBlockSet(uint idx) {
 		NodeIdx block = _store.leaf(idx);
-		return _store[block]->state == HashNode::State::SET;
+		if (idx >= _leaves)
+			return false;
+		else
+			return _store[block]->state == HashNode::State::SET;
 	}
 
 private:
