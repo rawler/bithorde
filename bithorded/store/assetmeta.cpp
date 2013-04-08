@@ -125,9 +125,3 @@ void AssetMeta::write(size_t offset, const TigerBaseNode& node)
 		throw ios_base::failure(buf.str());
 	}
 }
-
-
-// const boost::filesystem::path& AssetMeta::path() const
-// {
-// 	return _path;
-// }
