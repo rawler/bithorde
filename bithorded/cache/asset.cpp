@@ -19,13 +19,13 @@
 #include "manager.hpp"
 
 bithorded::cache::CachedAsset::CachedAsset(const boost::filesystem::path& metaFolder) :
-	StoredAsset(metaFolder)
+	StoredAsset(metaFolder, RandomAccessFile::READWRITE)
 {
 	setStatus(hasRootHash() ? bithorde::SUCCESS : bithorde::NOTFOUND);
 }
 
 bithorded::cache::CachedAsset::CachedAsset(const boost::filesystem::path& metaFolder, uint64_t size) :
-	StoredAsset(metaFolder, size)
+	StoredAsset(metaFolder, RandomAccessFile::READWRITE, size)
 {
 	setStatus(bithorde::SUCCESS);
 }

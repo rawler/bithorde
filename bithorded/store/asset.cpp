@@ -23,18 +23,18 @@ const size_t MAX_CHUNK = 64*1024;
 using namespace std;
 using namespace bithorded::store;
 
-StoredAsset::StoredAsset(const boost::filesystem::path& metaFolder) :
+StoredAsset::StoredAsset(const boost::filesystem::path& metaFolder, RandomAccessFile::Mode mode) :
 	_metaFolder(metaFolder),
-	_file(metaFolder/"data"),
+	_file(metaFolder/"data", mode),
 	_metaStore(metaFolder/"meta", _file.blocks(BLOCKSIZE)),
 	_hasher(_metaStore)
 {
 
 }
 
-StoredAsset::StoredAsset(const boost::filesystem::path& metaFolder, uint64_t size) :
+StoredAsset::StoredAsset(const boost::filesystem::path& metaFolder, RandomAccessFile::Mode mode, uint64_t size) :
 	_metaFolder(metaFolder),
-	_file(metaFolder/"data", RandomAccessFile::READWRITE, size),
+	_file(metaFolder/"data", mode, size),
 	_metaStore(metaFolder/"meta", _file.blocks(BLOCKSIZE)),
 	_hasher(_metaStore)
 {

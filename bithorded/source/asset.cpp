@@ -23,7 +23,7 @@ using namespace bithorded;
 using namespace bithorded::source;
 
 SourceAsset::SourceAsset(const boost::filesystem::path& metaFolder) :
-	StoredAsset(metaFolder)
+	StoredAsset(metaFolder, RandomAccessFile::READ)
 {
 	setStatus(bithorde::SUCCESS);
 }
