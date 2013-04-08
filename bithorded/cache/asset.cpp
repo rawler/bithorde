@@ -120,8 +120,11 @@ void bithorded::cache::CachingAsset::upstreamDataArrived(bithorded::IAsset::Read
 
 void bithorded::cache::CachingAsset::upstreamStatusChange(bithorde::Status newStatus)
 {
-	if ((newStatus == bithorde::Status::SUCCESS) && !_cached && _upstream->size() > 0)
-		_cached = _manager.prepareUpload(_upstream->size());
+	BitHordeIds ids;
+	if ((newStatus == bithorde::Status::SUCCESS) && !_cached && _upstream->size() > 0) {
+		_upstream->getIds(ids);
+		_cached = _manager.prepareUpload(_upstream->size(), ids);
+	}
 	bool statusOk = (newStatus == bithorde::Status::SUCCESS) || (_cached && _cached->hasRootHash());
 	setStatus(statusOk ? bithorde::Status::SUCCESS : bithorde::Status::NOTFOUND);
 }

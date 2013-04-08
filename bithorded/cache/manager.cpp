@@ -59,10 +59,11 @@ IAsset::Ptr CacheManager::openAsset(const bithorde::BindRead& req)
 		return stored;
 	} else {
 		auto upstream = _router.findAsset(req);
-		if (auto upstream_ = boost::dynamic_pointer_cast<router::ForwardedAsset>(upstream))
+		if (auto upstream_ = boost::dynamic_pointer_cast<router::ForwardedAsset>(upstream)) {
 			return boost::make_shared<CachingAsset>(*this, upstream_, stored);
-		else
+		} else {
 			return upstream;
+		}
 	}
 }
 
@@ -84,6 +85,15 @@ CachedAsset::Ptr CacheManager::prepareUpload(uint64_t size)
 		return CachedAsset::Ptr();
 	}
 }
+
+CachedAsset::Ptr CacheManager::prepareUpload(uint64_t size, const BitHordeIds& ids)
+{
+	auto res = prepareUpload(size);
+	if (res)
+		AssetStore::update_links(ids, res);
+	return res;
+}
+
 
 IAsset::Ptr CacheManager::findAsset(const bithorde::BindRead& req)
 {

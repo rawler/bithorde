@@ -92,8 +92,6 @@ void AssetStore::update_links(const BitHordeIds& ids, const boost::shared_ptr<St
 		return;
 	purge_links(asset, ids);
 
-	AssetSessions::add(tigerId, asset);
-
 	fs::path link = _tigerFolder / base32encode(tigerId);
 	if (fs::exists(fs::symlink_status(link)))
 		fs::remove(link);

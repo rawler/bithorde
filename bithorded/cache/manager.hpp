@@ -47,6 +47,11 @@ public:
 	CachedAsset::Ptr prepareUpload(uint64_t size);
 
 	/**
+	 * Version of prepareUpload which also links up the given ids to it.
+	 */
+	CachedAsset::Ptr prepareUpload(uint64_t size, const BitHordeIds& ids);
+
+	/**
 	 * Finds an asset by bithorde HashId. (Only the tiger-hash is actually used)
 	 */
 	IAsset::Ptr findAsset(const bithorde::BindRead& req);
