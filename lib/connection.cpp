@@ -48,9 +48,8 @@ public:
 	}
 
 	void trySend() {
-		auto buf = _sndQueue.firstMessage();
-		if (buf.size() > 0) {
-			_socket->async_write_some(asio::buffer(buf),
+		if (auto msg = _sndQueue.firstMessage()) {
+			_socket->async_write_some(asio::buffer(msg->buf),
 				boost::bind(&Connection::onWritten, shared_from_this(),
 							asio::placeholders::error, asio::placeholders::bytes_transferred)
 			);
@@ -79,6 +78,14 @@ Message::Deadline Message::in(int msec)
 	return Clock::now()+chrono::milliseconds(msec);
 }
 
+Message::Message(Deadline expires) :
+	expires(expires)
+{
+}
+
+MessageQueue::MessageQueue()
+	: _size(0)
+{}
 
 std::string MessageQueue::_empty;
 
@@ -87,46 +94,45 @@ bool MessageQueue::empty() const
 	return _queue.empty();
 }
 
-string& MessageQueue::enqueue(const Message::Deadline& expires)
+void MessageQueue::enqueue(Message* msg)
 {
-	_queue.push_back(Message());
-	auto& newMsg = _queue.back();
-	newMsg.expires = expires;
-	return newMsg.buf;
+	_queue.push_back(msg);
+	_size += msg->buf.size();
 }
 
-const string& MessageQueue::firstMessage()
+const Message* MessageQueue::firstMessage()
 {
 	auto now = chrono::steady_clock::now();
-	while (_queue.size() && _queue.front().expires < now) {
+	while (_queue.size() && _queue.front()->expires < now) {
+		_size -= _queue.front()->buf.size();
+		delete _queue.front();
 		_queue.pop_front();
 	}
-	if (_queue.size()) {
-		_queue.front().expires = chrono::steady_clock::time_point::max();
-		return _queue.front().buf;
+	if (_queue.empty()) {
+		return NULL;
 	} else {
-		return _empty;
+		_queue.front()->expires = chrono::steady_clock::time_point::max();
+		return _queue.front();
 	}
 }
 
 void MessageQueue::pop(size_t amount)
 {
 	BOOST_ASSERT(_queue.size() > 0);
-	auto& msg = _queue.front();
-	BOOST_ASSERT(amount <= msg.buf.size());
-	if (amount == msg.buf.size())
+	auto msg = _queue.front();
+	BOOST_ASSERT(amount <= msg->buf.size());
+	if (amount == msg->buf.size()) {
+		delete msg;
 		_queue.pop_front();
-	else
-		msg.buf = msg.buf.substr(amount);
+	} else {
+		msg->buf = msg->buf.substr(amount);
+	}
+	_size -= amount;
 }
 
 size_t MessageQueue::size() const
 {
-	size_t res = 0;
-	for (auto iter=_queue.begin(); iter != _queue.end(); iter++) {
-		res += iter->buf.size();
-	}
-	return res;
+	return _size;
 }
 
 ConnectionStats::ConnectionStats(const TimerService::Ptr& ts) :
@@ -274,13 +280,14 @@ bool Connection::sendMessage(Connection::MessageType type, const google::protobu
 
 	// Encode
 	{
-		auto& buf = _sndQueue.enqueue(expires);
-		::google::protobuf::io::StringOutputStream of(&buf);
+		auto buf = new Message(expires);
+		::google::protobuf::io::StringOutputStream of(&buf->buf);
 		::google::protobuf::io::CodedOutputStream stream(&of);
 		stream.WriteTag(::google::protobuf::internal::WireFormatLite::MakeTag(type, ::google::protobuf::internal::WireFormatLite::WIRETYPE_LENGTH_DELIMITED));
 		stream.WriteVarint32(msg.ByteSize());
 		bool encoded = msg.SerializeToCodedStream(&stream);
 		BOOST_ASSERT(encoded);
+		_sndQueue.enqueue(buf);
 	}
 	_stats->outgoingMessages += 1;
 	_stats->outgoingMessagesCurrent += 1;

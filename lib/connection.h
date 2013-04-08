@@ -22,18 +22,25 @@ struct Message {
 	typedef Clock::time_point Deadline;
 	static Deadline NEVER;
 	static Deadline in(int msec);
-	
+
+	Message(Deadline expires);
 	std::string buf; // TODO: test if ostringstream faster
 	boost::chrono::steady_clock::time_point expires;
 };
 
 class MessageQueue {
-	std::list<Message> _queue;
+	std::list<Message*> _queue;
+	std::size_t _size;
 	static std::string _empty;
 public:
+	MessageQueue();
 	bool empty() const;
-	std::string& enqueue(const Message::Deadline& expires);
-	const std::string& firstMessage();
+
+	/**
+	 * Note: queue takes ownership of the message, and destroys it when done
+	 */
+	void enqueue(Message* msg);
+	const Message* firstMessage();
 	void pop(size_t amount);
 	std::size_t size() const;
 };
@@ -97,7 +104,7 @@ protected:
 
 	virtual void trySend() = 0;
 	virtual void tryRead() = 0;
-	
+
 	void onRead(const boost::system::error_code& err, size_t count);
 	void onWritten(const boost::system::error_code& err, size_t count);
 
