@@ -79,7 +79,7 @@ public:
 	virtual ~Client();
 
 	/**
-	 * Tries to parse spec either as HOST:PORT, or as /absolute/socket/path and connect to it. 
+	 * Tries to parse spec either as HOST:PORT, or as /absolute/socket/path and connect to it.
 	 */
 	void connect(std::string spec);
 
