@@ -278,17 +278,18 @@ bool Connection::sendMessage(Connection::MessageType type, const google::protobu
 		return false;
 	bool wasEmpty = _sndQueue.empty();
 
+	auto buf = new Message(expires);
 	// Encode
 	{
-		auto buf = new Message(expires);
 		::google::protobuf::io::StringOutputStream of(&buf->buf);
 		::google::protobuf::io::CodedOutputStream stream(&of);
 		stream.WriteTag(::google::protobuf::internal::WireFormatLite::MakeTag(type, ::google::protobuf::internal::WireFormatLite::WIRETYPE_LENGTH_DELIMITED));
 		stream.WriteVarint32(msg.ByteSize());
 		bool encoded = msg.SerializeToCodedStream(&stream);
 		BOOST_ASSERT(encoded);
-		_sndQueue.enqueue(buf);
 	}
+	_sndQueue.enqueue(buf);
+
 	_stats->outgoingMessages += 1;
 	_stats->outgoingMessagesCurrent += 1;
 
