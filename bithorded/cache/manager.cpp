@@ -54,6 +54,8 @@ IAsset::Ptr CacheManager::openAsset(const boost::filesystem::path& assetPath)
 
 IAsset::Ptr CacheManager::openAsset(const bithorde::BindRead& req)
 {
+	if (_baseDir.empty())
+		return IAsset::Ptr();
 	auto stored = boost::dynamic_pointer_cast<CachedAsset>(bithorded::store::AssetStore::openAsset(req));
 	if (stored && (stored->status == bithorde::Status::SUCCESS)) {
 		return stored;
