@@ -1,7 +1,7 @@
 #ifndef BITHORDE_MAGNETURI_H
 #define BITHORDE_MAGNETURI_H
 
-#include <iostream>
+#include <iosfwd>
 #include <string>
 #include <vector>
 
