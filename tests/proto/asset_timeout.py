@@ -17,10 +17,6 @@ if __name__ == '__main__':
     bithorded.wait_for("Failed upstream deadservant")
     conn.expect(message.AssetStatus(handle=1, status=message.NOTFOUND))
 
-    # Send late reply and verify it is correctly handled
-    server.send(message.AssetStatus(handle=req.handle, ids=req.ids, status=message.SUCCESS))
-    bithorded.wait_for("deadservant:1 Status OK recieved for Asset supposedly closed or re-written.")
-
     # BithordeD should now have closed the connection. Hold the confirmation.
     req = server.expect(message.BindRead(handle=req.handle, ids=[]))
 
