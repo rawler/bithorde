@@ -15,7 +15,7 @@ using namespace std;
 using namespace bithorde;
 
 const static size_t BLOCK_SIZE = (64*1024);
-const static size_t PARALLELL_BLOCKS = (8);
+const static size_t PARALLELL_BLOCKS = (4);
 
 struct OutQueue {
 	typedef pair<uint64_t, string> Chunk;

@@ -12,11 +12,10 @@
 
 const size_t K = 1024;
 const size_t M = 1024*K;
-const size_t MAX_MSG = 256*K;
-const size_t READ_BLOCK = MAX_MSG*2;
-const size_t SEND_BUF = 16*M;
-const size_t SEND_BUF_EMERGENCY = 18*M;
-const size_t SEND_BUF_LOW_WATER_MARK = 2*MAX_MSG;
+const size_t MAX_MSG = 130*K;
+const size_t SEND_BUF = 512*K;
+const size_t SEND_BUF_EMERGENCY = 768*K;
+const size_t SEND_BUF_LOW_WATER_MARK = MAX_MSG;
 
 namespace asio = boost::asio;
 namespace chrono = boost::chrono;
