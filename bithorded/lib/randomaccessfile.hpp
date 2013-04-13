@@ -30,7 +30,7 @@ public:
 	enum Mode {
 	READ = 1,
 	WRITE = 2,
-	READWRITE = 3,
+	READWRITE = READ|WRITE,
 	};
 
 	RandomAccessFile();

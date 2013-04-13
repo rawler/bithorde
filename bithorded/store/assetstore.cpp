@@ -32,6 +32,7 @@
 using namespace bithorded;
 using namespace bithorded::store;
 namespace fs = boost::filesystem;
+namespace bsys = boost::system;
 using namespace std;
 
 const fs::path ASSETS_DIR = "assets";
@@ -209,11 +210,20 @@ IAsset::Ptr AssetStore::openAsset(const bithorde::BindRead& req)
 		return IAsset::Ptr();
 	else try {
 		return openAsset(assetPath);
+	} catch (const boost::system::system_error& e) {
+		if (e.code().value() == bsys::errc::no_such_file_or_directory) {
+			LOG4CPLUS_ERROR(storeLog, "Linked asset " << assetPath << "broken. Purging...");
+			unlinkAndRemove(req.ids());
+		} else if (e.code().value() == bsys::errc::file_exists) {
+			LOG4CPLUS_ERROR(storeLog, "Linked asset " << assetPath << "exists with wrong size. Purging...");
+			unlinkAndRemove(req.ids());
+		} else {
+			LOG4CPLUS_ERROR(storeLog, "Failed to open " << assetPath << " with unknown error " << e.what());
+		}
 	} catch (const std::ios::failure& e) {
-		LOG4CPLUS_ERROR(storeLog, "Failed to open " << assetPath << " with error " << e.what() << ". Purging...");
-		unlinkAndRemove(req.ids());
-		return IAsset::Ptr();
+		LOG4CPLUS_ERROR(storeLog, "Failed to open " << assetPath << " with unknown error " << e.what());
 	}
+	return IAsset::Ptr();
 }
 
 

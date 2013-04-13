@@ -26,6 +26,7 @@
 
 using namespace std;
 
+namespace bsys = boost::system;
 namespace fs = boost::filesystem;
 
 RandomAccessFile::RandomAccessFile() :
@@ -59,14 +60,18 @@ void RandomAccessFile::open(const boost::filesystem::path& path, RandomAccessFil
 	if (size > 0 && fs::exists(_path) && fs::file_size(_path) != size) {
 		ostringstream buf;
 		buf << path << " exists with mismatching size, (" << size << " : " << fs::file_size(_path) << ")";
-		throw std::ios_base::failure(buf.str());
+		throw bsys::system_error(bsys::errc::make_error_code(bsys::errc::file_exists), buf.str());
 	}
 
 	_fd = ::open(path.c_str(), m, S_IRUSR|S_IWUSR);
-	if (_fd < 0)
-		throw std::ios_base::failure("Failed opening "+path.string());
-	else if (size > 0)
-		ftruncate(_fd, size);
+	if (_fd < 0) {
+		throw bsys::system_error(bsys::errc::make_error_code(static_cast<bsys::errc::errc_t>(errno)), "Failed opening "+path.string());
+	} else if ((size > 0) && (mode & WRITE) && (ftruncate(_fd, size) == -1)) {
+		::close(_fd);
+		ostringstream buf;
+		buf << "Failed truncating " << path.string() << " to " << size;
+		throw bsys::system_error(bsys::errc::make_error_code(static_cast<bsys::errc::errc_t>(errno)), buf.str());
+	}
 }
 
 void RandomAccessFile::close()
