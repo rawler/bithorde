@@ -29,6 +29,7 @@ MSG_REV_MAP = {
     message.BindWrite:     7,
     message.DataSegment:   8,
 }
+DEFAULT_TIMEOUT=4000
 
 class HandleAllocator(object):
     '''Stack-like allocator for keeping track of used and unused handles.'''
@@ -140,7 +141,7 @@ class Client(Connection):
         self._assets[handle] = asset
         return asset
 
-    def _bind(self, asset):
+    def _bind(self, asset, timeout):
         '''Try to open asset'''
         assert(self.msgHandler == self._mainState)
         assert(asset is not None)
@@ -151,7 +152,7 @@ class Client(Connection):
             id = msg.ids.add()
             id.type = t
             id.id = v
-        msg.timeout = 10000
+        msg.timeout = timeout
         self.writeMsg(msg)
 
     def _closeAsset(self, handle):
@@ -199,10 +200,10 @@ class Asset(object):
         '''Creates a new Asset, unbound to any particular client instance.'''
         self.handle = None
 
-    def bind(self, hashIds):
+    def bind(self, hashIds, timeout=DEFAULT_TIMEOUT):
         '''Binds the asset to the provided hashIds'''
         self.hashIds = hashIds
-        self.client._bind(self)
+        self.client._bind(self, timeout)
 
     def close(self):
         '''Closes the asset.'''
@@ -216,13 +217,14 @@ class Asset(object):
 class AssetIterator(object):
     '''Helper to iterate some assets, trying to open them, and fire a callback for each
        asset. See exampel in __main__ part of module.'''
-    def __init__(self, client, assets, callback, whenDone, parallel=10):
+    def __init__(self, client, assets, callback, whenDone, parallel=10, timeout=DEFAULT_TIMEOUT):
         self.client = client
         self.assets = assets
         self.callback = callback
         self.whenDone = whenDone
         self.parallel = parallel
         self.requestCount = 0
+        self.timeout = timeout
         self._request()
 
     def _request(self):
@@ -236,7 +238,7 @@ class AssetIterator(object):
             asset.key = key
             asset.onStatusUpdate = MethodType(self._gotResponse, asset, Asset)
             self.client.allocateHandle(asset)
-            asset.bind(hashIds)
+            asset.bind(hashIds, self.timeout)
 
             self.requestCount += 1
 
