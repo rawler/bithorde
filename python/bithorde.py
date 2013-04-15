@@ -158,9 +158,9 @@ class Client(Connection):
     def _closeAsset(self, handle):
         '''Unbind an asset from this Client and notify upstream.'''
         def _cleanupCallback(status):
-            assert status and status.status == message.NOTFOUND
-            self._assets[handle] = None
-            self._handles.deallocate(handle)
+            if status and status.status == message.NOTFOUND:
+                self._assets[handle] = None
+                self._handles.deallocate(handle)
         asset = self._assets[handle]
         if asset:
             asset.handle = None
