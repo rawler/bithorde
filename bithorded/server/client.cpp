@@ -217,7 +217,7 @@ void Client::informAssetStatus(bithorde::Asset::Handle h, bithorde::Status s)
 	bithorde::AssetStatus resp;
 	resp.set_handle(h);
 	resp.set_status(s);
-	sendMessage(bithorde::Connection::AssetStatus, resp);
+	sendMessage(bithorde::Connection::AssetStatus, resp, bithorde::Message::NEVER, true);
 }
 
 void Client::informAssetStatusUpdate(bithorde::Asset::Handle h, const bithorded::IAsset::WeakPtr& asset_)

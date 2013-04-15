@@ -96,7 +96,7 @@ public:
 	bool bind(ReadAsset & asset, int timeout_ms, uint64_t uuid);
 	bool bind(UploadAsset & asset);
 
-	bool sendMessage(bithorde::Connection::MessageType type, const google::protobuf::Message& msg, const bithorde::Message::Deadline& expires=Message::NEVER );
+	bool sendMessage(bithorde::Connection::MessageType type, const google::protobuf::Message& msg, const bithorde::Message::Deadline& expires=Message::NEVER, bool prioritized=false);
 
 	boost::signals2::signal<void (std::string&)> authenticated;
 	boost::signals2::signal<void ()> writable;

@@ -170,11 +170,11 @@ const Client::AssetMap& Client::clientAssets() const
 	return _assetMap;
 }
 
-bool Client::sendMessage(Connection::MessageType type, const google::protobuf::Message& msg, const Message::Deadline& expires)
+bool Client::sendMessage(Connection::MessageType type, const google::protobuf::Message& msg, const bithorde::Message::Deadline& expires, bool prioritized)
 {
 	BOOST_ASSERT(_connection);
 
-	return _connection->sendMessage(type, msg, expires, false);
+	return _connection->sendMessage(type, msg, expires, prioritized);
 }
 
 void Client::sayHello() {
@@ -378,13 +378,16 @@ bool Client::informBound(const AssetBinding& asset, uint64_t uuid, int timeout_m
 	bithorde::BindRead msg;
 	msg.set_handle(asset._handle);
 
-	ReadAsset * readAsset = asset.readAsset();
-	if (readAsset)
-		msg.mutable_ids()->CopyFrom(readAsset->requestIds());
 	msg.set_timeout(timeout_ms);
 	msg.set_uuid(uuid);
 
-	return _connection->sendMessage(Connection::MessageType::BindRead, msg, Message::in(timeout_ms), true);
+	ReadAsset * readAsset = asset.readAsset();
+	if (readAsset) {
+		msg.mutable_ids()->CopyFrom(readAsset->requestIds());
+		return _connection->sendMessage(Connection::MessageType::BindRead, msg, Message::in(timeout_ms), false);
+	} else {
+		return _connection->sendMessage(Connection::MessageType::BindRead, msg, Message::NEVER, true);
+	}
 }
 
 int Client::allocRPCRequest(Asset::Handle asset)
