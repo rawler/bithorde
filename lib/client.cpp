@@ -172,9 +172,10 @@ const Client::AssetMap& Client::clientAssets() const
 
 bool Client::sendMessage(Connection::MessageType type, const google::protobuf::Message& msg, const bithorde::Message::Deadline& expires, bool prioritized)
 {
-	BOOST_ASSERT(_connection);
-
-	return _connection->sendMessage(type, msg, expires, prioritized);
+	if (_connection)
+		return _connection->sendMessage(type, msg, expires, prioritized);
+	else
+		return false;
 }
 
 void Client::sayHello() {
@@ -300,7 +301,7 @@ void Client::onMessage(const bithorde::HandShakeConfirmed & msg) {
 }
 void Client::onMessage(const bithorde::Ping & msg) {
 	bithorde::Ping reply;
-	_connection->sendMessage(Connection::MessageType::Ping, reply, Message::NEVER, false);
+	sendMessage(Connection::MessageType::Ping, reply, Message::NEVER, false);
 }
 
 bool Client::bind(ReadAsset &asset) {
@@ -348,7 +349,7 @@ bool Client::bind(UploadAsset & asset)
 	const auto& link = asset.link();
 	if (!link.empty())
 		msg.set_linkpath(link.string());
-	return _connection->sendMessage(Connection::MessageType::BindWrite, msg, Message::NEVER, false);
+	return sendMessage(Connection::MessageType::BindWrite, msg, Message::NEVER, false);
 }
 
 bool Client::release(Asset & asset)
@@ -384,9 +385,9 @@ bool Client::informBound(const AssetBinding& asset, uint64_t uuid, int timeout_m
 	ReadAsset * readAsset = asset.readAsset();
 	if (readAsset) {
 		msg.mutable_ids()->CopyFrom(readAsset->requestIds());
-		return _connection->sendMessage(Connection::MessageType::BindRead, msg, Message::in(timeout_ms), false);
+		return sendMessage(Connection::MessageType::BindRead, msg, Message::in(timeout_ms), false);
 	} else {
-		return _connection->sendMessage(Connection::MessageType::BindRead, msg, Message::NEVER, true);
+		return sendMessage(Connection::MessageType::BindRead, msg, Message::NEVER, true);
 	}
 }
 
