@@ -242,13 +242,14 @@ void Client::informAssetStatusUpdate(bithorde::Asset::Handle h, const bithorded:
 	sendMessage(bithorde::Connection::AssetStatus, resp);
 }
 
-bithorde::Status Client::assignAsset(bithorde::Asset::Handle handle_, const IAsset::Ptr& a)
+void Client::assignAsset(bithorde::Asset::Handle handle_, const IAsset::Ptr& a)
 {
 	size_t handle = handle_;
 	if (handle >= _assets.size()) {
 		if (handle >= MAX_ASSETS) {
-			LOG4CPLUS_ERROR(clientLogger, peerName() << ": handle larger than allowed limit (" << handle << " < " << MAX_ASSETS << ")");
-			return bithorde::INVALID_HANDLE;
+			LOG4CPLUS_ERROR(clientLogger, peerName() << ": handle larger than allowed limit (" << handle << " > " << MAX_ASSETS << ")");
+			informAssetStatus(handle_, bithorde::Status::INVALID_HANDLE);
+			return;
 		}
 		size_t new_size = _assets.size() + (handle - _assets.size() + 1) * 2;
 		if (new_size > MAX_ASSETS)
@@ -264,8 +265,6 @@ bithorde::Status Client::assignAsset(bithorde::Asset::Handle handle_, const IAss
 		// We already have a valid status for the asset, so inform about it
 		informAssetStatusUpdate(handle_, a);
 	}
-
-	return a->status;
 }
 
 void Client::onDisconnected()

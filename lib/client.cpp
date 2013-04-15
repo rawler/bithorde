@@ -13,6 +13,7 @@
 
 const static boost::posix_time::millisec DEFAULT_ASSET_TIMEOUT(1500);
 const static boost::posix_time::millisec CLOSE_TIMEOUT(300);
+const static int MAX_ASSETS(1024);
 
 using namespace std;
 namespace asio = boost::asio;
@@ -222,7 +223,7 @@ void Client::onMessage(const bithorde::HandShake &msg)
 			binding->setTimer(DEFAULT_ASSET_TIMEOUT);
 			informBound(*iter->second, rand64(), DEFAULT_ASSET_TIMEOUT.total_milliseconds());
 		}
-			
+
 		authenticated(_peerName);
 	}
 }
@@ -242,7 +243,7 @@ void Client::onMessage(const bithorde::AssetStatus & msg) {
 	if (_assetMap.count(handle)) {
 		AssetBinding& a = *_assetMap[handle];
 		a.clearTimer();
-		if (a) {
+		if (a && a->status != bithorde::Status::INVALID_HANDLE) {
 			if (a->status == bithorde::Status::NONE)
 				assetResponseTime.post((ptime::microsec_clock::universal_time() - a._opened_at).total_milliseconds());
 			a->handleMessage(msg);
@@ -315,7 +316,10 @@ bool Client::bind(ReadAsset& asset, int timeout_ms, uint64_t uuid) {
 	if (!asset.isBound()) {
 		BOOST_ASSERT(asset._handle < 0);
 		BOOST_ASSERT(asset.requestIds().size() > 0);
-		asset._handle = _handleAllocator.allocate();
+		auto handle = _handleAllocator.allocate();
+		if (handle >= MAX_ASSETS)
+			return false;
+		asset._handle = handle;
 		BOOST_ASSERT(asset._handle > 0);
 		BOOST_ASSERT(_assetMap.count(asset._handle) == 0);
 		auto& bind = _assetMap[asset._handle];
@@ -331,7 +335,10 @@ bool Client::bind(UploadAsset & asset)
 	BOOST_ASSERT(asset._client.get() == this);
 	BOOST_ASSERT(asset._handle < 0);
 	BOOST_ASSERT(asset.size() > 0);
-	asset._handle = _handleAllocator.allocate();
+	auto handle = _handleAllocator.allocate();
+	if (handle >= MAX_ASSETS)
+		return false;
+	asset._handle = handle;
 	auto& bind = _assetMap[asset._handle];
 	bind = boost::make_shared<AssetBinding>(this, &asset, asset._handle);
 	bind->setTimer(DEFAULT_ASSET_TIMEOUT);

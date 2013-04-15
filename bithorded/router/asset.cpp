@@ -57,7 +57,8 @@ void bithorded::router::ForwardedAsset::bindUpstreams(const std::map< string, bi
 			bithorde::ASSET_ARG_OFFSET, bithorde::ASSET_ARG_DATA, bithorde::ASSET_ARG_TAG));
 		auto& upstream_ = _upstream[peername];
 		upstream_.reset(upstream);
-		f->bind(*upstream_, timeout, uuid);
+		if (!f->bind(*upstream_, timeout, uuid))
+			dropUpstream(peername);
 	}
 	updateStatus();
 }
@@ -128,7 +129,7 @@ void bithorded::router::ForwardedAsset::async_read(uint64_t offset, size_t& size
 void bithorded::router::ForwardedAsset::onData(uint64_t offset, const std::string& data, int tag) {
 	for (auto iter=_pendingReads.begin(); iter != _pendingReads.end(); ) {
 		if (iter->offset == offset) {
-			iter->cb(offset, data);	
+			iter->cb(offset, data);
 			iter = _pendingReads.erase(iter); // Will increase the iterator
 		} else {
 			iter++;	// Move to next
