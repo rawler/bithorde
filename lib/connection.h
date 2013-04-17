@@ -40,8 +40,7 @@ public:
 	 * Note: queue takes ownership of the message, and destroys it when done
 	 */
 	void enqueue(Message* msg);
-	const Message* firstMessage();
-	void pop(size_t amount);
+	std::vector< const Message* > dequeue(size_t bytes_per_sec, ushort millis);
 	std::size_t size() const;
 };
 
@@ -106,7 +105,7 @@ protected:
 	virtual void tryRead() = 0;
 
 	void onRead(const boost::system::error_code& err, size_t count);
-	void onWritten(const boost::system::error_code& err, size_t count);
+	void onWritten(const boost::system::error_code& err, size_t written, std::vector< const bithorde::Message* > queued);
 
 protected:
 	State _state;
@@ -116,6 +115,7 @@ protected:
 
 	Buffer _rcvBuf;
 	MessageQueue _sndQueue;
+	size_t _sendWaiting;
 
 private:
 	template <class T> bool dequeue(MessageType type, ::google::protobuf::io::CodedInputStream &stream);

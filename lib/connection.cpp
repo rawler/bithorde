@@ -13,9 +13,10 @@
 const size_t K = 1024;
 const size_t M = 1024*K;
 const size_t MAX_MSG = 130*K;
-const size_t SEND_BUF = 512*K;
-const size_t SEND_BUF_EMERGENCY = 768*K;
-const size_t SEND_BUF_LOW_WATER_MARK = MAX_MSG;
+const size_t SEND_BUF = 1024*K;
+const size_t SEND_BUF_EMERGENCY = SEND_BUF + 64*K;
+const size_t SEND_BUF_LOW_WATER_MARK = SEND_BUF/4;
+const size_t SEND_CHUNK_MS = 50;
 
 namespace asio = boost::asio;
 namespace chrono = boost::chrono;
@@ -47,10 +48,18 @@ public:
 	}
 
 	void trySend() {
-		if (auto msg = _sndQueue.firstMessage()) {
-			_socket->async_write_some(asio::buffer(msg->buf),
+		_sendWaiting = 0;
+		auto queued = _sndQueue.dequeue(_stats->outgoingBitrateCurrent.value()/8, SEND_CHUNK_MS);
+		std::vector<boost::asio::const_buffer> buffers;
+		buffers.reserve(queued.size());
+		for (auto iter=queued.begin(); iter != queued.end(); iter++) {
+			buffers.push_back(boost::asio::buffer((*iter)->buf));
+			_sendWaiting += (*iter)->buf.size();
+		}
+		if (_sendWaiting) {
+			boost::asio::async_write(*_socket, buffers,
 				boost::bind(&Connection::onWritten, shared_from_this(),
-							asio::placeholders::error, asio::placeholders::bytes_transferred)
+							asio::placeholders::error, asio::placeholders::bytes_transferred, queued)
 			);
 		}
 	}
@@ -99,34 +108,25 @@ void MessageQueue::enqueue(Message* msg)
 	_size += msg->buf.size();
 }
 
-const Message* MessageQueue::firstMessage()
+std::vector< const Message* > MessageQueue::dequeue(size_t bytes_per_sec, ushort millis)
 {
+	if (bytes_per_sec < 128*K)
+		bytes_per_sec = 128*K;
+	size_t bytes(((bytes_per_sec*millis)/1000)+1), dequeued(0);
 	auto now = chrono::steady_clock::now();
-	while (_queue.size() && _queue.front()->expires < now) {
-		_size -= _queue.front()->buf.size();
-		delete _queue.front();
+	std::vector<const Message*> res;
+	res.reserve(_size);
+	while (dequeued < bytes && !_queue.empty()) {
+		auto next = _queue.front();
 		_queue.pop_front();
+		auto size = next->buf.size();
+		_size -= size;
+		auto prospect_bytes = dequeued + size;
+		auto prospect_time = now + boost::chrono::milliseconds(prospect_bytes / (bytes_per_sec * 1000));
+		if (prospect_time < next->expires)
+			res.push_back(next);
 	}
-	if (_queue.empty()) {
-		return NULL;
-	} else {
-		_queue.front()->expires = chrono::steady_clock::time_point::max();
-		return _queue.front();
-	}
-}
-
-void MessageQueue::pop(size_t amount)
-{
-	BOOST_ASSERT(_queue.size() > 0);
-	auto msg = _queue.front();
-	BOOST_ASSERT(amount <= msg->buf.size());
-	if (amount == msg->buf.size()) {
-		delete msg;
-		_queue.pop_front();
-	} else {
-		msg->buf = msg->buf.substr(amount);
-	}
-	_size -= amount;
+	return res;
 }
 
 size_t MessageQueue::size() const
@@ -150,7 +150,8 @@ ConnectionStats::ConnectionStats(const TimerService::Ptr& ts) :
 Connection::Connection(asio::io_service & ioSvc, const ConnectionStats::Ptr& stats) :
 	_state(Connected),
 	_ioSvc(ioSvc),
-	_stats(stats)
+	_stats(stats),
+	_sendWaiting(0)
 {
 }
 
@@ -275,7 +276,6 @@ bool Connection::sendMessage(Connection::MessageType type, const google::protobu
 	size_t bufLimit = prioritized ? SEND_BUF_EMERGENCY : SEND_BUF;
 	if (_sndQueue.size() > bufLimit)
 		return false;
-	bool wasEmpty = _sndQueue.empty();
 
 	auto buf = new Message(expires);
 	// Encode
@@ -293,17 +293,20 @@ bool Connection::sendMessage(Connection::MessageType type, const google::protobu
 	_stats->outgoingMessagesCurrent += 1;
 
 	// Push out at once unless _queued;
-	if (wasEmpty)
+	if (_sendWaiting == 0)
 		trySend();
 	return true;
 }
 
-void Connection::onWritten(const boost::system::error_code& err, size_t written) {
-	if ((!err) && (written > 0)) {
+void Connection::onWritten(const boost::system::error_code& err, size_t written, std::vector<const Message*> queued) {
+	size_t queued_bytes(0);
+	for (auto iter=queued.begin(); iter != queued.end(); iter++) {
+		queued_bytes += (*iter)->buf.size();
+		delete *iter;
+	}
+	if ((!err) && (written == queued_bytes) && (written>0)) {
 		_stats->outgoingBitrateCurrent += written*8;
 		_stats->outgoingBytes += written;
-
-		_sndQueue.pop(written);
 		trySend();
 		if (_sndQueue.size() < SEND_BUF_LOW_WATER_MARK)
 			writable();
