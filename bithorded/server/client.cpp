@@ -222,10 +222,14 @@ void Client::informAssetStatus(bithorde::Asset::Handle h, bithorde::Status s)
 
 void Client::informAssetStatusUpdate(bithorde::Asset::Handle h, const bithorded::IAsset::WeakPtr& asset_)
 {
+	auto asset = asset_.lock();
+	size_t asset_idx = h;
+	if ((asset_idx >= _assets.size()) || (_assets[asset_idx] != asset))
+		return;
+
 	bithorde::AssetStatus resp;
 	resp.set_handle(h);
-
-	if (auto asset = asset_.lock()) {
+	if (asset) {
 		if (asset->status == bithorde::NONE)
 			return;
 		resp.set_status(asset->status);
