@@ -45,8 +45,6 @@ class Router : public AssetSessions, public management::DescriptiveDirectory
 	std::map<std::string, Friend> _friends;
 	std::map<std::string, boost::shared_ptr<FriendConnector> > _connectors;
 	std::map<std::string, Client::Ptr > _connectedFriends;
-
-	std::unordered_set< uint64_t > _sessionFilter;
 public:
 	Router(Server& server);
 
@@ -66,8 +64,6 @@ public:
     virtual void describe(management::Info& target) const;
 protected:
 	virtual bithorded::IAsset::Ptr openAsset(const bithorde::BindRead& req);
-private:
-	void clearSessionId(uint64_t id, boost::shared_ptr<boost::asio::deadline_timer> _);
 };
 
 }}

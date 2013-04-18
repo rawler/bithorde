@@ -167,20 +167,8 @@ bithorded::IAsset::Ptr bithorded::router::Router::openAsset(const bithorde::Bind
 	if (timeout <= 0)
 		return bithorded::IAsset::Ptr();
 
-	if (_sessionFilter.count(req.uuid())) {
-		LOG4CPLUS_INFO(routerLog, "Looped on uuid " << req.uuid());
-		throw BindError(bithorde::WOULD_LOOP);
-	}
 	auto asset = boost::make_shared<ForwardedAsset, Router&, const BitHordeIds&>(*this, req.ids());
-	_sessionFilter.insert(req.uuid());
-	auto timer = boost::make_shared<boost::asio::deadline_timer>(_server.ioService(), boost::posix_time::millisec(max((uint32_t)4000, req.timeout())*4));
-	timer->async_wait(boost::bind(&Router::clearSessionId, this, req.uuid(), timer));
 
 	asset->bindUpstreams(_connectedFriends, req.uuid(), timeout);
 	return asset;
-}
-
-void Router::clearSessionId(uint64_t id, boost::shared_ptr< asio::deadline_timer > _)
-{
-	_sessionFilter.erase(id);
 }

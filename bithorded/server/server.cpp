@@ -28,6 +28,7 @@
 #include "buildconf.hpp"
 #include "client.hpp"
 #include "config.hpp"
+#include "../lib/loopfilter.hpp"
 
 using namespace std;
 
@@ -190,6 +191,11 @@ IAsset::Ptr Server::async_linkAsset(const boost::filesystem::path& filePath)
 
 IAsset::Ptr Server::async_findAsset(const bithorde::BindRead& req)
 {
+	if (!_loopFilter.test_and_set(req.uuid())) {
+		LOG4CPLUS_INFO(serverLog, "Looped on uuid " << req.uuid());
+		throw BindError(bithorde::WOULD_LOOP);
+	}
+
 	for (auto iter=_assetStores.begin(); iter != _assetStores.end(); iter++) {
 		if (auto asset = (*iter)->findAsset(req))
 			return asset;

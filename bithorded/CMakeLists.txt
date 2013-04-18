@@ -14,6 +14,7 @@ ADD_EXECUTABLE(bithorded
 
 	lib/assetsessions.cpp
 	lib/hashtree.cpp
+	lib/loopfilter.cpp
 	lib/management.cpp
 	lib/randomaccessfile.cpp
 	lib/relativepath.cpp
