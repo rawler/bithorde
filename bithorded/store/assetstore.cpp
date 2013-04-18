@@ -145,7 +145,7 @@ boost::filesystem::directory_iterator AssetStore::assetIterator()
 
 uintmax_t AssetStore::size()
 {
-	uintmax_t res=0;
+	uintmax_t res(0);
 	fs::directory_iterator end;
 	for (auto iter=assetIterator(); iter != end; iter++) {
 		res += assetFullSize(iter->path());
@@ -158,7 +158,9 @@ uintmax_t AssetStore::assetFullSize(const boost::filesystem::path& path)
 	uintmax_t res=0;
 	fs::directory_iterator end;
 	for (fs::directory_iterator iter(path); iter != end; iter++) {
-		res += fs::file_size(iter->path());
+		struct stat res_stat;
+		if (stat(iter->path().c_str(), &res_stat) == 0)
+			res += res_stat.st_blocks * 512;
 	}
 	return res;
 }
