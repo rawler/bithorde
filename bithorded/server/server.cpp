@@ -154,6 +154,7 @@ void Server::inspect(management::InfoList& target) const
 {
 	target.append("router", _router);
 	target.append("connections", _connections);
+	target.append("cache", _cache);
 	for (auto iter=_assetStores.begin(); iter!=_assetStores.end(); iter++) {
 		const auto& store = **iter;
 		target.append("source."+store.label(), store);

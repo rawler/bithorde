@@ -47,6 +47,19 @@ CacheManager::CacheManager(boost::asio::io_service& ioSvc,
 		AssetStore::openOrCreate();
 }
 
+void CacheManager::describe(management::Info& target) const
+{
+	auto size = store::AssetStore::size();
+	target << "capacity: " << (_maxSize/(1024*1024)) << "MB, size: " << (size/(1024*1024)) << "MB (" << (int)((size*100)/_maxSize) << "%)";
+}
+
+void CacheManager::inspect(management::InfoList& target) const
+{
+	target.append("path") << _baseDir;
+	target.append("capacity") << _maxSize;
+	target.append("size") << store::AssetStore::size();
+}
+
 IAsset::Ptr CacheManager::openAsset(const boost::filesystem::path& assetPath)
 {
 	return boost::make_shared<CachedAsset>(assetPath);
@@ -95,7 +108,6 @@ CachedAsset::Ptr CacheManager::prepareUpload(uint64_t size, const BitHordeIds& i
 		AssetStore::update_links(ids, res);
 	return res;
 }
-
 
 IAsset::Ptr CacheManager::findAsset(const bithorde::BindRead& req)
 {

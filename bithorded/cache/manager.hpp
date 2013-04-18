@@ -21,12 +21,13 @@
 #include <boost/asio/io_service.hpp>
 
 #include "asset.hpp"
+#include "../lib/management.hpp"
 #include "../router/router.hpp"
 #include "../store/assetstore.hpp"
 
 namespace bithorded { namespace cache {
 
-class CacheManager : private bithorded::store::AssetStore
+class CacheManager : private bithorded::store::AssetStore, public bithorded::management::DescriptiveDirectory
 {
 	boost::filesystem::path _baseDir;
 	boost::asio::io_service& _ioSvc;
@@ -35,6 +36,10 @@ class CacheManager : private bithorded::store::AssetStore
 	uintmax_t _maxSize;
 public:
 	CacheManager(boost::asio::io_service& ioSvc, bithorded::router::Router& router, const boost::filesystem::path& baseDir, intmax_t size);
+
+	virtual void describe(management::Info& target) const;
+
+	virtual void inspect(management::InfoList& target) const;
 
 	/**
 	 * Add an asset to the idx, allocating space for
