@@ -25,6 +25,7 @@
 
 #include "asset.hpp"
 #include "bithorde.pb.h"
+#include "../lib/management.hpp"
 #include "../lib/threadpool.hpp"
 #include "../lib/weakmap.hpp"
 #include "../store/assetstore.hpp"
@@ -32,13 +33,19 @@
 namespace bithorded {
 	namespace source {
 
-class Store : private bithorded::store::AssetStore
+class Store : private bithorded::store::AssetStore, public bithorded::management::DescriptiveDirectory
 {
 	ThreadPool _threadPool;
 	boost::asio::io_service& _ioSvc;
+	std::string _label;
 	boost::filesystem::path _baseDir;
 public:
-	Store(boost::asio::io_service& ioSvc, const boost::filesystem::path& baseDir);
+	Store(boost::asio::io_service& ioSvc, const std::string label, const boost::filesystem::path& baseDir);
+
+	virtual void describe(management::Info& target) const;
+	virtual void inspect(management::InfoList& target) const;
+
+	const std::string& label() const;
 
 	/**
 	 * Add an asset to the idx, creating a hash in the background. When hashing is done,

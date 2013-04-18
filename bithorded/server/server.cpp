@@ -71,7 +71,7 @@ Server::Server(asio::io_service& ioSvc, Config& cfg) :
 	_cache(ioSvc, _router, cfg.cacheDir, static_cast<intmax_t>(cfg.cacheSizeMB)*1024*1024)
 {
 	for (auto iter=_cfg.sources.begin(); iter != _cfg.sources.end(); iter++)
-		_assetStores.push_back( unique_ptr<source::Store>(new source::Store(ioSvc, iter->root)) );
+		_assetStores.push_back( unique_ptr<source::Store>(new source::Store(ioSvc, iter->name, iter->root)) );
 
 	for (auto iter=_cfg.friends.begin(); iter != _cfg.friends.end(); iter++)
 		_router.addFriend(*iter);
@@ -154,6 +154,10 @@ void Server::inspect(management::InfoList& target) const
 {
 	target.append("router", _router);
 	target.append("connections", _connections);
+	for (auto iter=_assetStores.begin(); iter!=_assetStores.end(); iter++) {
+		const auto& store = **iter;
+		target.append("source."+store.label(), store);
+	}
 }
 
 void Server::clientConnected(const bithorded::Client::Ptr& client)

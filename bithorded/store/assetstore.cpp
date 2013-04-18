@@ -138,12 +138,12 @@ boost::filesystem::path AssetStore::resolveIds(const BitHordeIds& ids)
 	return fs::path();
 }
 
-boost::filesystem::directory_iterator AssetStore::assetIterator()
+boost::filesystem::directory_iterator AssetStore::assetIterator() const
 {
 	return fs::directory_iterator(_assetsFolder);
 }
 
-uintmax_t AssetStore::size()
+uintmax_t AssetStore::size() const
 {
 	uintmax_t res(0);
 	fs::directory_iterator end;
@@ -153,7 +153,7 @@ uintmax_t AssetStore::size()
 	return res;
 }
 
-uintmax_t AssetStore::assetFullSize(const boost::filesystem::path& path)
+uintmax_t AssetStore::assetFullSize(const boost::filesystem::path& path) const
 {
 	uintmax_t res=0;
 	fs::directory_iterator end;

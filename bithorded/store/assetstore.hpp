@@ -52,17 +52,17 @@ public:
 	/**
 	 * Returns iterator allowing iterating over the assets in the store.
 	 */
-	boost::filesystem::directory_iterator assetIterator();
+	boost::filesystem::directory_iterator assetIterator() const;
 
 	/**
 	 * Calculates used store-size. Can be smaller than the sum of the file-sizes due to sparse allocation
 	 */
-	uintmax_t size();
+	uintmax_t size() const;
 
 	/**
 	 * Returns the "full" size of the asset, that is the size of the asset and it's metadata
 	 */
-	uintmax_t assetFullSize(const boost::filesystem::path& path);
+	uintmax_t assetFullSize(const boost::filesystem::path& path) const;
 
 	static void removeAsset(const boost::filesystem::path& assetPath) noexcept;
 	static void unlink(const boost::filesystem::path& linkPath) noexcept;

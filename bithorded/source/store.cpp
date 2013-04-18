@@ -43,15 +43,32 @@ namespace bithorded {
 	}
 }
 
-Store::Store(boost::asio::io_service& ioSvc, const boost::filesystem::path& baseDir) :
+Store::Store(asio::io_service& ioSvc, const string label, const boost::filesystem::path& baseDir) :
 	bithorded::store::AssetStore(baseDir.empty() ? fs::path() : (baseDir/META_DIR)),
 	_threadPool(THREADPOOL_CONCURRENCY),
 	_ioSvc(ioSvc),
+	_label(label),
 	_baseDir(baseDir)
 {
 	if (!fs::exists(_baseDir))
 		throw ios_base::failure("LinkedAssetStore: baseDir does not exist");
 	AssetStore::openOrCreate();
+}
+
+void Store::describe(management::Info& target) const
+{
+	target << _baseDir << ": " << (store::AssetStore::size()/(1024*1024)) << "MB";
+}
+
+void Store::inspect(management::InfoList& target) const
+{
+	target.append("path") << _baseDir;
+	target.append("size") << store::AssetStore::size();
+}
+
+const string& Store::label() const
+{
+	return _label;
 }
 
 struct HashTask : public Task, private boost::noncopyable {
