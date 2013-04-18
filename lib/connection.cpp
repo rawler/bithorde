@@ -285,7 +285,7 @@ bool Connection::sendMessage(Connection::MessageType type, const google::protobu
 		stream.WriteTag(::google::protobuf::internal::WireFormatLite::MakeTag(type, ::google::protobuf::internal::WireFormatLite::WIRETYPE_LENGTH_DELIMITED));
 		stream.WriteVarint32(msg.ByteSize());
 		bool encoded = msg.SerializeToCodedStream(&stream);
-		BOOST_ASSERT(encoded);
+		BOOST_VERIFY(encoded);
 	}
 	_sndQueue.enqueue(buf);
 
