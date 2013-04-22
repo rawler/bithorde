@@ -78,6 +78,7 @@ Client::Client(asio::io_service& ioSvc, string myName) :
 	_ioSvc(ioSvc),
 	_timerSvc(new TimerService(ioSvc)),
 	_connection(),
+	_state(Connecting),
 	_myName(myName),
 	_handleAllocator(1),
 	_rpcIdAllocator(1),
@@ -95,6 +96,8 @@ Client::~Client()
 
 void Client::connect(Connection::Pointer newConn) {
 	BOOST_ASSERT(!_connection);
+	BOOST_ASSERT(_state == Connecting);
+	_state = Connected;
 
 	stats = newConn->stats();
 
@@ -179,6 +182,8 @@ bool Client::sendMessage(Connection::MessageType type, const google::protobuf::M
 }
 
 void Client::sayHello() {
+	if (_state != Connected)
+		throw std::runtime_error("Client were in wrong state for sayHello");
 	bithorde::HandShake h;
 	h.set_protoversion(2);
 	h.set_name(_myName);
@@ -188,17 +193,30 @@ void Client::sayHello() {
 
 void Client::onIncomingMessage(Connection::MessageType type, ::google::protobuf::Message& msg)
 {
-	switch (type) {
-	case Connection::MessageType::HandShake: return onMessage((bithorde::HandShake&) msg);
-	case Connection::MessageType::BindRead: return onMessage((bithorde::BindRead&) msg);
-	case Connection::MessageType::AssetStatus: return onMessage((bithorde::AssetStatus&) msg);
-	case Connection::MessageType::ReadRequest: return onMessage((bithorde::Read::Request&) msg);
-	case Connection::MessageType::ReadResponse: return onMessage((bithorde::Read::Response&) msg);
-	case Connection::MessageType::BindWrite: return onMessage((bithorde::BindWrite&) msg);
-	case Connection::MessageType::DataSegment: return onMessage((bithorde::DataSegment&) msg);
-	case Connection::MessageType::HandShakeConfirmed: return onMessage((bithorde::HandShakeConfirmed&) msg);
-	case Connection::MessageType::Ping: return onMessage((bithorde::Ping&) msg);
+	switch (_state) {
+	case Connecting: break;
+	case Connected: switch (type) {
+		case Connection::MessageType::HandShake: return onMessage((bithorde::HandShake&) msg);
+		default: break;
+	} break;
+	case AwaitingAuth: switch (type) {
+		case Connection::MessageType::HandShakeConfirmed: return onMessage((bithorde::HandShakeConfirmed&) msg);
+		default: break;
+	} break;
+	case Authenticated: switch (type) {
+		case Connection::MessageType::BindRead: return onMessage((bithorde::BindRead&) msg);
+		case Connection::MessageType::AssetStatus: return onMessage((bithorde::AssetStatus&) msg);
+		case Connection::MessageType::ReadRequest: return onMessage((bithorde::Read::Request&) msg);
+		case Connection::MessageType::ReadResponse: return onMessage((bithorde::Read::Response&) msg);
+		case Connection::MessageType::BindWrite: return onMessage((bithorde::BindWrite&) msg);
+		case Connection::MessageType::DataSegment: return onMessage((bithorde::DataSegment&) msg);
+		case Connection::MessageType::HandShakeConfirmed: return onMessage((bithorde::HandShakeConfirmed&) msg);
+		case Connection::MessageType::Ping: return onMessage((bithorde::Ping&) msg);
+		default: break;
+	} break;
 	}
+	cerr << "ERROR: BitHorde State Error, Disconnecting" << endl;
+	_connection->close();
 }
 
 void Client::onMessage(const bithorde::HandShake &msg)
@@ -225,6 +243,7 @@ void Client::onMessage(const bithorde::HandShake &msg)
 			informBound(*iter->second, rand64(), DEFAULT_ASSET_TIMEOUT.total_milliseconds());
 		}
 
+		_state = State::Authenticated;
 		authenticated(_peerName);
 	}
 }

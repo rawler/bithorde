@@ -48,6 +48,14 @@ private:
 
 class Client
 {
+public:
+	enum State {
+		Connecting,
+		Connected,
+		AwaitingAuth,
+		Authenticated,
+	};
+private:
 	friend class AssetBinding;
 	friend class Asset;
 	friend class ReadAsset;
@@ -59,6 +67,8 @@ class Client
 	boost::asio::io_service& _ioSvc;
 	TimerService::Ptr _timerSvc;
 	Connection::Pointer _connection;
+
+	State _state;
 
 	std::string _myName;
 	std::string _peerName;
@@ -77,6 +87,8 @@ public:
 		return Pointer(new Client(ioSvc, myName));
 	}
 	virtual ~Client();
+
+	State state();
 
 	/**
 	 * Tries to parse spec either as HOST:PORT, or as /absolute/socket/path and connect to it.

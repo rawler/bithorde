@@ -148,7 +148,6 @@ ConnectionStats::ConnectionStats(const TimerService::Ptr& ts) :
 }
 
 Connection::Connection(asio::io_service & ioSvc, const ConnectionStats::Ptr& stats) :
-	_state(Connected),
 	_ioSvc(ioSvc),
 	_stats(stats),
 	_sendWaiting(0)
@@ -202,31 +201,22 @@ void Connection::onRead(const boost::system::error_code& err, size_t count)
 			break;
 		switch (::google::protobuf::internal::WireFormatLite::GetTagFieldNumber(tag)) {
 		case HandShake:
-			if (_state != Connected) goto proto_error;
 			res = dequeue<bithorde::HandShake>(HandShake, stream); break;
 		case BindRead:
-			if (_state == Authenticated) goto proto_error;
 			res = dequeue<bithorde::BindRead>(BindRead, stream); break;
 		case AssetStatus:
-			if (_state == Authenticated) goto proto_error;
 			res = dequeue<bithorde::AssetStatus>(AssetStatus, stream); break;
 		case ReadRequest:
-			if (_state == Authenticated) goto proto_error;
 			res = dequeue<bithorde::Read::Request>(ReadRequest, stream); break;
 		case ReadResponse:
-			if (_state == Authenticated) goto proto_error;
 			res = dequeue<bithorde::Read::Response>(ReadResponse, stream); break;
 		case BindWrite:
-			if (_state == Authenticated) goto proto_error;
 			res = dequeue<bithorde::BindWrite>(BindWrite, stream); break;
 		case DataSegment:
-			if (_state == Authenticated) goto proto_error;
 			res = dequeue<bithorde::DataSegment>(DataSegment, stream); break;
 		case HandShakeConfirmed:
-			if (_state != AwaitingAuth) goto proto_error;
 			res = dequeue<bithorde::HandShakeConfirmed>(HandShakeConfirmed, stream); break;
 		case Ping:
-			if (_state == Authenticated) goto proto_error;
 			res = dequeue<bithorde::Ping>(Ping, stream); break;
 		default:
 			cerr << "BitHorde protocol warning: unknown message tag" << endl;
@@ -237,10 +227,6 @@ void Connection::onRead(const boost::system::error_code& err, size_t count)
 	_rcvBuf.pop(_rcvBuf.size-remains);
 
 	tryRead();
-	return;
-proto_error:
-	cerr << "ERROR: BitHorde Protocol Error, Disconnecting" << endl;
-	close();
 	return;
 }
 

@@ -74,12 +74,6 @@ public:
 		HandShakeConfirmed = 9,
 		Ping = 10,
 	};
-	enum State {
-		Connecting,
-		Connected,
-		AwaitingAuth,
-		Authenticated,
-	};
 
 	static Pointer create(boost::asio::io_service& ioSvc, const bithorde::ConnectionStats::Ptr& stats, const boost::asio::ip::tcp::endpoint& addr);
 	static Pointer create(boost::asio::io_service& ioSvc, const bithorde::ConnectionStats::Ptr& stats, boost::shared_ptr< boost::asio::ip::tcp::socket >& socket);
@@ -108,15 +102,12 @@ protected:
 	void onWritten(const boost::system::error_code& err, size_t written, std::vector< const bithorde::Message* > queued);
 
 protected:
-	State _state;
-
 	boost::asio::io_service& _ioSvc;
 	ConnectionStats::Ptr _stats;
 
 	Buffer _rcvBuf;
 	MessageQueue _sndQueue;
 	size_t _sendWaiting;
-
 private:
 	template <class T> bool dequeue(MessageType type, ::google::protobuf::io::CodedInputStream &stream);
 };
