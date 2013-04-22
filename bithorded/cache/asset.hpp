@@ -50,6 +50,7 @@ class CachingAsset : public IAsset, public boost::enable_shared_from_this<Cachin
 	CacheManager& _manager;
 	router::ForwardedAsset::Ptr _upstream;
 	CachedAsset::Ptr _cached;
+	bool _delayedCreation;
 public:
 	CachingAsset(CacheManager& mgr, bithorded::router::ForwardedAsset::Ptr upstream, bithorded::cache::CachedAsset::Ptr cached);
 	virtual ~CachingAsset();
@@ -65,6 +66,8 @@ public:
 	virtual uint64_t size();
 
 private:
+	CachedAsset::Ptr cached();
+
 	void disconnect();
 	void upstreamDataArrived(ReadCallback cb, int64_t offset, const std::string& data);
 	void upstreamStatusChange(bithorde::Status newStatus);

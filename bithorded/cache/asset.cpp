@@ -44,7 +44,7 @@ size_t bithorded::cache::CachedAsset::write(uint64_t offset, const std::string& 
 }
 
 bithorded::cache::CachingAsset::CachingAsset(bithorded::cache::CacheManager& mgr, bithorded::router::ForwardedAsset::Ptr upstream, bithorded::cache::CachedAsset::Ptr cached)
-	: _manager(mgr), _upstream(upstream), _cached(cached)
+	: _manager(mgr), _upstream(upstream), _cached(cached), _delayedCreation(false)
 {
 	_upstream->statusChange.connect(boost::bind(&CachingAsset::upstreamStatusChange, this, _1));
 }
@@ -64,8 +64,9 @@ void bithorded::cache::CachingAsset::inspect(bithorded::management::InfoList& ta
 void bithorded::cache::CachingAsset::async_read(uint64_t offset, size_t& size, uint32_t timeout, bithorded::IAsset::ReadCallback cb)
 {
 	size_t trimmed_size;
-	if (_cached && (trimmed_size = _cached->can_read(offset, size))) {
-		_cached->async_read(offset, trimmed_size, timeout, cb);
+	auto cached_ = cached();
+	if (cached_ && (trimmed_size = cached_->can_read(offset, size))) {
+		cached_->async_read(offset, trimmed_size, timeout, cb);
 	} else if (_upstream) {
 		_upstream->async_read(offset, size, timeout, boost::bind(&CachingAsset::upstreamDataArrived, shared_from_this(), cb, _1, _2));
 	} else {
@@ -87,16 +88,16 @@ size_t bithorded::cache::CachingAsset::can_read(uint64_t offset, size_t size)
 {
 	if (_upstream)
 		return _upstream->can_read(offset, size);
-	else if (_cached)
-		return _cached->can_read(offset, size);
+	else if (auto cached_ = cached())
+		return cached_->can_read(offset, size);
 	else
 		return 0;
 }
 
 uint64_t bithorded::cache::CachingAsset::size()
 {
-	if (_cached)
-		return _cached->size();
+	if (auto cached_ = cached())
+		return cached_->size();
 	else if (_upstream)
 		return _upstream->size();
 	else
@@ -113,20 +114,29 @@ void bithorded::cache::CachingAsset::disconnect()
 void bithorded::cache::CachingAsset::upstreamDataArrived(bithorded::IAsset::ReadCallback cb, int64_t offset, const std::string& data)
 {
 	cb(offset, data);
-	if (_cached) {
-		_cached->write(offset, data);
-		if (_cached->hasRootHash())
+	if (auto cached_ = cached()) {
+		cached_->write(offset, data);
+		if (cached_->hasRootHash())
 			disconnect();
 	}
 }
 
 void bithorded::cache::CachingAsset::upstreamStatusChange(bithorde::Status newStatus)
 {
-	BitHordeIds ids;
 	if ((newStatus == bithorde::Status::SUCCESS) && !_cached && _upstream->size() > 0) {
-		_upstream->getIds(ids);
-		_cached = _manager.prepareUpload(_upstream->size(), ids);
+		_delayedCreation = true;
 	}
 	bool statusOk = (newStatus == bithorde::Status::SUCCESS) || (_cached && _cached->hasRootHash());
 	setStatus(statusOk ? bithorde::Status::SUCCESS : bithorde::Status::NOTFOUND);
+}
+
+bithorded::cache::CachedAsset::Ptr bithorded::cache::CachingAsset::cached()
+{
+	if (_delayedCreation && _upstream) {
+		BitHordeIds ids;
+		_delayedCreation = false;
+		_upstream->getIds(ids);
+		_cached = _manager.prepareUpload(_upstream->size(), ids);
+	}
+	return _cached;
 }
