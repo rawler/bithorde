@@ -17,7 +17,7 @@
 #include "config.hpp"
 
 #include <boost/any.hpp>
-#include <boost/algorithm/string/predicate.hpp>
+#include <boost/algorithm/string.hpp>
 #include <boost/asio/ip/host_name.hpp>
 #include <boost/assert.hpp>
 #include <boost/filesystem.hpp>
@@ -26,6 +26,8 @@
 #include <boost/program_options.hpp>
 #include <iostream>
 #include <fstream>
+
+#include <crypto++/base64.h>
 
 #include "buildconf.hpp"
 
@@ -46,8 +48,13 @@ public:
 	{
 	}
 
-	const po::variable_value & operator[](const std::string &key) {
-		return _map[key];
+	po::variable_value dummy_value;
+	const po::variable_value & operator[](const std::string &key) const {
+		auto iter = _map.find(key);
+		if (iter != _map.end())
+			return iter->second;
+		else
+			return dummy_value;
 	}
 
 	string name() const {
@@ -94,6 +101,31 @@ public:
 		return res;
 	}
 };
+
+bithorded::Config::Client::Client() :
+	name(), cipher(CLEARTEXT), key()
+{
+}
+
+void read_client(const OptionGroup& options, bithorded::Config::Client& c) {
+	c.name = options.name();
+	auto key = options["key"];
+	if (!key.empty())
+		CryptoPP::StringSource(key.as<string>(), true,
+			new CryptoPP::Base64Decoder(
+				new CryptoPP::StringSink(c.key)));
+	auto cipher_ = options["cipher"];
+	if (!cipher_.empty()) {
+		auto cipher = cipher_.as<string>();
+		boost::to_upper(cipher);
+		if ((cipher == "RC4") || (cipher == "ARC4"))
+			c.cipher = bithorded::Config::Client::RC4;
+		else if (cipher == "AES")
+			c.cipher = bithorded::Config::Client::AES_CTR;
+		else if ((cipher == "PLAIN") || cipher == "CLEARTEXT")
+			c.cipher = bithorded::Config::Client::CLEARTEXT;
+	}
+}
 
 bithorded::Config::Config(int argc, char* argv[])
 {
@@ -163,7 +195,7 @@ bithorded::Config::Config(int argc, char* argv[])
 	vector<OptionGroup> friend_opts = vm.groups("friend");
 	for (auto opt=friend_opts.begin(); opt != friend_opts.end(); opt++) {
 		Friend f;
-		f.name = opt->name();
+		read_client(*opt, f);
 		string addr = (*opt)["addr"].as<string>();
 		size_t colpos = addr.rfind(':');
 		f.addr = addr.substr(0, colpos);
@@ -172,6 +204,13 @@ bithorded::Config::Config(int argc, char* argv[])
 		else
 			f.port = boost::lexical_cast<ushort>(addr.substr(colpos+1));
 		friends.push_back(f);
+	}
+
+	vector<OptionGroup> client_opts = vm.groups("client");
+	for (auto opt=client_opts.begin(); opt != client_opts.end(); opt++) {
+		Client c;
+		read_client(*opt, c);
+		clients.push_back(c);
 	}
 
 	if (friends.empty() && sources.empty() && cacheDir.empty()) {

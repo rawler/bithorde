@@ -20,7 +20,6 @@
 
 #include <boost/asio/ip/address.hpp>
 #include <boost/filesystem/path.hpp>
-
 #include <map>
 #include <string>
 
@@ -39,19 +38,30 @@ private:
 // Special Exception to hint at version-printing.
 class VersionExit : public std::exception {};
 
-struct Source {
-	std::string name;
-	boost::filesystem::path root;
-};
-
-struct Friend {
-	std::string name;
-	std::string addr;
-	ushort port;
-};
-
 struct Config
 {
+	struct Source {
+		std::string name;
+		boost::filesystem::path root;
+	};
+
+	struct Client {
+		Client();
+		std::string name;
+		enum CipherType {
+			CLEARTEXT = 0,
+			XOR = 1,
+			RC4 = 2,
+			AES_CTR = 3
+		} cipher;
+		std::string key;
+	};
+
+	struct Friend : public Client {
+		std::string addr;
+		ushort port;
+	};
+
 	Config(int argc, char* argv[]);
 
 	static void print_usage(std::ostream& stream);
@@ -69,6 +79,7 @@ struct Config
 
 	std::vector<Source> sources;
 	std::vector<Friend> friends;
+	std::vector<Client> clients;
 };
 
 }

@@ -42,13 +42,13 @@ class FriendConnector;
 class Router : public AssetSessions, public management::DescriptiveDirectory
 {
 	Server& _server;
-	std::map<std::string, Friend> _friends;
+	std::map<std::string, Config::Friend> _friends;
 	std::map<std::string, boost::shared_ptr<FriendConnector> > _connectors;
 	std::map<std::string, Client::Ptr > _connectedFriends;
 public:
 	Router(Server& server);
 
-	void addFriend(const Friend& f);
+	void addFriend(const Config::Friend& f);
 
 	Server& server() { return _server; }
 
