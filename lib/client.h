@@ -110,7 +110,11 @@ public:
 
 	bool sendMessage(bithorde::Connection::MessageType type, const google::protobuf::Message& msg, const bithorde::Message::Deadline& expires=Message::NEVER, bool prioritized=false);
 
-	boost::signals2::signal<void (std::string&)> authenticated;
+	/**
+	 * Signal to indicate authentication has been performed.
+	 * the second argument is the peerName. Empty peerName means authentication failed.
+	 */
+	boost::signals2::signal<void (Client&, const std::string&)> authenticated;
 	boost::signals2::signal<void ()> writable;
 	boost::signals2::signal<void ()> disconnected;
 

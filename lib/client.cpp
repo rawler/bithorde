@@ -244,7 +244,7 @@ void Client::onMessage(const bithorde::HandShake &msg)
 		}
 
 		_state = State::Authenticated;
-		authenticated(_peerName);
+		authenticated(*this, _peerName);
 	}
 }
 

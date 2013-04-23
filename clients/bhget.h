@@ -35,7 +35,7 @@ public:
 
 	bool optDebug;
 private:
-	void onAuthenticated(std::string& peerName);
+	void onAuthenticated(bithorde::Client& c, const std::string& peerName);
 	void onStatusUpdate(const bithorde::AssetStatus&);
 	void onDataChunk(uint64_t offset, const std::string& data, int tag);
 

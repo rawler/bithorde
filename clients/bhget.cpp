@@ -83,7 +83,7 @@ int BHGet::main(const std::vector<std::string>& args) {
 	}
 
 	_client = Client::create(_ioSvc, optMyName);
-	_client->authenticated.connect(boost::bind(&BHGet::onAuthenticated, this, _1));
+	_client->authenticated.connect(boost::bind(&BHGet::onAuthenticated, this, _1, _2));
 	_client->connect(optConnectUrl);
 
 	_ioSvc.run();
@@ -192,7 +192,11 @@ void BHGet::onDataChunk(uint64_t offset, const string& data, int tag)
 	}
 }
 
-void BHGet::onAuthenticated(string& peerName) {
+void BHGet::onAuthenticated(Client& c, const string& peerName) {
+	if (peerName.empty()) {
+		cerr << "Failed authentication" << endl;
+		_ioSvc.stop();
+	}
 	if (optDebug)
 		cerr << "DEBUG: Connected to " << peerName << endl;
 	cerr.flush();
