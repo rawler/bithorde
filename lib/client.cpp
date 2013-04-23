@@ -24,6 +24,16 @@ namespace ptime = boost::posix_time;
 
 using namespace bithorde;
 
+namespace bithorde {
+struct CipherConfig {
+	CipherType type;
+	string iv;
+
+	CipherConfig(CipherType type, const string& iv) :
+		type(type), iv(iv) {}
+};
+}
+
 AssetBinding::AssetBinding(Client* client, Asset* asset, Asset::Handle handle) :
 	_client(client),
 	_asset(asset),
@@ -82,7 +92,6 @@ Client::Client(asio::io_service& ioSvc, string myName) :
 	_timerSvc(new TimerService(ioSvc)),
 	_state(Connecting),
 	_myName(myName),
-	_cipher(CipherType::CLEARTEXT),
 	_handleAllocator(1),
 	_rpcIdAllocator(1),
 	_protoVersion(0),
@@ -107,7 +116,7 @@ void Client::setSecurity(const string& key, CipherType cipher)
 	if ((_state != Connecting) && (_state != Connected))
 		throw std::runtime_error("Client were in wrong state for setSecurity");
 	_key = key;
-	_cipher = cipher;
+	_sendCipher.reset(new CipherConfig(cipher, secureRandomBytes(key.size())));
 }
 
 void Client::hookup(Connection::Pointer newConn)
@@ -125,7 +134,6 @@ void Client::hookup(Connection::Pointer newConn)
 	_writableConnection = _connection->writable.connect(writable);
 	_disconnectedConnection = _connection->disconnected.connect(Connection::VoidSignal::slot_type(&Client::onDisconnected, this));
 }
-
 
 void Client::connect(Connection::Pointer newConn) {
 	hookup(newConn);
@@ -243,7 +251,6 @@ void Client::onIncomingMessage(Connection::MessageType type, ::google::protobuf:
 		case Connection::MessageType::ReadResponse: return onMessage((bithorde::Read::Response&) msg);
 		case Connection::MessageType::BindWrite: return onMessage((bithorde::BindWrite&) msg);
 		case Connection::MessageType::DataSegment: return onMessage((bithorde::DataSegment&) msg);
-		case Connection::MessageType::HandShakeConfirmed: return onMessage((bithorde::HandShakeConfirmed&) msg);
 		case Connection::MessageType::Ping: return onMessage((bithorde::Ping&) msg);
 		default: break;
 	} break;
@@ -267,11 +274,11 @@ void Client::onMessage(const bithorde::HandShake &msg)
 
 	if (msg.has_challenge()) {
 		if (_key.empty()) {
-			cerr << "Challenged from " << msg.name() << "without known key." << endl;
+			cerr << "Challenged from " << msg.name() << " without known key." << endl;
 			_connection->close();
 		} else {
-			auto cipher = (byte)bithorde::CipherType::CLEARTEXT;
-			string cipheriv("");
+			auto cipher = (byte)(_sendCipher ? _sendCipher->type : bithorde::CLEARTEXT);
+			string cipheriv(_sendCipher ? _sendCipher->iv : "");
 			CryptoPP::HMAC<CryptoPP::SHA256> digest((const byte*)_key.data(), _key.size());
 			digest.Update((const byte*)msg.challenge().data(), msg.challenge().size());
 			digest.Update(&cipher, sizeof(cipher));
@@ -281,7 +288,10 @@ void Client::onMessage(const bithorde::HandShake &msg)
 			digest.Final(digest_);
 
 			HandShakeConfirmed auth;
-			auth.set_cipher((bithorde::CipherType)cipher);
+			if (_sendCipher) {
+				auth.set_cipher((bithorde::CipherType)_sendCipher->type);
+				auth.set_cipheriv(_sendCipher->iv);
+			}
 			auth.set_authentication(digest_, digest.DigestSize());
 			sendMessage(Connection::MessageType::HandShakeConfirmed, auth);
 		}
@@ -294,6 +304,10 @@ void Client::onMessage(const bithorde::HandShake &msg)
 void Client::setAuthenticated(const std::string peerName)
 {
 	if (peerName.size()) {
+		if (_sendCipher)
+			_connection->setEncryption(_sendCipher->type, _key, _sendCipher->iv);
+		if (_recvCipher)
+			_connection->setDecryption(_recvCipher->type, _key, _recvCipher->iv);
 		_state = State::Authenticated;
 		for (auto iter = _assetMap.begin(); iter != _assetMap.end(); iter++) {
 			auto binding = iter->second;
@@ -379,6 +393,8 @@ void Client::onMessage(const bithorde::HandShakeConfirmed & msg) {
 	digest.Update((const byte*)msg.cipheriv().data(), msg.cipheriv().size());
 	if ((msg.authentication().size() == digest.DigestSize())
 	    && digest.Verify((const byte*)msg.authentication().data())) {
+		if (msg.has_cipher() && msg.cipher() != bithorde::CLEARTEXT)
+			_recvCipher.reset(new CipherConfig(msg.cipher(), msg.cipheriv()));
 		setAuthenticated(_peerName);
 	} else {
 		setAuthenticated("");

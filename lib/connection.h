@@ -80,6 +80,9 @@ public:
 	static Pointer create(boost::asio::io_service& ioSvc, const bithorde::ConnectionStats::Ptr& stats, const boost::asio::local::stream_protocol::endpoint& addr);
 	static Pointer create(boost::asio::io_service& ioSvc, const bithorde::ConnectionStats::Ptr& stats, boost::shared_ptr< boost::asio::local::stream_protocol::socket >& socket);
 
+	virtual void setEncryption(bithorde::CipherType t, const std::string& key, const std::string& iv) = 0;
+	virtual void setDecryption(bithorde::CipherType t, const std::string& key, const std::string& iv) = 0;
+
 	typedef boost::signals2::signal<void ()> VoidSignal;
 	typedef boost::signals2::signal<void (MessageType, ::google::protobuf::Message&)> MessageSignal;
 	VoidSignal disconnected;
@@ -97,6 +100,7 @@ protected:
 
 	virtual void trySend() = 0;
 	virtual void tryRead() = 0;
+	virtual void decrypt(byte* buf, size_t size) = 0;
 
 	void onRead(const boost::system::error_code& err, size_t count);
 	void onWritten(const boost::system::error_code& err, size_t written, std::vector< const bithorde::Message* > queued);

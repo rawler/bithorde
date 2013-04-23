@@ -46,6 +46,7 @@ private:
 	void onTimeout();
 };
 
+class CipherConfig;
 class Client
 {
 public:
@@ -72,7 +73,7 @@ private:
 
 	std::string _myName, _peerName;
 	std::string _key, _sentChallenge;
-	CipherType _cipher;
+	std::unique_ptr<CipherConfig> _sendCipher, _recvCipher;
 
 	AssetMap _assetMap;
 	std::map<int, Asset::Handle> _requestIdMap;

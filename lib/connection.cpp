@@ -1,9 +1,16 @@
 #include "connection.h"
 
-#include <iostream>
-
 #include <boost/asio.hpp>
 #include <boost/bind.hpp>
+#include <iostream>
+
+#define CRYPTOPP_ENABLE_NAMESPACE_WEAK 1
+
+#include <crypto++/arc4.h>
+#include <crypto++/aes.h>
+#include <crypto++/hmac.h>
+#include <crypto++/modes.h>
+#include <crypto++/sha.h>
 
 #include <google/protobuf/wire_format_lite.h>
 #include <google/protobuf/wire_format_lite_inl.h>
@@ -24,12 +31,16 @@ using namespace std;
 
 using namespace bithorde;
 
+typedef CryptoPP::HMAC<CryptoPP::SHA256> HMAC_SHA256;
+
 template <typename Protocol>
 class ConnectionImpl : public Connection {
 	typedef typename Protocol::socket Socket;
 	typedef typename Protocol::endpoint EndPoint;
 
 	boost::shared_ptr<Socket> _socket;
+
+	boost::shared_ptr<CryptoPP::SymmetricCipher> _encryptor, _decryptor;
 public:
 	ConnectionImpl(boost::asio::io_service& ioSvc, const ConnectionStats::Ptr& stats, const EndPoint& addr)
 		: Connection(ioSvc, stats), _socket(new Socket(ioSvc))
@@ -47,14 +58,59 @@ public:
 		close();
 	}
 
+	virtual void setEncryption(bithorde::CipherType t, const std::string& key, const std::string& iv) {
+		switch (t) {
+			case bithorde::CipherType::CLEARTEXT:
+				_encryptor.reset();
+				break;
+			case bithorde::CipherType::AES_CTR:
+				_encryptor.reset(new CryptoPP::CTR_Mode<CryptoPP::AES>::Encryption());
+				_encryptor->SetKeyWithIV((const byte*)key.data(), key.size(), (const byte*)iv.data(), iv.size());
+				break;
+			case bithorde::CipherType::RC4:
+				byte key_[HMAC_SHA256::DIGESTSIZE];
+				HMAC_SHA256((const byte*)key.data(), key.size()).CalculateDigest(key_, (const byte*)iv.data(), iv.size());
+				_encryptor.reset(new CryptoPP::Weak1::ARC4::Encryption());
+				_encryptor->SetKey(key_, sizeof(key_));
+				break;
+			case bithorde::CipherType::XOR:
+			default:
+				throw std::runtime_error("Unsupported Cipher " + bithorde::CipherType_Name(t));
+		}
+	}
+
+	virtual void setDecryption(bithorde::CipherType t, const std::string& key, const std::string& iv) {
+		switch (t) {
+			case bithorde::CipherType::CLEARTEXT:
+				_decryptor.reset();
+				break;
+			case bithorde::CipherType::AES_CTR:
+				_decryptor.reset(new CryptoPP::CTR_Mode<CryptoPP::AES>::Decryption());
+				_decryptor->SetKeyWithIV((const byte*)key.data(), key.size(), (const byte*)iv.data(), iv.size());
+				break;
+			case bithorde::CipherType::RC4:
+				byte key_[HMAC_SHA256::DIGESTSIZE];
+				HMAC_SHA256((const byte*)key.data(), key.size()).CalculateDigest(key_, (const byte*)iv.data(), iv.size());
+				_decryptor.reset(new CryptoPP::Weak1::ARC4::Decryption());
+				_decryptor->SetKey(key_, sizeof(key_));
+				break;
+			case bithorde::CipherType::XOR:
+			default:
+				throw std::runtime_error("Unsupported Cipher " + bithorde::CipherType_Name(t));
+		}
+	}
+
 	void trySend() {
 		_sendWaiting = 0;
 		auto queued = _sndQueue.dequeue(_stats->outgoingBitrateCurrent.value()/8, SEND_CHUNK_MS);
 		std::vector<boost::asio::const_buffer> buffers;
 		buffers.reserve(queued.size());
 		for (auto iter=queued.begin(); iter != queued.end(); iter++) {
-			buffers.push_back(boost::asio::buffer((*iter)->buf));
-			_sendWaiting += (*iter)->buf.size();
+			auto& buf = (*iter)->buf;
+			if (_encryptor)
+				_encryptor->ProcessString((byte*)buf.data(), buf.size());
+			buffers.push_back(boost::asio::buffer(buf));
+			_sendWaiting += buf.size();
 		}
 		if (_sendWaiting) {
 			boost::asio::async_write(*_socket, buffers,
@@ -70,6 +126,11 @@ public:
 				asio::placeholders::error, asio::placeholders::bytes_transferred
 			)
 		);
+	}
+
+	virtual void decrypt(byte* buf, size_t size) {
+		if (_decryptor)
+			_decryptor->ProcessString(buf, size);
 	}
 
 	void close() {
@@ -186,6 +247,7 @@ void Connection::onRead(const boost::system::error_code& err, size_t count)
 		close();
 		return;
 	} else {
+		decrypt(_rcvBuf.ptr+_rcvBuf.size, count);
 		_rcvBuf.charge(count);
 		_stats->incomingBitrateCurrent += count*8;
 		_stats->incomingBytes += count;
