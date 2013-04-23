@@ -28,6 +28,7 @@ MSG_REV_MAP = {
     message.Read.Response: 6,
     message.BindWrite:     7,
     message.DataSegment:   8,
+    message.HandShakeConfirmed: 9,
 }
 DEFAULT_TIMEOUT=4000
 

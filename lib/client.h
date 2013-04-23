@@ -50,10 +50,10 @@ class Client
 {
 public:
 	enum State {
-		Connecting,
-		Connected,
-		AwaitingAuth,
-		Authenticated,
+		Connecting,    // No underlying connection (yet)
+		Connected,     // Connected, but has yet not said hello
+		AwaitingAuth,  // Has said hello, but is still waiting for HandShake or HandShakeConfirmed
+		Authenticated, // Authenticated and running
 	};
 private:
 	friend class AssetBinding;
@@ -70,8 +70,9 @@ private:
 
 	State _state;
 
-	std::string _myName;
-	std::string _peerName;
+	std::string _myName, _peerName;
+	std::string _key, _sentChallenge;
+	CipherType _cipher;
 
 	AssetMap _assetMap;
 	std::map<int, Asset::Handle> _requestIdMap;
@@ -90,6 +91,8 @@ public:
 
 	State state();
 
+	void setSecurity(const std::string& key, CipherType cipher);
+
 	/**
 	 * Tries to parse spec either as HOST:PORT, or as /absolute/socket/path and connect to it.
 	 */
@@ -98,6 +101,9 @@ public:
 	void connect(boost::asio::ip::tcp::endpoint& ep);
 	void connect(boost::asio::local::stream_protocol::endpoint& ep);
 	void connect(Connection::Pointer newConn);
+	void hookup(bithorde::Connection::Pointer newConn);
+
+	void close();
 
 	bool isConnected();
 	const std::string& peerName();
@@ -139,6 +145,7 @@ protected:
 	virtual void onMessage(const bithorde::HandShakeConfirmed & msg);
 	virtual void onMessage(const bithorde::Ping & msg);
 
+	virtual void setAuthenticated(const std::string peerName);
 private:
 	bool release(Asset & a);
 

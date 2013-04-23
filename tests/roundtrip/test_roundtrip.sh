@@ -43,7 +43,7 @@ echo "Preparing testfile..."
 create_testfile $TESTFILE $TESTSIZE
 
 echo "Uploading to A..."
-MAGNETURL=$("$BHUPLOAD" -u$A_SOCK "$TESTFILE"|grep '^magnet:')
+MAGNETURL=$("$BHUPLOAD" -d -u$A_SOCK "$TESTFILE"|grep '^magnet:')
 verify_equal cachea/assets/?????*/data "$TESTFILE" || exit_error "Uploaded file did not match upload source"
 VERIFICATION=$("$BHUPLOAD" -u$A_SOCK "$TESTFILE"|grep '^magnet:')
 [ "$MAGNETURL" == "$VERIFICATION" ] || exit_error "Re-upload with different magnet-link".

@@ -61,6 +61,8 @@ void ConnectionList::describe(management::Info& target) const
 	target << size() << " connections";
 }
 
+bithorded::Config::Client null_client;
+
 Server::Server(asio::io_service& ioSvc, Config& cfg) :
 	_cfg(cfg),
 	_ioSvc(ioSvc),
@@ -122,15 +124,20 @@ void Server::waitForTCPConnection()
 void Server::onTCPConnected(boost::shared_ptr< asio::ip::tcp::socket >& socket, const boost::system::error_code& ec)
 {
 	if (!ec) {
-		onTCPConnected(socket);
+		hookup(socket, null_client);
 		waitForTCPConnection();
 	}
 }
 
-void Server::onTCPConnected ( boost::shared_ptr< asio::ip::tcp::socket >& socket )
+void Server::hookup ( boost::shared_ptr< asio::ip::tcp::socket >& socket, const Config::Client& client)
 {
 	bithorded::Client::Ptr c = bithorded::Client::create(*this);
-	c->connect(bithorde::Connection::create(_ioSvc, boost::make_shared<bithorde::ConnectionStats>(_timerSvc), socket));
+	auto conn = bithorde::Connection::create(_ioSvc, boost::make_shared<bithorde::ConnectionStats>(_timerSvc), socket);
+	c->setSecurity(client.key, (bithorde::CipherType)client.cipher);
+	if (client.name.empty())
+		c->hookup(conn);
+	else
+		c->connect(conn);
 	clientConnected(c);
 }
 
@@ -144,7 +151,7 @@ void Server::onLocalConnected(boost::shared_ptr< boost::asio::local::stream_prot
 {
 	if (!ec) {
 		bithorded::Client::Ptr c = bithorded::Client::create(*this);
-		c->connect(bithorde::Connection::create(_ioSvc, boost::make_shared<bithorde::ConnectionStats>(_timerSvc), socket));
+		c->hookup(bithorde::Connection::create(_ioSvc, boost::make_shared<bithorde::ConnectionStats>(_timerSvc), socket));
 		clientConnected(c);
 		waitForLocalConnection();
 	}
@@ -182,6 +189,19 @@ void Server::clientDisconnected(bithorded::Client::Ptr& client)
 	_router.onDisconnected(client);
 	// Will destroy the client, unless others are holding references.
 	client.reset();
+}
+
+const bithorded::Config::Client& Server::getClientConfig(const string& name)
+{
+	for (auto iter = _cfg.friends.begin(); iter != _cfg.friends.end(); iter++) {
+		if (name == iter->name)
+			return *iter;
+	}
+	for (auto iter = _cfg.clients.begin(); iter != _cfg.clients.end(); iter++) {
+		if (name == iter->name)
+			return *iter;
+	}
+	return null_client;
 }
 
 IAsset::Ptr Server::async_linkAsset(const boost::filesystem::path& filePath)

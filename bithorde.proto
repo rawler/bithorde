@@ -12,7 +12,7 @@ enum CipherType {
   CLEARTEXT = 0;    // Cleartext
   XOR = 1;          // Very fast, pure-obfuscation. Keeps nosy people out, but not secure at all.
   RC4 = 2;          // ArcFour. Quite fast, but has some security-weaknesses. See http://en.wikipedia.org/wiki/RC4 for details.
-  AES_CTR = 3;      // Highly secure, but comparatively slow/cpu-intensive.
+  AES_CTR = 3;      // Highly secure, but comparatively slow/cpu-intensive. Size of cipher is determined by the key size.
 }
 
 enum Status {
@@ -42,7 +42,7 @@ message HandShake { // Must be first message in stream
  * A word on authentication and encryption.
  *
  *  Authentication works by each peer sending a challenge to other part, asking for
- *  proof that the other part has a copy of a secret pre-share key. The challenge is
+ *  proof that the other part has a copy of a secret pre-shared key. The challenge is
  *  fulfilled by the other part answering the HMAC-Sha256 of the message-parts.
  *
  * The parts may also in the second stage decide to inform it's messages will be
@@ -51,7 +51,7 @@ message HandShake { // Must be first message in stream
  * HandShakeConfirmation.
  *
  * The HandShake is finally confirmed and authenticated by HMAC[SHA256]-hashing:
- *   shared_key ~ recieved_challenge ~ cipher(as single byte-int) ~ cipheriv
+ *   shared_key, recieved_challenge ~ cipher(as single byte-int) ~ cipheriv
  *
  * NOTE: There is currently no negotiation over supported Ciphers. Sender decides what
  *       cipher to use. The behavior if recipient cannot support that cipher is
@@ -60,7 +60,7 @@ message HandShake { // Must be first message in stream
 message HandShakeConfirmed { // Must be second message in stream (or skipped if no challenge recieved)
   optional CipherType cipher = 1;    // Cipher used by sender.
   optional bytes cipheriv = 2;       // Set if sender is encrypting the rest of the conversation
-  required bytes authentication = 3; // SHA256 of shared key + recieved challenge + sent cipheriv
+  required bytes authentication = 3; // HMAC<SHA256>(shared_key, recieved challenge ~ cipher ~ sent cipheriv)
 }
 
 /****************************************************************************************

@@ -9,6 +9,9 @@
 #include <iostream>
 #include <string.h>
 
+#include <crypto++/hmac.h>
+#include <crypto++/sha.h>
+
 #include "random.h"
 
 const static boost::posix_time::millisec DEFAULT_ASSET_TIMEOUT(1500);
@@ -77,9 +80,9 @@ void AssetBinding::onTimeout()
 Client::Client(asio::io_service& ioSvc, string myName) :
 	_ioSvc(ioSvc),
 	_timerSvc(new TimerService(ioSvc)),
-	_connection(),
 	_state(Connecting),
 	_myName(myName),
+	_cipher(CipherType::CLEARTEXT),
 	_handleAllocator(1),
 	_rpcIdAllocator(1),
 	_protoVersion(0),
@@ -94,7 +97,21 @@ Client::~Client()
 	}
 }
 
-void Client::connect(Connection::Pointer newConn) {
+Client::State Client::state()
+{
+	return _state;
+}
+
+void Client::setSecurity(const string& key, CipherType cipher)
+{
+	if ((_state != Connecting) && (_state != Connected))
+		throw std::runtime_error("Client were in wrong state for setSecurity");
+	_key = key;
+	_cipher = cipher;
+}
+
+void Client::hookup(Connection::Pointer newConn)
+{
 	BOOST_ASSERT(!_connection);
 	BOOST_ASSERT(_state == Connecting);
 	_state = Connected;
@@ -107,7 +124,11 @@ void Client::connect(Connection::Pointer newConn) {
 	_messageConnection = _connection->message.connect(Connection::MessageSignal::slot_type(&Client::onIncomingMessage, this, _1, _2));
 	_writableConnection = _connection->writable.connect(writable);
 	_disconnectedConnection = _connection->disconnected.connect(Connection::VoidSignal::slot_type(&Client::onDisconnected, this));
+}
 
+
+void Client::connect(Connection::Pointer newConn) {
+	hookup(newConn);
 	sayHello();
 }
 
@@ -137,6 +158,12 @@ void Client::connect(string spec) {
 	} else {
 		throw string("Failed to parse: " + spec);
 	}
+}
+
+void Client::close()
+{
+	if (_connection)
+		_connection->close();
 }
 
 void Client::onDisconnected() {
@@ -187,8 +214,13 @@ void Client::sayHello() {
 	bithorde::HandShake h;
 	h.set_protoversion(2);
 	h.set_name(_myName);
-
+	_sentChallenge.clear();
+	if (_key.size()) {
+		_sentChallenge = secureRandomBytes(16);
+		h.set_challenge(_sentChallenge);
+	}
 	sendMessage(Connection::MessageType::HandShake, h);
+	_state = State::AwaitingAuth;
 }
 
 void Client::onIncomingMessage(Connection::MessageType type, ::google::protobuf::Message& msg)
@@ -200,6 +232,7 @@ void Client::onIncomingMessage(Connection::MessageType type, ::google::protobuf:
 		default: break;
 	} break;
 	case AwaitingAuth: switch (type) {
+		case Connection::MessageType::HandShake: return onMessage((bithorde::HandShake&) msg);
 		case Connection::MessageType::HandShakeConfirmed: return onMessage((bithorde::HandShakeConfirmed&) msg);
 		default: break;
 	} break;
@@ -215,7 +248,7 @@ void Client::onIncomingMessage(Connection::MessageType type, ::google::protobuf:
 		default: break;
 	} break;
 	}
-	cerr << "ERROR: BitHorde State Error, Disconnecting" << endl;
+	cerr << "ERROR: BitHorde State Error (" << _state << "," << type << "), Disconnecting" << endl;
 	_connection->close();
 }
 
@@ -233,19 +266,43 @@ void Client::onMessage(const bithorde::HandShake &msg)
 	_peerName = msg.name();
 
 	if (msg.has_challenge()) {
-		cerr << "Challenge required" << endl;
-		// Setup encryption
-	} else {
+		if (_key.empty()) {
+			cerr << "Challenged from " << msg.name() << "without known key." << endl;
+			_connection->close();
+		} else {
+			auto cipher = (byte)bithorde::CipherType::CLEARTEXT;
+			string cipheriv("");
+			CryptoPP::HMAC<CryptoPP::SHA256> digest((const byte*)_key.data(), _key.size());
+			digest.Update((const byte*)msg.challenge().data(), msg.challenge().size());
+			digest.Update(&cipher, sizeof(cipher));
+			digest.Update((const byte*)cipheriv.data(), cipheriv.size());
+
+			auto digest_ = (byte*)alloca(digest.DigestSize());
+			digest.Final(digest_);
+
+			HandShakeConfirmed auth;
+			auth.set_cipher((bithorde::CipherType)cipher);
+			auth.set_authentication(digest_, digest.DigestSize());
+			sendMessage(Connection::MessageType::HandShakeConfirmed, auth);
+		}
+	}
+	if (_sentChallenge.empty()) {
+		setAuthenticated(_peerName);
+	}
+}
+
+void Client::setAuthenticated(const std::string peerName)
+{
+	if (peerName.size()) {
+		_state = State::Authenticated;
 		for (auto iter = _assetMap.begin(); iter != _assetMap.end(); iter++) {
 			auto binding = iter->second;
 			BOOST_ASSERT(binding && binding->readAsset());
 			binding->setTimer(DEFAULT_ASSET_TIMEOUT);
 			informBound(*iter->second, rand64(), DEFAULT_ASSET_TIMEOUT.total_milliseconds());
 		}
-
-		_state = State::Authenticated;
-		authenticated(*this, _peerName);
 	}
+	authenticated(*this, peerName);
 }
 
 void Client::onMessage(bithorde::BindRead & msg) {
@@ -315,8 +372,17 @@ void Client::onMessage(const bithorde::DataSegment & msg) {
 	_connection->close();
 }
 void Client::onMessage(const bithorde::HandShakeConfirmed & msg) {
-	cerr << "unsupported: challenge-response handshakes" << endl;
-	_connection->close();
+	CryptoPP::HMAC<CryptoPP::SHA256> digest((const byte*)_key.data(), _key.size());
+	digest.Update((const byte*)_sentChallenge.data(), _sentChallenge.size());
+	auto cipher = (byte)msg.cipher();
+	digest.Update(&cipher, sizeof(cipher));
+	digest.Update((const byte*)msg.cipheriv().data(), msg.cipheriv().size());
+	if ((msg.authentication().size() == digest.DigestSize())
+	    && digest.Verify((const byte*)msg.authentication().data())) {
+		setAuthenticated(_peerName);
+	} else {
+		setAuthenticated("");
+	}
 }
 void Client::onMessage(const bithorde::Ping & msg) {
 	bithorde::Ping reply;

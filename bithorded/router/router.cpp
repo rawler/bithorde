@@ -40,6 +40,7 @@ namespace bithorded { namespace router {
 
 class bithorded::router::FriendConnector : public boost::enable_shared_from_this<bithorded::router::FriendConnector> {
 	Server& _server;
+	Config::Friend _f;
 	boost::shared_ptr<boost::asio::ip::tcp::socket> _socket;
 	boost::asio::ip::tcp::resolver _resolver;
 	boost::asio::deadline_timer _timer;
@@ -48,6 +49,7 @@ class bithorded::router::FriendConnector : public boost::enable_shared_from_this
 public:
 	FriendConnector(Server& server, const bithorded::Config::Friend& cfg) :
 		_server(server),
+		_f(cfg),
 		_socket(boost::make_shared<boost::asio::ip::tcp::socket>(server.ioService())),
 		_resolver(server.ioService()),
 		_timer(server.ioService()),
@@ -90,7 +92,7 @@ private:
 		if (error) {
 			scheduleRestart();
 		} else if (!_cancelled) {
-			_server.onTCPConnected(_socket);
+			_server.hookup(_socket, _f);
 			scheduleRestart(RECONNECT_INTERVAL * 2);
 		}
 	}
