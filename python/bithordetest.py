@@ -76,15 +76,6 @@ class TestConnection:
         self.send(message.HandShake(name=name, protoversion=2))
         self.expect(message.HandShake)
 
-class TestServer:
-    def __init__(self, addr, name='bithorded-test'):
-        self.name = name
-        eventlet.serve(eventlet.listen(addr), self.run, concurrenct=1)
-    def run(self, socket, addr):
-        conn = TestConnection(socket, 'bithorded-test')
-        for msg in conn:
-            pass
-
 class BithordeD(Process):
     def __init__(self, label='bithorded', bithorded=os.environ.get('BITHORDED', 'bithorded'), config={}):
         if hasattr(config, 'setdefault'):
@@ -124,6 +115,8 @@ class BithordeD(Process):
                 break
         assert self.started
         eventlet.spawn(self._run)
+    def is_alive(self):
+        return self.popen4.poll() == -1
     def _run(self):
         for line in self.child_stdout_stderr:
             if self.label:

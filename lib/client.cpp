@@ -276,6 +276,7 @@ void Client::onMessage(const bithorde::HandShake &msg)
 		if (_key.empty()) {
 			cerr << "Challenged from " << msg.name() << " without known key." << endl;
 			_connection->close();
+			return;
 		} else {
 			auto cipher = (byte)(_sendCipher ? _sendCipher->type : bithorde::CLEARTEXT);
 			string cipheriv(_sendCipher ? _sendCipher->iv : "");

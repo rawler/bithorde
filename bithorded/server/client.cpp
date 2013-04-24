@@ -105,8 +105,8 @@ void Client::onMessage(const bithorde::HandShake& msg)
 		setSecurity(client_config.key, (bithorde::CipherType)client_config.cipher);
 		sayHello();
 	}
-	bithorde::Client::onMessage(msg);
 	LOG4CPLUS_INFO(clientLogger, "Connected: " << msg.name());
+	bithorde::Client::onMessage(msg);
 }
 
 void Client::onMessage(const bithorde::BindWrite& msg)
