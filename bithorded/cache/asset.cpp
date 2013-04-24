@@ -126,8 +126,9 @@ void bithorded::cache::CachingAsset::upstreamStatusChange(bithorde::Status newSt
 	if ((newStatus == bithorde::Status::SUCCESS) && !_cached && _upstream->size() > 0) {
 		_delayedCreation = true;
 	}
-	bool statusOk = (newStatus == bithorde::Status::SUCCESS) || (_cached && _cached->hasRootHash());
-	setStatus(statusOk ? bithorde::Status::SUCCESS : bithorde::Status::NOTFOUND);
+	if (_cached && _cached->hasRootHash())
+		newStatus = bithorde::Status::SUCCESS;
+	setStatus(newStatus);
 }
 
 bithorded::cache::CachedAsset::Ptr bithorded::cache::CachingAsset::cached()
