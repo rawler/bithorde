@@ -44,6 +44,12 @@ public:
 
 	virtual void async_read(uint64_t offset, size_t& size, uint32_t timeout, ReadCallback cb) = 0;
 	virtual uint64_t size() = 0;
+
+	/**
+	 * Valid parameters
+	 * offset - 0 to size() - size
+	 * size - 1 to size()
+	 */
 	virtual size_t can_read(uint64_t offset, size_t size) = 0;
 	virtual bool getIds(BitHordeIds& ids) const = 0;
 

@@ -21,12 +21,13 @@
 #include <boost/asio/io_service.hpp>
 
 #include "asset.hpp"
+#include "../lib/management.hpp"
 #include "../router/router.hpp"
 #include "../store/assetstore.hpp"
 
 namespace bithorded { namespace cache {
 
-class CacheManager : private bithorded::store::AssetStore
+class CacheManager : private bithorded::store::AssetStore, public bithorded::management::DescriptiveDirectory
 {
 	boost::filesystem::path _baseDir;
 	boost::asio::io_service& _ioSvc;
@@ -36,6 +37,10 @@ class CacheManager : private bithorded::store::AssetStore
 public:
 	CacheManager(boost::asio::io_service& ioSvc, bithorded::router::Router& router, const boost::filesystem::path& baseDir, intmax_t size);
 
+	virtual void describe(management::Info& target) const;
+
+	virtual void inspect(management::InfoList& target) const;
+
 	/**
 	 * Add an asset to the idx, allocating space for
 	 * the status of the asset will be updated to reflect it.
@@ -44,19 +49,25 @@ public:
 	 *
 	 * @returns a valid asset if file is within acceptable path, NULL otherwise
 	 */
-	IAsset::Ptr prepareUpload(uint64_t size);
+	CachedAsset::Ptr prepareUpload(uint64_t size);
+
+	/**
+	 * Version of prepareUpload which also links up the given ids to it.
+	 */
+	CachedAsset::Ptr prepareUpload(uint64_t size, const BitHordeIds& ids);
 
 	/**
 	 * Finds an asset by bithorde HashId. (Only the tiger-hash is actually used)
 	 */
 	IAsset::Ptr findAsset(const bithorde::BindRead& req);
-
 protected:
 	/**
 	 * Finds an asset by bithorde HashId. (Only the tiger-hash is actually used)
 	 */
 	IAsset::Ptr openAsset(const boost::filesystem::path& assetPath);
-	
+
+	virtual IAsset::Ptr openAsset(const bithorde::BindRead& req);
+
 private:
 	bool makeRoom(uint64_t size);
 	void linkAsset(bithorded::cache::CachedAsset::WeakPtr asset_);

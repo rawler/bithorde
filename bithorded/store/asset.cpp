@@ -23,18 +23,18 @@ const size_t MAX_CHUNK = 64*1024;
 using namespace std;
 using namespace bithorded::store;
 
-StoredAsset::StoredAsset(const boost::filesystem::path& metaFolder) :
+StoredAsset::StoredAsset(const boost::filesystem::path& metaFolder, RandomAccessFile::Mode mode) :
 	_metaFolder(metaFolder),
-	_file(metaFolder/"data"),
+	_file(metaFolder/"data", mode),
 	_metaStore(metaFolder/"meta", _file.blocks(BLOCKSIZE)),
 	_hasher(_metaStore)
 {
 
 }
 
-StoredAsset::StoredAsset(const boost::filesystem::path& metaFolder, uint64_t size) :
+StoredAsset::StoredAsset(const boost::filesystem::path& metaFolder, RandomAccessFile::Mode mode, uint64_t size) :
 	_metaFolder(metaFolder),
-	_file(metaFolder/"data", RandomAccessFile::READWRITE, size),
+	_file(metaFolder/"data", mode, size),
 	_metaStore(metaFolder/"meta", _file.blocks(BLOCKSIZE)),
 	_hasher(_metaStore)
 {
@@ -53,21 +53,23 @@ void StoredAsset::async_read(uint64_t offset, size_t& size, uint32_t timeout, bi
 
 size_t StoredAsset::can_read(uint64_t offset, size_t size)
 {
+	BOOST_ASSERT(size > 0);
 	size_t res = 0;
 	if (size > MAX_CHUNK)
 		size = MAX_CHUNK;
-	uint currentBlock = offset / BLOCKSIZE;
-	uint endBlockNum = (offset + size) / BLOCKSIZE;
-	size_t currentBlockSize = BLOCKSIZE - (offset % BLOCKSIZE);
+	auto stopoffset = offset+size;
+	auto lastbyteoffset = stopoffset-1;
+	uint firstBlock = offset / BLOCKSIZE;
+	uint lastBlock = lastbyteoffset / BLOCKSIZE;
 
-	while (currentBlock <= endBlockNum && _hasher.isBlockSet(currentBlock)) {
-		res += currentBlockSize;
-
-		currentBlock += 1;
-		if (currentBlock == endBlockNum)
-			currentBlockSize = (offset+size) % BLOCKSIZE;
-		else
-			currentBlockSize = BLOCKSIZE;
+	for (auto currentBlock = firstBlock; currentBlock <= lastBlock && _hasher.isBlockSet(currentBlock); currentBlock++) {
+		res += BLOCKSIZE;
+		if (currentBlock == firstBlock)
+			res -= offset % BLOCKSIZE;
+		if (currentBlock == lastBlock) {
+			if (auto overflow = (stopoffset % BLOCKSIZE))
+				res -= BLOCKSIZE - overflow;
+		}
 	}
 
 	return res;

@@ -96,9 +96,7 @@ bool path_is_in(const fs::path& path, const fs::path& folder) {
 
 IAsset::Ptr Store::addAsset(const boost::filesystem::path& file)
 {
-	if (!path_is_in(file, _baseDir)) {
-		return ASSET_NONE;
-	} else {
+	if (path_is_in(file, _baseDir)) {
 		fs::path assetFolder(AssetStore::newAssetDir());
 
 		fs::create_relative_symlink(file, assetFolder/"data");
@@ -114,6 +112,8 @@ IAsset::Ptr Store::addAsset(const boost::filesystem::path& file)
 			AssetStore::removeAsset(assetFolder);
 			return IAsset::Ptr();
 		}
+	} else {
+		return ASSET_NONE;
 	}
 }
 
@@ -130,7 +130,7 @@ void Store::_addAsset(SourceAsset::WeakPtr asset_)
 		const char *data_path = (asset->folder()/"data").c_str();
 		lutimes(data_path, NULL);
 
-		AssetStore::link(ids, asset);
+		AssetStore::update_links(ids, asset);
 	}
 }
 
@@ -143,6 +143,6 @@ IAsset::Ptr Store::openAsset(const boost::filesystem::path& assetPath)
 	} else {
 		LOG4CPLUS_WARN(log, "Unhashed asset detected, hashing");
 		_threadPool.post(*new HashTask(asset, _ioSvc));
-		return IAsset::Ptr();
+		return store::StoredAsset::Ptr();
 	}
 }

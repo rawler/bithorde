@@ -42,8 +42,8 @@ public:
 	 */
 	const static int BLOCKSIZE = Hasher::BLOCKSIZE;
 
-	StoredAsset(const boost::filesystem::path& metaFolder);
-	StoredAsset(const boost::filesystem::path& metaFolder, uint64_t size);
+	StoredAsset(const boost::filesystem::path& metaFolder, RandomAccessFile::Mode mode);
+	StoredAsset(const boost::filesystem::path& metaFolder, RandomAccessFile::Mode mode, uint64_t size);
 
 	/**
 	 * Will read up to /size/ bytes from underlying file, and send to callback.

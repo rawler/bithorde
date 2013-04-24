@@ -35,14 +35,19 @@ struct PendingRead {
 	IAsset::ReadCallback cb;
 };
 
-class ForwardedAsset : public bithorded::IAsset
-{
-	typedef bithorde::ReadAsset UpstreamAsset;
+class UpstreamAsset : public bithorde::ReadAsset, public boost::enable_shared_from_this<UpstreamAsset> {
+public:
+	typedef boost::shared_ptr<UpstreamAsset> Ptr;
+	explicit UpstreamAsset(const ClientPointer& client, const BitHordeIds& requestIds);
+	virtual void handleMessage(const bithorde::Read::Response& resp);
+};
 
+class ForwardedAsset : public bithorded::IAsset, public boost::noncopyable, public boost::enable_shared_from_this<ForwardedAsset>
+{
 	Router& _router;
 	BitHordeIds _ids;
 	int64_t _size;
-	std::map<std::string, std::unique_ptr<UpstreamAsset> > _upstream;
+	std::map<std::string, UpstreamAsset::Ptr> _upstream;
 	std::list<PendingRead> _pendingReads;
 public:
 	typedef boost::shared_ptr<ForwardedAsset> Ptr;
@@ -56,8 +61,6 @@ public:
 		_pendingReads()
 	{}
 
-	virtual ~ForwardedAsset();
-
 	bool hasUpstream(const std::string peername);
 	void bindUpstreams(const std::map< std::string, bithorded::Client::Ptr >& friends, uint64_t uuid, int timeout);
 
@@ -67,6 +70,7 @@ public:
 	virtual uint64_t size();
 
 	virtual void inspect(management::InfoList& target) const;
+	void inspect_upstreams(management::InfoList& target) const;
 private:
 	void onUpstreamStatus(const std::string& peername, const bithorde::AssetStatus& status);
 	void updateStatus();

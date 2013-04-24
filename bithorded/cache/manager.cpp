@@ -30,7 +30,7 @@ namespace fs = boost::filesystem;
 
 namespace bithorded {
 	namespace cache {
-		log4cplus::Logger log = log4cplus::Logger::getInstance("source");
+		log4cplus::Logger log = log4cplus::Logger::getInstance("cache");
 	}
 }
 
@@ -47,17 +47,42 @@ CacheManager::CacheManager(boost::asio::io_service& ioSvc,
 		AssetStore::openOrCreate();
 }
 
+void CacheManager::describe(management::Info& target) const
+{
+	auto size = store::AssetStore::size();
+	target << "capacity: " << (_maxSize/(1024*1024)) << "MB, size: " << (size/(1024*1024)) << "MB (" << (int)((size*100)/_maxSize) << "%)";
+}
+
+void CacheManager::inspect(management::InfoList& target) const
+{
+	target.append("path") << _baseDir;
+	target.append("capacity") << _maxSize;
+	target.append("size") << store::AssetStore::size();
+}
+
 IAsset::Ptr CacheManager::openAsset(const boost::filesystem::path& assetPath)
 {
-	auto asset = boost::make_shared<CachedAsset>(assetPath);
-	if (asset->hasRootHash()) {
-		return asset;
-	} else {
+	return boost::make_shared<CachedAsset>(assetPath);
+}
+
+IAsset::Ptr CacheManager::openAsset(const bithorde::BindRead& req)
+{
+	if (_baseDir.empty())
 		return IAsset::Ptr();
+	auto stored = boost::dynamic_pointer_cast<CachedAsset>(bithorded::store::AssetStore::openAsset(req));
+	if (stored && (stored->status == bithorde::Status::SUCCESS)) {
+		return stored;
+	} else {
+		auto upstream = _router.findAsset(req);
+		if (auto upstream_ = boost::dynamic_pointer_cast<router::ForwardedAsset>(upstream)) {
+			return boost::make_shared<CachingAsset>(*this, upstream_, stored);
+		} else {
+			return upstream;
+		}
 	}
 }
 
-IAsset::Ptr CacheManager::prepareUpload(uint64_t size)
+CachedAsset::Ptr CacheManager::prepareUpload(uint64_t size)
 {
 	if ((!_baseDir.empty()) && makeRoom(size)) {
 		fs::path assetFolder(AssetStore::newAssetDir());
@@ -69,11 +94,19 @@ IAsset::Ptr CacheManager::prepareUpload(uint64_t size)
 		} catch (const std::ios::failure& e) {
 			LOG4CPLUS_ERROR(log, "Failed to create " << assetFolder << " for upload. Purging...");
 			AssetStore::removeAsset(assetFolder);
-			return IAsset::Ptr();
+			return CachedAsset::Ptr();
 		}
 	} else {
-		return IAsset::Ptr();
+		return CachedAsset::Ptr();
 	}
+}
+
+CachedAsset::Ptr CacheManager::prepareUpload(uint64_t size, const BitHordeIds& ids)
+{
+	auto res = prepareUpload(size);
+	if (res)
+		AssetStore::update_links(ids, res);
+	return res;
 }
 
 IAsset::Ptr CacheManager::findAsset(const bithorde::BindRead& req)
@@ -114,11 +147,11 @@ void CacheManager::linkAsset(CachedAsset::WeakPtr asset_)
 	auto asset = asset_.lock();
 	BitHordeIds ids;
 	if (asset && asset->getIds(ids)) {
-		std::cerr << "Linking" << std::endl;
+		LOG4CPLUS_DEBUG(log, "Linking " << ids << " to " << asset->folder());
 		const char *data_path = (asset->folder()/"data").c_str();
 		lutimes(data_path, NULL);
 
-		AssetStore::link(ids, asset);
+		AssetStore::update_links(ids, asset);
 	}
 }
 

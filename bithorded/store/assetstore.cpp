@@ -16,6 +16,7 @@
 #include "assetstore.hpp"
 
 #include <boost/filesystem.hpp>
+#include <set>
 #include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
@@ -66,13 +67,30 @@ boost::filesystem::path AssetStore::newAssetDir()
 	return assetFolder;
 }
 
-void AssetStore::link(const BitHordeIds& ids, const boost::shared_ptr<StoredAsset>& asset)
+void AssetStore::purge_links(const boost::shared_ptr< StoredAsset >& asset, const BitHordeIds& except)
+{
+	fs::directory_iterator end;
+	auto tgt = asset->folder();
+	boost::system::error_code ec;
+	std::set<fs::path> exceptions;
+	for (auto iter = except.begin(); iter != except.end(); ++iter) {
+		if (iter->type() == bithorde::HashType::TREE_TIGER)
+			exceptions.insert(base32encode(iter->id()));
+	}
+	for (fs::directory_iterator iter(_tigerFolder); iter != end; ++iter) {
+		if (fs::is_symlink(iter->status())) {
+			if ((fs::absolute(fs::read_symlink(_tigerFolder/iter->path(), ec), _tigerFolder) == tgt) && !exceptions.count(iter->path()))
+				unlink(_tigerFolder / iter->path());
+		}
+	}
+}
+
+void AssetStore::update_links(const BitHordeIds& ids, const boost::shared_ptr<StoredAsset>& asset)
 {
 	auto tigerId = findBithordeId(ids, bithorde::HashType::TREE_TIGER);
 	if (tigerId.empty())
 		return;
-
-	AssetSessions::add(tigerId, asset);
+	purge_links(asset, ids);
 
 	fs::path link = _tigerFolder / base32encode(tigerId);
 	if (fs::exists(fs::symlink_status(link)))
@@ -227,8 +245,3 @@ IAsset::Ptr AssetStore::openAsset(const bithorde::BindRead& req)
 	}
 	return IAsset::Ptr();
 }
-
-
-
-
-

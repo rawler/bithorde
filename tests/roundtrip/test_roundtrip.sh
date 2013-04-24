@@ -53,5 +53,6 @@ echo "Getting (2 in parallel) from B..."
 "$BHGET" -nbhget2 -u$B_SOCK "$MAGNETURL" | verify_equal $TESTFILE & DL2=$!
 wait $DL1 || exit_error "Download 1 file did not match upload source"
 wait $DL2 || exit_error "Download 2 file did not match upload source"
+verify_equal cacheb/assets/?????*/data "$TESTFILE" || exit_error "Cached file did not match upload source"
 
 exit_success
