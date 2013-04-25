@@ -58,6 +58,7 @@ protected:
 	virtual void onMessage(const bithorde::Read::Request& msg);
 	virtual void onMessage(const bithorde::DataSegment& msg);
 
+	virtual void setAuthenticated(const std::string peerName);
 private:
 	void informAssetStatus(bithorde::Asset::Handle h, bithorde::Status s);
 	void informAssetStatusUpdate(bithorde::Asset::Handle h, const bithorded::IAsset::WeakPtr& asset);

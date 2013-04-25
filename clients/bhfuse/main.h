@@ -38,7 +38,7 @@ public:
 	const BHFuseOptions opts;
 
 public:
-	void onConnected(std::string remoteName);
+	void onConnected(bithorde::Client&, std::string remoteName);
 	FUSEAsset * registerAsset(boost::shared_ptr< bithorde::ReadAsset > asset);
 	void reconnect();
 

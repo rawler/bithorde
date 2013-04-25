@@ -16,6 +16,8 @@
 
 #include "random.h"
 
+#include <boost/random/random_device.hpp>
+#include <stdexcept>
 #include <stdlib.h>
 #include <sys/time.h>
 #include <unistd.h>
@@ -61,3 +63,15 @@ std::string randomAlphaNumeric(size_t len)
 	return r.randomAlphaNumeric(len);
 }
 
+std::string secureRandomBytes(size_t len)
+{
+	if ((len % 4) != 0)
+		throw std::runtime_error("secureRandomBytes(len) must be requested for even multiples of four");
+	boost::random::random_device rng;
+	char* buf = static_cast<char*>(alloca(len));
+	uint32_t* proxy_buf = (uint32_t*)buf;
+	rng.generate(proxy_buf, proxy_buf+(len/4));
+	std::string res;
+	res.append(buf, len);
+	return res;
+}

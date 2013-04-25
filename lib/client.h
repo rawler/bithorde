@@ -46,8 +46,17 @@ private:
 	void onTimeout();
 };
 
+class CipherConfig;
 class Client
 {
+public:
+	enum State {
+		Connecting,    // No underlying connection (yet)
+		Connected,     // Connected, but has yet not said hello
+		AwaitingAuth,  // Has said hello, but is still waiting for HandShake or HandShakeConfirmed
+		Authenticated, // Authenticated and running
+	};
+private:
 	friend class AssetBinding;
 	friend class Asset;
 	friend class ReadAsset;
@@ -60,8 +69,11 @@ class Client
 	TimerService::Ptr _timerSvc;
 	Connection::Pointer _connection;
 
-	std::string _myName;
-	std::string _peerName;
+	State _state;
+
+	std::string _myName, _peerName;
+	std::string _key, _sentChallenge;
+	std::unique_ptr<CipherConfig> _sendCipher, _recvCipher;
 
 	AssetMap _assetMap;
 	std::map<int, Asset::Handle> _requestIdMap;
@@ -78,6 +90,10 @@ public:
 	}
 	virtual ~Client();
 
+	State state();
+
+	void setSecurity(const std::string& key, CipherType cipher);
+
 	/**
 	 * Tries to parse spec either as HOST:PORT, or as /absolute/socket/path and connect to it.
 	 */
@@ -86,6 +102,9 @@ public:
 	void connect(boost::asio::ip::tcp::endpoint& ep);
 	void connect(boost::asio::local::stream_protocol::endpoint& ep);
 	void connect(Connection::Pointer newConn);
+	void hookup(bithorde::Connection::Pointer newConn);
+
+	void close();
 
 	bool isConnected();
 	const std::string& peerName();
@@ -98,7 +117,11 @@ public:
 
 	bool sendMessage(bithorde::Connection::MessageType type, const google::protobuf::Message& msg, const bithorde::Message::Deadline& expires=Message::NEVER, bool prioritized=false);
 
-	boost::signals2::signal<void (std::string&)> authenticated;
+	/**
+	 * Signal to indicate authentication has been performed.
+	 * the second argument is the peerName. Empty peerName means authentication failed.
+	 */
+	boost::signals2::signal<void (Client&, const std::string&)> authenticated;
 	boost::signals2::signal<void ()> writable;
 	boost::signals2::signal<void ()> disconnected;
 
@@ -123,6 +146,7 @@ protected:
 	virtual void onMessage(const bithorde::HandShakeConfirmed & msg);
 	virtual void onMessage(const bithorde::Ping & msg);
 
+	virtual void setAuthenticated(const std::string peerName);
 private:
 	bool release(Asset & a);
 

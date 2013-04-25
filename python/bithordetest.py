@@ -19,6 +19,7 @@ class TestConnection:
         self.buf = ""
         if name:
             self.auth(name)
+
     def _connect(self, tgt):
         if isinstance(tgt, tuple):
             family = socket.AF_INET
@@ -28,7 +29,7 @@ class TestConnection:
 
     def send(self, msg):
         enc = encoder.MessageEncoder(MSG_REV_MAP[type(msg)], False, False)
-        enc(self._socket.send, msg)
+        enc(self.push, msg)
 
     def close(self):
         self._socket.close()
@@ -43,10 +44,16 @@ class TestConnection:
                 self.buf = self.buf[consumed:]
                 return msg
             except IndexError:
-                new = self._socket.recv(4096)
-                if not new:
-                    raise StopIteration
-                self.buf += new
+                self.buf += self.fetch()
+
+    def fetch(self):
+        new = self._socket.recv(128*1024)
+        if not new:
+            raise StopIteration
+        return new
+
+    def push(self, str):
+        self._socket.send(str)
 
     @classmethod
     def _matches(cls, msg, criteria):
@@ -68,15 +75,6 @@ class TestConnection:
     def auth(self, name="bhtest"):
         self.send(message.HandShake(name=name, protoversion=2))
         self.expect(message.HandShake)
-
-class TestServer:
-    def __init__(self, addr, name='bithorded-test'):
-        self.name = name
-        eventlet.serve(eventlet.listen(addr), self.run, concurrenct=1)
-    def run(self, socket, addr):
-        conn = TestConnection(socket, 'bithorded-test')
-        for msg in conn:
-            pass
 
 class BithordeD(Process):
     def __init__(self, label='bithorded', bithorded=os.environ.get('BITHORDED', 'bithorded'), config={}):
@@ -117,6 +115,8 @@ class BithordeD(Process):
                 break
         assert self.started
         eventlet.spawn(self._run)
+    def is_alive(self):
+        return self.popen4.poll() == -1
     def _run(self):
         for line in self.child_stdout_stderr:
             if self.label:

@@ -38,7 +38,7 @@ int BHUpload::main(const std::vector<std::string>& args) {
 	}
 
 	_client = Client::create(_ioSvc, optMyName);
-	_client->authenticated.connect(boost::bind(&BHUpload::onAuthenticated, this, _1));
+	_client->authenticated.connect(boost::bind(&BHUpload::onAuthenticated, this, _1, _2));
 	_client->connect(optConnectUrl);
 
 	_ioSvc.run();
@@ -141,7 +141,11 @@ bool BHUpload::tryWrite() {
 	}
 }
 
-void BHUpload::onAuthenticated(string& peerName) {
+void BHUpload::onAuthenticated(Client& c, const string& peerName) {
+	if (peerName.empty()) {
+		cerr << "Failed authentication" << endl;
+		_ioSvc.stop();
+	}
 	if (optDebug)
 		cerr << "DEBUG: Connected to " << peerName << endl;
 	nextAsset();

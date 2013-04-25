@@ -39,7 +39,7 @@ public:
 
 	int main(const std::vector<std::string>& args);
 private:
-	void onAuthenticated(std::string& peerName);
+	void onAuthenticated(bithorde::Client& c, const std::string& peerName);
 	void onStatusUpdate(const bithorde::AssetStatus&);
 	void onWritable();
 

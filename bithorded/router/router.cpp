@@ -40,14 +40,16 @@ namespace bithorded { namespace router {
 
 class bithorded::router::FriendConnector : public boost::enable_shared_from_this<bithorded::router::FriendConnector> {
 	Server& _server;
+	Config::Friend _f;
 	boost::shared_ptr<boost::asio::ip::tcp::socket> _socket;
 	boost::asio::ip::tcp::resolver _resolver;
 	boost::asio::deadline_timer _timer;
 	boost::asio::ip::tcp::resolver::query _q;
 	bool _cancelled;
 public:
-	FriendConnector(Server& server, const bithorded::Friend& cfg) :
+	FriendConnector(Server& server, const bithorded::Config::Friend& cfg) :
 		_server(server),
+		_f(cfg),
 		_socket(boost::make_shared<boost::asio::ip::tcp::socket>(server.ioService())),
 		_resolver(server.ioService()),
 		_timer(server.ioService()),
@@ -56,7 +58,7 @@ public:
 	{
 	}
 
-	static boost::shared_ptr<FriendConnector> create(Server& server, const bithorded::Friend& cfg) {
+	static boost::shared_ptr<FriendConnector> create(Server& server, const bithorded::Config::Friend& cfg) {
 		auto res = boost::make_shared<FriendConnector>(server, cfg);
 		res->start();
 		return res;
@@ -90,7 +92,7 @@ private:
 		if (error) {
 			scheduleRestart();
 		} else if (!_cancelled) {
-			_server.onTCPConnected(_socket);
+			_server.hookup(_socket, _f);
 			scheduleRestart(RECONNECT_INTERVAL * 2);
 		}
 	}
@@ -101,7 +103,7 @@ bithorded::router::Router::Router(Server& server)
 {
 }
 
-void bithorded::router::Router::addFriend(const bithorded::Friend& f)
+void bithorded::router::Router::addFriend(const bithorded::Config::Friend& f)
 {
 	_connectors[f.name] = FriendConnector::create(_server, f);
 	_friends[f.name] = f;

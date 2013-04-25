@@ -73,12 +73,13 @@ public:
 
 	boost::asio::io_service& ioService();
 	std::string name() { return _cfg.nodeName; }
+	const Config::Client& getClientConfig(const std::string& name);
 
 	IAsset::Ptr async_linkAsset(const boost::filesystem::path& filePath);
 	IAsset::Ptr async_findAsset(const bithorde::BindRead& req);
     IAsset::Ptr prepareUpload(uint64_t size);
 
-	void onTCPConnected(boost::shared_ptr<boost::asio::ip::tcp::socket>& socket);
+	void hookup(boost::shared_ptr< boost::asio::ip::tcp::socket >& socket, const Config::Client& client);
 
 	virtual void inspect(management::InfoList& target) const;
 private:

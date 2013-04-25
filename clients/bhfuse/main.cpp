@@ -115,7 +115,7 @@ BHFuse::BHFuse(asio::io_service& ioSvc, string bithorded, const BHFuseOptions& o
 	_ino_allocator(2)
 {
 	client = Client::create(ioSvc, "bhfuse");
-	client->authenticated.connect(boost::bind(&BHFuse::onConnected, this, _1));
+	client->authenticated.connect(boost::bind(&BHFuse::onConnected, this, _1, _2));
 	client->disconnected.connect(boost::bind(&BHFuse::reconnect, this));
 
 	client->connect(bithorded);
@@ -137,8 +137,13 @@ void BHFuse::reconnect()
 	ioSvc.stop();
 }
 
-void BHFuse::onConnected(std::string remoteName) {
-	(cout << "Connected to " << remoteName << endl).flush();
+void BHFuse::onConnected(bithorde::Client&, std::string remoteName) {
+	if (remoteName.empty()) {
+		(cerr << "Failed authentication" << endl).flush();
+		ioSvc.stop();
+	} else {
+		(cerr << "Connected to " << remoteName << endl).flush();
+	}
 }
 
 void BHFuse::fuse_init(fuse_conn_info* conn)

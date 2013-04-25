@@ -60,6 +60,7 @@ void Client::describe(management::Info& tgt) const
 		<< ", incoming: " << stats->incomingBitrateCurrent
 		<< ", outgoing: " << stats->outgoingBitrateCurrent;
 }
+
 void Client::inspect(management::InfoList& tgt) const
 {
 	tgt.append("incomingCurrent") << stats->incomingBitrateCurrent.autoScale() << ", " << stats->incomingMessagesCurrent.autoScale();
@@ -99,8 +100,13 @@ bool Client::requestsAsset(const BitHordeIds& ids) {
 
 void Client::onMessage(const bithorde::HandShake& msg)
 {
-	bithorde::Client::onMessage(msg);
+	if (state() == Connected) {
+		auto client_config = _server.getClientConfig(msg.name());
+		setSecurity(client_config.key, (bithorde::CipherType)client_config.cipher);
+		sayHello();
+	}
 	LOG4CPLUS_INFO(clientLogger, "Connected: " << msg.name());
+	bithorde::Client::onMessage(msg);
 }
 
 void Client::onMessage(const bithorde::BindWrite& msg)
@@ -195,6 +201,15 @@ void Client::onMessage(const bithorde::DataSegment& msg)
 	}
 
 	return;
+}
+
+void Client::setAuthenticated(const string peerName_)
+{
+	bithorde::Client::setAuthenticated(peerName_);
+	if (peerName_.empty()) {
+		LOG4CPLUS_WARN(clientLogger, peerName() << ": failed authentication");
+		close();
+	}
 }
 
 void Client::onReadResponse(const bithorde::Read::Request& req, int64_t offset, const std::string& data, bithorde::Message::Deadline t) {

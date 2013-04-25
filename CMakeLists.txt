@@ -63,7 +63,7 @@ ADD_DEFINITIONS(-D_FILE_OFFSET_BITS=64)
 set(Boost_USE_STATIC_LIBS        ON)
 set(Boost_USE_MULTITHREADED      ON)
 set(Boost_USE_STATIC_RUNTIME    OFF)
-find_package( Boost REQUIRED COMPONENTS chrono filesystem iostreams program_options signals system thread unit_test_framework )
+find_package( Boost REQUIRED COMPONENTS chrono filesystem iostreams program_options random signals system thread unit_test_framework )
 if(Boost_FOUND)
 	include_directories(${Boost_INCLUDE_DIRS})
 	find_library(Boost_LIBRARY_DEPENDENCIES rt)
@@ -125,8 +125,8 @@ ENDMACRO(ADD_TEST_SCRIPT)
 ADD_TEST_SCRIPT(RoundtripTest ${CMAKE_SOURCE_DIR}/tests/roundtrip/test_roundtrip.sh)
 ADD_TEST_SCRIPT(LinkSourceTest ${CMAKE_SOURCE_DIR}/tests/link_source/test_links.sh)
 ADD_TEST_SCRIPT(Proto_AssetTimeout ${CMAKE_SOURCE_DIR}/tests/proto/asset_timeout.py)
+ADD_TEST_SCRIPT(Proto_Encryption ${CMAKE_SOURCE_DIR}/tests/proto/encryption.py)
 ADD_TEST_SCRIPT(TestRandomReads ${CMAKE_SOURCE_DIR}/tests/test_random_reads.py)
-
 
 # CPack packaging
 INCLUDE(InstallRequiredSystemLibraries)
