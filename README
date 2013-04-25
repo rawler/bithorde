@@ -41,6 +41,11 @@ Build requirements (Ubuntu Package Names)
   libprotobuf-dev
   pkg-config
 
+Testing requirements (only required for running the test-suite)
+
+  python-crypto
+  python-eventlet
+
 With all dependencies installed, building should be as simple as:
 
 ::
@@ -48,5 +53,11 @@ With all dependencies installed, building should be as simple as:
   mkdir build && cd build
   cmake ..
   make
+
+The test-suite can be run from the build-directory using ctest:
+
+::
+
+  ctest
 
 Good Luck, and don't hesitate to ask around if you encounter problems.
