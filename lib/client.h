@@ -51,10 +51,12 @@ class Client
 {
 public:
 	enum State {
-		Connecting,    // No underlying connection (yet)
-		Connected,     // Connected, but has yet not said hello
-		AwaitingAuth,  // Has said hello, but is still waiting for HandShake or HandShakeConfirmed
-		Authenticated, // Authenticated and running
+		Connecting    = 0x00,
+		Connected     = 0x01,
+		SaidHello     = 0x02,
+		SentAuth      = 0x04,
+		GotAuth       = 0x08,
+		Authenticated = Connected|SaidHello|SentAuth|GotAuth,
 	};
 private:
 	friend class AssetBinding;
@@ -91,7 +93,6 @@ public:
 	virtual ~Client();
 
 	State state();
-
 	void setSecurity(const std::string& key, CipherType cipher);
 
 	/**
@@ -146,6 +147,7 @@ protected:
 	virtual void onMessage(const bithorde::HandShakeConfirmed & msg);
 	virtual void onMessage(const bithorde::Ping & msg);
 
+	virtual void addStateFlag(State s);
 	virtual void setAuthenticated(const std::string peerName);
 private:
 	bool release(Asset & a);

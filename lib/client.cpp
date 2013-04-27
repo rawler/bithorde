@@ -113,7 +113,7 @@ Client::State Client::state()
 
 void Client::setSecurity(const string& key, CipherType cipher)
 {
-	if ((_state != Connecting) && (_state != Connected))
+	if (_state & (SaidHello | SentAuth | GotAuth) )
 		throw std::runtime_error("Client were in wrong state for setSecurity");
 	_key = key;
 	_sendCipher.reset(new CipherConfig(cipher, secureRandomBytes(key.size())));
@@ -123,7 +123,7 @@ void Client::hookup(Connection::Pointer newConn)
 {
 	BOOST_ASSERT(!_connection);
 	BOOST_ASSERT(_state == Connecting);
-	_state = Connected;
+	addStateFlag(Connected);
 
 	stats = newConn->stats();
 
@@ -176,6 +176,7 @@ void Client::close()
 
 void Client::onDisconnected() {
 	_connection.reset();
+	_state = Connecting;
 	for (auto iter=_assetMap.begin(); iter != _assetMap.end();) {
 		auto current = iter++;
 		if (auto binding = current->second) {
@@ -217,8 +218,8 @@ bool Client::sendMessage(Connection::MessageType type, const google::protobuf::M
 }
 
 void Client::sayHello() {
-	if (_state != Connected)
-		throw std::runtime_error("Client were in wrong state for sayHello");
+	if (_state & SaidHello)
+		throw std::runtime_error("Already sent HandShake");
 	bithorde::HandShake h;
 	h.set_protoversion(2);
 	h.set_name(_myName);
@@ -228,23 +229,13 @@ void Client::sayHello() {
 		h.set_challenge(_sentChallenge);
 	}
 	sendMessage(Connection::MessageType::HandShake, h);
-	_state = State::AwaitingAuth;
+	addStateFlag(SaidHello);
 }
 
 void Client::onIncomingMessage(Connection::MessageType type, ::google::protobuf::Message& msg)
 {
-	switch (_state) {
-	case Connecting: break;
-	case Connected: switch (type) {
-		case Connection::MessageType::HandShake: return onMessage((bithorde::HandShake&) msg);
-		default: break;
-	} break;
-	case AwaitingAuth: switch (type) {
-		case Connection::MessageType::HandShake: return onMessage((bithorde::HandShake&) msg);
-		case Connection::MessageType::HandShakeConfirmed: return onMessage((bithorde::HandShakeConfirmed&) msg);
-		default: break;
-	} break;
-	case Authenticated: switch (type) {
+	if (_state == Authenticated) {
+		switch (type) {
 		case Connection::MessageType::BindRead: return onMessage((bithorde::BindRead&) msg);
 		case Connection::MessageType::AssetStatus: return onMessage((bithorde::AssetStatus&) msg);
 		case Connection::MessageType::ReadRequest: return onMessage((bithorde::Read::Request&) msg);
@@ -253,7 +244,13 @@ void Client::onIncomingMessage(Connection::MessageType type, ::google::protobuf:
 		case Connection::MessageType::DataSegment: return onMessage((bithorde::DataSegment&) msg);
 		case Connection::MessageType::Ping: return onMessage((bithorde::Ping&) msg);
 		default: break;
-	} break;
+		}
+	} else {
+		switch (type) {
+		case Connection::MessageType::HandShake: return onMessage((bithorde::HandShake&) msg);
+		case Connection::MessageType::HandShakeConfirmed: return onMessage((bithorde::HandShakeConfirmed&) msg);
+		default: break;
+		}
 	}
 	cerr << "ERROR: BitHorde State Error (" << _state << "," << type << "), Disconnecting" << endl;
 	_connection->close();
@@ -261,6 +258,7 @@ void Client::onIncomingMessage(Connection::MessageType type, ::google::protobuf:
 
 void Client::onMessage(const bithorde::HandShake &msg)
 {
+	BOOST_ASSERT(_state & SaidHello);
 	if (msg.protoversion() >= 2) {
 		_protoVersion = 2;
 	} else {
@@ -295,11 +293,20 @@ void Client::onMessage(const bithorde::HandShake &msg)
 			}
 			auth.set_authentication(digest_, digest.DigestSize());
 			sendMessage(Connection::MessageType::HandShakeConfirmed, auth);
+			addStateFlag(SentAuth);
 		}
+	} else {
+		addStateFlag(SentAuth);
 	}
-	if (_sentChallenge.empty()) {
+	if (_sentChallenge.empty())
+		addStateFlag(GotAuth);
+}
+
+void Client::addStateFlag(Client::State s)
+{
+	_state = (State)(_state | s);
+	if (_state == Authenticated)
 		setAuthenticated(_peerName);
-	}
 }
 
 void Client::setAuthenticated(const std::string peerName)
@@ -309,7 +316,6 @@ void Client::setAuthenticated(const std::string peerName)
 			_connection->setEncryption(_sendCipher->type, _key, _sendCipher->iv);
 		if (_recvCipher)
 			_connection->setDecryption(_recvCipher->type, _key, _recvCipher->iv);
-		_state = State::Authenticated;
 		for (auto iter = _assetMap.begin(); iter != _assetMap.end(); iter++) {
 			auto binding = iter->second;
 			BOOST_ASSERT(binding && binding->readAsset());
@@ -396,7 +402,7 @@ void Client::onMessage(const bithorde::HandShakeConfirmed & msg) {
 	    && digest.Verify((const byte*)msg.authentication().data())) {
 		if (msg.has_cipher() && msg.cipher() != bithorde::CLEARTEXT)
 			_recvCipher.reset(new CipherConfig(msg.cipher(), msg.cipheriv()));
-		setAuthenticated(_peerName);
+		addStateFlag(GotAuth);
 	} else {
 		setAuthenticated("");
 	}

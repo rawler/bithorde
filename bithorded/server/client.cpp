@@ -100,7 +100,7 @@ bool Client::requestsAsset(const BitHordeIds& ids) {
 
 void Client::onMessage(const bithorde::HandShake& msg)
 {
-	if (state() == Connected) {
+	if (!(state() & SaidHello)) {
 		auto client_config = _server.getClientConfig(msg.name());
 		setSecurity(client_config.key, (bithorde::CipherType)client_config.cipher);
 		sayHello();
