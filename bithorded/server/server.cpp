@@ -137,7 +137,7 @@ void Server::hookup ( boost::shared_ptr< asio::ip::tcp::socket >& socket, const 
 	if (client.name.empty())
 		c->hookup(conn);
 	else
-		c->connect(conn);
+		c->connect(conn, client.name);
 	clientConnected(c);
 }
 

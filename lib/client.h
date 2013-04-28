@@ -98,11 +98,11 @@ public:
 	/**
 	 * Tries to parse spec either as HOST:PORT, or as /absolute/socket/path and connect to it.
 	 */
-	void connect(std::string spec);
+	void connect(const std::string& spec);
 
 	void connect(boost::asio::ip::tcp::endpoint& ep);
 	void connect(boost::asio::local::stream_protocol::endpoint& ep);
-	void connect(Connection::Pointer newConn);
+	void connect(Connection::Pointer newConn, const std::string& expectedPeer="");
 	void hookup(bithorde::Connection::Pointer newConn);
 
 	void close();

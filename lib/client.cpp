@@ -135,7 +135,8 @@ void Client::hookup(Connection::Pointer newConn)
 	_disconnectedConnection = _connection->disconnected.connect(Connection::VoidSignal::slot_type(&Client::onDisconnected, this));
 }
 
-void Client::connect(Connection::Pointer newConn) {
+void Client::connect(Connection::Pointer newConn, const std::string& expectedPeer) {
+	_peerName = expectedPeer;
 	hookup(newConn);
 	sayHello();
 }
@@ -150,7 +151,7 @@ void Client::connect(asio::local::stream_protocol::endpoint& ep) {
 	connect(Connection::create(_ioSvc, stats, ep));
 }
 
-void Client::connect(string spec) {
+void Client::connect(const string& spec) {
 	vector<string> host_port;
 	if (spec[0] == '/') {
 		asio::local::stream_protocol::endpoint ep(spec);
@@ -263,18 +264,20 @@ void Client::onMessage(const bithorde::HandShake &msg)
 		_protoVersion = 2;
 	} else {
 		cerr << "Only Protocol-version 2 or higher supported" << endl;
-		_connection->close();
-		_connection.reset();
-		return;
+		return close();
 	}
 
-	_peerName = msg.name();
+	if (_peerName.empty()) {
+		_peerName = msg.name();
+	} else if (_peerName != msg.name()) {
+		cerr << "Error: Expected " << _peerName << " but was greeted by " << msg.name() << endl;
+		return close();
+	}
 
 	if (msg.has_challenge()) {
 		if (_key.empty()) {
 			cerr << "Challenged from " << msg.name() << " without known key." << endl;
-			_connection->close();
-			return;
+			return close();
 		} else {
 			auto cipher = (byte)(_sendCipher ? _sendCipher->type : bithorde::CLEARTEXT);
 			string cipheriv(_sendCipher ? _sendCipher->iv : "");
