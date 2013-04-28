@@ -105,8 +105,9 @@ bithorded::router::Router::Router(Server& server)
 
 void bithorded::router::Router::addFriend(const bithorded::Config::Friend& f)
 {
-	_connectors[f.name] = FriendConnector::create(_server, f);
 	_friends[f.name] = f;
+	if (f.port && !_connectors.count(f.name))
+		_connectors[f.name] = FriendConnector::create(_server, f);
 }
 
 size_t Router::friends() const
@@ -134,7 +135,10 @@ void Router::onConnected(const bithorded::Client::Ptr& client )
 void Router::onDisconnected(const bithorded::Client::Ptr& client)
 {
 	string peerName = client->peerName();
-	if (_connectedFriends.erase(peerName))
+	auto iter = _connectedFriends.find(peerName);
+	if ((iter != _connectedFriends.end()) && (iter->second == client))
+		_connectedFriends.erase(iter);
+	if (_friends.count(peerName) && _friends[peerName].port && !_connectors.count(peerName))
 		_connectors[peerName] = FriendConnector::create(_server, _friends[peerName]);
 }
 

@@ -104,8 +104,12 @@ public:
 
 bithorded::Config::Client::Client() :
 	name(), cipher(CLEARTEXT), key()
-{
-}
+{}
+
+bithorded::Config::Friend::Friend() :
+	addr(), port(0)
+{}
+
 
 void read_client(const OptionGroup& options, bithorded::Config::Client& c) {
 	c.name = options.name();
@@ -196,13 +200,16 @@ bithorded::Config::Config(int argc, char* argv[])
 	for (auto opt=friend_opts.begin(); opt != friend_opts.end(); opt++) {
 		Friend f;
 		read_client(*opt, f);
-		string addr = (*opt)["addr"].as<string>();
-		size_t colpos = addr.rfind(':');
-		f.addr = addr.substr(0, colpos);
-		if (colpos == string::npos)
-			f.port = 1337;
-		else
-			f.port = boost::lexical_cast<ushort>(addr.substr(colpos+1));
+		auto opt_addr = (*opt)["addr"];
+		if (!opt_addr.empty()) {
+			string addr = opt_addr.as<string>();
+			size_t colpos = addr.rfind(':');
+			f.addr = addr.substr(0, colpos);
+			if (colpos == string::npos)
+				f.port = 1337;
+			else
+				f.port = boost::lexical_cast<ushort>(addr.substr(colpos+1));
+		}
 		friends.push_back(f);
 	}
 

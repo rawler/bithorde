@@ -58,6 +58,7 @@ struct Config
 	};
 
 	struct Friend : public Client {
+		Friend();
 		std::string addr;
 		ushort port;
 	};
