@@ -254,7 +254,7 @@ void Client::onIncomingMessage(Connection::MessageType type, ::google::protobuf:
 		}
 	}
 	cerr << "ERROR: BitHorde State Error (" << _state << "," << type << "), Disconnecting" << endl;
-	_connection->close();
+	close();
 }
 
 void Client::onMessage(const bithorde::HandShake &msg)
@@ -393,7 +393,7 @@ void Client::onMessage(const bithorde::BindWrite & msg) {
 }
 void Client::onMessage(const bithorde::DataSegment & msg) {
 	cerr << "unsupported: handling DataSegment-pushes" << endl;
-	_connection->close();
+	close();
 }
 void Client::onMessage(const bithorde::HandShakeConfirmed & msg) {
 	CryptoPP::HMAC<CryptoPP::SHA256> digest((const byte*)_key.data(), _key.size());
