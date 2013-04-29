@@ -59,7 +59,8 @@ void TimerService::invoke(boost::system::error_code ec)
 	auto iter = _timers.begin();
 	while (iter != _timers.end() && iter->first <= now) {
 		iter->second->invoke(iter->first, now);
-		_timers.erase(iter++);
+		_timers.erase(iter);
+		iter = _timers.begin();
 	}
 	enable();
 }
