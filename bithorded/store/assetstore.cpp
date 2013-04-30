@@ -44,6 +44,7 @@ namespace bithorded {
 }
 
 AssetStore::AssetStore(const boost::filesystem::path& baseDir) :
+	_baseFolder(baseDir),
 	_assetsFolder(baseDir.empty() ? fs::path() : (baseDir/ASSETS_DIR)),
 	_tigerFolder(baseDir.empty() ? fs::path() : (baseDir/TIGER_DIR))
 {
@@ -163,6 +164,8 @@ boost::filesystem::directory_iterator AssetStore::assetIterator() const
 
 uintmax_t AssetStore::size() const
 {
+	if (_baseFolder.empty())
+		return 0;
 	uintmax_t res(0);
 	fs::directory_iterator end;
 	for (auto iter=assetIterator(); iter != end; iter++) {

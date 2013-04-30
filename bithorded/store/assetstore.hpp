@@ -31,6 +31,7 @@ class StoredAsset;
 
 class AssetStore : public AssetSessions
 {
+	boost::filesystem::path _baseFolder;
 	boost::filesystem::path _assetsFolder;
 	boost::filesystem::path _tigerFolder;
 public:
