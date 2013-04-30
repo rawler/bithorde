@@ -13,10 +13,14 @@
 #include <crypto++/sha.h>
 
 #include "random.h"
+#include "weak_fn.hpp"
 
 const static boost::posix_time::millisec DEFAULT_ASSET_TIMEOUT(1500);
 const static boost::posix_time::millisec CLOSE_TIMEOUT(300);
 const static int MAX_ASSETS(1024);
+
+const static boost::posix_time::seconds MINIMUM_PACKET_INTERVAL(90);
+const static boost::posix_time::seconds MAX_PING_RESPONSE_TIME(5);
 
 using namespace std;
 namespace asio = boost::asio;
@@ -31,6 +35,38 @@ struct CipherConfig {
 
 	CipherConfig(CipherType type, const string& iv) :
 		type(type), iv(iv) {}
+};
+
+class ClientKeepalive {
+	Client& _client; // We are fully owned by client, so references to client should always be intact
+	Timer _timer;
+	bool _stale;
+public:
+	ClientKeepalive(Client& client) :
+		_client(client), _timer(*client.timerService(), boost::bind(&ClientKeepalive::run, this)), _stale(false)
+	{
+		reset();
+	}
+
+	void reset() {
+		_stale = false;
+		_timer.clear();
+		_timer.arm(MINIMUM_PACKET_INTERVAL);
+	}
+
+	void run() {
+		if (_stale) {
+			cerr << "WARNING: " << _client.peerName() << " did not respond to ping. Disconnecting..." << endl;
+			return _client.close();
+		} else {
+			Ping ping;
+			ping.set_timeout(MAX_PING_RESPONSE_TIME.total_milliseconds());
+			_client.sendMessage(Connection::Ping, ping);
+			_stale = true;
+			_timer.clear();
+			_timer.arm(MAX_PING_RESPONSE_TIME * 1.5);
+		}
+	}
 };
 }
 
@@ -111,6 +147,11 @@ Client::State Client::state()
 	return _state;
 }
 
+const TimerService::Ptr& Client::timerService()
+{
+	return _timerSvc;
+}
+
 void Client::setSecurity(const string& key, CipherType cipher)
 {
 	if (_state & (SaidHello | SentAuth | GotAuth) )
@@ -173,6 +214,7 @@ void Client::close()
 {
 	if (_connection)
 		_connection->close();
+	_keepAlive.reset();
 }
 
 void Client::onDisconnected() {
@@ -236,6 +278,8 @@ void Client::sayHello() {
 void Client::onIncomingMessage(Connection::MessageType type, ::google::protobuf::Message& msg)
 {
 	if (_state == Authenticated) {
+		if (_keepAlive)
+			_keepAlive->reset();
 		switch (type) {
 		case Connection::MessageType::BindRead: return onMessage((bithorde::BindRead&) msg);
 		case Connection::MessageType::AssetStatus: return onMessage((bithorde::AssetStatus&) msg);
@@ -325,6 +369,7 @@ void Client::setAuthenticated(const std::string peerName)
 			binding->setTimer(DEFAULT_ASSET_TIMEOUT);
 			informBound(*iter->second, rand64(), DEFAULT_ASSET_TIMEOUT.total_milliseconds());
 		}
+		_keepAlive.reset(new ClientKeepalive(*this));
 	}
 	authenticated(*this, peerName);
 }
@@ -411,8 +456,11 @@ void Client::onMessage(const bithorde::HandShakeConfirmed & msg) {
 	}
 }
 void Client::onMessage(const bithorde::Ping & msg) {
-	bithorde::Ping reply;
-	sendMessage(Connection::MessageType::Ping, reply, Message::NEVER, false);
+	if (msg.timeout()) {
+		bithorde::Ping reply;
+		auto deadline =  boost::chrono::steady_clock::now() + boost::chrono::milliseconds(msg.timeout());
+		sendMessage(Connection::MessageType::Ping, reply, deadline, false);
+	}
 }
 
 bool Client::bind(ReadAsset &asset) {
