@@ -1,7 +1,7 @@
 Source: bithorde
 Section: net
 Priority: extra
-Maintainer: Ulrik Mikaelsson <ulrik.mikaelsson@gmail.com>
+Maintainer: Adam Palmblad <adam.palmblad@gmail.com>
 Build-Depends: debhelper (>= 7), cmake, libtango-ldc-dev, ldc, libfuse-dev,
                protobuf-compiler, python-protobuf, libprotobuf-dev
 Standards-Version: 3.8.3
