@@ -156,7 +156,7 @@ bithorded::Config::Config(int argc, char* argv[])
 
 	po::options_description cache_options("Cache Options");
 	cache_options.add_options()
-		("cache.dir", po::value<string>(&cacheDir)->default_value("/var/cache/bithorde"),
+		("cache.dir", po::value<string>(&cacheDir)->default_value(""),
 			"Directory for the cache. Set to empty to disable.")
 		("cache.size", po::value<int>(&cacheSizeMB)->default_value(1024),
 			"Max size of the cache, in MB.")

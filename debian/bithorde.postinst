@@ -1,12 +1,12 @@
 #!/bin/bash
 
 # Add bithorde account to system
-useradd -r -M -d /var/cache/bithorde -g nogroup bithorde 2>/dev/null
+useradd -r -M -d /var/lib/bithorde -g nogroup bithorde 2>/dev/null
 
 # Chown cache-dir using dpkg-statoverride
-dpkg-statoverride --update --add bithorde nogroup 0700 /var/cache/bithorde 2>/dev/null
-chown -R bithorde:users /var/cache/bithorde 2>/dev/null
-chmod -R 0700 /var/cache/bithorde 2>/dev/null
+dpkg-statoverride --update --add bithorde nogroup 0700 /var/lib/bithorde 2>/dev/null
+chown -R bithorde:users /var/lib/bithorde 2>/dev/null
+chmod -R 0700 /var/lib/bithorde 2>/dev/null
 
 if [ "$1" == configure ]; then
   if [ -z "$2" ]; then
