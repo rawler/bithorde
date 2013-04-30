@@ -38,8 +38,9 @@ public:
 	CacheManager(boost::asio::io_service& ioSvc, bithorded::router::Router& router, const boost::filesystem::path& baseDir, intmax_t size);
 
 	virtual void describe(management::Info& target) const;
-
 	virtual void inspect(management::InfoList& target) const;
+
+	bool enabled() const { return !_baseDir.empty(); }
 
 	/**
 	 * Add an asset to the idx, allocating space for
