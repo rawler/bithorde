@@ -171,20 +171,16 @@ void MessageQueue::enqueue(Message* msg)
 
 std::vector< const Message* > MessageQueue::dequeue(size_t bytes_per_sec, ushort millis)
 {
-	if (bytes_per_sec < 128*K)
-		bytes_per_sec = 128*K;
-	size_t bytes(((bytes_per_sec*millis)/1000)+1), dequeued(0);
+	bytes_per_sec = std::max(bytes_per_sec, 1*K);
+	std::size_t bytes(((bytes_per_sec*millis)/1000)+1), target_size((_size <= bytes) ? 0 : _size - bytes);
 	auto now = chrono::steady_clock::now();
 	std::vector<const Message*> res;
 	res.reserve(_size);
-	while (dequeued < bytes && !_queue.empty()) {
-		auto next = _queue.front();
+	while ((_size > target_size) && !_queue.empty()) {
+		Message* next = _queue.front();
 		_queue.pop_front();
-		auto size = next->buf.size();
-		_size -= size;
-		auto prospect_bytes = dequeued + size;
-		auto prospect_time = now + boost::chrono::milliseconds(prospect_bytes / (bytes_per_sec * 1000));
-		if (prospect_time < next->expires)
+		_size -= next->buf.size();
+		if (now < next->expires)
 			res.push_back(next);
 	}
 	return res;
