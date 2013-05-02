@@ -150,6 +150,8 @@ bithorded::Config::Config(int argc, char* argv[])
 			"HTTP port to serve up inspection interface on")
 		("server.unixSocket", po::value<string>(&unixSocket)->default_value("/tmp/bithorde"),
 			"Path to UNIX-socket to listen on")
+		("server.unixPerms", po::value<string>(&unixPerms)->default_value("0666"),
+			"Permissions for the created UNIX-socket.")
 	;
 
 	po::options_description cache_options("Cache Options");

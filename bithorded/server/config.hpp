@@ -76,6 +76,7 @@ struct Config
 
 	uint16_t tcpPort;
 	std::string unixSocket;
+	std::string unixPerms;
 	uint16_t inspectPort;
 
 	std::vector<Source> sources;

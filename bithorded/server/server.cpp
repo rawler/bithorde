@@ -92,11 +92,15 @@ Server::Server(asio::io_service& ioSvc, Config& cfg) :
 	if (!_cfg.unixSocket.empty()) {
 		if (fs::exists(_cfg.unixSocket))
 			fs::remove(_cfg.unixSocket);
+		long permissions = strtol(_cfg.unixPerms.c_str(), NULL, 0);
+		if (!permissions)
+			throw std::runtime_error("Failed to parse permissions for UNIX-socket");
 		auto localPort = asio::local::stream_protocol::endpoint(_cfg.unixSocket);
 		_localListener.open(localPort.protocol());
 		_localListener.set_option(boost::asio::local::stream_protocol::acceptor::reuse_address(true));
 		_localListener.bind(localPort);
 		_localListener.listen(4);
+		fs::permissions(localPort.path(), (fs::perms)permissions);
 		LOG4CPLUS_INFO(serverLog, "Listening on local socket " << localPort);
 
 		waitForLocalConnection();
