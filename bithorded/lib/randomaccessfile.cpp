@@ -46,10 +46,6 @@ RandomAccessFile::~RandomAccessFile()
 
 void RandomAccessFile::open(const boost::filesystem::path& path, RandomAccessFile::Mode mode, uint64_t size)
 {
-	if (!size)
-		size = fs::file_size(path);
-	_path = path;
-	_size = size;
 	int m;
 	switch (mode) {
 		case READ: m = O_RDONLY; break;
@@ -57,21 +53,29 @@ void RandomAccessFile::open(const boost::filesystem::path& path, RandomAccessFil
 		case READWRITE: m = O_RDWR|O_CREAT; break;
 		default: throw std::ios_base::failure("Unknown open-mode");
 	}
-	if (size > 0 && fs::exists(_path) && fs::file_size(_path) != size) {
-		ostringstream buf;
-		buf << path << " exists with mismatching size, (" << size << " : " << fs::file_size(_path) << ")";
-		throw bsys::system_error(bsys::errc::make_error_code(bsys::errc::file_exists), buf.str());
+	_size = fs::exists(path) ? fs::file_size(path) : 0;
+
+	if (_size != size) {
+		if (size == 0) {
+			size = _size;
+		} else if (_size != 0) {
+			ostringstream buf;
+			buf << path << " exists with mismatching size, (" << size << " : " << fs::file_size(path) << ")";
+			throw bsys::system_error(bsys::errc::make_error_code(bsys::errc::file_exists), buf.str());
+		}
 	}
 
 	_fd = ::open(path.c_str(), m, S_IRUSR|S_IWUSR);
 	if (_fd < 0) {
 		throw bsys::system_error(bsys::errc::make_error_code(static_cast<bsys::errc::errc_t>(errno)), "Failed opening "+path.string());
-	} else if ((size > 0) && (mode & WRITE) && (ftruncate(_fd, size) == -1)) {
+	} else if ((_size == 0) && (ftruncate(_fd, size) == -1)) {
 		::close(_fd);
 		ostringstream buf;
 		buf << "Failed truncating " << path.string() << " to " << size;
 		throw bsys::system_error(bsys::errc::make_error_code(static_cast<bsys::errc::errc_t>(errno)), buf.str());
 	}
+	_path = path;
+	_size = size;
 }
 
 void RandomAccessFile::close()
