@@ -120,6 +120,8 @@ bool BHGet::queueAsset(const std::string& _uri) {
 
 void BHGet::nextAsset() {
 	if (_asset) {
+		_asset->statusUpdate.disconnect(boost::bind(&BHGet::onStatusUpdate, this, _1));
+		_asset->dataArrived.disconnect(boost::bind(&BHGet::onDataChunk, this, _1, _2, _3));
 		_asset->close();
 		_asset.reset();
 	}
