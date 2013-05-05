@@ -116,6 +116,8 @@ void bithorded::router::ForwardedAsset::async_read(uint64_t offset, size_t& size
 	uint32_t current_best = 1000*60*60*24;
 	for (auto iter = _upstream.begin(); iter != _upstream.end(); iter++) {
 		auto& a = iter->second;
+		if (a->status != bithorde::SUCCESS)
+			continue;
 		if (current_best > a->readResponseTime.value()) {
 			current_best = a->readResponseTime.value();
 			chosen = iter;
