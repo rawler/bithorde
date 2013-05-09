@@ -46,6 +46,8 @@ size_t bithorded::cache::CachedAsset::write(uint64_t offset, const std::string& 
 bithorded::cache::CachingAsset::CachingAsset(bithorded::cache::CacheManager& mgr, bithorded::router::ForwardedAsset::Ptr upstream, bithorded::cache::CachedAsset::Ptr cached)
 	: _manager(mgr), _upstream(upstream), _cached(cached), _delayedCreation(false)
 {
+	if (_upstream)
+		setStatus(_upstream->status);
 	_upstream->statusChange.connect(boost::bind(&CachingAsset::upstreamStatusChange, this, _1));
 }
 

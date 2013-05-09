@@ -1,4 +1,4 @@
-import atexit, os, socket, sys, types
+import atexit, base64, os, shutil, socket, sys, types
 from time import time
 
 from bithorde import decodeMessage, encoder, MSG_REV_MAP, message
@@ -128,6 +128,22 @@ class BithordeD(Process):
             if line.find(crit) >= 0:
                 return True
         assert False, "%s: did not find expected '%s'" % (self.label, crit)
+
+class TestFolder(object):
+    def __init__(self, path="test-cache"):
+        self.path = path
+        if self.path:
+            shutil.rmtree(path, ignore_errors=True)
+    def __str__(self):
+        return self.path
+
+class Cache(TestFolder):
+    pass
+
+def TigerId(base32):
+    padding = (((len(base32)+7)/8)*8 - len(base32))
+    base32 = base32 + '='*padding # Pad up to even multiple of 8
+    return message.Identifier(type=message.TREE_TIGER, id=base64.b32decode(base32))
 
 if __name__ == '__main__':
     from os import path
