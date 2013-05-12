@@ -60,6 +60,8 @@ class TestConnection:
         if isinstance(criteria, type):
             return isinstance(msg, criteria)
         elif isinstance(criteria, message.message.Message):
+            if not isinstance(msg, type(criteria)):
+                return False
             for field, value in criteria.ListFields():
                 if getattr(msg, field.name) != value:
                     return False

@@ -87,6 +87,10 @@ void Client::inspect(management::InfoList& tgt) const
 }
 
 bool Client::requestsAsset(const BitHordeIds& ids) {
+	for (auto iter=_opening.begin(); iter!=_opening.end(); iter++) {
+		if (idsOverlap(*iter, ids))
+			return true;
+	}
 	for (auto iter=_assets.begin(); iter!=_assets.end(); iter++) {
 		auto asset = *iter;
 		if (asset) {
@@ -152,7 +156,10 @@ void Client::onMessage(bithorde::BindRead& msg)
 			msg.set_uuid(rand64());
 
 		try {
+			_opening.push_front(msg.ids());
+			auto iter = _opening.begin();
 			auto asset = _server.async_findAsset(msg);
+			_opening.erase(iter);
 			if (asset)
 				assignAsset(h, asset);
 			else
