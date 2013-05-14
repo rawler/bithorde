@@ -12,7 +12,7 @@
 #include <boost/filesystem/path.hpp>
 #include <boost/signals2.hpp>
 #include <boost/shared_ptr.hpp>
-#include <boost/smart_ptr/enable_shared_from_this2.hpp>
+#include <boost/smart_ptr/enable_shared_from_this.hpp>
 
 #include "bithorde.pb.h"
 #include "counter.h"
@@ -71,7 +71,7 @@ static boost::arg<2> ASSET_ARG_DATA;
 static boost::arg<3> ASSET_ARG_TAG;
 
 class ReadAsset;
-class ReadRequestContext : public bithorde::Read_Request, public boost::enable_shared_from_this2<ReadRequestContext> {
+class ReadRequestContext : public bithorde::Read_Request, public boost::enable_shared_from_this<ReadRequestContext> {
 	ReadAsset* _asset;
 	Asset::ClientPointer _client;
 	boost::asio::deadline_timer _timer;
