@@ -239,7 +239,7 @@ void Client::onDisconnected() {
 
 bool Client::isConnected()
 {
-	return _connection;
+	return _connection.get();
 }
 
 const std::string& Client::peerName()
