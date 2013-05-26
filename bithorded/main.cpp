@@ -6,6 +6,7 @@
 
 #include <crypto++/files.h>
 #include <log4cplus/configurator.h>
+#include <log4cplus/hierarchy.h>
 
 #include "buildconf.hpp"
 #include "lib/hashes.h"
