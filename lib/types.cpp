@@ -1,5 +1,9 @@
 #include "types.h"
 
+#include <stdexcept>
+#include <stdlib.h>
+#include <string.h>
+
 Buffer::Buffer()
 {
 	ptr = 0;

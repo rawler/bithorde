@@ -1,10 +1,7 @@
 #ifndef BITHORDE_TYPES_H
 #define BITHORDE_TYPES_H
 
-#include <stdexcept>
-#include <stdlib.h>
-#include <string.h>
-#include <vector>
+#include <sys/types.h>
 
 typedef unsigned char byte;
 
