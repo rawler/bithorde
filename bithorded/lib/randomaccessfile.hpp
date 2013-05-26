@@ -60,7 +60,7 @@ public:
 	/**
 	 * The number of blocks of /blockSize/ required to hold all file content
 	 */
-	uint blocks(size_t blockSize) const;
+	uint32_t blocks(size_t blockSize) const;
 
 	/**
 	 * Reads up to /size/ bytes from file and returns a pointer to the data.

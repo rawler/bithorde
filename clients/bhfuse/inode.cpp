@@ -6,11 +6,11 @@
 
 #include <lib/client.h>
 
-static const uint ATTR_TIMEOUT = 2;
-static const uint INODE_TIMEOUT = 4;
-static const uint REBIND_INTERVAL_MS = 1000;
-static const uint REBIND_RETRIES = 5;
-static const uint READ_RETRIES = 5;
+static const uint32_t ATTR_TIMEOUT = 2;
+static const uint32_t INODE_TIMEOUT = 4;
+static const uint32_t REBIND_INTERVAL_MS = 1000;
+static const uint32_t REBIND_RETRIES = 5;
+static const uint32_t READ_RETRIES = 5;
 
 using namespace std;
 namespace asio = boost::asio;

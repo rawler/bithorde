@@ -60,7 +60,7 @@ bithorded::store::TigerNode::~TigerNode()
 	_metaFile.write(_offset, *this);
 }
 
-AssetMeta::AssetMeta(const boost::filesystem::path& path, uint leafBlocks)
+AssetMeta::AssetMeta(const boost::filesystem::path& path, uint32_t leafBlocks)
 	: _leafBlocks(leafBlocks), _nodes_offset(sizeof(Header))
 {
 	uint64_t expectedSize = _nodes_offset + treesize(leafBlocks)*sizeof(TigerBaseNode);

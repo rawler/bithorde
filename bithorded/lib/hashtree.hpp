@@ -71,7 +71,7 @@ public:
 		return _store[TREE_ROOT_NODE];
 	}
 
-	void setData(uint offset, const byte* input, size_t length) {
+	void setData(uint32_t offset, const byte* input, size_t length) {
 		BOOST_ASSERT((length == BLOCKSIZE) || (offset == (_leaves-1)));
 		NodeIdx currentIdx = _store.leaf(offset);
 		NodePtr current = _store[currentIdx];
@@ -106,7 +106,7 @@ public:
 		}
 	}
 
-	bool isBlockSet(uint idx) {
+	bool isBlockSet(uint32_t idx) {
 		NodeIdx block = _store.leaf(idx);
 		if (idx >= _leaves)
 			return false;
@@ -130,7 +130,7 @@ private:
 
 	TreeStore< Node, BackingStore > _store;
 	HashAlgorithm _hasher;
-	uint _leaves;
+	uint32_t _leaves;
 };
 
 #endif // BITHORDED_HASHTREE_H

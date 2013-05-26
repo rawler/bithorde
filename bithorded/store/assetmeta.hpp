@@ -52,7 +52,7 @@ class AssetMeta {
 	uint64_t _file_size;
 public:
 	typedef typename boost::shared_ptr<TigerNode> NodePtr;
-	AssetMeta(const boost::filesystem::path& path, uint leafBlocks);
+	AssetMeta(const boost::filesystem::path& path, uint32_t leafBlocks);
 
 	NodePtr operator[](const std::size_t offset);
 	size_t size();

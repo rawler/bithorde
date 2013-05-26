@@ -59,8 +59,8 @@ size_t StoredAsset::can_read(uint64_t offset, size_t size)
 		size = MAX_CHUNK;
 	auto stopoffset = offset+size;
 	auto lastbyteoffset = stopoffset-1;
-	uint firstBlock = offset / BLOCKSIZE;
-	uint lastBlock = lastbyteoffset / BLOCKSIZE;
+	uint32_t firstBlock = offset / BLOCKSIZE;
+	uint32_t lastBlock = lastbyteoffset / BLOCKSIZE;
 
 	for (auto currentBlock = firstBlock; currentBlock <= lastBlock && _hasher.isBlockSet(currentBlock); currentBlock++) {
 		res += BLOCKSIZE;

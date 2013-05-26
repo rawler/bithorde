@@ -27,27 +27,27 @@
 #include <boost/assert.hpp>
 #include <boost/shared_ptr.hpp>
 
-inline uint parentlayersize(uint nodes) {
+inline uint32_t parentlayersize(uint32_t nodes) {
 	if (nodes > 1)
 		return (nodes+1)/2;
 	else
 		return 0;
 }
 
-inline uint treesize(uint leafs) {
+inline uint32_t treesize(uint32_t leafs) {
 	if (leafs > 1)
 		return leafs + treesize(parentlayersize(leafs));
 	else
 		return leafs;
 }
 
-uint calc_leaves(uint treesize);
+uint32_t calc_leaves(uint32_t treesize);
 
 struct NodeIdx {
-	uint nodeIdx;
-	uint layerSize;
+	uint32_t nodeIdx;
+	uint32_t layerSize;
 
-	NodeIdx(uint nodeIdx, uint layerSize) 
+	NodeIdx(uint32_t nodeIdx, uint32_t layerSize)
 		: nodeIdx(nodeIdx), layerSize(layerSize)
 	{}
 
@@ -94,7 +94,7 @@ public:
 		BOOST_ASSERT(backingStore.size() >= treesize(_leaves));
 	}
 
-	NodeIdx leaf(uint i) const {
+	NodeIdx leaf(uint32_t i) const {
 		return NodeIdx(i, _leaves);
 	};
 
@@ -107,13 +107,13 @@ public:
 		return _storage[layer_offset + idx.nodeIdx];
 	}
 
-	uint leaves() const {
+	uint32_t leaves() const {
 		return _leaves;
 	}
 
 private:
 	BackingStore& _storage;
-	uint _leaves;
+	uint32_t _leaves;
 };
 
 #endif // BITHORDED_TREESTORE_H

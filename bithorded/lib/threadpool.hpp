@@ -44,7 +44,7 @@ private:
 
 	bool _running;
 	boost::mutex _m;
-	uint _maxThreads;
+	uint32_t _maxThreads;
 	std::map<boost::thread::id, boost::thread*> _threads;
 	std::queue<Task*> _tasks;
 };

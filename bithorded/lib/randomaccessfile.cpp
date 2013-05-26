@@ -97,7 +97,7 @@ uint64_t RandomAccessFile::size() const
 	return _size;
 }
 
-uint RandomAccessFile::blocks(size_t blockSize) const
+uint32_t RandomAccessFile::blocks(size_t blockSize) const
 {
 	// Round up the number of blocks
 	return (size() + blockSize - 1) / blockSize;

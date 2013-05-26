@@ -30,8 +30,8 @@ class WeakMap
 {
 	typedef boost::weak_ptr<LinkType> WeakPtr;
 	std::unordered_map<KeyType, WeakPtr> _map;
-	uint _scrubThreshold; // Will automatically perform a complete scrubbing after this amount of changes
-	uint _dirtiness; // The amount of changes made since last scrubbing
+	uint32_t _scrubThreshold; // Will automatically perform a complete scrubbing after this amount of changes
+	uint32_t _dirtiness; // The amount of changes made since last scrubbing
 	boost::mutex _m;
 	typedef boost::lock_guard<boost::mutex> lock_guard;
 public:
