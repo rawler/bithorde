@@ -151,7 +151,7 @@ void Client::onMessage(bithorde::BindRead& msg)
 	}
 	if (msg.ids_size() > 0) {
 		// Trying to open
-		LOG4CPLUS_INFO(clientLogger, peerName() << ':' << h << " requested: " << MagnetURI(msg));
+		LOG4CPLUS_DEBUG(clientLogger, peerName() << ':' << h << " requested: " << MagnetURI(msg));
 		if (!msg.has_uuid())
 			msg.set_uuid(rand64());
 
@@ -201,10 +201,10 @@ void Client::onMessage(const bithorde::DataSegment& msg)
 		if (asset) {
 			asset->write(msg.offset(), msg.content());
 		} else {
-			LOG4CPLUS_INFO(clientLogger, peerName() << ':' << msg.handle() << " is not an upload-asset");
+			LOG4CPLUS_ERROR(clientLogger, peerName() << ':' << msg.handle() << " is not an upload-asset");
 		}
 	} else {
-		LOG4CPLUS_INFO(clientLogger, peerName() << ':' << msg.handle() << " is not bound to any asset");
+		LOG4CPLUS_ERROR(clientLogger, peerName() << ':' << msg.handle() << " is not bound to any asset");
 	}
 
 	return;
@@ -263,7 +263,7 @@ void Client::informAssetStatusUpdate(bithorde::Asset::Handle h, const bithorded:
 	} else {
 		resp.set_status(bithorde::NOTFOUND);
 	}
-	LOG4CPLUS_INFO(clientLogger, peerName() << ':' << h << " new state " << bithorde::Status_Name(resp.status()) << " (" << resp.ids() << ")");
+	LOG4CPLUS_DEBUG(clientLogger, peerName() << ':' << h << " new state " << bithorde::Status_Name(resp.status()) << " (" << resp.ids() << ")");
 
 	sendMessage(bithorde::Connection::AssetStatus, resp);
 }
@@ -313,9 +313,9 @@ void Client::clearAsset(bithorde::Asset::Handle handle_)
 		if (auto& a=_assets[handle]) {
 			a->statusChange.disconnect(boost::bind(&Client::informAssetStatusUpdate, this, handle_, IAsset::WeakPtr(a)));
 			_assets[handle].reset();
+			LOG4CPLUS_DEBUG(clientLogger, peerName() << ':' << handle_ << " released");
 		}
 	}
-	LOG4CPLUS_INFO(clientLogger, peerName() << ':' << handle_ << " released");
 }
 
 IAsset::Ptr& Client::getAsset(bithorde::Asset::Handle handle_)
