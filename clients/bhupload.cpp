@@ -75,6 +75,7 @@ void BHUpload::nextAsset() {
 	} else {
 		fs::path& p = _files.front();
 		_currentFile.open(p.c_str(), ifstream::in | ifstream::binary);
+		_currentFile.exceptions(ios_base::badbit);
 		if (optLink)
 			_currentAsset = new UploadAsset(_client, p);
 		else
