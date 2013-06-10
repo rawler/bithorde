@@ -147,7 +147,7 @@ void ReadRequestContext::timer_callback(const boost::system::error_code& error)
 
 ReadAsset::ReadAsset(const bithorde::ReadAsset::ClientPointer& client, const BitHordeIds& requestIds) :
 	Asset(client),
-	readResponseTime(0.1, "ms"),
+	readResponseTime(0.95, "ms"),
 	_requestIds(requestIds)
 {}
 

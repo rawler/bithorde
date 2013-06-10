@@ -131,7 +131,7 @@ Client::Client(asio::io_service& ioSvc, string myName) :
 	_handleAllocator(1),
 	_rpcIdAllocator(1),
 	_protoVersion(0),
-	assetResponseTime(0.2, "ms")
+	assetResponseTime(0.98, "ms")
 {
 }
 

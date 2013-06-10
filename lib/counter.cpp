@@ -55,13 +55,13 @@ uint64_t Counter::reset()
 	return res;
 }
 
-InertialValue::InertialValue(float falloff, const std::string& unit)
-	: TypedValue(unit), _falloff(falloff)
+InertialValue::InertialValue(float inertia, const std::string& unit)
+	: TypedValue(unit), _inertia(inertia)
 {}
 
 uint64_t InertialValue::post(uint64_t amount)
 {
-	return _value = (amount * _falloff) + (_value * (1.0-_falloff));
+	return _value = (amount * (1.0-_inertia)) + (_value * (_inertia));
 }
 
 LazyCounter::LazyCounter(TimerService& ts, const std::string& unit, const boost::posix_time::time_duration& granularity, float falloff)

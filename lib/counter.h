@@ -45,10 +45,10 @@ public:
 
 class InertialValue : public TypedValue {
 	uint64_t _current;
-	float _falloff; // How much is the current data wheighted
+	float _inertia; // How much is the current data wheighted
 	const std::string unit;
 public:
-	InertialValue(float falloff, const std::string& unit);
+	InertialValue(float inertia, const std::string& unit);
 	uint64_t post(uint64_t amount);
 };
 
