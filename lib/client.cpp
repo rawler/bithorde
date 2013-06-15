@@ -16,6 +16,7 @@
 #include "weak_fn.hpp"
 
 const static boost::posix_time::millisec DEFAULT_ASSET_TIMEOUT(1500);
+const static boost::posix_time::millisec UPLOAD_ASSET_TIMEOUT(10000);
 const static boost::posix_time::millisec CLOSE_TIMEOUT(300);
 const static int MAX_ASSETS(1024);
 
@@ -501,7 +502,7 @@ bool Client::bind(UploadAsset & asset)
 	asset._handle = handle;
 	auto& bind = _assetMap[asset._handle];
 	bind = boost::make_shared<AssetBinding>(this, &asset, asset._handle);
-	bind->setTimer(DEFAULT_ASSET_TIMEOUT);
+	bind->setTimer(UPLOAD_ASSET_TIMEOUT);
 	bithorde::BindWrite msg;
 	msg.set_handle(asset._handle);
 	msg.set_size(asset.size());
