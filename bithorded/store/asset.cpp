@@ -16,27 +16,35 @@
 
 
 #include "asset.hpp"
+
+#include "../lib/grandcentraldispatch.hpp"
 #include "../lib/rounding.hpp"
+
+#include <boost/bind/protect.hpp>
+#include <boost/shared_array.hpp>
 
 const size_t MAX_CHUNK = 64*1024;
 
 using namespace std;
+using namespace bithorded;
 using namespace bithorded::store;
 
-StoredAsset::StoredAsset(const boost::filesystem::path& metaFolder, RandomAccessFile::Mode mode) :
+StoredAsset::StoredAsset(GrandCentralDispatch& gcd, const boost::filesystem::path& metaFolder, RandomAccessFile::Mode mode) :
+	_gcd(gcd),
 	_metaFolder(metaFolder),
-	_file(metaFolder/"data", mode),
-	_metaStore(metaFolder/"meta", _file.blocks(BLOCKSIZE)),
-	_hasher(_metaStore)
+	_file(new RandomAccessFile(metaFolder/"data", mode)),
+	_metaStore(metaFolder/"meta", _file->blocks(BLOCKSIZE)),
+	_hasher(new Hasher(_metaStore))
 {
 
 }
 
-StoredAsset::StoredAsset(const boost::filesystem::path& metaFolder, RandomAccessFile::Mode mode, uint64_t size) :
+StoredAsset::StoredAsset(GrandCentralDispatch& gcd, const boost::filesystem::path& metaFolder, RandomAccessFile::Mode mode, uint64_t size) :
+	_gcd(gcd),
 	_metaFolder(metaFolder),
-	_file(metaFolder/"data", mode, size),
-	_metaStore(metaFolder/"meta", _file.blocks(BLOCKSIZE)),
-	_hasher(_metaStore)
+	_file(new RandomAccessFile(metaFolder/"data", mode, size)),
+	_metaStore(metaFolder/"meta", _file->blocks(BLOCKSIZE)),
+	_hasher(new Hasher(_metaStore))
 {
 
 }
@@ -44,7 +52,7 @@ StoredAsset::StoredAsset(const boost::filesystem::path& metaFolder, RandomAccess
 void StoredAsset::async_read(uint64_t offset, size_t& size, uint32_t timeout, bithorded::IAsset::ReadCallback cb)
 {
 	byte buf[MAX_CHUNK];
-	const byte* data = _file.read(offset, size, buf);
+	const byte* data = _file->read(offset, size, buf);
 	if (data)
 		cb(offset, std::string((char*)data, size));
 	else
@@ -62,7 +70,7 @@ size_t StoredAsset::can_read(uint64_t offset, size_t size)
 	uint32_t firstBlock = offset / BLOCKSIZE;
 	uint32_t lastBlock = lastbyteoffset / BLOCKSIZE;
 
-	for (auto currentBlock = firstBlock; currentBlock <= lastBlock && _hasher.isBlockSet(currentBlock); currentBlock++) {
+	for (auto currentBlock = firstBlock; currentBlock <= lastBlock && _hasher->isBlockSet(currentBlock); currentBlock++) {
 		res += BLOCKSIZE;
 		if (currentBlock == firstBlock)
 			res -= offset % BLOCKSIZE;
@@ -78,7 +86,7 @@ size_t StoredAsset::can_read(uint64_t offset, size_t size)
 bool StoredAsset::getIds(BitHordeIds& ids) const
 {
 	BOOST_ASSERT( ids.size() == 0 );
-	auto root = _hasher.getRoot();
+	auto root = _hasher->getRoot();
 
 	if (root->state == TigerNode::State::SET) {
 		auto tigerId = ids.Add();
@@ -92,7 +100,7 @@ bool StoredAsset::getIds(BitHordeIds& ids) const
 
 bool StoredAsset::hasRootHash()
 {
-	auto root = _hasher.getRoot();
+	auto root = _hasher->getRoot();
 	return (root->state == TigerNode::State::SET);
 }
 
@@ -108,7 +116,7 @@ void StoredAsset::notifyValidRange(uint64_t offset, uint64_t size)
 }
 
 uint64_t StoredAsset::size() {
-	return _file.size();
+	return _file->size();
 }
 
 boost::filesystem::path StoredAsset::folder()
@@ -122,21 +130,35 @@ void StoredAsset::updateStatus()
 		setStatus(bithorde::SUCCESS);
 }
 
+boost::shared_array<byte> crunch_piece(boost::shared_ptr<RandomAccessFile> file, uint64_t offset, size_t size) {
+	byte BUF[StoredAsset::BLOCKSIZE];
+	byte* res = new byte[Hasher::DigestSize];
+
+	size_t got(size);
+	byte* buf = file->read(offset, got, BUF);
+	if (got != size)
+		throw ios_base::failure("Unexpected read error");
+
+	Hasher::computeLeaf(buf, got, res);
+	return boost::shared_array<byte>(res);
+}
+
+void add_piece(boost::shared_ptr<StoredAsset> self, boost::shared_ptr<Hasher> hasher, uint32_t offset, boost::shared_array<byte> leafDigest) {
+	hasher->setLeaf(offset, leafDigest.get());
+	self->updateStatus();
+}
+
 void StoredAsset::updateHash(uint64_t offset, uint64_t end)
 {
-	byte BUF[BLOCKSIZE];
-
 	while (offset < end) {
 		size_t blockSize = BLOCKSIZE;
 		if (offset+blockSize > end)
 			blockSize = end - offset;
 		size_t read = blockSize;
 
-		byte* buf = _file.read(offset, read, BUF);
-		if (read != blockSize)
-			throw ios_base::failure("Unexpected read error");
-
-		_hasher.setData(offset/BLOCKSIZE, buf, read);
+		auto job_handler = boost::bind(&crunch_piece, _file, offset, read);
+		auto result_handler = boost::bind(&add_piece, shared_from_this(), _hasher, (uint32_t)(offset/BLOCKSIZE), _1);
+		_gcd.submit(job_handler, result_handler);
 
 		offset += blockSize;
 	}

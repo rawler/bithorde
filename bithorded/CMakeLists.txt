@@ -13,6 +13,7 @@ ADD_EXECUTABLE(bithorded
 	http_server/server.cpp
 
 	lib/assetsessions.cpp
+	lib/grandcentraldispatch.cpp
 	lib/hashtree.cpp
 	lib/loopfilter.cpp
 	lib/management.cpp

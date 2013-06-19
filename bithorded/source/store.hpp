@@ -36,11 +36,11 @@ namespace bithorded {
 class Store : private bithorded::store::AssetStore, public bithorded::management::DescriptiveDirectory
 {
 	ThreadPool _threadPool;
-	boost::asio::io_service& _ioSvc;
+	GrandCentralDispatch& _gcd;
 	std::string _label;
 	boost::filesystem::path _baseDir;
 public:
-	Store(boost::asio::io_service& ioSvc, const std::string label, const boost::filesystem::path& baseDir);
+	Store(GrandCentralDispatch& gcd, const std::string label, const boost::filesystem::path& baseDir);
 
 	virtual void describe(management::Info& target) const;
 	virtual void inspect(management::InfoList& target) const;

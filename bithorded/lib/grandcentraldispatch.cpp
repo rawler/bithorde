@@ -1,5 +1,5 @@
 /*
-    Copyright 2012 Ulrik Mikaelsson <ulrik.mikaelsson@gmail.com>
+    Copyright 2013 <copyright holder> <email>
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -15,21 +15,13 @@
 */
 
 
-#include "asset.hpp"
-
-using namespace std;
+#include "grandcentraldispatch.hpp"
 
 using namespace bithorded;
-using namespace bithorded::source;
 
-SourceAsset::SourceAsset(GrandCentralDispatch& gcd, const boost::filesystem::path& metaFolder) :
-	StoredAsset(gcd, metaFolder, RandomAccessFile::READ)
+GrandCentralDispatch::GrandCentralDispatch(boost::asio::io_service& controller, int parallel)
+	: _controller(controller), _work(_jobService)
 {
-	setStatus(bithorde::SUCCESS);
-}
-
-void SourceAsset::inspect(management::InfoList& target) const
-{
-	target.append("type") << "SourceAsset";
-	target.append("path") << _file->path();
+	for (int i = 0; i < parallel; ++i)
+		_workers.create_thread(boost::bind(&boost::asio::io_service::run, &_jobService));
 }

@@ -18,14 +18,14 @@
 #include "asset.hpp"
 #include "manager.hpp"
 
-bithorded::cache::CachedAsset::CachedAsset(const boost::filesystem::path& metaFolder) :
-	StoredAsset(metaFolder, RandomAccessFile::READWRITE)
+bithorded::cache::CachedAsset::CachedAsset(GrandCentralDispatch& gcd, const boost::filesystem::path& metaFolder) :
+	StoredAsset(gcd, metaFolder, RandomAccessFile::READWRITE)
 {
 	setStatus(hasRootHash() ? bithorde::SUCCESS : bithorde::NOTFOUND);
 }
 
-bithorded::cache::CachedAsset::CachedAsset(const boost::filesystem::path& metaFolder, uint64_t size) :
-	StoredAsset(metaFolder, RandomAccessFile::READWRITE, size)
+bithorded::cache::CachedAsset::CachedAsset(GrandCentralDispatch& gcd, const boost::filesystem::path& metaFolder, uint64_t size) :
+	StoredAsset(gcd, metaFolder, RandomAccessFile::READWRITE, size)
 {
 	setStatus(bithorde::SUCCESS);
 }
@@ -37,7 +37,7 @@ void bithorded::cache::CachedAsset::inspect(bithorded::management::InfoList& tar
 
 size_t bithorded::cache::CachedAsset::write(uint64_t offset, const std::string& data)
 {
-	auto res = _file.write(offset, data.data(), data.length());
+	auto res = _file->write(offset, data.data(), data.length());
 	notifyValidRange(offset, data.length());
 	updateStatus();
 	return res;

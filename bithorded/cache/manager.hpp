@@ -18,8 +18,6 @@
 #ifndef BITHORDED_CACHE_MANAGER_HPP
 #define BITHORDED_CACHE_MANAGER_HPP
 
-#include <boost/asio/io_service.hpp>
-
 #include "asset.hpp"
 #include "../lib/management.hpp"
 #include "../router/router.hpp"
@@ -30,12 +28,12 @@ namespace bithorded { namespace cache {
 class CacheManager : private bithorded::store::AssetStore, public bithorded::management::DescriptiveDirectory
 {
 	boost::filesystem::path _baseDir;
-	boost::asio::io_service& _ioSvc;
+	GrandCentralDispatch& _gcd;
 	bithorded::router::Router& _router;
 
 	uintmax_t _maxSize;
 public:
-	CacheManager(boost::asio::io_service& ioSvc, bithorded::router::Router& router, const boost::filesystem::path& baseDir, intmax_t size);
+	CacheManager(GrandCentralDispatch& gcd, bithorded::router::Router& router, const boost::filesystem::path& baseDir, intmax_t size);
 
 	virtual void describe(management::Info& target) const;
 	virtual void inspect(management::InfoList& target) const;

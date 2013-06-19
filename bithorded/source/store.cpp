@@ -25,6 +25,7 @@
 #include <log4cplus/loggingmacros.h>
 
 #include "../lib/relativepath.hpp"
+#include "../lib/grandcentraldispatch.hpp"
 
 using namespace std;
 
@@ -43,10 +44,10 @@ namespace bithorded {
 	}
 }
 
-Store::Store(asio::io_service& ioSvc, const string label, const boost::filesystem::path& baseDir) :
+Store::Store(GrandCentralDispatch& gcd, const string label, const boost::filesystem::path& baseDir) :
 	bithorded::store::AssetStore(baseDir.empty() ? fs::path() : (baseDir/META_DIR)),
 	_threadPool(THREADPOOL_CONCURRENCY),
-	_ioSvc(ioSvc),
+	_gcd(gcd),
 	_label(label),
 	_baseDir(baseDir)
 {
@@ -102,9 +103,9 @@ IAsset::Ptr Store::addAsset(const boost::filesystem::path& file)
 		fs::create_relative_symlink(file, assetFolder/"data");
 
 		try {
-			SourceAsset::Ptr asset = boost::make_shared<SourceAsset>(assetFolder);
+			SourceAsset::Ptr asset = boost::make_shared<SourceAsset>(_gcd, assetFolder);
 			asset->statusChange.connect(boost::bind(&Store::_addAsset, this, SourceAsset::WeakPtr(asset)));
-			HashTask* task = new HashTask(asset, _ioSvc);
+			HashTask* task = new HashTask(asset, _gcd.ioService());
 			_threadPool.post(*task);
 			return asset;
 		} catch (const std::ios::failure& e) {
@@ -137,12 +138,12 @@ void Store::_addAsset(SourceAsset::WeakPtr asset_)
 
 IAsset::Ptr Store::openAsset(const boost::filesystem::path& assetPath)
 {
-	auto asset = boost::make_shared<SourceAsset>(assetPath);
+	auto asset = boost::make_shared<SourceAsset>(_gcd, assetPath);
 	if (asset->hasRootHash()) {
 		return asset;
 	} else {
 		LOG4CPLUS_WARN(log, "Unhashed asset detected, hashing");
-		_threadPool.post(*new HashTask(asset, _ioSvc));
+		_threadPool.post(*new HashTask(asset, _gcd.ioService()));
 		return store::StoredAsset::Ptr();
 	}
 }

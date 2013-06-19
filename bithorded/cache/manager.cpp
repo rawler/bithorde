@@ -34,12 +34,12 @@ namespace bithorded {
 	}
 }
 
-CacheManager::CacheManager(boost::asio::io_service& ioSvc,
+CacheManager::CacheManager(GrandCentralDispatch& gcd,
                            bithorded::router::Router& router,
                            const boost::filesystem::path& baseDir, intmax_t size) :
 	bithorded::store::AssetStore(baseDir),
 	_baseDir(baseDir),
-	_ioSvc(ioSvc),
+	_gcd(gcd),
 	_router(router),
 	_maxSize(size)
 {
@@ -62,7 +62,7 @@ void CacheManager::inspect(management::InfoList& target) const
 
 IAsset::Ptr CacheManager::openAsset(const boost::filesystem::path& assetPath)
 {
-	return boost::make_shared<CachedAsset>(assetPath);
+	return boost::make_shared<CachedAsset>(_gcd, assetPath);
 }
 
 IAsset::Ptr CacheManager::openAsset(const bithorde::BindRead& req)
@@ -88,7 +88,7 @@ CachedAsset::Ptr CacheManager::prepareUpload(uint64_t size)
 		fs::path assetFolder(AssetStore::newAssetDir());
 
 		try {
-			auto asset = boost::make_shared<CachedAsset>(assetFolder,size);
+			auto asset = boost::make_shared<CachedAsset>(_gcd, assetFolder,size);
 			asset->statusChange.connect(boost::bind(&CacheManager::linkAsset, this, CachedAsset::WeakPtr(asset)));
 			return asset;
 		} catch (const std::ios::failure& e) {

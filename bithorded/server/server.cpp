@@ -65,16 +65,16 @@ void ConnectionList::describe(management::Info& target) const
 bithorded::Config::Client null_client;
 
 Server::Server(asio::io_service& ioSvc, Config& cfg) :
+	GrandCentralDispatch(ioSvc, cfg.parallel),
 	_cfg(cfg),
-	_ioSvc(ioSvc),
 	_timerSvc(new TimerService(ioSvc)),
 	_tcpListener(ioSvc),
 	_localListener(ioSvc),
 	_router(*this),
-	_cache(ioSvc, _router, cfg.cacheDir, static_cast<intmax_t>(cfg.cacheSizeMB)*1024*1024)
+	_cache(*this, _router, cfg.cacheDir, static_cast<intmax_t>(cfg.cacheSizeMB)*1024*1024)
 {
 	for (auto iter=_cfg.sources.begin(); iter != _cfg.sources.end(); iter++)
-		_assetStores.push_back( unique_ptr<source::Store>(new source::Store(ioSvc, iter->name, iter->root)) );
+		_assetStores.push_back( unique_ptr<source::Store>(new source::Store(*this, iter->name, iter->root)) );
 
 	for (auto iter=_cfg.friends.begin(); iter != _cfg.friends.end(); iter++)
 		_router.addFriend(*iter);
@@ -109,21 +109,16 @@ Server::Server(asio::io_service& ioSvc, Config& cfg) :
 	}
 
 	if (_cfg.inspectPort) {
-		_httpInterface.reset(new http::server::server(_ioSvc, "127.0.0.1", _cfg.inspectPort, *this));
+		_httpInterface.reset(new http::server::server(ioService(), "127.0.0.1", _cfg.inspectPort, *this));
 		LOG4CPLUS_INFO(serverLog, "Inspection interface listening on port " << _cfg.inspectPort);
 	}
 
 	LOG4CPLUS_INFO(serverLog, "Server started, version " << bithorde::build_version);
 }
 
-asio::io_service& Server::ioService()
-{
-	return _ioSvc;
-}
-
 void Server::waitForTCPConnection()
 {
-	boost::shared_ptr<asio::ip::tcp::socket> sock = boost::make_shared<asio::ip::tcp::socket>(_ioSvc);
+	boost::shared_ptr<asio::ip::tcp::socket> sock = boost::make_shared<asio::ip::tcp::socket>(ioService());
 	_tcpListener.async_accept(*sock, boost::bind(&Server::onTCPConnected, this, sock, asio::placeholders::error));
 }
 
@@ -138,7 +133,7 @@ void Server::onTCPConnected(boost::shared_ptr< asio::ip::tcp::socket >& socket, 
 void Server::hookup ( boost::shared_ptr< asio::ip::tcp::socket >& socket, const Config::Client& client)
 {
 	bithorded::Client::Ptr c = bithorded::Client::create(*this);
-	auto conn = bithorde::Connection::create(_ioSvc, boost::make_shared<bithorde::ConnectionStats>(_timerSvc), socket);
+	auto conn = bithorde::Connection::create(ioService(), boost::make_shared<bithorde::ConnectionStats>(_timerSvc), socket);
 	c->setSecurity(client.key, (bithorde::CipherType)client.cipher);
 	if (client.name.empty())
 		c->hookup(conn);
@@ -149,7 +144,7 @@ void Server::hookup ( boost::shared_ptr< asio::ip::tcp::socket >& socket, const 
 
 void Server::waitForLocalConnection()
 {
-	boost::shared_ptr<asio::local::stream_protocol::socket> sock = boost::make_shared<asio::local::stream_protocol::socket>(_ioSvc);
+	boost::shared_ptr<asio::local::stream_protocol::socket> sock = boost::make_shared<asio::local::stream_protocol::socket>(ioService());
 	_localListener.async_accept(*sock, boost::bind(&Server::onLocalConnected, this, sock, asio::placeholders::error));
 }
 
@@ -157,7 +152,7 @@ void Server::onLocalConnected(boost::shared_ptr< boost::asio::local::stream_prot
 {
 	if (!ec) {
 		bithorded::Client::Ptr c = bithorded::Client::create(*this);
-		c->hookup(bithorde::Connection::create(_ioSvc, boost::make_shared<bithorde::ConnectionStats>(_timerSvc), socket));
+		c->hookup(bithorde::Connection::create(ioService(), boost::make_shared<bithorde::ConnectionStats>(_timerSvc), socket));
 		clientConnected(c);
 		waitForLocalConnection();
 	}

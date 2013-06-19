@@ -73,9 +73,15 @@ public:
 
 	void setData(uint32_t offset, const byte* input, size_t length) {
 		BOOST_ASSERT((length == BLOCKSIZE) || (offset == (_leaves-1)));
+		byte digest[DigestSize];
+		_computeLeaf(input, length, digest);
+		setLeaf(offset, digest);
+	}
+
+	void setLeaf(uint32_t offset, const byte* digest) {
 		NodeIdx currentIdx = _store.leaf(offset);
 		NodePtr current = _store[currentIdx];
-		computeLeaf(input, length, current->digest);
+		memcpy(current->digest, digest, DigestSize);
 		current->state = Node::State::SET;
 
 		while (not currentIdx.isRoot()) {
@@ -93,9 +99,9 @@ public:
 				} else {
 					BOOST_ASSERT(!(currentIdx == siblingIdx));
 					if (siblingIdx < currentIdx)
-						computeInternal(*sibling, *current, *parent);
+						_computeInternal(*sibling, *current, *parent);
 					else
-						computeInternal(*current, *sibling, *parent);
+						_computeInternal(*current, *sibling, *parent);
 				}
 			} else {
 				memcpy(parent->digest, current->digest, DigestSize);
@@ -114,14 +120,21 @@ public:
 			return _store[block]->state == HashNode::State::SET;
 	}
 
+	static void computeLeaf(const byte* input, size_t length, byte* output) {
+		HashAlgorithm hasher;
+		hasher.Update(&TREE_LEAF_PREFIX, 1);
+		hasher.Update(input, length);
+		hasher.Final(output);
+	}
+
 private:
-	void computeLeaf(const byte* input, size_t length, byte* output) {
+	void _computeLeaf(const byte* input, size_t length, byte* output) {
 		_hasher.Update(&TREE_LEAF_PREFIX, 1);
 		_hasher.Update(input, length);
 		_hasher.Final(output);
 	}
 
-	void computeInternal(const Node& leftChild, const Node& rightChild, Node& output) {
+	void _computeInternal(const Node& leftChild, const Node& rightChild, Node& output) {
 		_hasher.Update(&TREE_INTERNAL_PREFIX, 1);
 		_hasher.Update(leftChild.digest, DigestSize);
 		_hasher.Update(rightChild.digest, DigestSize);

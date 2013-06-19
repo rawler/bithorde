@@ -35,8 +35,8 @@ public:
 	typedef boost::shared_ptr<CachedAsset> Ptr;
 	typedef boost::weak_ptr<CachedAsset> WeakPtr;
 
-	CachedAsset(const boost::filesystem::path& metaFolder);
-	CachedAsset(const boost::filesystem::path& metaFolder, uint64_t size);
+	CachedAsset(GrandCentralDispatch& gcd, const boost::filesystem::path& metaFolder);
+	CachedAsset(GrandCentralDispatch& gcd, const boost::filesystem::path& metaFolder, uint64_t size);
 
 	virtual void inspect(management::InfoList& target) const;
 

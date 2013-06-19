@@ -40,7 +40,7 @@ public:
 	 *  "data" which is an actual data-file or symlink to the data-file, and
 	 *  "meta" which holds info about blocks indexed, hashtree indexes etc.
 	 */
-	SourceAsset(const boost::filesystem::path& metaFolder);
+	SourceAsset(GrandCentralDispatch& gcd, const boost::filesystem::path& metaFolder);
 
 	virtual void inspect(management::InfoList& target) const;
 };

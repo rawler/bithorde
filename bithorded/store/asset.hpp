@@ -18,22 +18,29 @@
 #ifndef BITHORDED_STORE_ASSET_HPP
 #define BITHORDED_STORE_ASSET_HPP
 
+#include <boost/enable_shared_from_this.hpp>
+
 #include "assetmeta.hpp"
 #include "../../lib/hashes.h"
 #include "../lib/randomaccessfile.hpp"
 #include "../server/asset.hpp"
 
-namespace bithorded { namespace store {
+namespace bithorded {
+
+class GrandCentralDispatch;
+
+namespace store {
 
 typedef HashTree<TigerNode, AssetMeta> Hasher;
 
-class StoredAsset : public IAsset {
+class StoredAsset : public IAsset, public boost::enable_shared_from_this<StoredAsset> {
 protected:
+	GrandCentralDispatch& _gcd;
 	const boost::filesystem::path _assetFolder;
 	boost::filesystem::path _metaFolder;
-	RandomAccessFile _file;
+	boost::shared_ptr<RandomAccessFile> _file;
 	AssetMeta _metaStore;
-	Hasher _hasher;
+	boost::shared_ptr<Hasher> _hasher;
 public:
 	typedef typename boost::shared_ptr<StoredAsset> Ptr;
 
@@ -42,8 +49,8 @@ public:
 	 */
 	const static int BLOCKSIZE = Hasher::BLOCKSIZE;
 
-	StoredAsset(const boost::filesystem::path& metaFolder, RandomAccessFile::Mode mode);
-	StoredAsset(const boost::filesystem::path& metaFolder, RandomAccessFile::Mode mode, uint64_t size);
+	StoredAsset(GrandCentralDispatch& gcd, const boost::filesystem::path& metaFolder, RandomAccessFile::Mode mode);
+	StoredAsset(GrandCentralDispatch& gcd, const boost::filesystem::path& metaFolder, RandomAccessFile::Mode mode, uint64_t size);
 
 	/**
 	 * Will read up to /size/ bytes from underlying file, and send to callback.

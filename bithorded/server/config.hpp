@@ -70,6 +70,7 @@ struct Config
 	std::string configPath;
 
 	std::string nodeName;
+	uint16_t parallel;
 
 	std::string cacheDir;
 	int cacheSizeMB;

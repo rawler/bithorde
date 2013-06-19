@@ -32,6 +32,7 @@
 #include "../http_server/server.hpp"
 #include "../lib/loopfilter.hpp"
 #include "../lib/management.hpp"
+#include "../lib/grandcentraldispatch.hpp"
 #include "../router/router.hpp"
 #include "../source/store.hpp"
 #include "bithorde.pb.h"
@@ -52,10 +53,9 @@ class ConnectionList : public WeakMap<std::string, bithorded::Client>, public ma
 	virtual void describe(management::Info& target) const;
 };
 
-class Server : public management::Directory
+class Server : public GrandCentralDispatch, public management::Directory
 {
 	Config &_cfg;
-	boost::asio::io_service& _ioSvc;
 	TimerService::Ptr _timerSvc;
 
 	boost::asio::ip::tcp::acceptor _tcpListener;
@@ -71,7 +71,6 @@ class Server : public management::Directory
 public:
 	Server(boost::asio::io_service& ioSvc, Config& cfg);
 
-	boost::asio::io_service& ioService();
 	std::string name() { return _cfg.nodeName; }
 	const Config::Client& getClientConfig(const std::string& name);
 

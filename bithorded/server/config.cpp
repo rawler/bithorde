@@ -152,6 +152,8 @@ bithorded::Config::Config(int argc, char* argv[])
 			"Path to UNIX-socket to listen on")
 		("server.unixPerms", po::value<string>(&unixPerms)->default_value("0666"),
 			"Permissions for the created UNIX-socket.")
+		("server.parallel", po::value<uint16_t>(&parallel)->default_value(16),
+			"How many workers to run for parallel job processing.")
 	;
 
 	po::options_description cache_options("Cache Options");
