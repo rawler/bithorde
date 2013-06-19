@@ -19,10 +19,11 @@
 #define BITHORDED_RANDOMACCESSFILE_H
 
 #include <boost/filesystem/path.hpp>
+#include <boost/noncopyable.hpp>
 
 #include "lib/types.h"
 
-class RandomAccessFile {
+class RandomAccessFile : boost::noncopyable {
 	int _fd;
 	boost::filesystem::path _path;
 	uint64_t _size;
@@ -50,7 +51,7 @@ public:
 	/**
 	 * See if file is currently open
 	 */
-	   bool is_open() const;
+	bool is_open() const;
 
 	/**
 	 * The number of bytes in the open file
