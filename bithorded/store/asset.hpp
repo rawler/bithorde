@@ -38,9 +38,9 @@ protected:
 	GrandCentralDispatch& _gcd;
 	const boost::filesystem::path _assetFolder;
 	boost::filesystem::path _metaFolder;
-	boost::shared_ptr<RandomAccessFile> _file;
+	RandomAccessFile _file;
 	AssetMeta _metaStore;
-	boost::shared_ptr<Hasher> _hasher;
+	Hasher _hasher;
 public:
 	typedef typename boost::shared_ptr<StoredAsset> Ptr;
 

@@ -31,5 +31,5 @@ SourceAsset::SourceAsset(GrandCentralDispatch& gcd, const boost::filesystem::pat
 void SourceAsset::inspect(management::InfoList& target) const
 {
 	target.append("type") << "SourceAsset";
-	target.append("path") << _file->path();
+	target.append("path") << _file.path();
 }
