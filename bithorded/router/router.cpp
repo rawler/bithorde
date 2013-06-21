@@ -154,7 +154,7 @@ void Router::inspect(management::InfoList& target) const
 		auto name = iter->first;
 		auto connectedIter = _connectedFriends.find(iter->first);
 		if (connectedIter != _connectedFriends.end()) {
-			target.append(name+'*', *connectedIter->second);
+			target.append(name, *connectedIter->second);
 		} else {
 			target.append(name) << iter->second.addr << ':' << iter->second.port;
 		}
