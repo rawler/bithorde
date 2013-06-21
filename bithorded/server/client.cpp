@@ -57,8 +57,8 @@ size_t Client::serverAssets() const
 void Client::describe(management::Info& tgt) const
 {
 	tgt << '+' << clientAssets().size() << '-' << serverAssets()
-		<< ", incoming: " << stats->incomingBitrateCurrent
-		<< ", outgoing: " << stats->outgoingBitrateCurrent;
+		<< ", incoming: " << stats->incomingBitrateCurrent.autoScale()
+		<< ", outgoing: " << stats->outgoingBitrateCurrent.autoScale();
 }
 
 void Client::inspect(management::InfoList& tgt) const
