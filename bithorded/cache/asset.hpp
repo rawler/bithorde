@@ -42,8 +42,11 @@ public:
 
 	/**
 	 * Writes up to /size/ from buf into asset, updating amount written in hasher
+	 *  NOTE: data will be processed asynchronously, so if you need to wait for it, pass
+	 *        a callback to /whenDone/
+	 *  whenDone - called when written content is completely processed
 	 */
-	size_t write(uint64_t offset, const std::string& data);
+	size_t write(uint64_t offset, const std::string& data, const std::function< void() > whenDone = 0);
 };
 
 class CachingAsset : public IAsset, public boost::enable_shared_from_this<CachingAsset> {
@@ -67,6 +70,8 @@ public:
 
 private:
 	CachedAsset::Ptr cached();
+
+	void releaseIfCached();
 
 	void disconnect();
 	void upstreamDataArrived(ReadCallback cb, int64_t offset, const std::string& data);

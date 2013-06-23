@@ -83,7 +83,7 @@ public:
 	/**
 	 * Notify that given range of the file is available for hashing. Should respect BLOCKSIZE
 	 */
-	void notifyValidRange(uint64_t offset, uint64_t size);
+	void notifyValidRange(uint64_t offset, uint64_t size, std::function< void() > whenDone=0);
 
 	/**
 	 * The size of the asset, in bytes
@@ -96,7 +96,7 @@ public:
 	void updateStatus();
 
 private:
-	void updateHash(uint64_t offset, uint64_t end);
+	void updateHash(uint64_t offset, uint64_t end, std::function< void() > whenDone);
 };
 
 }}

@@ -107,7 +107,7 @@ bool StoredAsset::hasRootHash()
 	return (root->state == TigerNode::State::SET);
 }
 
-void StoredAsset::notifyValidRange(uint64_t offset, uint64_t size)
+void StoredAsset::notifyValidRange(uint64_t offset, uint64_t size, std::function< void() > whenDone)
 {
 	uint64_t filesize = StoredAsset::size();
 	uint64_t end = offset + size;
@@ -115,7 +115,7 @@ void StoredAsset::notifyValidRange(uint64_t offset, uint64_t size)
 	if (end != filesize)
 		end = roundDown(end, BLOCKSIZE);
 
-	updateHash(offset, end);
+	updateHash(offset, end, whenDone);
 }
 
 uint64_t StoredAsset::size() {
@@ -154,15 +154,23 @@ struct HashTail : public boost::enable_shared_from_this<HashTail> {
 	RandomAccessFile& file;
 	Hasher& hasher;
 	boost::shared_ptr<StoredAsset> asset;
+	std::function<void()> whenDone;
 
-	HashTail(uint64_t offset, uint64_t end, GrandCentralDispatch& gcd, RandomAccessFile& file, Hasher& hasher, boost::shared_ptr<StoredAsset> asset) :
+	HashTail(uint64_t offset, uint64_t end, GrandCentralDispatch& gcd, RandomAccessFile& file, Hasher& hasher, boost::shared_ptr<StoredAsset> asset, std::function<void()> whenDone=0) :
 		offset(offset),
 		end(end),
 		gcd(gcd),
 		file(file),
 		hasher(hasher),
-		asset(asset)
+		asset(asset),
+		whenDone(whenDone)
 	{}
+
+	~HashTail() {
+		asset->updateStatus();
+		if (whenDone)
+			whenDone();
+	}
 	
 	bool empty() const { return offset >= end; }
 
@@ -186,14 +194,12 @@ struct HashTail : public boost::enable_shared_from_this<HashTail> {
 
 		if (!empty())
 			chewNext();
-		else
-			asset->updateStatus();
 	}
 };
 
-void StoredAsset::updateHash(uint64_t offset, uint64_t end)
+void StoredAsset::updateHash(uint64_t offset, uint64_t end, std::function< void() > whenDone)
 {
-	boost::shared_ptr<HashTail> tail(boost::make_shared<HashTail>(offset, end, _gcd, _file, _hasher, shared_from_this()));
+	boost::shared_ptr<HashTail> tail(boost::make_shared<HashTail>(offset, end, _gcd, _file, _hasher, shared_from_this(), whenDone));
 	
 	for (size_t i=0; (i < PARALLEL_HASH_JOBS) && !tail->empty(); i++ ) {
 		tail->chewNext();

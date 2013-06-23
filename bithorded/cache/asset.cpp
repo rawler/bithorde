@@ -18,6 +18,8 @@
 #include "asset.hpp"
 #include "manager.hpp"
 
+using namespace bithorded::cache;
+
 bithorded::cache::CachedAsset::CachedAsset(GrandCentralDispatch& gcd, const boost::filesystem::path& metaFolder) :
 	StoredAsset(gcd, metaFolder, RandomAccessFile::READWRITE)
 {
@@ -35,11 +37,10 @@ void bithorded::cache::CachedAsset::inspect(bithorded::management::InfoList& tar
 	target.append("type") << "Cached";
 }
 
-size_t bithorded::cache::CachedAsset::write(uint64_t offset, const std::string& data)
+size_t bithorded::cache::CachedAsset::write(uint64_t offset, const std::string& data, const std::function< void() > whenDone)
 {
 	auto res = _file.write(offset, data.data(), data.length());
-	notifyValidRange(offset, data.length());
-	updateStatus();
+	notifyValidRange(offset, data.length(), whenDone);
 	return res;
 }
 
@@ -117,9 +118,7 @@ void bithorded::cache::CachingAsset::upstreamDataArrived(bithorded::IAsset::Read
 {
 	cb(offset, data);
 	if (auto cached_ = cached()) {
-		cached_->write(offset, data);
-		if (cached_->hasRootHash())
-			disconnect();
+		cached_->write(offset, data, boost::bind(&CachingAsset::releaseIfCached, shared_from_this()));
 	}
 }
 
@@ -131,6 +130,13 @@ void bithorded::cache::CachingAsset::upstreamStatusChange(bithorde::Status newSt
 	if (_cached && _cached->hasRootHash())
 		newStatus = bithorde::Status::SUCCESS;
 	setStatus(newStatus);
+}
+
+void CachingAsset::releaseIfCached()
+{
+	auto cached_ = cached();
+	if (cached_ && cached_->hasRootHash())
+		disconnect();
 }
 
 bithorded::cache::CachedAsset::Ptr bithorded::cache::CachingAsset::cached()
