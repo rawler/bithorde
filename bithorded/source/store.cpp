@@ -35,7 +35,6 @@ namespace fs = boost::filesystem;
 using namespace bithorded;
 using namespace bithorded::source;
 
-const int THREADPOOL_CONCURRENCY = 4;
 const fs::path META_DIR = ".bh_meta";
 
 namespace bithorded {
@@ -46,7 +45,6 @@ namespace bithorded {
 
 Store::Store(GrandCentralDispatch& gcd, const string label, const boost::filesystem::path& baseDir) :
 	bithorded::store::AssetStore(baseDir.empty() ? fs::path() : (baseDir/META_DIR)),
-	_threadPool(THREADPOOL_CONCURRENCY),
 	_gcd(gcd),
 	_label(label),
 	_baseDir(baseDir)
@@ -72,23 +70,6 @@ const string& Store::label() const
 	return _label;
 }
 
-struct HashTask : public Task, private boost::noncopyable {
-	SourceAsset::Ptr asset;
-	asio::io_service& io_svc;
-	asio::io_service::work _work;
-
-	HashTask(SourceAsset::Ptr asset, asio::io_service& io_svc)
-		: asset(asset), io_svc(io_svc), _work(io_svc)
-	{}
-
-	void operator()() {
-		asset->notifyValidRange(0, asset->size());
-
-		io_svc.post(boost::bind(&SourceAsset::updateStatus, asset));
-		delete this;
-	}
-};
-
 bool path_is_in(const fs::path& path, const fs::path& folder) {
 	string path_(fs::absolute(path).string());
 	string folder_(fs::absolute(folder).string()+'/');
@@ -100,13 +81,11 @@ IAsset::Ptr Store::addAsset(const boost::filesystem::path& file)
 	if (path_is_in(file, _baseDir)) {
 		fs::path assetFolder(AssetStore::newAssetDir());
 
-		fs::create_relative_symlink(file, assetFolder/"data");
-
 		try {
+			fs::create_relative_symlink(file, assetFolder/"data");
 			SourceAsset::Ptr asset = boost::make_shared<SourceAsset>(_gcd, assetFolder);
 			asset->statusChange.connect(boost::bind(&Store::_addAsset, this, SourceAsset::WeakPtr(asset)));
-			HashTask* task = new HashTask(asset, _gcd.ioService());
-			_threadPool.post(*task);
+			asset->hash();
 			return asset;
 		} catch (const std::ios::failure& e) {
 			LOG4CPLUS_ERROR(log, "Failed to create " << assetFolder << " for hashing " << file << ". Purging...");
@@ -143,7 +122,8 @@ IAsset::Ptr Store::openAsset(const boost::filesystem::path& assetPath)
 		return asset;
 	} else {
 		LOG4CPLUS_WARN(log, "Unhashed asset detected, hashing");
-		_threadPool.post(*new HashTask(asset, _gcd.ioService()));
+		asset->statusChange.connect(boost::bind(&Store::_addAsset, this, SourceAsset::WeakPtr(asset)));
+		asset->hash();
 		return store::StoredAsset::Ptr();
 	}
 }

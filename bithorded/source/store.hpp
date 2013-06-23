@@ -26,7 +26,6 @@
 #include "asset.hpp"
 #include "bithorde.pb.h"
 #include "../lib/management.hpp"
-#include "../lib/threadpool.hpp"
 #include "../lib/weakmap.hpp"
 #include "../store/assetstore.hpp"
 
@@ -35,7 +34,6 @@ namespace bithorded {
 
 class Store : private bithorded::store::AssetStore, public bithorded::management::DescriptiveDirectory
 {
-	ThreadPool _threadPool;
 	GrandCentralDispatch& _gcd;
 	std::string _label;
 	boost::filesystem::path _baseDir;
@@ -61,7 +59,6 @@ public:
 	 * Finds an asset by bithorde HashId. (Only the tiger-hash is actually used)
 	 */
 	IAsset::Ptr findAsset(const bithorde::BindRead& req);
-
 protected:
 	/**
 	 * Finds an asset by bithorde HashId. (Only the tiger-hash is actually used)

@@ -33,3 +33,8 @@ void SourceAsset::inspect(management::InfoList& target) const
 	target.append("type") << "SourceAsset";
 	target.append("path") << _file.path();
 }
+
+void SourceAsset::hash()
+{
+	notifyValidRange(0, size());
+}

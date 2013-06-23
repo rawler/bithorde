@@ -43,6 +43,11 @@ public:
 	SourceAsset(GrandCentralDispatch& gcd, const boost::filesystem::path& metaFolder);
 
 	virtual void inspect(management::InfoList& target) const;
+
+	/**
+	 * Starts background job building a hashtree of the content in the asset
+	 */
+	void hash();
 };
 
 	}
