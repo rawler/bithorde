@@ -20,7 +20,6 @@ ADD_EXECUTABLE(bithorded
 	lib/randomaccessfile.cpp
 	lib/relativepath.cpp
 	lib/rounding.cpp
-	lib/threadpool.cpp
 	lib/treestore.cpp
 
 	router/asset.cpp
