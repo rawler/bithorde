@@ -23,7 +23,7 @@ BHGET="$BINDIR/bhget"
 function create_testfile() {
     # $1 - filename
     # $2 - size in MB
-    dd if=/dev/urandom of="$1" bs=1048576 count=$2 2>/dev/null
+    dd if=/dev/urandom of="$1" bs=1024 count=$2 2>/dev/null
 }
 
 function verify_equal() {
