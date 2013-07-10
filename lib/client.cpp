@@ -420,13 +420,13 @@ void Client::onMessage(const bithorde::Read::Response & msg) {
 			if (a) {
 				a->handleMessage(msg);
 			} else {
-				cerr << "WARNING: ReadResponse " << msg.reqid() << " for handle being closed " << assetHandle << endl;
+				cerr << "WARNING " << peerName() << ": ReadResponse " << msg.reqid() << " for handle being closed " << assetHandle << endl;
 			}
 		} else {
-			cerr << "WARNING: ReadResponse " << msg.reqid() << " for unmapped handle " << assetHandle << endl;
+			cerr << "WARNING " << peerName() << ": ReadResponse " << msg.reqid() << " for unmapped handle " << assetHandle << endl;
 		}
 	} else {
-		cerr << "WARNING: ReadResponse with unknown requestId" << endl;
+		cerr << "WARNING " << peerName() << ": ReadResponse with unknown requestId" << endl;
 	}
 }
 
