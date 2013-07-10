@@ -186,7 +186,7 @@ void BHGet::requestMore()
 void BHGet::onDataChunk(uint64_t offset, const string& data, int tag)
 {
 	if ((data.size() < BLOCK_SIZE) && ((offset+data.size()) < _asset->size())) {
-		cerr << "WARNING: got unexpectedly small data-block " << data.size() << " vs. " << BLOCK_SIZE << endl;
+		cerr << "WARNING: got unexpectedly small data-block at offset " << offset << ", " << data.size() << " vs. " << BLOCK_SIZE << endl;
 		if (++_failures < BLOCK_RETRIES) {
 			cerr << "Retrying..." << endl;
 			_asset->aSyncRead(offset, BLOCK_SIZE);
