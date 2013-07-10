@@ -66,12 +66,11 @@ void bithorded::cache::CachingAsset::inspect(bithorded::management::InfoList& ta
 
 void bithorded::cache::CachingAsset::async_read(uint64_t offset, size_t& size, uint32_t timeout, bithorded::IAsset::ReadCallback cb)
 {
-	size_t trimmed_size;
 	auto cached_ = cached();
-	if (cached_ && (trimmed_size = cached_->can_read(offset, size))) {
-		cached_->async_read(offset, trimmed_size, timeout, cb);
+	if (cached_ && (cached_->can_read(offset, size) == size)) {
+		cached_->async_read(offset, size, timeout, cb);
 	} else if (_upstream) {
-		_upstream->async_read(offset, size, timeout, boost::bind(&CachingAsset::upstreamDataArrived, shared_from_this(), cb, _1, _2));
+		_upstream->async_read(offset, size, timeout, boost::bind(&CachingAsset::upstreamDataArrived, shared_from_this(), cb, size, _1, _2));
 	} else {
 		cb(-1, "");
 	}
@@ -92,7 +91,7 @@ size_t bithorded::cache::CachingAsset::can_read(uint64_t offset, size_t size)
 	if (_upstream)
 		return _upstream->can_read(offset, size);
 	else if (auto cached_ = cached())
-		return cached_->can_read(offset, size);
+		return (cached_->can_read(offset, size) == size) ? size : 0;
 	else
 		return 0;
 }
@@ -114,12 +113,16 @@ void bithorded::cache::CachingAsset::disconnect()
 	_upstream.reset();
 }
 
-void bithorded::cache::CachingAsset::upstreamDataArrived(bithorded::IAsset::ReadCallback cb, int64_t offset, const std::string& data)
+void bithorded::cache::CachingAsset::upstreamDataArrived(bithorded::IAsset::ReadCallback cb, std::size_t requested_size, int64_t offset, const std::string& data)
 {
-	cb(offset, data);
-	if (auto cached_ = cached()) {
-		cached_->write(offset, data, boost::bind(&CachingAsset::releaseIfCached, shared_from_this()));
+	auto cached_ = cached();
+	if (data.size() >= requested_size) {
+		cb(offset, data);
+	} else if (cached_ && (cached_->can_read(offset, requested_size) == requested_size)) {
+		cached_->async_read(offset, requested_size, 0, cb);
 	}
+	if (data.size() && cached_)
+		cached_->write(offset, data, boost::bind(&CachingAsset::releaseIfCached, shared_from_this()));
 }
 
 void bithorded::cache::CachingAsset::upstreamStatusChange(bithorde::Status newStatus)

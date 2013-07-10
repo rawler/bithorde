@@ -74,7 +74,7 @@ private:
 	void releaseIfCached();
 
 	void disconnect();
-	void upstreamDataArrived(ReadCallback cb, int64_t offset, const std::string& data);
+	void upstreamDataArrived(bithorded::IAsset::ReadCallback cb, std::size_t requested_size, int64_t offset, const std::string& data);
 	void upstreamStatusChange(bithorde::Status newStatus);
 };
 	}

@@ -33,6 +33,11 @@ namespace bithorded { namespace router {
 	log4cplus::Logger assetLogger = log4cplus::Logger::getInstance("router");
 } }
 
+void PendingRead::cancel()
+{
+	cb(offset, "");
+}
+
 UpstreamAsset::UpstreamAsset(const bithorde::ReadAsset::ClientPointer& client, const BitHordeIds& requestIds)
 	: ReadAsset(client, requestIds)
 {}
@@ -41,6 +46,12 @@ void UpstreamAsset::handleMessage(const bithorde::Read::Response& resp)
 {
 	auto self_ref = shared_from_this();
 	bithorde::ReadAsset::handleMessage(resp);
+}
+
+ForwardedAsset::~ForwardedAsset()
+{
+	for (auto iter=_pendingReads.begin(); iter != _pendingReads.end(); iter++)
+		iter->cancel();
 }
 
 bool bithorded::router::ForwardedAsset::hasUpstream(const std::string peername)

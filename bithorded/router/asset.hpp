@@ -33,6 +33,8 @@ struct PendingRead {
 	uint64_t offset;
 	size_t size;
 	IAsset::ReadCallback cb;
+
+	void cancel();
 };
 
 class UpstreamAsset : public bithorde::ReadAsset, public boost::enable_shared_from_this<UpstreamAsset> {
@@ -60,6 +62,7 @@ public:
 		_upstream(),
 		_pendingReads()
 	{}
+	virtual ~ForwardedAsset();
 
 	bool hasUpstream(const std::string peername);
 	void bindUpstreams(const std::map< std::string, bithorded::Client::Ptr >& friends, uint64_t uuid, int timeout);
