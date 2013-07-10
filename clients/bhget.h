@@ -26,6 +26,7 @@ class BHGet {
 	std::unique_ptr<bithorde::ReadAsset> _asset;
 	uint64_t _currentOffset;
 	OutQueue * _outQueue;
+	uint32_t _failures;
 	int _res;
 public:
 	BHGet(boost::program_options::variables_map &map);

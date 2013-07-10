@@ -16,6 +16,7 @@ using namespace bithorde;
 
 const static size_t BLOCK_SIZE = (64*1024);
 const static size_t PARALLELL_BLOCKS = (4);
+const static size_t BLOCK_RETRIES = 5;
 
 struct OutQueue {
 	typedef pair<uint64_t, string> Chunk;
@@ -144,6 +145,7 @@ void BHGet::nextAsset() {
 
 	_outQueue = new OutQueue();
 	_currentOffset = 0;
+	_failures = 0;
 }
 
 void BHGet::onStatusUpdate(const bithorde::AssetStatus& status)
@@ -184,7 +186,15 @@ void BHGet::requestMore()
 void BHGet::onDataChunk(uint64_t offset, const string& data, int tag)
 {
 	if ((data.size() < BLOCK_SIZE) && ((offset+data.size()) < _asset->size())) {
-		 cerr << "ERROR: got unexpectedly small data-block " << data.size() << " vs. " << BLOCK_SIZE << endl;
+		cerr << "WARNING: got unexpectedly small data-block " << data.size() << " vs. " << BLOCK_SIZE << endl;
+		if (++_failures < BLOCK_RETRIES) {
+			cerr << "Retrying..." << endl;
+			_asset->aSyncRead(offset, BLOCK_SIZE);
+		} else {
+			cerr << "Too many retries, failing asset";
+			nextAsset();
+			return;
+		}
 	}
 	_outQueue->send(offset, data);
 	if (_outQueue->position < _asset->size()) {
