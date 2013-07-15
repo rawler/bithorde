@@ -1,3 +1,25 @@
+bithorde (0.2.97.7-alpha1) raring; urgency=low
+
+  * Drop use of 'uint' in favor of uint32_t.
+  * Adapt some client-activity-logging with to suitable severity.
+  * Enable exceptions on errors in input-file.
+  * Drop unused MMAP-constant.
+
+ -- Adam Palmblad <adam.palmblad@gmail.com>  Sat, 29 Jun 2013 17:52:27 +0200
+
+bithorde (0.2.97.6-alpha1) raring; urgency=low
+
+  * Don't do direct smart_ptr to bool conversion.
+
+ -- Adam Palmblad <adam.palmblad@gmail.com>  Wed, 15 May 2013 16:15:56 +0200
+
+bithorde (0.2.97.5-alpha1) raring; urgency=low
+
+  * Don't use shared_from_this2 explicitly. Use shared_from_this.
+  * Avoid sending queries back to a client that just issued the same query.
+
+ -- Adam Palmblad <adam.palmblad@gmail.com>  Wed, 15 May 2013 09:09:32 +0200
+
 bithorde (0.2.97.4-alpha1ubuntu1) raring; urgency=low
 
   * Change to libboost1.53-all-dev
