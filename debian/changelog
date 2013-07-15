@@ -1,3 +1,22 @@
+bithorde (0.2.97.4-alpha1ubuntu1) raring; urgency=low
+
+  * Change to libboost1.53-all-dev
+
+ -- Adam Palmblad <adam.palmblad@gmail.com>  Tue, 14 May 2013 20:45:20 +0200
+
+bithorde (0.2.97.3-alpha1) raring; urgency=low
+
+  * Add python-twisted as build dependency
+  * Increase build version of libboost-all-dev to 1.51
+
+ -- Adam Palmblad <adam.palmblad@gmail.com>  Mon, 13 May 2013 22:33:34 +0200
+
+bithorde (0.2.97-alpha1) raring; urgency=low
+
+  * Initial alpha build based on the boost remake.
+
+ -- Adam Palmblad <adam.palmblad@gmail.com>  Sun, 12 May 2013 18:17:58 +0200
+
 bithorde (0.1.99+0.2rc1-1) natty; urgency=low
 
   * Minor bugfixes

@@ -2,10 +2,11 @@ Source: bithorde
 Section: net
 Priority: extra
 Maintainer: Adam Palmblad <adam.palmblad@gmail.com>
-Build-Depends: debhelper (>= 7), cmake, libboost-all-dev (>= 1.48),
+Build-Depends: debhelper (>= 7), cmake, libboost1.53-all-dev,
                libcrypto++-dev, libfuse-dev, liblog4cplus-dev,
                libprotobuf-dev, pkg-config, protobuf-compiler,
-               python-crypto, python-eventlet, python-protobuf
+               python-crypto, python-eventlet, python-protobuf,
+               python-twisted
 Standards-Version: 3.8.3
 Homepage: http://www.bithorde.org/
 
