@@ -19,6 +19,7 @@
 #define BITHORDED_ASSETMETA_H
 
 #include <boost/filesystem/path.hpp>
+#include <boost/interprocess/sync/null_mutex.hpp>
 #include <boost/iostreams/device/mapped_file.hpp>
 #include <boost/noncopyable.hpp>
 
@@ -45,7 +46,7 @@ public:
 
 class AssetMeta {
 	RandomAccessFile _file;
-	WeakMap<std::size_t, TigerNode> _nodeMap;
+	WeakMap<std::size_t, TigerNode, boost::interprocess::null_mutex> _nodeMap;
 
 	size_t _leafBlocks;
 	size_t _nodes_offset;

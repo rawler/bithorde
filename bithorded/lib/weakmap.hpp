@@ -25,15 +25,15 @@
 
 namespace bithorded {
 
-template <typename KeyType, typename LinkType>
+template <typename KeyType, typename LinkType, typename MutexType=boost::mutex>
 class WeakMap
 {
 	typedef boost::weak_ptr<LinkType> WeakPtr;
 	std::unordered_map<KeyType, WeakPtr> _map;
 	uint32_t _scrubThreshold; // Will automatically perform a complete scrubbing after this amount of changes
 	uint32_t _dirtiness; // The amount of changes made since last scrubbing
-	boost::mutex _m;
-	typedef boost::lock_guard<boost::mutex> lock_guard;
+	MutexType _m;
+	typedef boost::lock_guard<MutexType> lock_guard;
 public:
 	typedef boost::shared_ptr<LinkType> Link;
 	WeakMap(int scrubThreshold=sizeof(KeyType) / 10000) :
