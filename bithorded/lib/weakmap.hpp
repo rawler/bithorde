@@ -36,7 +36,7 @@ class WeakMap
 	typedef boost::lock_guard<MutexType> lock_guard;
 public:
 	typedef boost::shared_ptr<LinkType> Link;
-	WeakMap(int scrubThreshold=sizeof(KeyType) / 10000) :
+	WeakMap(int scrubThreshold=10000/sizeof(KeyType)) :
 		_scrubThreshold(scrubThreshold),
 		_dirtiness(0)
 	{}
