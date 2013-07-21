@@ -51,12 +51,12 @@ struct NodeIdx {
 		: nodeIdx(nodeIdx), layerSize(layerSize)
 	{}
 
-	NodeIdx parent() {
+	NodeIdx parent() const {
 		BOOST_ASSERT( not isRoot() );
 		return NodeIdx(nodeIdx/2, parentlayersize(layerSize));
 	}
 
-	NodeIdx sibling() {
+	NodeIdx sibling() const {
 		return NodeIdx(nodeIdx ^ 0x01, layerSize);
 	}
 
@@ -65,7 +65,7 @@ struct NodeIdx {
 		return this->nodeIdx < other.nodeIdx;
 	}
 
-	bool isValid() {
+	bool isValid() const {
 		return nodeIdx < layerSize;
 	}
 
@@ -74,7 +74,7 @@ struct NodeIdx {
 			&& (this->layerSize == other.layerSize);
 	}
 
-	bool isRoot() {
+	bool isRoot() const {
 		return (layerSize == 1);
 	}
 };

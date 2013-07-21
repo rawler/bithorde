@@ -78,38 +78,41 @@ public:
 		setLeaf(offset, digest);
 	}
 
+	void propagate(const NodeIdx& currentIdx, const NodePtr& current) {
+		if (currentIdx.isRoot())
+			return;
+		NodeIdx siblingIdx = currentIdx.sibling();
+
+		NodeIdx parentIdx = currentIdx.parent();
+		NodePtr parent = _store[parentIdx];
+		if (parent->state == Node::State::SET) // TODO: Should probably verify it?
+			return;
+
+		if (siblingIdx.isValid()) {
+			NodePtr sibling = _store[siblingIdx];
+			if (sibling->state != Node::State::SET) {
+				return;
+			} else {
+				BOOST_ASSERT(!(currentIdx == siblingIdx));
+				if (siblingIdx < currentIdx)
+					_computeInternal(*sibling, *current, *parent);
+				else
+					_computeInternal(*current, *sibling, *parent);
+			}
+		} else {
+			memcpy(parent->digest, current->digest, DigestSize);
+		}
+		parent->state = Node::State::SET;
+		propagate(parentIdx, parent);
+	}
+
 	void setLeaf(uint32_t offset, const byte* digest) {
 		NodeIdx currentIdx = _store.leaf(offset);
 		NodePtr current = _store[currentIdx];
 		memcpy(current->digest, digest, DigestSize);
 		current->state = Node::State::SET;
 
-		while (not currentIdx.isRoot()) {
-			NodeIdx siblingIdx = currentIdx.sibling();
-
-			NodeIdx parentIdx = currentIdx.parent();
-			NodePtr parent = _store[parentIdx];
-			if (parent->state == Node::State::SET) // TODO: Should probably verify it?
-				break;
-
-			if (siblingIdx.isValid()) {
-				NodePtr sibling = _store[siblingIdx];
-				if (sibling->state != Node::State::SET) {
-					break;
-				} else {
-					BOOST_ASSERT(!(currentIdx == siblingIdx));
-					if (siblingIdx < currentIdx)
-						_computeInternal(*sibling, *current, *parent);
-					else
-						_computeInternal(*current, *sibling, *parent);
-				}
-			} else {
-				memcpy(parent->digest, current->digest, DigestSize);
-			}
-			parent->state = Node::State::SET;
-			currentIdx = parentIdx;
-			current = parent;
-		}
+		propagate(currentIdx, current);
 	}
 
 	bool isBlockSet(uint32_t idx) {
