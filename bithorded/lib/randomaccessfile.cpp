@@ -123,6 +123,11 @@ ssize_t RandomAccessFile::write(uint64_t offset, const void* src, size_t size)
 	return written;
 }
 
+ssize_t RandomAccessFile::write(uint64_t offset, const string& buf)
+{
+	return write(offset, buf.data(), buf.length());
+}
+
 const boost::filesystem::path& RandomAccessFile::path() const
 {
 	return _path;

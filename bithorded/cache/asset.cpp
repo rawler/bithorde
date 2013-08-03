@@ -18,6 +18,8 @@
 #include "asset.hpp"
 #include "manager.hpp"
 
+#include <bithorded/lib/grandcentraldispatch.hpp>
+
 using namespace bithorded::cache;
 
 bithorded::cache::CachedAsset::CachedAsset(GrandCentralDispatch& gcd, const boost::filesystem::path& metaFolder) :
@@ -37,11 +39,11 @@ void bithorded::cache::CachedAsset::inspect(bithorded::management::InfoList& tar
 	target.append("type") << "Cached";
 }
 
-size_t bithorded::cache::CachedAsset::write(uint64_t offset, const std::string& data, const std::function< void() > whenDone)
+void bithorded::cache::CachedAsset::write(uint64_t offset, const std::string& data, const std::function< void() > whenDone)
 {
-	auto res = _file.write(offset, data.data(), data.length());
-	notifyValidRange(offset, data.length(), whenDone);
-	return res;
+	auto job = boost::bind(&RandomAccessFile::write, &_file, offset, data);
+	auto completion = boost::bind(&StoredAsset::notifyValidRange, shared_from_this(), offset, _1, whenDone);
+	_gcd.submit(job, completion);
 }
 
 bithorded::cache::CachingAsset::CachingAsset(bithorded::cache::CacheManager& mgr, bithorded::router::ForwardedAsset::Ptr upstream, bithorded::cache::CachedAsset::Ptr cached)

@@ -46,7 +46,7 @@ public:
 	 *        a callback to /whenDone/
 	 *  whenDone - called when written content is completely processed
 	 */
-	size_t write(uint64_t offset, const std::string& data, const std::function< void() > whenDone = 0);
+	void write(uint64_t offset, const std::string& data, const std::function< void() > whenDone = 0);
 };
 
 class CachingAsset : public IAsset, public boost::enable_shared_from_this<CachingAsset> {

@@ -73,9 +73,14 @@ public:
 	byte* read(uint64_t offset, size_t& size, byte* buf) const;
 
 	/**
-	 * Writes up to /size/ bytes to file beginning at /offset/.
+	 * Writes /size/ bytes to file beginning at /offset/.
 	 */
 	ssize_t write(uint64_t offset, const void* src, size_t size);
+
+	/**
+	 * Writes a given string-buf to file beginning at /offset/.
+	 */
+	ssize_t write(uint64_t offset, const std::string& buf);
 
 	/**
 	 * Return the path used to open the file
