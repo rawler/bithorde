@@ -48,14 +48,16 @@ struct Header {
 bithorded::store::TigerNode::TigerNode(AssetMeta& metaFile, size_t offset) :
 	TigerBaseNode(metaFile.read(offset)),
 	_metaFile(metaFile),
-	_offset(offset)
+	_offset(offset),
+	_unmodified(*this)
 {
-
 }
 
 bithorded::store::TigerNode::~TigerNode()
 {
-	_metaFile.write(_offset, *this);
+	if (_unmodified != *static_cast<TigerBaseNode*>(this)) {
+		_metaFile.write(_offset, *this);
+	}
 }
 
 AssetMeta::AssetMeta(const boost::filesystem::path& path, uint32_t leafBlocks)

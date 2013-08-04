@@ -23,6 +23,7 @@
 #include "treestore.hpp"
 
 #pragma pack(push, 1)
+// TODO: FUGLY. Should not be dependent on serialized form.
 template <typename _HashAlgorithm>
 struct HashNode {
 	typedef _HashAlgorithm HashAlgorithm;
@@ -43,6 +44,21 @@ struct HashNode {
 	}
 };
 #pragma pack(pop)
+
+template <typename HashAlgorithm>
+bool operator==(const HashNode< HashAlgorithm >& a, const HashNode< HashAlgorithm >& b)
+{
+	if (a.state != b.state)
+		return !memcmp(a.digest, b.digest, HashNode<HashAlgorithm>::DigestSize);
+	else
+		return true;
+}
+
+template <typename HashAlgorithm>
+bool operator!=(const HashNode< HashAlgorithm >& a, const HashNode< HashAlgorithm >& b)
+{
+	return !(a == b);
+}
 
 const static byte TREE_INTERNAL_PREFIX = 0x01;
 const static byte TREE_LEAF_PREFIX = 0x00;

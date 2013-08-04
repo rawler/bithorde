@@ -39,6 +39,7 @@ class AssetMeta;
 class TigerNode : public TigerBaseNode, private boost::noncopyable {
 	AssetMeta& _metaFile;
 	size_t _offset;
+	TigerBaseNode _unmodified;
 public:
 	TigerNode(AssetMeta& metaFile, size_t offset);
 	virtual ~TigerNode();
