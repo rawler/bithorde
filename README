@@ -34,7 +34,7 @@ POSIX-systems).
 Build requirements (Ubuntu Package Names)
 
   cmake
-  libboost-all-dev (>= 1.48, might work with earlier, may not need all modules)
+  libboost1.53-all-dev
   libcrypto++-dev
   libfuse-dev
   liblog4cplus-dev
@@ -47,6 +47,7 @@ Testing requirements (only required for running the test-suite)
   python-crypto
   python-eventlet
   python-protobuf
+  python-twisted
 
 With all dependencies installed, building should be as simple as:
 
