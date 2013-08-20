@@ -22,6 +22,7 @@
 #include <utility>
 
 #include <lib/weak_fn.hpp>
+#include "lib/random.h"
 
 #include <log4cplus/logger.h>
 #include <log4cplus/loggingmacros.h>
@@ -48,6 +49,15 @@ void UpstreamAsset::handleMessage(const bithorde::Read::Response& resp)
 	bithorde::ReadAsset::handleMessage(resp);
 }
 
+ForwardedAsset::ForwardedAsset(Router& router, const BitHordeIds& ids) :
+	_router(router),
+	_ids(ids),
+	_size(-1),
+	_upstream(),
+	_pendingReads(),
+	_sessionId(rand64())
+{}
+
 ForwardedAsset::~ForwardedAsset()
 {
 	for (auto iter=_pendingReads.begin(); iter != _pendingReads.end(); iter++)
@@ -59,7 +69,7 @@ bool bithorded::router::ForwardedAsset::hasUpstream(const std::string peername)
 	return _upstream.count(peername);
 }
 
-void bithorded::router::ForwardedAsset::bindUpstreams(const std::map< string, bithorded::Client::Ptr >& friends, uint64_t uuid, int timeout)
+void bithorded::router::ForwardedAsset::bindUpstreams(const std::map< string, bithorded::Client::Ptr >& friends, const bithorde::RouteTrace& requesters, int timeout)
 {
 	BOOST_FOREACH(auto f_, friends) {
 		auto f = f_.second;
@@ -71,7 +81,9 @@ void bithorded::router::ForwardedAsset::bindUpstreams(const std::map< string, bi
 		upstream->statusUpdate.connect(boost::bind(boost::weak_fn(&ForwardedAsset::onUpstreamStatus, self), peername, bithorde::ASSET_ARG_STATUS));
 		upstream->dataArrived.connect(boost::bind(boost::weak_fn(&ForwardedAsset::onData, self),
 			bithorde::ASSET_ARG_OFFSET, bithorde::ASSET_ARG_DATA, bithorde::ASSET_ARG_TAG));
-		if (!f->bind(*upstream, timeout, uuid))
+		bithorde::RouteTrace requesters_(requesters);
+		requesters_.Add(_sessionId);
+		if (!f->bind(*upstream, timeout, requesters))
 			dropUpstream(peername);
 	}
 	updateStatus();

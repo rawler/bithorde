@@ -20,6 +20,8 @@ namespace bithorde {
 class Client;
 class ClientKeepalive;
 
+typedef ::google::protobuf::RepeatedField<uint64_t> RouteTrace;
+
 class AssetBinding {
 	friend class Client;
 
@@ -28,6 +30,8 @@ class AssetBinding {
 	Asset::Handle _handle;
 	Timer _statusTimer;
 	boost::posix_time::ptime _opened_at;
+
+	RouteTrace _requesters;
 public:
 	AssetBinding(Client* client, Asset* asset, Asset::Handle handle);
 
@@ -38,6 +42,9 @@ public:
 
 	operator bool() const { return _asset; }
 	Asset* operator->() const { return _asset; }
+
+	const RouteTrace& requesters() const { return _requesters; }
+	RouteTrace& requesters() { return _requesters; }
 
 	void close();
 private:
@@ -116,7 +123,7 @@ public:
 
 	bool bind(ReadAsset & asset);
 	bool bind(ReadAsset & asset, int timeout_ms);
-	bool bind(ReadAsset & asset, int timeout_ms, uint64_t uuid);
+	bool bind(bithorde::ReadAsset& asset, int timeout_ms, const bithorde::RouteTrace& downstream);
 	bool bind(UploadAsset & asset);
 
 	bool sendMessage(bithorde::Connection::MessageType type, const google::protobuf::Message& msg, const bithorde::Message::Deadline& expires=Message::NEVER, bool prioritized=false);
@@ -159,7 +166,7 @@ private:
 	boost::signals2::scoped_connection _writableConnection;
 	boost::signals2::scoped_connection _disconnectedConnection;
 
-	bool informBound(const bithorde::AssetBinding& asset, uint64_t uuid, int timeout);
+	bool informBound(const bithorde::AssetBinding& asset, int timeout_ms);
 	int allocRPCRequest(Asset::Handle asset);
 	void releaseRPCRequest(int reqId);
 };

@@ -51,21 +51,16 @@ class ForwardedAsset : public bithorded::IAsset, public boost::noncopyable, publ
 	int64_t _size;
 	std::map<std::string, UpstreamAsset::Ptr> _upstream;
 	std::list<PendingRead> _pendingReads;
+	uint64_t _sessionId;
 public:
 	typedef boost::shared_ptr<ForwardedAsset> Ptr;
 	typedef boost::weak_ptr<ForwardedAsset> WeakPtr;
 
-	ForwardedAsset(Router& router, const BitHordeIds& ids) :
-		_router(router),
-		_ids(ids),
-		_size(-1),
-		_upstream(),
-		_pendingReads()
-	{}
+	ForwardedAsset(Router& router, const BitHordeIds& ids);
 	virtual ~ForwardedAsset();
 
 	bool hasUpstream(const std::string peername);
-	void bindUpstreams(const std::map< std::string, bithorded::Client::Ptr >& friends, uint64_t uuid, int timeout);
+	void bindUpstreams(const std::map< std::string, bithorded::Client::Ptr >& friends, const bithorde::RouteTrace& requesters, int timeout);
 
 	virtual size_t can_read(uint64_t offset, size_t size);
 	virtual bool getIds(BitHordeIds& ids) const;

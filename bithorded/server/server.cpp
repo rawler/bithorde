@@ -218,9 +218,12 @@ IAsset::Ptr Server::async_linkAsset(const boost::filesystem::path& filePath)
 
 IAsset::Ptr Server::async_findAsset(const bithorde::BindRead& req)
 {
-	if (!_loopFilter.test_and_set(req.uuid())) {
-		LOG4CPLUS_INFO(serverLog, "Looped on uuid " << req.uuid());
-		throw BindError(bithorde::WOULD_LOOP);
+	for (auto iter=req.requesters().begin(); iter != req.requesters().end(); iter++) {
+		// TODO: Rewrite loop-filtering logic
+		if (!_loopFilter.test_and_set(*iter)) {
+			LOG4CPLUS_INFO(serverLog, "Looped on uuid " << *iter);
+			throw BindError(bithorde::WOULD_LOOP);
+		}
 	}
 
 	for (auto iter=_assetStores.begin(); iter != _assetStores.end(); iter++) {

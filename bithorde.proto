@@ -71,7 +71,15 @@ message HandShakeConfirmed { // Must be second message in stream (or skipped if 
 message BindRead { // Client->Server initate Read-Only binding
   required uint32 handle = 1;
   repeated Identifier ids = 2;
-  required uint64 uuid = 3;
+
+  // The requesters are an additive set, indicating downstream nodes interested in this
+  // asset. A router should add its own node to the set before forwarding, and keep
+  // upstreams informed about changes to the list by new BindReads. A loop can be
+  // detected by looking for the routers own, or an id from the upstreams as indicated
+  // by AssetStatus.servers, in this list.
+  repeated uint64 requesters = 3;
+
+  // Timeout in ms.
   required uint32 timeout = 4;
 }
 
@@ -92,6 +100,12 @@ message AssetStatus { // Server->Client, confirm bind-status (respond to Bind-Re
   // availability of assets by this number, factored in the availability and priority of
   // the Serving-Friend itself. (Bandwidth, uptime, ...)
   optional uint32 availability = 5;
+
+  // The servers are an additive set, indicating upstream nodes involved in serving this
+  // asset. Their use aids in early loop prevention for a special case. Routers serving
+  // an asset should add it's own id to the list, and inform downstream requesters of any
+  // updates to the list.
+  repeated uint64 servers = 6;
 }
 
 message Read {

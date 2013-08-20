@@ -87,7 +87,7 @@ void AssetBinding::onTimeout()
 		msg.set_status(bithorde::Status::TIMEOUT);
 		_asset->handleMessage(msg);
 	} else if (_client) {
-		_client->informBound(*this, rand64(), LOTS_OF_MILLISECONDS);
+		_client->informBound(*this, LOTS_OF_MILLISECONDS);
 		setTimer(CLOSE_TIMEOUT);
 	}
 }
@@ -333,7 +333,7 @@ void Client::setAuthenticated(const std::string peerName)
 			auto binding = iter->second;
 			BOOST_ASSERT(binding && binding->readAsset());
 			binding->setTimer(DEFAULT_ASSET_TIMEOUT);
-			informBound(*iter->second, rand64(), DEFAULT_ASSET_TIMEOUT.total_milliseconds());
+			informBound(*iter->second, DEFAULT_ASSET_TIMEOUT.total_milliseconds());
 		}
 		_connection->setKeepalive(new Keepalive(*this));
 	}
@@ -435,10 +435,12 @@ bool Client::bind(ReadAsset &asset) {
 
 bool Client::bind(ReadAsset& asset, int timeout_ms)
 {
-	return bind(asset, timeout_ms, rand64());
+	RouteTrace requesters;
+	(*requesters.Add()) = rand64();
+	return bind(asset, timeout_ms, requesters);
 }
 
-bool Client::bind(ReadAsset& asset, int timeout_ms, uint64_t uuid) {
+bool Client::bind(ReadAsset& asset, int timeout_ms, const RouteTrace& requesters) {
 	if (!asset.isBound()) {
 		BOOST_ASSERT(asset._handle < 0);
 		BOOST_ASSERT(asset.requestIds().size() > 0);
@@ -452,8 +454,9 @@ bool Client::bind(ReadAsset& asset, int timeout_ms, uint64_t uuid) {
 		bind = boost::make_shared<AssetBinding>(this, &asset, asset._handle);
 		bind->setTimer(boost::posix_time::millisec(timeout_ms));
 	}
+	 _assetMap[asset._handle]->requesters().CopyFrom(requesters);
 
-	return informBound(*_assetMap[asset._handle], uuid, timeout_ms);
+	return informBound(*_assetMap[asset._handle], timeout_ms);
 }
 
 bool Client::bind(UploadAsset & asset)
@@ -489,12 +492,12 @@ bool Client::release(Asset & asset)
 	asset._handle = -1;
 
 	if (_connection)
-		return informBound(binding, rand64(), DEFAULT_ASSET_TIMEOUT.total_milliseconds());
+		return informBound(binding, DEFAULT_ASSET_TIMEOUT.total_milliseconds());
 	else
 		return true; // Since connection is down, other side should not have the bound state as it is.
 }
 
-bool Client::informBound(const AssetBinding& asset, uint64_t uuid, int timeout_ms)
+bool Client::informBound(const AssetBinding& asset, int timeout_ms)
 {
 	BOOST_ASSERT(asset._handle >= 0);
 
@@ -505,7 +508,7 @@ bool Client::informBound(const AssetBinding& asset, uint64_t uuid, int timeout_m
 	msg.set_handle(asset._handle);
 
 	msg.set_timeout(timeout_ms);
-	msg.set_uuid(uuid);
+	msg.mutable_requesters()->MergeFrom(asset.requesters());
 
 	ReadAsset * readAsset = asset.readAsset();
 	if (readAsset) {

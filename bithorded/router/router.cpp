@@ -168,13 +168,12 @@ void Router::describe(management::Info& target) const
 
 bithorded::IAsset::Ptr bithorded::router::Router::openAsset(const bithorde::BindRead& req)
 {
-	BOOST_ASSERT(req.has_uuid());
 	int timeout = req.has_timeout() ? req.timeout()-20 : 500; // TODO: Find actual reasonable time message has been in air. Use DEFAULT_ASSET_TIMEOUT from library.
 	if (timeout <= 0)
 		return bithorded::IAsset::Ptr();
 
 	auto asset = boost::make_shared<ForwardedAsset, Router&, const BitHordeIds&>(*this, req.ids());
 
-	asset->bindUpstreams(_connectedFriends, req.uuid(), timeout);
+	asset->bindUpstreams(_connectedFriends, req.requesters(), timeout);
 	return asset;
 }

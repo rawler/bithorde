@@ -152,8 +152,6 @@ void Client::onMessage(bithorde::BindRead& msg)
 	if (msg.ids_size() > 0) {
 		// Trying to open
 		LOG4CPLUS_DEBUG(clientLogger, peerName() << ':' << h << " requested: " << MagnetURI(msg));
-		if (!msg.has_uuid())
-			msg.set_uuid(rand64());
 
 		try {
 			_opening.push_front(msg.ids());
