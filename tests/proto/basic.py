@@ -8,7 +8,7 @@ if __name__ == '__main__':
 
     bithorded = BithordeD(config={
         'cache': {'dir': Cache() },
-        'friend.tester.addr': '',
+        'client.tester.addr': '',
     })
     conn = TestConnection(bithorded, name='tester')
 

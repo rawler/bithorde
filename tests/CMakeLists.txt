@@ -4,6 +4,7 @@ ADD_EXECUTABLE( unittests
 	../bithorded/lib/randomaccessfile.cpp
 	../bithorded/lib/hashtree.cpp test_hashtree.cpp
 	../bithorded/lib/rounding.cpp test_rounding.cpp
+	../bithorded/lib/subscribable.cpp test_subscribable.cpp
 	../lib/timer.cpp test_timer.cpp
 	../lib/connection.cpp test_message_queue.cpp
 	../bithorded/lib/treestore.cpp test_treestore.cpp
