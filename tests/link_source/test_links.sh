@@ -23,7 +23,7 @@ SOURCE_ROOT=src
 DAEMON_SOCKET=$(readlink -f bithorded.sock)
 
 TESTFILE=$SOURCE_ROOT/testfile
-TESTSIZE=4
+TESTSIZE=768
 
 function clean() {
     rm -rf *.log "$TESTFILE"{,.new}
