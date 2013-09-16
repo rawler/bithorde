@@ -1,8 +1,10 @@
 #!/usr/bin/env python
 
 from bithordetest import message, BithordeD, TestConnection
+from random import randint
 
 ASSET_IDS = [message.Identifier(type=message.TREE_TIGER, id='GIS3CRGMSBT7CKRBLQFXFAL3K4YIO5P5E3AMC2A')]
+INITIAL_REQUEST = randint(0,(2**64)-1)
 
 if __name__ == '__main__':
     bithorded = BithordeD(config={
@@ -15,11 +17,12 @@ if __name__ == '__main__':
     downstream2 = TestConnection(bithorded, name='downstream2')
 
     # Request an asset-session
-    downstream1.send(message.BindRead(handle=1, ids=ASSET_IDS, timeout=500, requesters=[162532344]))
+    downstream1.send(message.BindRead(handle=1, ids=ASSET_IDS, timeout=500, requesters=[INITIAL_REQUEST]))
     req1 = upstream1.expect(message.BindRead)
     assert len(req1.requesters) > 1
-    assert 162532344 in req1.requesters
-    server_id = [x for x in req1.requesters if x != 162532344][0]
+    assert INITIAL_REQUEST in req1.requesters
+    assert INITIAL_REQUEST == req1.requesters[-1] # Try to keep backwards compatibility
+    server_id = next(x for x in req1.requesters if x != INITIAL_REQUEST)
 
     # Let upstream1 join as server
     upstream1.send(message.AssetStatus(handle=req1.handle, status=message.SUCCESS, ids=ASSET_IDS, servers=[99998888], size=15))
@@ -47,7 +50,7 @@ if __name__ == '__main__':
     downstream2.send(message.BindRead(handle=1, ids=ASSET_IDS, timeout=500, requesters=[9873474]))
     req2 = upstream2.expect(message.BindRead)
     assert len(req2.requesters) > 2
-    assert 162532344 in req2.requesters
+    assert INITIAL_REQUEST in req2.requesters
     assert 9873474 in req2.requesters
 
     resp2 = downstream2.expect(message.AssetStatus(status=message.SUCCESS))
