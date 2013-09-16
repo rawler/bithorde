@@ -55,6 +55,8 @@ public:
 	std::size_t friends() const;
 	std::size_t upstreams() const;
 
+	const std::map<std::string, Client::Ptr >& connectedFriends() const;
+
 	void onConnected(const bithorded::Client::Ptr& client);
 	void onDisconnected(const bithorded::Client::Ptr& client);
 

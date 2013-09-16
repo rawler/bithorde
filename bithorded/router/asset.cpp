@@ -16,6 +16,7 @@
 
 
 #include "asset.hpp"
+#include "router.hpp"
 
 #include <boost/foreach.hpp>
 #include <boost/smart_ptr/make_shared.hpp>
@@ -54,9 +55,10 @@ ForwardedAsset::ForwardedAsset(Router& router, const BitHordeIds& ids) :
 	_ids(ids),
 	_size(-1),
 	_upstream(),
-	_pendingReads(),
-	_sessionId(rand64())
-{}
+	_pendingReads()
+{
+	requesters.onChange.connect(boost::bind(&ForwardedAsset::bindUpstreams, this, _1, _2));
+}
 
 ForwardedAsset::~ForwardedAsset()
 {
@@ -69,24 +71,71 @@ bool bithorded::router::ForwardedAsset::hasUpstream(const std::string peername)
 	return _upstream.count(peername);
 }
 
-void bithorded::router::ForwardedAsset::bindUpstreams(const std::map< string, bithorded::Client::Ptr >& friends, const bithorde::RouteTrace& requesters, int timeout)
+void bithorded::router::ForwardedAsset::bindUpstreams(const Requesters& old_requesters, const Requesters& new_requesters )
 {
-	BOOST_FOREACH(auto f_, friends) {
-		auto f = f_.second;
-		if (f->requestsAsset(_ids)) // This path surely doesn't have the asset.
+	bool has_new_requesters = false;
+	for (auto iter=new_requesters.begin(); iter != new_requesters.end(); iter++) {
+		if (!old_requesters.count(*iter))
+			has_new_requesters = true;
+	}
+	auto requesters_ = requestTrace();
+	auto& friends = _router.connectedFriends();
+
+	for (auto iter = friends.begin(); iter != friends.end(); iter++) {
+		auto f = iter->second;
+
+		if (f->requestsAsset(_ids)) // This path likely doesn't have the asset.
 			continue;
+
 		auto peername = f->peerName();
-		auto& upstream = _upstream[peername] = make_shared<UpstreamAsset>(f, _ids);
-		auto self = boost::weak_ptr<ForwardedAsset>(shared_from_this());
-		upstream->statusUpdate.connect(boost::bind(boost::weak_fn(&ForwardedAsset::onUpstreamStatus, self), peername, bithorde::ASSET_ARG_STATUS));
-		upstream->dataArrived.connect(boost::bind(boost::weak_fn(&ForwardedAsset::onData, self),
-			bithorde::ASSET_ARG_OFFSET, bithorde::ASSET_ARG_DATA, bithorde::ASSET_ARG_TAG));
-		bithorde::RouteTrace requesters_(requesters);
-		requesters_.Add(_sessionId);
-		if (!f->bind(*upstream, timeout, requesters))
-			dropUpstream(peername);
+		if (_upstream.count(peername)) {
+			if (new_requesters.size()) { // Some downstreams are still interested
+				auto& upstream = _upstream[peername];
+				auto client = upstream->client();
+				client->bind(*upstream, requesters_);
+			} else {
+				dropUpstream(peername);
+			}
+		} else if (has_new_requesters) {
+			auto upstream = make_shared<UpstreamAsset>(f, _ids);
+			auto self = boost::weak_ptr<ForwardedAsset>(shared_from_this());
+			upstream->statusUpdate.connect(boost::bind(boost::weak_fn(&ForwardedAsset::onUpstreamStatus, self), peername, bithorde::ASSET_ARG_STATUS));
+			upstream->dataArrived.connect(boost::bind(boost::weak_fn(&ForwardedAsset::onData, self),
+				bithorde::ASSET_ARG_OFFSET, bithorde::ASSET_ARG_DATA, bithorde::ASSET_ARG_TAG));
+			if (f->bind(*upstream, requesters_))
+				_upstream[peername] = upstream;
+		}
 	}
 	updateStatus();
+}
+
+unordered_set< uint64_t > ForwardedAsset::servers() const
+{
+	auto res = bithorded::IAsset::servers();
+	for (auto iter = _upstream.begin(); iter != _upstream.end(); iter++) {
+		const auto& upstreamServers = iter->second->servers();
+		res.insert(upstreamServers.begin(), upstreamServers.end());
+	}
+	return res;
+}
+
+bool ForwardedAsset::bindDownstream(const bithorded::AssetBinding* binding)
+{
+	if (binding) {
+		const auto& servers_ = servers();
+		const auto& requesters_ = binding->requesters();
+		for (auto iter=requesters_.begin(); iter != requesters_.end(); iter++) {
+			if (servers_.count(*iter)) {
+				return false;
+			}
+		}
+	}
+	return IAsset::bindDownstream(binding);
+}
+
+void ForwardedAsset::unbindDownstream(const bithorded::AssetBinding* binding)
+{
+	bithorded::IAsset::unbindDownstream(binding);
 }
 
 void bithorded::router::ForwardedAsset::onUpstreamStatus(const string& peername, const bithorde::AssetStatus& status)
@@ -194,4 +243,14 @@ void ForwardedAsset::dropUpstream(const string& peername)
 			bithorde::ASSET_ARG_OFFSET, bithorde::ASSET_ARG_DATA, bithorde::ASSET_ARG_TAG));
 		_upstream.erase(upstream);
 	}
+}
+
+bithorde::RouteTrace ForwardedAsset::requestTrace() const
+{
+	bithorde::RouteTrace requesters_;
+	requesters_.Add(sessionId());
+	for (auto iter=requesters->begin(); iter != requesters->end(); iter++) {
+		requesters_.Add(*iter);
+	}
+	return requesters_;
 }

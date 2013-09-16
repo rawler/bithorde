@@ -2,6 +2,7 @@
 #define BITHORDE_TYPES_H
 
 #include <sys/types.h>
+#include <google/protobuf/repeated_field.h>
 
 typedef unsigned char byte;
 
@@ -29,5 +30,9 @@ struct Buffer {
 	 */
 	void pop(size_t amount);
 };
+
+namespace bithorde {
+typedef ::google::protobuf::RepeatedField<uint64_t> RouteTrace;
+}
 
 #endif // BITHORDE_TYPES_H

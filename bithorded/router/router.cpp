@@ -120,6 +120,11 @@ size_t Router::upstreams() const
 	return _connectedFriends.size();
 }
 
+const map< string, Client::Ptr >& Router::connectedFriends() const
+{
+	return _connectedFriends;
+}
+
 void Router::onConnected(const bithorded::Client::Ptr& client )
 {
 	string peerName = client->peerName();
@@ -173,7 +178,5 @@ bithorded::IAsset::Ptr bithorded::router::Router::openAsset(const bithorde::Bind
 		return bithorded::IAsset::Ptr();
 
 	auto asset = boost::make_shared<ForwardedAsset, Router&, const BitHordeIds&>(*this, req.ids());
-
-	asset->bindUpstreams(_connectedFriends, req.requesters(), timeout);
 	return asset;
 }

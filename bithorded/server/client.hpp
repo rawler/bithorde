@@ -31,7 +31,7 @@ class Server;
 class Client : public bithorde::Client, public boost::enable_shared_from_this<Client>, public management::DescriptiveDirectory
 {
 	Server& _server;
-	std::vector< IAsset::Ptr > _assets;
+	std::vector< AssetBinding > _assets;
 	std::list< BitHordeIds > _opening;
 public:
 	typedef boost::shared_ptr<Client> Ptr;
@@ -39,7 +39,7 @@ public:
 	static Ptr create(Server& server) {
 		return Ptr(new Client(server));
 	}
-	bool requestsAsset(const BitHordeIds& ids);
+	bool requestsAsset(const BitHordeIds& ids) const;
 
 	size_t serverAssets() const;
 
@@ -64,10 +64,10 @@ private:
 	void informAssetStatus(bithorde::Asset::Handle h, bithorde::Status s);
 	void informAssetStatusUpdate(bithorde::Asset::Handle h, const bithorded::IAsset::WeakPtr& asset);
 	void onReadResponse( const bithorde::Read::Request& req, int64_t offset, const std::string& data, bithorde::Message::Deadline t);
-	void assignAsset(bithorde::Asset::Handle handle_, const bithorded::IAsset::Ptr& a);
+	void assignAsset(bithorde::Asset::Handle handle_, const bithorded::IAsset::Ptr& a, const bithorde::RouteTrace& requesters);
 	void clearAssets();
 	void clearAsset(bithorde::Asset::Handle handle);
-	IAsset::Ptr& getAsset(bithorde::Asset::Handle handle);
+	const IAsset::Ptr& getAsset(bithorde::Asset::Handle handle_) const;
 };
 
 }

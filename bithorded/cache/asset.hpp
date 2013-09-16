@@ -68,6 +68,10 @@ public:
 	virtual size_t can_read(uint64_t offset, size_t size);
 
 	virtual uint64_t size();
+	virtual std::unordered_set< uint64_t > servers() const;
+
+	virtual bool bindDownstream(const AssetBinding* binding);
+	virtual void unbindDownstream(const AssetBinding* binding);
 
 private:
 	CachedAsset::Ptr cached();

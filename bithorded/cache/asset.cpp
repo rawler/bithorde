@@ -110,6 +110,31 @@ uint64_t bithorded::cache::CachingAsset::size()
 		return 0;
 }
 
+std::unordered_set< uint64_t > CachingAsset::servers() const
+{
+	if (_upstream)
+		return _upstream->servers();
+	else
+		return bithorded::IAsset::servers();
+}
+
+bool CachingAsset::bindDownstream(const bithorded::AssetBinding* binding)
+{
+	bithorded::IAsset::bindDownstream(binding);
+	if (_upstream) {
+		return _upstream->bindDownstream(binding);
+	} else {
+		return true;
+	}
+}
+
+void CachingAsset::unbindDownstream(const bithorded::AssetBinding* binding)
+{
+	bithorded::IAsset::unbindDownstream(binding);
+	if (_upstream)
+		_upstream->unbindDownstream(binding);
+}
+
 void bithorded::cache::CachingAsset::disconnect()
 {
 	_upstreamTracker.disconnect();

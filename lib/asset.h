@@ -5,6 +5,7 @@
 #include <map>
 #include <utility>
 #include <vector>
+#include <unordered_set>
 
 #include <boost/asio/deadline_timer.hpp>
 #include <boost/bind/placeholders.hpp>
@@ -49,6 +50,8 @@ public:
 	std::string label();
 	uint64_t size();
 
+	const std::unordered_set<uint64_t>& servers();
+
 	typedef boost::signals2::signal<void (const bithorde::AssetStatus&)> StatusSignal;
 	typedef boost::signals2::signal<void ()> VoidSignal;
 	VoidSignal closed;
@@ -61,6 +64,7 @@ protected:
 	boost::asio::io_service& _ioSvc;
 	Handle _handle;
 	int64_t _size;
+	std::unordered_set<uint64_t> _servers;
 
 	virtual void handleMessage(const bithorde::AssetStatus &msg);
 	virtual void handleMessage(const bithorde::Read::Response &msg) = 0;

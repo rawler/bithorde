@@ -20,8 +20,6 @@ namespace bithorde {
 class Client;
 class ClientKeepalive;
 
-typedef ::google::protobuf::RepeatedField<uint64_t> RouteTrace;
-
 class AssetBinding {
 	friend class Client;
 
@@ -123,7 +121,8 @@ public:
 
 	bool bind(ReadAsset & asset);
 	bool bind(ReadAsset & asset, int timeout_ms);
-	bool bind(bithorde::ReadAsset& asset, int timeout_ms, const bithorde::RouteTrace& downstream);
+	bool bind(bithorde::ReadAsset& asset, const bithorde::RouteTrace& requesters);
+	bool bind(bithorde::ReadAsset& asset, int timeout_ms, const bithorde::RouteTrace& requesters);
 	bool bind(UploadAsset & asset);
 
 	bool sendMessage(bithorde::Connection::MessageType type, const google::protobuf::Message& msg, const bithorde::Message::Deadline& expires=Message::NEVER, bool prioritized=false);

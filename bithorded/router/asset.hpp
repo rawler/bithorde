@@ -22,6 +22,7 @@
 
 #include "../server/asset.hpp"
 #include "../server/client.hpp"
+#include <bithorded/lib/subscribable.hpp>
 #include "../../lib/asset.h"
 #include "../../lib/client.h"
 
@@ -51,16 +52,19 @@ class ForwardedAsset : public bithorded::IAsset, public boost::noncopyable, publ
 	int64_t _size;
 	std::map<std::string, UpstreamAsset::Ptr> _upstream;
 	std::list<PendingRead> _pendingReads;
-	uint64_t _sessionId;
 public:
 	typedef boost::shared_ptr<ForwardedAsset> Ptr;
 	typedef boost::weak_ptr<ForwardedAsset> WeakPtr;
+	typedef std::unordered_set<uint64_t> Requesters;
 
 	ForwardedAsset(Router& router, const BitHordeIds& ids);
 	virtual ~ForwardedAsset();
 
 	bool hasUpstream(const std::string peername);
-	void bindUpstreams(const std::map< std::string, bithorded::Client::Ptr >& friends, const bithorde::RouteTrace& requesters, int timeout);
+
+	virtual std::unordered_set< uint64_t > servers() const;
+	virtual bool bindDownstream(const AssetBinding* binding);
+	virtual void unbindDownstream(const AssetBinding* binding);
 
 	virtual size_t can_read(uint64_t offset, size_t size);
 	virtual bool getIds(BitHordeIds& ids) const;
@@ -70,10 +74,12 @@ public:
 	virtual void inspect(management::InfoList& target) const;
 	void inspect_upstreams(management::InfoList& target) const;
 private:
+	void bindUpstreams(const std::unordered_set< uint64_t >& old_requesters, const std::unordered_set< uint64_t >& new_requesters);
 	void onUpstreamStatus(const std::string& peername, const bithorde::AssetStatus& status);
 	void updateStatus();
 	void onData(uint64_t offset, const std::string& data, int tag);
 	void dropUpstream(const std::string& peername);
+	bithorde::RouteTrace requestTrace() const;
 };
 
 }

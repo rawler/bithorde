@@ -77,9 +77,16 @@ uint64_t Asset::size()
 	return _size;
 }
 
+const unordered_set< uint64_t >& Asset::servers()
+{
+	return _servers;
+}
+
 void Asset::handleMessage(const bithorde::AssetStatus & msg)
 {
 	status = msg.status();
+	_servers.clear();
+	_servers.insert(msg.servers().begin(), msg.servers().end());
 	statusUpdate(msg);
 }
 

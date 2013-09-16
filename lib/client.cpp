@@ -440,7 +440,13 @@ bool Client::bind(ReadAsset& asset, int timeout_ms)
 	return bind(asset, timeout_ms, requesters);
 }
 
-bool Client::bind(ReadAsset& asset, int timeout_ms, const RouteTrace& requesters) {
+bool Client::bind(ReadAsset& asset, const RouteTrace& requesters)
+{
+	return bind(asset, DEFAULT_ASSET_TIMEOUT.total_milliseconds(), requesters);
+}
+
+bool Client::bind(ReadAsset& asset, int timeout_ms, const RouteTrace& requesters)
+{
 	if (!asset.isBound()) {
 		BOOST_ASSERT(asset._handle < 0);
 		BOOST_ASSERT(asset.requestIds().size() > 0);

@@ -86,13 +86,13 @@ void Client::inspect(management::InfoList& tgt) const
 	}
 }
 
-bool Client::requestsAsset(const BitHordeIds& ids) {
+bool Client::requestsAsset(const BitHordeIds& ids) const {
 	for (auto iter=_opening.begin(); iter!=_opening.end(); iter++) {
 		if (idsOverlap(*iter, ids))
 			return true;
 	}
 	for (auto iter=_assets.begin(); iter!=_assets.end(); iter++) {
-		auto asset = *iter;
+		auto& asset = *iter;
 		if (asset) {
 			BitHordeIds assetIds;
 			if (asset->getIds(assetIds) && idsOverlap(assetIds, ids))
@@ -124,7 +124,7 @@ void Client::onMessage(const bithorde::BindWrite& msg)
 		if (path.is_absolute()) {
 			if (auto asset = _server.async_linkAsset(path)) {
 				LOG4CPLUS_INFO(clientLogger, "Linking " << path);
-				assignAsset(msg.handle(), asset);
+				assignAsset(msg.handle(), asset, bithorde::RouteTrace());
 			} else {
 				LOG4CPLUS_ERROR(clientLogger, "Upload did not match any allowed assetStore: " << path);
 				informAssetStatus(msg.handle(), bithorde::ERROR);
@@ -136,7 +136,7 @@ void Client::onMessage(const bithorde::BindWrite& msg)
 	} else {
 		if (auto asset = _server.prepareUpload(msg.size())) {
 			LOG4CPLUS_INFO(clientLogger, "Ready for upload");
-			assignAsset(msg.handle(), asset);
+			assignAsset(msg.handle(), asset, bithorde::RouteTrace());
 		} else {
 			informAssetStatus(msg.handle(), bithorde::NORESOURCES);
 		}
@@ -147,7 +147,19 @@ void Client::onMessage(bithorde::BindRead& msg)
 {
 	auto h = msg.handle();
 	if ((_assets.size() > h) && _assets[h]) {
-		clearAsset(h);
+		BitHordeIds ids;
+		auto& asset = _assets[h];
+		asset->getIds(ids);
+		if (idsOverlap(ids, msg.ids())) {
+			if (asset.bind(msg.requesters())) {
+				informAssetStatusUpdate(h, asset.weak());
+			} else {
+				informAssetStatus(h, bithorde::WOULD_LOOP);
+			}
+			return;
+		} else {
+			clearAsset(h);
+		}
 	}
 	if (msg.ids_size() > 0) {
 		// Trying to open
@@ -159,7 +171,7 @@ void Client::onMessage(bithorde::BindRead& msg)
 			auto asset = _server.async_findAsset(msg);
 			_opening.erase(iter);
 			if (asset)
-				assignAsset(h, asset);
+				assignAsset(h, asset, msg.requesters());
 			else
 				informAssetStatus(h, bithorde::NOTFOUND);
 		} catch (bithorded::BindError e) {
@@ -173,7 +185,7 @@ void Client::onMessage(bithorde::BindRead& msg)
 
 void Client::onMessage(const bithorde::Read::Request& msg)
 {
-	IAsset::Ptr& asset = getAsset(msg.handle());
+	const IAsset::Ptr& asset = getAsset(msg.handle());
 	if (asset) {
 		uint64_t offset = msg.offset();
 		size_t size = msg.size();
@@ -193,7 +205,7 @@ void Client::onMessage(const bithorde::Read::Request& msg)
 
 void Client::onMessage(const bithorde::DataSegment& msg)
 {
-	IAsset::Ptr& asset_ = getAsset(msg.handle());
+	const IAsset::Ptr& asset_ = getAsset(msg.handle());
 	if (asset_) {
 		bithorded::cache::CachedAsset::Ptr asset = dynamic_pointer_cast<bithorded::cache::CachedAsset>(asset_);
 		if (asset) {
@@ -257,6 +269,11 @@ void Client::informAssetStatusUpdate(bithorde::Asset::Handle h, const bithorded:
 			resp.set_availability(1000);
 			resp.set_size(asset->size());
 			asset->getIds(*resp.mutable_ids());
+			auto servers = asset->servers();
+			auto resp_servers = resp.mutable_servers();
+			for (auto iter=servers.begin(); iter != servers.end(); iter++) {
+				resp_servers->Add(*iter);
+			}
 		}
 	} else {
 		resp.set_status(bithorde::NOTFOUND);
@@ -266,7 +283,7 @@ void Client::informAssetStatusUpdate(bithorde::Asset::Handle h, const bithorded:
 	sendMessage(bithorde::Connection::AssetStatus, resp);
 }
 
-void Client::assignAsset(bithorde::Asset::Handle handle_, const IAsset::Ptr& a)
+void Client::assignAsset(bithorde::Asset::Handle handle_, const IAsset::Ptr& a, const bithorde::RouteTrace& requesters)
 {
 	size_t handle = handle_;
 	if (handle >= _assets.size()) {
@@ -280,14 +297,16 @@ void Client::assignAsset(bithorde::Asset::Handle handle_, const IAsset::Ptr& a)
 			new_size = MAX_ASSETS;
 		_assets.resize(new_size);
 	}
-	_assets[handle] = a;
+	if (_assets[handle].bind(a, requesters)) {
+		// Remember to inform peer about changes in asset-status.
+		a->statusChange.connect(boost::bind(&Client::informAssetStatusUpdate, this, handle_, IAsset::WeakPtr(a)));
 
-	// Remember to inform peer about changes in asset-status.
-	a->statusChange.connect(boost::bind(&Client::informAssetStatusUpdate, this, handle_, IAsset::WeakPtr(a)));
-
-	if (a->status != bithorde::Status::NONE) {
-		// We already have a valid status for the asset, so inform about it
-		informAssetStatusUpdate(handle_, a);
+		if (a->status != bithorde::Status::NONE) {
+			// We already have a valid status for the asset, so inform about it
+			informAssetStatusUpdate(handle_, a);
+		}
+	} else {
+		informAssetStatus(handle_, bithorde::Status::WOULD_LOOP);
 	}
 }
 
@@ -309,18 +328,18 @@ void Client::clearAsset(bithorde::Asset::Handle handle_)
 	size_t handle = handle_;
 	if (handle < _assets.size()) {
 		if (auto& a=_assets[handle]) {
-			a->statusChange.disconnect(boost::bind(&Client::informAssetStatusUpdate, this, handle_, IAsset::WeakPtr(a)));
+			a->statusChange.disconnect(boost::bind(&Client::informAssetStatusUpdate, this, handle_, a.weak()));
 			_assets[handle].reset();
 			LOG4CPLUS_DEBUG(clientLogger, peerName() << ':' << handle_ << " released");
 		}
 	}
 }
 
-IAsset::Ptr& Client::getAsset(bithorde::Asset::Handle handle_)
+const IAsset::Ptr& Client::getAsset(bithorde::Asset::Handle handle_) const
 {
 	size_t handle = handle_;
 	if (handle < _assets.size())
-		return _assets.at(handle);
+		return _assets.at(handle).shared();
 	else
 		return ASSET_NONE;
 }
