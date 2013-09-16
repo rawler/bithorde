@@ -18,6 +18,7 @@
 const static boost::posix_time::millisec DEFAULT_ASSET_TIMEOUT(1500);
 const static boost::posix_time::millisec UPLOAD_ASSET_TIMEOUT(10000);
 const static boost::posix_time::millisec CLOSE_TIMEOUT(300);
+const static int LOTS_OF_MILLISECONDS(2^30);
 const static int MAX_ASSETS(1024);
 
 const static boost::posix_time::seconds MINIMUM_PACKET_INTERVAL(90);
@@ -119,7 +120,7 @@ void AssetBinding::onTimeout()
 		msg.set_status(bithorde::Status::TIMEOUT);
 		_asset->handleMessage(msg);
 	} else if (_client) {
-		_client->informBound(*this, rand64(), CLOSE_TIMEOUT.total_milliseconds());
+		_client->informBound(*this, rand64(), LOTS_OF_MILLISECONDS);
 		setTimer(CLOSE_TIMEOUT);
 	}
 }
