@@ -88,7 +88,7 @@ void bithorded::router::ForwardedAsset::onUpstreamStatus(const string& peername,
 				LOG4CPLUS_WARN(assetLogger, peername << " " << _ids << " responded with mismatching size, ignoring...");
 				dropUpstream(peername);
 			}
-		} else {
+		} else if (status.ids().size()) {
 			LOG4CPLUS_WARN(assetLogger, peername << " " << _ids << " SUCCESS response not accompanied with asset-size.");
 		}
 	} else {
