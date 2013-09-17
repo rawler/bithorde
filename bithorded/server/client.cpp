@@ -146,6 +146,12 @@ void Client::onMessage(const bithorde::BindWrite& msg)
 void Client::onMessage(bithorde::BindRead& msg)
 {
 	auto h = msg.handle();
+
+	if (msg.ids_size() > 0) {
+		// Trying to open
+		LOG4CPLUS_DEBUG(clientLogger, peerName() << ':' << h << " requested: " << MagnetURI(msg));
+	}
+
 	if ((_assets.size() > h) && _assets[h]) {
 		BitHordeIds ids;
 		auto& asset = _assets[h];
@@ -161,10 +167,9 @@ void Client::onMessage(bithorde::BindRead& msg)
 			clearAsset(h);
 		}
 	}
+
 	if (msg.ids_size() > 0) {
 		// Trying to open
-		LOG4CPLUS_DEBUG(clientLogger, peerName() << ':' << h << " requested: " << MagnetURI(msg));
-
 		try {
 			_opening.push_front(msg.ids());
 			auto iter = _opening.begin();
