@@ -64,3 +64,6 @@ if __name__ == '__main__':
     # TODO: Should really not expect status-change on unaffected downstream.
     resp1 = downstream1.expect(message.AssetStatus(status=message.SUCCESS))
     resp1 = downstream1.expect(message.AssetStatus(status=message.WOULD_LOOP))
+
+    downstream1.send(message.BindRead(handle=1, ids=ASSET_IDS, timeout=500, requesters=[9873474]))
+    resp1 = downstream1.expect(message.AssetStatus(status=message.SUCCESS))

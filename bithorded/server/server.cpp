@@ -14,7 +14,6 @@
     limitations under the License.
 */
 
-
 #include "server.hpp"
 
 #include <boost/asio/placeholders.hpp>
@@ -29,7 +28,6 @@
 #include "buildconf.hpp"
 #include "client.hpp"
 #include "config.hpp"
-#include "../lib/loopfilter.hpp"
 
 using namespace std;
 
@@ -218,14 +216,6 @@ IAsset::Ptr Server::async_linkAsset(const boost::filesystem::path& filePath)
 
 IAsset::Ptr Server::async_findAsset(const bithorde::BindRead& req)
 {
-	for (auto iter=req.requesters().begin(); iter != req.requesters().end(); iter++) {
-		// TODO: Rewrite loop-filtering logic
-		if (!_loopFilter.test_and_set(*iter)) {
-			LOG4CPLUS_INFO(serverLog, "Looped on uuid " << *iter);
-			throw BindError(bithorde::WOULD_LOOP);
-		}
-	}
-
 	for (auto iter=_assetStores.begin(); iter != _assetStores.end(); iter++) {
 		if (auto asset = (*iter)->findAsset(req))
 			return asset;

@@ -30,7 +30,6 @@
 
 #include "../cache/manager.hpp"
 #include "../http_server/server.hpp"
-#include "../lib/loopfilter.hpp"
 #include "../lib/management.hpp"
 #include "../lib/grandcentraldispatch.hpp"
 #include "../router/router.hpp"
@@ -61,7 +60,6 @@ class Server : public GrandCentralDispatch, public management::Directory
 	boost::asio::ip::tcp::acceptor _tcpListener;
 	boost::asio::local::stream_protocol::acceptor _localListener;
 
-	LoopFilter _loopFilter;
 	ConnectionList _connections;
 
 	std::vector< std::unique_ptr<bithorded::source::Store> > _assetStores;
