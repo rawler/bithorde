@@ -18,20 +18,23 @@
 #include "asset.hpp"
 
 #include <lib/random.h>
+#include <boost/make_shared.hpp>
 
 using namespace bithorded;
 
+/**** AssetBinding *****/
+
 AssetBinding::AssetBinding() :
-	boost::shared_ptr<IAsset>(),
+	_ptr(),
 	_requesters()
 {}
 
 AssetBinding::AssetBinding(const AssetBinding& other) :
-	boost::shared_ptr<IAsset>(other),
+	_ptr(other._ptr),
 	_requesters(other._requesters)
 {
-	if (auto ptr = get()) {
-		ptr->bindDownstream(this);
+	if (_ptr) {
+		_ptr->bindDownstream(this);
 	}
 }
 
@@ -42,21 +45,21 @@ AssetBinding::~AssetBinding()
 
 bool AssetBinding::bind(const bithorde::RouteTrace& requesters)
 {
-	return bind(*this, requesters);
+	return bind(_ptr, requesters);
 }
 
-bool AssetBinding::bind(const boost::shared_ptr< IAsset >& asset, const bithorde::RouteTrace& requesters)
+bool AssetBinding::bind(const boost::shared_ptr<UpstreamRequestBinding>& asset, const bithorde::RouteTrace& requesters)
 {
-	if (auto ptr = get()) {
-		if (asset != *this)
-			ptr->unbindDownstream(this);
+	if (_ptr) {
+		if (asset != _ptr)
+			_ptr->unbindDownstream(this);
 	}
 	_requesters = requesters;
 	if (_requesters.size() == 0)
 		_requesters.Add(rand64());
 	if (asset->bindDownstream(this)) {
-		if (asset != *this)
-			boost::shared_ptr<IAsset>::operator=(asset);
+		if (asset != _ptr)
+			_ptr = asset;
 		return true;
 	} else {
 		reset();
@@ -66,24 +69,54 @@ bool AssetBinding::bind(const boost::shared_ptr< IAsset >& asset, const bithorde
 
 void AssetBinding::reset()
 {
-	if (auto ptr = get()) {
-		ptr->unbindDownstream(this);
+	if (_ptr) {
+		_ptr->unbindDownstream(this);
 	}
-	shared_ptr::reset();
+	_ptr.reset();
 	_requesters.Clear();
 }
 
 AssetBinding& AssetBinding::operator=(const AssetBinding& other)
 {
-	if (auto ptr = get()) {
-		ptr->unbindDownstream(this);
+	if (_ptr) {
+		_ptr->unbindDownstream(this);
 	}
-	boost::shared_ptr<IAsset>::operator=(other);
+	_ptr = other._ptr;
 	_requesters = other._requesters;
-	if (auto ptr = get()) {
-		ptr->bindDownstream(this);
+	if (_ptr) {
+		_ptr->bindDownstream(this);
 	}
 	return *this;
+}
+
+IAsset* AssetBinding::get() const
+{
+	return _ptr->get();
+}
+
+IAsset& AssetBinding::operator*() const
+{
+	return _ptr->operator*();
+}
+
+IAsset* AssetBinding::operator->() const
+{
+	return _ptr->operator->();
+}
+
+AssetBinding::operator bool() const
+{
+	return _ptr.get() && _ptr->get();
+}
+
+const boost::shared_ptr< IAsset >& AssetBinding::shared() const
+{
+	return _ptr->shared();
+}
+
+boost::weak_ptr< IAsset > AssetBinding::weak() const
+{
+	return _ptr->weaken();
 }
 
 bool bithorded::operator==(const AssetBinding& a, const boost::shared_ptr< IAsset >& b)
@@ -96,6 +129,78 @@ bool bithorded::operator!=(const AssetBinding& a, const boost::shared_ptr< IAsse
 	return a.get() != b.get();
 }
 
+/**** AssetRequestParameters *****/
+bool AssetRequestParameters::operator!=(const AssetRequestParameters& other)
+{
+	return (this->requesters != other.requesters);
+}
+
+/**** UpstreamRequestBinding *****/
+UpstreamRequestBinding::UpstreamRequestBinding(boost::shared_ptr< IAsset > asset) :
+	_ptr(asset), _parameters(), _downstreams()
+{}
+
+bool UpstreamRequestBinding::bindDownstream(const AssetBinding* binding)
+{
+	const auto& servers_ = _ptr->servers();
+	const auto& requesters_ = binding->requesters();
+	for (auto iter=requesters_.begin(); iter != requesters_.end(); iter++) {
+		if (servers_.count(*iter)) {
+			return false;
+		}
+	}
+	_downstreams.insert(binding);
+	rebuild();
+	return true;
+}
+
+void UpstreamRequestBinding::unbindDownstream(const AssetBinding* binding)
+{
+	_downstreams.erase(binding);
+	rebuild();
+}
+
+IAsset* UpstreamRequestBinding::get() const
+{
+	return _ptr.get();
+}
+
+IAsset& UpstreamRequestBinding::operator*() const
+{
+	return _ptr.operator*();
+}
+
+IAsset* UpstreamRequestBinding::operator->() const
+{
+	return _ptr.operator->();
+}
+
+const boost::shared_ptr< IAsset >& UpstreamRequestBinding::shared()
+{
+	return _ptr;
+}
+
+boost::weak_ptr< IAsset > UpstreamRequestBinding::weaken()
+{
+	return boost::weak_ptr<IAsset>(_ptr);
+}
+
+void UpstreamRequestBinding::rebuild()
+{
+	auto& requesters = _parameters.requesters;
+	auto old = _parameters;
+	requesters.clear();
+	for (auto iter=_downstreams.begin(); iter != _downstreams.end(); iter++) {
+		const auto& downstream_requesters = (*iter)->requesters();
+		requesters.insert(downstream_requesters.begin(), downstream_requesters.end());
+	}
+	if (old != _parameters) {
+		_ptr->apply(old, _parameters);
+	}
+}
+
+/**** IAsset *****/
+
 IAsset::IAsset() :
 	_sessionId(rand64()),
 	status(bithorde::Status::NONE)
@@ -106,24 +211,6 @@ std::unordered_set< uint64_t > IAsset::servers() const
 	std::unordered_set<uint64_t> res;
 	res.insert(_sessionId);
 	return res;
-}
-
-bool IAsset::bindDownstream(const AssetBinding* binding)
-{
-	_downstreams.insert(binding);
-	rebuildRequesters();
-	return true;
-}
-
-void IAsset::unbindDownstream(const AssetBinding* binding)
-{
-	_downstreams.erase(binding);
-	rebuildRequesters();
-}
-
-const std::unordered_set< const AssetBinding* >& IAsset::downstreams() const
-{
-	return _downstreams;
 }
 
 void IAsset::setStatus(bithorde::Status newStatus)
@@ -138,14 +225,4 @@ void IAsset::describe(bithorded::management::Info& target) const
 	target << bithorde::Status_Name(status);
 	if (getIds(ids))
 		target << ", " << ids;
-}
-
-void IAsset::rebuildRequesters()
-{
-	auto trx = requesters.change();
-	trx->clear();
-	for (auto iter=_downstreams.begin(); iter != _downstreams.end(); iter++) {
-		const auto& downstream_requesters = (*iter)->requesters();
-		trx->insert(downstream_requesters.begin(), downstream_requesters.end());
-	}
 }

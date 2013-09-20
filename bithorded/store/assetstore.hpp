@@ -47,11 +47,6 @@ public:
 	boost::filesystem::path resolveIds(const BitHordeIds& ids);
 
 	/**
-	 * Shared code for locating assets
-	 */
-	IAsset::Ptr findAsset(const BitHordeIds& ids);
-
-	/**
 	 * Returns iterator allowing iterating over the assets in the store.
 	 */
 	boost::filesystem::directory_iterator assetIterator() const;

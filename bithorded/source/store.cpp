@@ -76,7 +76,7 @@ bool path_is_in(const fs::path& path, const fs::path& folder) {
 	return boost::starts_with(path_, folder_);
 }
 
-IAsset::Ptr Store::addAsset(const boost::filesystem::path& file)
+UpstreamRequestBinding::Ptr Store::addAsset(const boost::filesystem::path& file)
 {
 	if (path_is_in(file, _baseDir)) {
 		fs::path assetFolder(AssetStore::newAssetDir());
@@ -86,18 +86,18 @@ IAsset::Ptr Store::addAsset(const boost::filesystem::path& file)
 			SourceAsset::Ptr asset = boost::make_shared<SourceAsset>(_gcd, assetFolder);
 			asset->statusChange.connect(boost::bind(&Store::_addAsset, this, SourceAsset::WeakPtr(asset)));
 			asset->hash();
-			return asset;
+			return boost::make_shared<UpstreamRequestBinding>(asset);
 		} catch (const std::ios::failure& e) {
 			LOG4CPLUS_ERROR(log, "Failed to create " << assetFolder << " for hashing " << file << ". Purging...");
 			AssetStore::removeAsset(assetFolder);
-			return IAsset::Ptr();
+			return ASSET_NONE;
 		}
 	} else {
 		return ASSET_NONE;
 	}
 }
 
-IAsset::Ptr Store::findAsset(const bithorde::BindRead& req)
+UpstreamRequestBinding::Ptr Store::findAsset(const bithorde::BindRead& req)
 {
 	return AssetSessions::findAsset(req);
 }

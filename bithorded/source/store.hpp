@@ -53,12 +53,12 @@ public:
 	 *
 	 * @returns a valid asset if file is within acceptable path, NULL otherwise
 	 */
-	IAsset::Ptr addAsset(const boost::filesystem::path& file);
+	UpstreamRequestBinding::Ptr addAsset(const boost::filesystem::path& file);
 
 	/**
 	 * Finds an asset by bithorde HashId. (Only the tiger-hash is actually used)
 	 */
-	IAsset::Ptr findAsset(const bithorde::BindRead& req);
+	UpstreamRequestBinding::Ptr findAsset(const bithorde::BindRead& req);
 protected:
 	/**
 	 * Finds an asset by bithorde HashId. (Only the tiger-hash is actually used)

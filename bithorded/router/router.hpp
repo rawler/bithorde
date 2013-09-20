@@ -60,7 +60,7 @@ public:
 	void onConnected(const bithorded::Client::Ptr& client);
 	void onDisconnected(const bithorded::Client::Ptr& client);
 
-	IAsset::Ptr findAsset(const bithorde::BindRead& req);
+	UpstreamRequestBinding::Ptr findAsset(const bithorde::BindRead& req);
 
 	virtual void inspect(management::InfoList& target) const;
     virtual void describe(management::Info& target) const;

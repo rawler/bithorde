@@ -147,7 +147,7 @@ void Router::onDisconnected(const bithorded::Client::Ptr& client)
 		_connectors[peerName] = FriendConnector::create(_server, _friends[peerName]);
 }
 
-IAsset::Ptr Router::findAsset(const bithorde::BindRead& req)
+UpstreamRequestBinding::Ptr Router::findAsset(const bithorde::BindRead& req)
 {
 	// TODO; make sure returned asset isn't stale
 	return AssetSessions::findAsset(req);

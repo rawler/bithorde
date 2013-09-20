@@ -62,7 +62,8 @@ void CacheManager::inspect(management::InfoList& target) const
 
 IAsset::Ptr CacheManager::openAsset(const boost::filesystem::path& assetPath)
 {
-	return boost::make_shared<CachedAsset>(_gcd, assetPath);
+	auto res = boost::make_shared<CachedAsset>(_gcd, assetPath);
+	return IAsset::Ptr(res);
 }
 
 IAsset::Ptr CacheManager::openAsset(const bithorde::BindRead& req)
@@ -74,10 +75,10 @@ IAsset::Ptr CacheManager::openAsset(const bithorde::BindRead& req)
 		return stored;
 	} else {
 		auto upstream = _router.findAsset(req);
-		if (auto upstream_ = boost::dynamic_pointer_cast<router::ForwardedAsset>(upstream)) {
+		if (auto upstream_ = boost::dynamic_pointer_cast<router::ForwardedAsset>(upstream->shared())) {
 			return boost::make_shared<CachingAsset>(*this, upstream_, stored);
 		} else {
-			return upstream;
+			return upstream->shared();
 		}
 	}
 }
@@ -109,7 +110,7 @@ CachedAsset::Ptr CacheManager::prepareUpload(uint64_t size, const BitHordeIds& i
 	return res;
 }
 
-IAsset::Ptr CacheManager::findAsset(const bithorde::BindRead& req)
+UpstreamRequestBinding::Ptr CacheManager::findAsset(const bithorde::BindRead& req)
 {
 	return AssetSessions::findAsset(req);
 }

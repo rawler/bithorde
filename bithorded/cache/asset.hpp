@@ -40,6 +40,8 @@ public:
 
 	virtual void inspect(management::InfoList& target) const;
 
+	virtual void apply(const AssetRequestParameters& old_parameters, const AssetRequestParameters& new_parameters);
+
 	/**
 	 * Writes up to /size/ from buf into asset, updating amount written in hasher
 	 *  NOTE: data will be processed asynchronously, so if you need to wait for it, pass
@@ -70,9 +72,8 @@ public:
 	virtual uint64_t size();
 	virtual std::unordered_set< uint64_t > servers() const;
 
-	virtual bool bindDownstream(const AssetBinding* binding);
-	virtual void unbindDownstream(const AssetBinding* binding);
-
+	virtual void apply(const AssetRequestParameters& old_parameters, const AssetRequestParameters& new_parameters);
+	
 private:
 	CachedAsset::Ptr cached();
 

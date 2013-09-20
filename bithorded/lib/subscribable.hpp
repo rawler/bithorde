@@ -18,8 +18,9 @@
 #ifndef SUBSCRIBABLE_HPP
 #define SUBSCRIBABLE_HPP
 
-#include <boost/signals2/signal.hpp>
 #include <boost/noncopyable.hpp>
+#include <boost/shared_ptr.hpp>
+#include <boost/signals2/signal.hpp>
 
 template <typename T>
 class ChangeGuard{
@@ -96,7 +97,6 @@ public:
 	virtual const T& operator*() const {
 		return _value;
 	}
-
 };
 
 #endif // SUBSCRIBABLE_HPP

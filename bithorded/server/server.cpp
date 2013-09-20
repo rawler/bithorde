@@ -205,7 +205,7 @@ const bithorded::Config::Client& Server::getClientConfig(const string& name)
 	return null_client;
 }
 
-IAsset::Ptr Server::async_linkAsset(const boost::filesystem::path& filePath)
+UpstreamRequestBinding::Ptr Server::async_linkAsset(const boost::filesystem::path& filePath)
 {
 	for (auto iter=_assetStores.begin(); iter != _assetStores.end(); iter++) {
 		if (auto res = (*iter)->addAsset(filePath))
@@ -214,21 +214,24 @@ IAsset::Ptr Server::async_linkAsset(const boost::filesystem::path& filePath)
 	return ASSET_NONE;
 }
 
-IAsset::Ptr Server::async_findAsset(const bithorde::BindRead& req)
+UpstreamRequestBinding::Ptr Server::async_findAsset(const bithorde::BindRead& req)
 {
 	for (auto iter=_assetStores.begin(); iter != _assetStores.end(); iter++) {
 		if (auto asset = (*iter)->findAsset(req))
 			return asset;
 	}
 
-	if (auto asset = _cache.findAsset(req))
+	if (auto asset = _cache.findAsset(req)) {
 		return asset;
-	else
+	} else
 		return _router.findAsset(req);
 }
 
-IAsset::Ptr Server::prepareUpload(uint64_t size)
+UpstreamRequestBinding::Ptr Server::prepareUpload(uint64_t size)
 {
-	return _cache.prepareUpload(size);
+	UpstreamRequestBinding::Ptr res;
+	if (auto asset = _cache.prepareUpload(size))
+		res = make_shared<UpstreamRequestBinding>(asset);
+	return res;
 }
 

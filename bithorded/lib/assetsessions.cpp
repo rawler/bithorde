@@ -18,21 +18,25 @@
 #include "assetsessions.hpp"
 
 #include "../../lib/hashes.h"
+#include <boost/make_shared.hpp>
 
-bithorded::IAsset::Ptr bithorded::AssetSessions::findAsset(const bithorde::BindRead& req)
+bithorded::UpstreamRequestBinding::Ptr bithorded::AssetSessions::findAsset(const bithorde::BindRead& req)
 {
 	std::string tigerId = findBithordeId(req.ids(), bithorde::HashType::TREE_TIGER);
 	if (tigerId.empty())
-		return IAsset::Ptr();
+		return UpstreamRequestBinding::Ptr();
 	if (auto active = _tigerCache[tigerId])
 		return active;
 
-	auto res = openAsset(req);
-	add(tigerId, res);
+	UpstreamRequestBinding::Ptr res;
+	if (auto asset = openAsset(req)) {
+		res = boost::make_shared<UpstreamRequestBinding>(asset);
+		add(tigerId, res);
+	}
 	return res;
 }
 
-void bithorded::AssetSessions::add(const std::string& tigerId, const bithorded::IAsset::Ptr& asset)
+void bithorded::AssetSessions::add(const std::string& tigerId, const UpstreamRequestBinding::Ptr& asset)
 {
 	if (asset)
 		_tigerCache.set(tigerId, asset);

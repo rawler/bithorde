@@ -39,6 +39,9 @@ void bithorded::cache::CachedAsset::inspect(bithorded::management::InfoList& tar
 	target.append("type") << "Cached";
 }
 
+void CachedAsset::apply(const bithorded::AssetRequestParameters& old_parameters, const bithorded::AssetRequestParameters& new_parameters)
+{}
+
 void bithorded::cache::CachedAsset::write(uint64_t offset, const std::string& data, const std::function< void() > whenDone)
 {
 	auto job = boost::bind(&RandomAccessFile::write, &_file, offset, data);
@@ -118,21 +121,10 @@ std::unordered_set< uint64_t > CachingAsset::servers() const
 		return bithorded::IAsset::servers();
 }
 
-bool CachingAsset::bindDownstream(const bithorded::AssetBinding* binding)
+void CachingAsset::apply(const bithorded::AssetRequestParameters& old_parameters, const bithorded::AssetRequestParameters& new_parameters)
 {
-	bithorded::IAsset::bindDownstream(binding);
-	if (_upstream) {
-		return _upstream->bindDownstream(binding);
-	} else {
-		return true;
-	}
-}
-
-void CachingAsset::unbindDownstream(const bithorded::AssetBinding* binding)
-{
-	bithorded::IAsset::unbindDownstream(binding);
 	if (_upstream)
-		_upstream->unbindDownstream(binding);
+		_upstream->apply(old_parameters, new_parameters);
 }
 
 void bithorded::cache::CachingAsset::disconnect()

@@ -190,7 +190,7 @@ void Client::onMessage(bithorde::BindRead& msg)
 
 void Client::onMessage(const bithorde::Read::Request& msg)
 {
-	const IAsset::Ptr& asset = getAsset(msg.handle());
+	const AssetBinding& asset = getAsset(msg.handle());
 	if (asset) {
 		uint64_t offset = msg.offset();
 		size_t size = msg.size();
@@ -210,9 +210,9 @@ void Client::onMessage(const bithorde::Read::Request& msg)
 
 void Client::onMessage(const bithorde::DataSegment& msg)
 {
-	const IAsset::Ptr& asset_ = getAsset(msg.handle());
+	const AssetBinding& asset_ = getAsset(msg.handle());
 	if (asset_) {
-		bithorded::cache::CachedAsset::Ptr asset = dynamic_pointer_cast<bithorded::cache::CachedAsset>(asset_);
+		bithorded::cache::CachedAsset::Ptr asset = dynamic_pointer_cast<bithorded::cache::CachedAsset>(asset_.shared());
 		if (asset) {
 			asset->write(msg.offset(), msg.content());
 		} else {
@@ -288,7 +288,7 @@ void Client::informAssetStatusUpdate(bithorde::Asset::Handle h, const bithorded:
 	sendMessage(bithorde::Connection::AssetStatus, resp);
 }
 
-void Client::assignAsset(bithorde::Asset::Handle handle_, const IAsset::Ptr& a, const bithorde::RouteTrace& requesters)
+void Client::assignAsset(bithorde::Asset::Handle handle_, const UpstreamRequestBinding::Ptr& a, const bithorde::RouteTrace& requesters)
 {
 	size_t handle = handle_;
 	if (handle >= _assets.size()) {
@@ -304,11 +304,11 @@ void Client::assignAsset(bithorde::Asset::Handle handle_, const IAsset::Ptr& a, 
 	}
 	if (_assets[handle].bind(a, requesters)) {
 		// Remember to inform peer about changes in asset-status.
-		a->statusChange.connect(boost::bind(&Client::informAssetStatusUpdate, this, handle_, IAsset::WeakPtr(a)));
+		(*a)->statusChange.connect(boost::bind(&Client::informAssetStatusUpdate, this, handle_, a->weaken()));
 
-		if (a->status != bithorde::Status::NONE) {
+		if ((*a)->status != bithorde::Status::NONE) {
 			// We already have a valid status for the asset, so inform about it
-			informAssetStatusUpdate(handle_, a);
+			informAssetStatusUpdate(handle_, a->shared());
 		}
 	} else {
 		informAssetStatus(handle_, bithorde::Status::WOULD_LOOP);
@@ -340,11 +340,11 @@ void Client::clearAsset(bithorde::Asset::Handle handle_)
 	}
 }
 
-const IAsset::Ptr& Client::getAsset(bithorde::Asset::Handle handle_) const
+const AssetBinding& Client::getAsset(bithorde::Asset::Handle handle_) const
 {
 	size_t handle = handle_;
 	if (handle < _assets.size())
-		return _assets.at(handle).shared();
+		return _assets.at(handle);
 	else
-		return ASSET_NONE;
+		return BINDING_NONE;
 }

@@ -26,14 +26,15 @@
 #include <lib/hashes.h>
 #include <lib/types.h>
 #include "../lib/management.hpp"
-#include <bithorded/lib/subscribable.hpp>
 
 namespace bithorded
 {
 
 class IAsset;
+class UpstreamRequestBinding;
 
-class AssetBinding : private boost::shared_ptr<IAsset> {
+class AssetBinding {
+	boost::shared_ptr<UpstreamRequestBinding> _ptr;
 	bithorde::RouteTrace _requesters;
 public:
 	AssetBinding();
@@ -41,17 +42,17 @@ public:
 	virtual ~AssetBinding();
 
 	bool bind(const bithorde::RouteTrace& requesters);
-	bool bind(const boost::shared_ptr< bithorded::IAsset >& asset, const bithorde::RouteTrace& requesters);
+	bool bind(const boost::shared_ptr< bithorded::UpstreamRequestBinding >& asset, const bithorde::RouteTrace& requesters);
 	void reset();
 
 	AssetBinding& operator=(const AssetBinding& other);
-	IAsset & operator*() const { return shared_ptr::operator*();}
-	IAsset* operator->() const { return shared_ptr::operator->(); }
-	IAsset* get() const { return shared_ptr::get(); }
-	explicit operator bool() const { return shared_ptr::get(); }
+	IAsset & operator*() const;
+	IAsset* operator->() const;
+	IAsset* get() const;
+	explicit operator bool() const;
 
-	const boost::shared_ptr<IAsset>& shared() const { return *this; }
-	boost::weak_ptr<IAsset> weak() const { return boost::weak_ptr<IAsset>(*this); }
+	const boost::shared_ptr< IAsset >& shared() const;
+	boost::weak_ptr< IAsset > weak() const;
 
 	const bithorde::RouteTrace& requesters() const { return _requesters; }
 };
@@ -59,10 +60,37 @@ public:
 bool operator==(const bithorded::AssetBinding& a, const boost::shared_ptr< bithorded::IAsset >& b);
 bool operator!=(const bithorded::AssetBinding& a, const boost::shared_ptr< bithorded::IAsset >& b);
 
+struct AssetRequestParameters {
+	std::unordered_set<uint64_t> requesters;
+
+	bool operator!=(const AssetRequestParameters& other);
+};
+
+class UpstreamRequestBinding : boost::noncopyable {
+	boost::shared_ptr<IAsset> _ptr;
+	AssetRequestParameters _parameters;
+	std::unordered_set<const AssetBinding*> _downstreams;
+public:
+	typedef boost::shared_ptr<UpstreamRequestBinding> Ptr;
+
+	UpstreamRequestBinding(boost::shared_ptr<IAsset> asset);
+
+	virtual bool bindDownstream(const AssetBinding* binding);
+	virtual void unbindDownstream(const bithorded::AssetBinding* binding);
+
+	const boost::shared_ptr< IAsset >& shared();
+	boost::weak_ptr<IAsset> weaken();
+
+	IAsset* get() const;
+	IAsset* operator->() const;
+	IAsset& operator*() const;
+private:
+	void rebuild();
+};
+
 class IAsset : public management::DescriptiveDirectory
 {
 	uint64_t _sessionId;
-	std::unordered_set<const AssetBinding*> _downstreams;
 public:
 	typedef boost::function<void(int64_t offset, const std::string& data)> ReadCallback;
 
@@ -80,10 +108,7 @@ public:
 	uint64_t sessionId() const { return _sessionId; }
 	virtual std::unordered_set<uint64_t> servers() const;
 
-	virtual bool bindDownstream(const AssetBinding* binding);
-	virtual void unbindDownstream(const bithorded::AssetBinding* binding);
-	const std::unordered_set<const AssetBinding*>& downstreams() const;
-	Subscribable< std::unordered_set<uint64_t> > requesters;
+	virtual void apply(const AssetRequestParameters& old_parameters, const AssetRequestParameters& new_parameters) = 0;
 
 	/**
 	 * Valid parameters
@@ -97,17 +122,15 @@ public:
 
 protected:
 	void setStatus(bithorde::Status newStatus);
-private:
-	void rebuildRequesters();
 };
 
 class IAssetStore
 {
-	IAsset::Ptr findAsset(const BitHordeIds& ids);
+	virtual boost::shared_ptr<IAsset> findAsset(const BitHordeIds& ids) = 0;
 };
 
 // Empty dummy Asset::Ptr, for cases when a null Ptr& is needed.
-static IAsset::Ptr ASSET_NONE;
+static UpstreamRequestBinding::Ptr ASSET_NONE;
 
 }
 

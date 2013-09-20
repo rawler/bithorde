@@ -64,11 +64,13 @@ private:
 	void informAssetStatus(bithorde::Asset::Handle h, bithorde::Status s);
 	void informAssetStatusUpdate(bithorde::Asset::Handle h, const bithorded::IAsset::WeakPtr& asset);
 	void onReadResponse( const bithorde::Read::Request& req, int64_t offset, const std::string& data, bithorde::Message::Deadline t);
-	void assignAsset(bithorde::Asset::Handle handle_, const bithorded::IAsset::Ptr& a, const bithorde::RouteTrace& requesters);
+	void assignAsset(bithorde::Asset::Handle handle_, const UpstreamRequestBinding::Ptr& a, const bithorde::RouteTrace& requesters);
 	void clearAssets();
 	void clearAsset(bithorde::Asset::Handle handle);
-	const IAsset::Ptr& getAsset(bithorde::Asset::Handle handle_) const;
+	const AssetBinding& getAsset(bithorde::Asset::Handle handle_) const;
 };
+
+static AssetBinding BINDING_NONE;
 
 }
 #endif // BITHORDED_CLIENT_H

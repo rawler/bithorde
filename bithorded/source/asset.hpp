@@ -44,6 +44,8 @@ public:
 
 	virtual void inspect(management::InfoList& target) const;
 
+	virtual void apply(const AssetRequestParameters& old_parameters, const AssetRequestParameters& new_parameters);
+
 	/**
 	 * Starts background job building a hashtree of the content in the asset
 	 */

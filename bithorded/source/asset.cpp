@@ -34,6 +34,9 @@ void SourceAsset::inspect(management::InfoList& target) const
 	target.append("path") << _file.path();
 }
 
+void SourceAsset::apply(const AssetRequestParameters& old_parameters, const AssetRequestParameters& new_parameters)
+{}
+
 void SourceAsset::hash()
 {
 	notifyValidRange(0, size());
