@@ -46,12 +46,14 @@ void bithorded::cache::CachedAsset::write(uint64_t offset, const std::string& da
 	_gcd.submit(job, completion);
 }
 
-bithorded::cache::CachingAsset::CachingAsset(bithorded::cache::CacheManager& mgr, bithorded::router::ForwardedAsset::Ptr upstream, bithorded::cache::CachedAsset::Ptr cached)
-	: _manager(mgr), _upstream(upstream), _cached(cached), _delayedCreation(false)
+bithorded::cache::CachingAsset::CachingAsset(bithorded::cache::CacheManager& mgr, bithorded::router::ForwardedAsset::Ptr upstream, bithorded::cache::CachedAsset::Ptr cached) :
+	_manager(mgr),
+	_upstream(upstream),
+	_upstreamTracker(_upstream->statusChange.connect(boost::bind(&CachingAsset::upstreamStatusChange, this, _1))),
+	_cached(cached),
+	_delayedCreation(false)
 {
-	if (_upstream)
-		setStatus(_upstream->status);
-	_upstream->statusChange.connect(boost::bind(&CachingAsset::upstreamStatusChange, this, _1));
+	setStatus(_upstream->status);
 }
 
 bithorded::cache::CachingAsset::~CachingAsset()
@@ -110,8 +112,7 @@ uint64_t bithorded::cache::CachingAsset::size()
 
 void bithorded::cache::CachingAsset::disconnect()
 {
-	if (_upstream)
-		_upstream->statusChange.disconnect(boost::bind(&CachingAsset::upstreamStatusChange, this));
+	_upstreamTracker.disconnect();
 	_upstream.reset();
 }
 
