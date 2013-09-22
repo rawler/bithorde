@@ -90,10 +90,10 @@ UpstreamRequestBinding::Ptr Store::addAsset(const boost::filesystem::path& file)
 		} catch (const std::ios::failure& e) {
 			LOG4CPLUS_ERROR(log, "Failed to create " << assetFolder << " for hashing " << file << ". Purging...");
 			AssetStore::removeAsset(assetFolder);
-			return ASSET_NONE;
+			return UpstreamRequestBinding::NONE;
 		}
 	} else {
-		return ASSET_NONE;
+		return UpstreamRequestBinding::NONE;
 	}
 }
 

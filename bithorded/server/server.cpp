@@ -211,7 +211,7 @@ UpstreamRequestBinding::Ptr Server::async_linkAsset(const boost::filesystem::pat
 		if (auto res = (*iter)->addAsset(filePath))
 			return res;
 	}
-	return ASSET_NONE;
+	return UpstreamRequestBinding::NONE;
 }
 
 UpstreamRequestBinding::Ptr Server::async_findAsset(const bithorde::BindRead& req)

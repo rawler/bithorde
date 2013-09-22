@@ -72,6 +72,7 @@ class UpstreamRequestBinding : boost::noncopyable {
 	std::unordered_set<const AssetBinding*> _downstreams;
 public:
 	typedef boost::shared_ptr<UpstreamRequestBinding> Ptr;
+	static UpstreamRequestBinding::Ptr NONE;
 
 	UpstreamRequestBinding(boost::shared_ptr<IAsset> asset);
 
@@ -101,6 +102,8 @@ public:
 
 	typedef boost::shared_ptr<IAsset> Ptr;
 	typedef boost::weak_ptr<IAsset> WeakPtr;
+	// Empty dummy Asset::Ptr, for cases when a null Ptr& is needed.
+	static IAsset::Ptr NONE;
 
 	virtual void async_read(uint64_t offset, size_t& size, uint32_t timeout, ReadCallback cb) = 0;
 	virtual uint64_t size() = 0;
@@ -128,9 +131,6 @@ class IAssetStore
 {
 	virtual boost::shared_ptr<IAsset> findAsset(const BitHordeIds& ids) = 0;
 };
-
-// Empty dummy Asset::Ptr, for cases when a null Ptr& is needed.
-static UpstreamRequestBinding::Ptr ASSET_NONE;
 
 }
 

@@ -136,6 +136,8 @@ bool AssetRequestParameters::operator!=(const AssetRequestParameters& other)
 }
 
 /**** UpstreamRequestBinding *****/
+UpstreamRequestBinding::Ptr UpstreamRequestBinding::NONE;
+
 UpstreamRequestBinding::UpstreamRequestBinding(boost::shared_ptr< IAsset > asset) :
 	_ptr(asset), _parameters(), _downstreams()
 {}
@@ -200,6 +202,7 @@ void UpstreamRequestBinding::rebuild()
 }
 
 /**** IAsset *****/
+IAsset::Ptr IAsset::NONE;
 
 IAsset::IAsset() :
 	_sessionId(rand64()),
