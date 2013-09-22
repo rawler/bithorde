@@ -91,7 +91,10 @@ AssetBinding& AssetBinding::operator=(const AssetBinding& other)
 
 IAsset* AssetBinding::get() const
 {
-	return _ptr->get();
+	if (_ptr)
+		return _ptr->get();
+	else
+		return NULL;
 }
 
 IAsset& AssetBinding::operator*() const
@@ -101,7 +104,7 @@ IAsset& AssetBinding::operator*() const
 
 IAsset* AssetBinding::operator->() const
 {
-	return _ptr->operator->();
+	return get();
 }
 
 AssetBinding::operator bool() const
@@ -111,12 +114,20 @@ AssetBinding::operator bool() const
 
 const boost::shared_ptr< IAsset >& AssetBinding::shared() const
 {
-	return _ptr->shared();
+	if (_ptr) {
+		return _ptr->shared();
+	} else {
+		return IAsset::NONE;
+	}
 }
 
 boost::weak_ptr< IAsset > AssetBinding::weak() const
 {
-	return _ptr->weaken();
+	if (_ptr) {
+		return _ptr->weaken();
+	} else {
+		return boost::weak_ptr< IAsset >();
+	}
 }
 
 bool bithorded::operator==(const AssetBinding& a, const boost::shared_ptr< IAsset >& b)
