@@ -1,5 +1,7 @@
 #include "connection.h"
 
+#include "keepalive.hpp"
+
 #include <boost/asio.hpp>
 #include <boost/bind.hpp>
 #include <iostream>
@@ -138,6 +140,7 @@ public:
 			_socket->close();
 			disconnected();
 		}
+		_keepAlive.reset(NULL);
 	}
 };
 
@@ -282,6 +285,8 @@ void Connection::onRead(const boost::system::error_code& err, size_t count)
 		}
 	}
 
+	if (_keepAlive)
+		_keepAlive->reset();
 	_rcvBuf.pop(_rcvBuf.size-remains);
 
 	tryRead();
@@ -308,6 +313,12 @@ bool Connection::dequeue(MessageType type, ::google::protobuf::io::CodedInputStr
 	stream.PopLimit(limit);
 
 	return res;
+}
+
+
+void Connection::setKeepalive(Keepalive* value)
+{
+	_keepAlive.reset(value);
 }
 
 ConnectionStats::Ptr Connection::stats()

@@ -17,6 +17,8 @@
 
 namespace bithorde {
 
+class Keepalive;
+
 struct Message {
 	typedef boost::chrono::steady_clock Clock;
 	typedef Clock::time_point Deadline;
@@ -82,6 +84,7 @@ public:
 
 	virtual void setEncryption(bithorde::CipherType t, const std::string& key, const std::string& iv) = 0;
 	virtual void setDecryption(bithorde::CipherType t, const std::string& key, const std::string& iv) = 0;
+	void setKeepalive(Keepalive* keepalive);
 
 	typedef boost::signals2::signal<void ()> VoidSignal;
 	typedef boost::signals2::signal<void (MessageType, ::google::protobuf::Message&)> MessageSignal;
@@ -108,6 +111,7 @@ protected:
 protected:
 	boost::asio::io_service& _ioSvc;
 	ConnectionStats::Ptr _stats;
+	std::unique_ptr<Keepalive> _keepAlive;
 
 	Buffer _rcvBuf;
 	MessageQueue _sndQueue;

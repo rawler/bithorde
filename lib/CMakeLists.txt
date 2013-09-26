@@ -11,6 +11,7 @@ ADD_LIBRARY(bithorde
 	counter.cpp
 	connection.h connection.cpp
 	hashes.h hashes.cpp
+	keepalive.cpp
 	magneturi.h magneturi.cpp
 	random.h random.cpp
 	timer.cpp

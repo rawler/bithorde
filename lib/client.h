@@ -78,8 +78,6 @@ private:
 	std::string _key, _sentChallenge;
 	std::unique_ptr<CipherConfig> _sendCipher, _recvCipher;
 
-	std::unique_ptr<ClientKeepalive> _keepAlive;
-
 	AssetMap _assetMap;
 	std::map<int, Asset::Handle> _requestIdMap;
 	CachedAllocator<Asset::Handle> _handleAllocator;
