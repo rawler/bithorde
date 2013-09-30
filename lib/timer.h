@@ -46,11 +46,15 @@ friend class TimerService;
 public:
 	typedef boost::function<void (const boost::posix_time::ptime& now)> Target;
 private:
-	TimerService& _ts;
-	const Target _target;
+	TimerService* _ts;
+	Target _target;
 public:
 	Timer(TimerService& ts, const Target& target);
+
+	Timer(const Timer& other);
 	virtual ~Timer();
+	Timer& operator=(const Timer& other);
+
 	void arm(boost::posix_time::ptime deadline);
 	void arm(boost::posix_time::time_duration in);
 	void clear();

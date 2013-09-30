@@ -66,8 +66,17 @@ void TimerService::invoke(boost::system::error_code ec)
 }
 
 Timer::Timer(TimerService& ts, const Timer::Target& target)
-	: _ts(ts), _target(target)
+	: _ts(&ts), _target(target)
 {
+}
+
+Timer::Timer(const Timer& other) :
+	_ts(other._ts), _target(other._target)
+{
+	for (auto iter = _ts->_timers.cbegin(); iter != _ts->_timers.cend(); iter++) {
+		if (iter->second == &other)
+			_ts->arm(iter->first, this);
+	}
 }
 
 Timer::~Timer()
@@ -75,18 +84,32 @@ Timer::~Timer()
 	clear();
 }
 
+Timer& Timer::operator=(const Timer& other)
+{
+	clear();
+	_ts = other._ts;
+	_target = other._target;
+	for (auto iter = _ts->_timers.cbegin(); iter != _ts->_timers.cend(); iter++) {
+		if (iter->second == &other)
+			_ts->arm(iter->first, this);
+	}
+	return *this;
+}
+
+
 void Timer::arm(boost::posix_time::ptime deadline)
 {
-	_ts.arm(deadline, this);
+	_ts->arm(deadline, this);
 }
 
 void Timer::arm(boost::posix_time::time_duration in)
 {
-	_ts.arm(boost::posix_time::microsec_clock::universal_time() + in, this);
+	auto deadline = boost::posix_time::microsec_clock::universal_time() + in;
+	_ts->arm(deadline, this);
 }
 
 void Timer::clear() {
-	_ts.clear(this);
+	_ts->clear(this);
 }
 
 void Timer::invoke(const boost::posix_time::ptime& scheduled_at, const boost::posix_time::ptime& now)
