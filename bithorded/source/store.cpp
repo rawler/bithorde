@@ -107,8 +107,8 @@ void Store::_addAsset(SourceAsset::WeakPtr asset_)
 	auto asset = asset_.lock();
 	BitHordeIds ids;
 	if (asset && asset->getIds(ids)) {
-		const char *data_path = (asset->folder()/"data").c_str();
-		lutimes(data_path, NULL);
+		auto data_path(asset->folder()/"data");
+		lutimes(data_path.c_str(), NULL);
 
 		AssetStore::update_links(ids, asset);
 	}
