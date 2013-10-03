@@ -65,5 +65,21 @@ if __name__ == '__main__':
     resp1 = downstream1.expect(message.AssetStatus(status=message.SUCCESS))
     resp1 = downstream1.expect(message.AssetStatus(status=message.WOULD_LOOP))
 
+    # Simulate redundantly connected downstream on downstream1
     downstream1.send(message.BindRead(handle=1, ids=ASSET_IDS, timeout=500, requesters=[9873474]))
     resp1 = downstream1.expect(message.AssetStatus(status=message.SUCCESS))
+
+    # TODO: Should really not expect status-change on unaffected downstream.
+    downstream2.expect(message.AssetStatus(handle=1, status=message.SUCCESS))
+
+    # Close both downstreams
+    downstream1.send(message.BindRead(handle=1, ids=[]))
+    downstream1.expect(message.AssetStatus(handle=1, status=message.NOTFOUND))
+    # TODO: Should really not expect status-change on unaffected downstream.
+    downstream2.expect(message.AssetStatus(handle=1, status=message.SUCCESS))
+    downstream2.send(message.BindRead(handle=1, ids=[]))
+    downstream2.expect(message.AssetStatus(handle=1, status=message.NOTFOUND))
+
+    # Simulate late loop
+    downstream1.send(message.BindRead(handle=1, ids=ASSET_IDS, timeout=500, requesters=req2.requesters))
+    downstream1.expect(message.AssetStatus(status=message.WOULD_LOOP))

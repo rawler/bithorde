@@ -21,6 +21,7 @@
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/make_shared.hpp>
+#include <unordered_set>
 
 #include <log4cplus/logger.h>
 #include <log4cplus/loggingmacros.h>
@@ -173,10 +174,35 @@ void Router::describe(management::Info& target) const
 
 bithorded::IAsset::Ptr bithorded::router::Router::openAsset(const bithorde::BindRead& req)
 {
-	int timeout = req.has_timeout() ? req.timeout()-20 : 500; // TODO: Find actual reasonable time message has been in air. Use DEFAULT_ASSET_TIMEOUT from library.
-	if (timeout <= 0)
-		return bithorded::IAsset::Ptr();
+	auto now = boost::posix_time::microsec_clock::universal_time();
+
+	if (_isBlacklisted(now, req.requesters()))
+		throw bithorded::BindError(bithorde::WOULD_LOOP);
 
 	auto asset = boost::make_shared<ForwardedAsset, Router&, const BitHordeIds&>(*this, req.ids());
+	// TODO: Implement deadlines and use them instead.
+	_addToBlacklist(now + boost::posix_time::seconds(30), asset->sessionId());
 	return asset;
+}
+
+void Router::_addToBlacklist(const boost::posix_time::ptime& deadline, uint64_t uid)
+{
+	_blacklist.insert(uid);
+	_blacklistQueue.push(pair<boost::posix_time::ptime, uint64_t>(deadline, uid));
+}
+
+bool Router::_isBlacklisted(const boost::posix_time::ptime& now, const google::protobuf::RepeatedField <google::protobuf::uint64 >& uids)
+{
+	while (_blacklistQueue.size() && _blacklistQueue.front().first <= now) {
+		_blacklist.erase(_blacklistQueue.front().second);
+		_blacklistQueue.pop();
+	}
+
+	for (auto iter=uids.begin(); iter != uids.end(); iter++) {
+		if (_blacklist.count(*iter)) {
+			return true;
+		}
+	}
+
+	return false;
 }

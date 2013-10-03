@@ -108,9 +108,19 @@ public:
 	virtual void async_read(uint64_t offset, size_t& size, uint32_t timeout, ReadCallback cb) = 0;
 	virtual uint64_t size() = 0;
 
+	/**
+	 * The 64-bit random id generated for this node in this session of the asset.
+	 */
 	uint64_t sessionId() const { return _sessionId; }
+
+	/**
+	 * A set of ids for serving nodes in this session of the asset. Includes sessionId()
+	 */
 	virtual std::unordered_set<uint64_t> servers() const;
 
+	/**
+	 * Current AssetRequestParameters were updated for this session
+	 */
 	virtual void apply(const AssetRequestParameters& old_parameters, const AssetRequestParameters& new_parameters) = 0;
 
 	/**

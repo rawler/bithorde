@@ -45,6 +45,9 @@ class Router : public AssetSessions, public management::DescriptiveDirectory
 	std::map<std::string, Config::Friend> _friends;
 	std::map<std::string, boost::shared_ptr<FriendConnector> > _connectors;
 	std::map<std::string, Client::Ptr > _connectedFriends;
+
+	std::unordered_set<uint64_t> _blacklist;
+	std::queue< std::pair<boost::posix_time::ptime,uint64_t> > _blacklistQueue;
 public:
 	Router(Server& server);
 
@@ -66,6 +69,10 @@ public:
     virtual void describe(management::Info& target) const;
 protected:
 	virtual bithorded::IAsset::Ptr openAsset(const bithorde::BindRead& req);
+
+private:
+	void _addToBlacklist(const boost::posix_time::ptime& deadline, uint64_t uid);
+	bool _isBlacklisted(const boost::posix_time::ptime& now, const google::protobuf::RepeatedField< google::protobuf::uint64 >& uids);
 };
 
 }}
