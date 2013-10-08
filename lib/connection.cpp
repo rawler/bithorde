@@ -160,28 +160,26 @@ MessageQueue::MessageQueue()
 	: _size(0)
 {}
 
-std::string MessageQueue::_empty;
-
 bool MessageQueue::empty() const
 {
 	return _queue.empty();
 }
 
-void MessageQueue::enqueue(Message* msg)
+void MessageQueue::enqueue(const MessageQueue::MessagePtr& msg)
 {
-	_queue.push_back(msg);
 	_size += msg->buf.size();
+	_queue.push_back(msg);
 }
 
-std::vector< const Message* > MessageQueue::dequeue(size_t bytes_per_sec, ushort millis)
+MessageQueue::MessageList MessageQueue::dequeue(size_t bytes_per_sec, ushort millis)
 {
 	bytes_per_sec = std::max(bytes_per_sec, 1*K);
 	int32_t wanted(std::max(((bytes_per_sec*millis)/1000), static_cast<size_t>(1)));
 	auto now = chrono::steady_clock::now();
-	std::vector<const Message*> res;
+	MessageList res;
 	res.reserve(_size);
 	while ((wanted > 0) && !_queue.empty()) {
-		Message* next = _queue.front();
+		auto next = _queue.front();
 		_queue.pop_front();
 		_size -= next->buf.size();
 		if (now < next->expires) {
@@ -336,15 +334,14 @@ bool Connection::sendMessage(Connection::MessageType type, const google::protobu
 	if (_sndQueue.size() > bufLimit)
 		return false;
 
-	auto buf = new Message(expires);
+	boost::shared_ptr<Message> buf(new Message(expires));
 	// Encode
 	{
 		::google::protobuf::io::StringOutputStream of(&buf->buf);
 		::google::protobuf::io::CodedOutputStream stream(&of);
 		stream.WriteTag(::google::protobuf::internal::WireFormatLite::MakeTag(type, ::google::protobuf::internal::WireFormatLite::WIRETYPE_LENGTH_DELIMITED));
 		stream.WriteVarint32(msg.ByteSize());
-		bool encoded = msg.SerializeToCodedStream(&stream);
-		BOOST_VERIFY(encoded);
+		BOOST_VERIFY( msg.SerializeToCodedStream(&stream) );
 	}
 	_sndQueue.enqueue(buf);
 
@@ -357,11 +354,10 @@ bool Connection::sendMessage(Connection::MessageType type, const google::protobu
 	return true;
 }
 
-void Connection::onWritten(const boost::system::error_code& err, size_t written, std::vector<const Message*> queued) {
+void Connection::onWritten(const boost::system::error_code& err, size_t written, const MessageQueue::MessageList& queued) {
 	size_t queued_bytes(0);
 	for (auto iter=queued.begin(); iter != queued.end(); iter++) {
 		queued_bytes += (*iter)->buf.size();
-		delete *iter;
 	}
 	if ((!err) && (written == queued_bytes) && (written>0)) {
 		_stats->outgoingBitrateCurrent += written*8;

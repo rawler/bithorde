@@ -30,19 +30,26 @@ struct Message {
 	boost::chrono::steady_clock::time_point expires;
 };
 
-class MessageQueue {
-	std::list<Message*> _queue;
+class MessageQueue : boost::noncopyable {
+public:
+	typedef boost::shared_ptr<const Message> MessagePtr;
+	typedef std::vector< MessagePtr > MessageList;
+private:
+	std::list< MessagePtr > _queue;
 	std::size_t _size;
-	static std::string _empty;
 public:
 	MessageQueue();
 	bool empty() const;
 
 	/**
-	 * Note: queue takes ownership of the message, and destroys it when done
+	 * Note: queue takes ownership of the message
 	 */
-	void enqueue(Message* msg);
-	std::vector< const Message* > dequeue(size_t bytes_per_sec, ushort millis);
+	void enqueue(const MessagePtr& msg);
+
+	/**
+	 * Note: relinquishes ownership of the messages
+	 */
+	MessageList dequeue(std::size_t bytes_per_sec, ushort millis);
 	std::size_t size() const;
 };
 
@@ -106,7 +113,7 @@ protected:
 	virtual void decrypt(byte* buf, size_t size) = 0;
 
 	void onRead(const boost::system::error_code& err, size_t count);
-	void onWritten(const boost::system::error_code& err, size_t written, std::vector< const bithorde::Message* > queued);
+	void onWritten(const boost::system::error_code& err, std::size_t written, const MessageQueue::MessageList& queued);
 
 protected:
 	boost::asio::io_service& _ioSvc;
