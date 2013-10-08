@@ -47,7 +47,7 @@ void TimerService::enable()
 		const auto& target_time = _timers.begin()->first;
 		if (target_time != _timer.expires_at()) {
 			_timer.expires_at(target_time);
-			_timer.async_wait(boost::bind(&TimerService::invoke, shared_from_this(), boost::asio::placeholders::error()));
+			_timer.async_wait(boost::bind(&TimerService::invoke, shared_from_this(), boost::asio::placeholders::error));
 		}
 	}
 }
@@ -58,8 +58,10 @@ void TimerService::invoke(boost::system::error_code ec)
 	auto now(boost::posix_time::microsec_clock::universal_time());
 	auto iter = _timers.begin();
 	while (iter != _timers.end() && iter->first <= now) {
-		iter->second->invoke(iter->first, now);
+		auto deadline = iter->first;
+		auto timer = iter->second;
 		_timers.erase(iter);
+		timer->invoke(deadline, now);
 		iter = _timers.begin();
 	}
 	enable();
