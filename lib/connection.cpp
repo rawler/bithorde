@@ -120,6 +120,7 @@ public:
 							asio::placeholders::error, asio::placeholders::bytes_transferred, queued)
 			);
 		}
+		BOOST_ASSERT(_sendWaiting || _sndQueue.empty());
 	}
 
 	void tryRead() {
@@ -175,17 +176,20 @@ void MessageQueue::enqueue(Message* msg)
 std::vector< const Message* > MessageQueue::dequeue(size_t bytes_per_sec, ushort millis)
 {
 	bytes_per_sec = std::max(bytes_per_sec, 1*K);
-	std::size_t bytes(((bytes_per_sec*millis)/1000)+1), target_size((_size <= bytes) ? 0 : _size - bytes);
+	int32_t wanted(std::max(((bytes_per_sec*millis)/1000), static_cast<size_t>(1)));
 	auto now = chrono::steady_clock::now();
 	std::vector<const Message*> res;
 	res.reserve(_size);
-	while ((_size > target_size) && !_queue.empty()) {
+	while ((wanted > 0) && !_queue.empty()) {
 		Message* next = _queue.front();
 		_queue.pop_front();
 		_size -= next->buf.size();
-		if (now < next->expires)
+		if (now < next->expires) {
+			wanted -= next->buf.size();
 			res.push_back(next);
+		}
 	}
+	BOOST_ASSERT(_queue.empty() ? _size == 0 : _size > 0);
 	return res;
 }
 
