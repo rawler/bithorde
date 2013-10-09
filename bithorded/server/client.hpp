@@ -32,14 +32,12 @@ class Client : public bithorde::Client, public boost::enable_shared_from_this<Cl
 {
 	Server& _server;
 	std::vector< AssetBinding > _assets;
-	std::list< BitHordeIds > _opening;
 public:
 	typedef boost::shared_ptr<Client> Ptr;
 	typedef boost::weak_ptr<Client> WeakPtr;
 	static Ptr create(Server& server) {
 		return Ptr(new Client(server));
 	}
-	bool requestsAsset(const BitHordeIds& ids) const;
 
 	size_t serverAssets() const;
 

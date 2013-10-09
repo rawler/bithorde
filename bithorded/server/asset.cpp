@@ -25,11 +25,13 @@ using namespace bithorded;
 /**** AssetBinding *****/
 
 AssetBinding::AssetBinding() :
+	_client(NULL),
 	_ptr(),
 	_requesters()
 {}
 
 AssetBinding::AssetBinding(const AssetBinding& other) :
+	_client(other._client),
 	_ptr(other._ptr),
 	_requesters(other._requesters)
 {
@@ -41,6 +43,16 @@ AssetBinding::AssetBinding(const AssetBinding& other) :
 AssetBinding::~AssetBinding()
 {
 	reset();
+}
+
+void AssetBinding::setClient(const boost::shared_ptr< Client >& client)
+{
+	_client = client.get();
+}
+
+Client* AssetBinding::client() const
+{
+	return _client;
 }
 
 bool AssetBinding::bind(const bithorde::RouteTrace& requesters)
@@ -141,7 +153,12 @@ bool bithorded::operator!=(const AssetBinding& a, const boost::shared_ptr< IAsse
 }
 
 /**** AssetRequestParameters *****/
-bool AssetRequestParameters::operator!=(const AssetRequestParameters& other)
+bool AssetRequestParameters::isRequester(const boost::shared_ptr< Client >& client) const
+{
+	return requesterClients.count(client.get());
+}
+
+bool AssetRequestParameters::operator!=(const AssetRequestParameters& other) const
 {
 	return (this->requesters != other.requesters);
 }
@@ -201,11 +218,14 @@ boost::weak_ptr< IAsset > UpstreamRequestBinding::weaken()
 void UpstreamRequestBinding::rebuild()
 {
 	auto& requesters = _parameters.requesters;
+	auto& requesterClients = _parameters.requesterClients;
 	auto old = _parameters;
 	requesters.clear();
+	requesterClients.clear();
 	for (auto iter=_downstreams.begin(); iter != _downstreams.end(); iter++) {
 		const auto& downstream_requesters = (*iter)->requesters();
 		requesters.insert(downstream_requesters.begin(), downstream_requesters.end());
+		requesterClients.insert((*iter)->client());
 	}
 	if (old != _parameters) {
 		_ptr->apply(old, _parameters);

@@ -83,7 +83,7 @@ void bithorded::router::ForwardedAsset::apply(const AssetRequestParameters& old,
 	for (auto iter = friends.begin(); iter != friends.end(); iter++) {
 		auto f = iter->second;
 
-		if (f->requestsAsset(_ids)) // This path likely doesn't have the asset.
+		if (old.isRequester(f) || current.isRequester(f))
 			continue;
 
 		auto peername = f->peerName();

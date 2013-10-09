@@ -30,16 +30,22 @@
 namespace bithorded
 {
 
+class Client;
+
 class IAsset;
 class UpstreamRequestBinding;
 
 class AssetBinding {
+	Client* _client; // Client owns us, so should always be valid.
 	boost::shared_ptr<UpstreamRequestBinding> _ptr;
 	bithorde::RouteTrace _requesters;
 public:
 	AssetBinding();
 	AssetBinding(const AssetBinding& other);
 	virtual ~AssetBinding();
+
+	void setClient(const boost::shared_ptr<Client>& client);
+	Client* client() const;
 
 	bool bind(const bithorde::RouteTrace& requesters);
 	bool bind(const boost::shared_ptr< bithorded::UpstreamRequestBinding >& asset, const bithorde::RouteTrace& requesters);
@@ -62,8 +68,10 @@ bool operator!=(const bithorded::AssetBinding& a, const boost::shared_ptr< bitho
 
 struct AssetRequestParameters {
 	std::unordered_set<uint64_t> requesters;
+	std::unordered_set<Client*> requesterClients;
 
-	bool operator!=(const AssetRequestParameters& other);
+	bool isRequester(const boost::shared_ptr<Client>& client) const;
+	bool operator!=(const AssetRequestParameters& other) const;
 };
 
 class UpstreamRequestBinding : boost::noncopyable {

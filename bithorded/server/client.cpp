@@ -86,22 +86,6 @@ void Client::inspect(management::InfoList& tgt) const
 	}
 }
 
-bool Client::requestsAsset(const BitHordeIds& ids) const {
-	for (auto iter=_opening.begin(); iter!=_opening.end(); iter++) {
-		if (idsOverlap(*iter, ids))
-			return true;
-	}
-	for (auto iter=_assets.begin(); iter!=_assets.end(); iter++) {
-		auto& asset = *iter;
-		if (asset) {
-			BitHordeIds assetIds;
-			if (asset->getIds(assetIds) && idsOverlap(assetIds, ids))
-				return true;
-		}
-	}
-	return false;
-}
-
 void Client::onMessage(const bithorde::HandShake& msg)
 {
 	if (!(state() & SaidHello)) {
@@ -171,10 +155,7 @@ void Client::onMessage(bithorde::BindRead& msg)
 	if (msg.ids_size() > 0) {
 		// Trying to open
 		try {
-			_opening.push_front(msg.ids());
-			auto iter = _opening.begin();
 			auto asset = _server.async_findAsset(msg);
-			_opening.erase(iter);
 			if (asset)
 				assignAsset(h, asset, msg.requesters());
 			else
@@ -297,10 +278,15 @@ void Client::assignAsset(bithorde::Asset::Handle handle_, const UpstreamRequestB
 			informAssetStatus(handle_, bithorde::Status::INVALID_HANDLE);
 			return;
 		}
+		size_t old_size = _assets.size();
 		size_t new_size = _assets.size() + (handle - _assets.size() + 1) * 2;
 		if (new_size > MAX_ASSETS)
 			new_size = MAX_ASSETS;
 		_assets.resize(new_size);
+		auto self = shared_from_this();
+		for (auto i=old_size; i < new_size; i++) {
+			_assets[i].setClient(self);
+		}
 	}
 	if (_assets[handle].bind(a, requesters)) {
 		// Remember to inform peer about changes in asset-status.
