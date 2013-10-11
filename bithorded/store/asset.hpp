@@ -71,11 +71,6 @@ public:
 	boost::filesystem::path folder();
 
 	/**
-	 * Fills ids with the ids of this asset.
-	 */
-	virtual bool getIds(BitHordeIds& ids) const;
-
-	/**
 	 * Is the root hash known yet?
 	 */
 	bool hasRootHash();

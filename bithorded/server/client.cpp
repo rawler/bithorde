@@ -137,12 +137,10 @@ void Client::onMessage(bithorde::BindRead& msg)
 	}
 
 	if ((_assets.size() > h) && _assets[h]) {
-		BitHordeIds ids;
 		auto& asset = _assets[h];
-		asset->getIds(ids);
-		if (idsOverlap(ids, msg.ids())) {
+		if (idsOverlap(asset->status->ids(), msg.ids())) {
 			if (asset.bind(msg.requesters())) {
-				informAssetStatusUpdate(h, asset.weak());
+				informAssetStatusUpdate(h, asset.weak(), *(asset->status));
 			} else {
 				informAssetStatus(h, bithorde::WOULD_LOOP);
 			}
@@ -238,32 +236,17 @@ void Client::informAssetStatus(bithorde::Asset::Handle h, bithorde::Status s)
 	sendMessage(bithorde::Connection::AssetStatus, resp, bithorde::Message::NEVER, true);
 }
 
-void Client::informAssetStatusUpdate(bithorde::Asset::Handle h, const bithorded::IAsset::WeakPtr& asset_)
+void Client::informAssetStatusUpdate(bithorde::Asset::Handle h, const IAsset::WeakPtr& asset, const bithorde::AssetStatus& status)
 {
-	auto asset = asset_.lock();
+	if (status.status() == bithorde::NONE)
+		return;
 	size_t asset_idx = h;
-	if ((asset_idx >= _assets.size()) || (_assets[asset_idx] != asset))
+	if ((asset_idx >= _assets.size()) || (_assets[asset_idx] != asset.lock()))
 		return;
 
-	bithorde::AssetStatus resp;
+	bithorde::AssetStatus resp(status);
 	resp.set_handle(h);
-	if (asset) {
-		if (asset->status == bithorde::NONE)
-			return;
-		resp.set_status(asset->status);
-		if (asset->status == bithorde::SUCCESS) {
-			resp.set_availability(1000);
-			resp.set_size(asset->size());
-			asset->getIds(*resp.mutable_ids());
-			auto servers = asset->servers();
-			auto resp_servers = resp.mutable_servers();
-			for (auto iter=servers.begin(); iter != servers.end(); iter++) {
-				resp_servers->Add(*iter);
-			}
-		}
-	} else {
-		resp.set_status(bithorde::NOTFOUND);
-	}
+
 	LOG4CPLUS_DEBUG(clientLogger, peerName() << ':' << h << " new state " << bithorde::Status_Name(resp.status()) << " (" << resp.ids() << ")");
 
 	sendMessage(bithorde::Connection::AssetStatus, resp);
@@ -289,12 +272,13 @@ void Client::assignAsset(bithorde::Asset::Handle handle_, const UpstreamRequestB
 		}
 	}
 	if (_assets[handle].bind(a, requesters)) {
+		auto weak_asset = _assets[handle].weak();
 		// Remember to inform peer about changes in asset-status.
-		(*a)->statusChange.connect(boost::bind(&Client::informAssetStatusUpdate, this, handle_, a->weaken()));
+		(*a)->status.onChange.connect(boost::bind(&Client::informAssetStatusUpdate, this, handle_, weak_asset, _2));
 
-		if ((*a)->status != bithorde::Status::NONE) {
+		if ((*a)->status->status() != bithorde::Status::NONE) {
 			// We already have a valid status for the asset, so inform about it
-			informAssetStatusUpdate(handle_, a->shared());
+			informAssetStatusUpdate(handle_, weak_asset, *((*a)->status));
 		}
 	} else {
 		informAssetStatus(handle_, bithorde::Status::WOULD_LOOP);
@@ -319,7 +303,7 @@ void Client::clearAsset(bithorde::Asset::Handle handle_)
 	size_t handle = handle_;
 	if (handle < _assets.size()) {
 		if (auto& a=_assets[handle]) {
-			a->statusChange.disconnect(boost::bind(&Client::informAssetStatusUpdate, this, handle_, a.weak()));
+			a->status.onChange.disconnect(boost::bind(&Client::informAssetStatusUpdate, this, handle_, _assets[handle].weak(), _2));
 			_assets[handle].reset();
 			LOG4CPLUS_DEBUG(clientLogger, peerName() << ':' << handle_ << " released");
 		}

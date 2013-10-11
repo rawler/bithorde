@@ -172,10 +172,11 @@ UpstreamRequestBinding::UpstreamRequestBinding(boost::shared_ptr< IAsset > asset
 
 bool UpstreamRequestBinding::bindDownstream(const AssetBinding* binding)
 {
-	const auto& servers_ = _ptr->servers();
+	const auto& servers_ = _ptr->status->servers();
+	std::unordered_set<uint64_t> servers(servers_.begin(), servers_.end());
 	const auto& requesters_ = binding->requesters();
 	for (auto iter=requesters_.begin(); iter != requesters_.end(); iter++) {
-		if (servers_.count(*iter)) {
+		if (servers.count(*iter)) {
 			return false;
 		}
 	}
@@ -236,27 +237,12 @@ void UpstreamRequestBinding::rebuild()
 IAsset::Ptr IAsset::NONE;
 
 IAsset::IAsset() :
-	_sessionId(rand64()),
-	status(bithorde::Status::NONE)
+	_sessionId(rand64())
 {}
-
-std::unordered_set< uint64_t > IAsset::servers() const
-{
-	std::unordered_set<uint64_t> res;
-	res.insert(_sessionId);
-	return res;
-}
-
-void IAsset::setStatus(bithorde::Status newStatus)
-{
-	status = newStatus;
-	statusChange(newStatus);
-}
 
 void IAsset::describe(bithorded::management::Info& target) const
 {
-	BitHordeIds ids;
-	target << bithorde::Status_Name(status);
-	if (getIds(ids))
-		target << ", " << ids;
+	target << bithorde::Status_Name(status->status());
+	if (status->ids_size())
+		target << ", " << status->ids();
 }

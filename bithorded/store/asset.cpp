@@ -39,7 +39,7 @@ StoredAsset::StoredAsset(GrandCentralDispatch& gcd, const boost::filesystem::pat
 	_metaStore(metaFolder/"meta", _file.blocks(BLOCKSIZE)),
 	_hasher(_metaStore)
 {
-
+	updateStatus();
 }
 
 StoredAsset::StoredAsset(GrandCentralDispatch& gcd, const boost::filesystem::path& metaFolder, RandomAccessFile::Mode mode, uint64_t size) :
@@ -49,7 +49,7 @@ StoredAsset::StoredAsset(GrandCentralDispatch& gcd, const boost::filesystem::pat
 	_metaStore(metaFolder/"meta", _file.blocks(BLOCKSIZE)),
 	_hasher(_metaStore)
 {
-
+	updateStatus();
 }
 
 void StoredAsset::async_read(uint64_t offset, size_t& size, uint32_t timeout, bithorded::IAsset::ReadCallback cb)
@@ -86,21 +86,6 @@ size_t StoredAsset::can_read(uint64_t offset, size_t size)
 	return res;
 }
 
-bool StoredAsset::getIds(BitHordeIds& ids) const
-{
-	BOOST_ASSERT( ids.size() == 0 );
-	auto root = _hasher.getRoot();
-
-	if (root->state == TigerNode::State::SET) {
-		auto tigerId = ids.Add();
-		tigerId->set_type(bithorde::TREE_TIGER);
-		tigerId->set_id(root->digest, TigerNode::DigestSize);
-		return true;
-	} else {
-		return false;
-	}
-}
-
 bool StoredAsset::hasRootHash()
 {
 	auto root = _hasher.getRoot();
@@ -129,8 +114,17 @@ boost::filesystem::path StoredAsset::folder()
 
 void StoredAsset::updateStatus()
 {
-	if (hasRootHash())
-		setStatus(bithorde::SUCCESS);
+	auto trx = status.change();
+	// TODO: trx->set_availability(_hasher.getCoveragePercent()*10);
+	trx->set_size(_file.size());
+	auto root = _hasher.getRoot();
+	if (root->state == TigerNode::State::SET) {
+		trx->set_status(bithorde::SUCCESS);
+		trx->clear_ids();
+		auto tigerId = trx->mutable_ids()->Add();
+		tigerId->set_type(bithorde::TREE_TIGER);
+		tigerId->set_id(root->digest, TigerNode::DigestSize);
+	}
 }
 
 boost::shared_array<byte> crunch_piece(RandomAccessFile* file, uint64_t offset, size_t size) {

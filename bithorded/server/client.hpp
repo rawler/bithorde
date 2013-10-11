@@ -60,7 +60,7 @@ protected:
 	virtual void setAuthenticated(const std::string peerName);
 private:
 	void informAssetStatus(bithorde::Asset::Handle h, bithorde::Status s);
-	void informAssetStatusUpdate(bithorde::Asset::Handle h, const bithorded::IAsset::WeakPtr& asset);
+	void informAssetStatusUpdate(bithorde::Asset::Handle h, const bithorded::IAsset::WeakPtr& asset, const bithorde::AssetStatus& status);
 	void onReadResponse( const bithorde::Read::Request& req, int64_t offset, const std::string& data, bithorde::Message::Deadline t);
 	void assignAsset(bithorde::Asset::Handle handle_, const UpstreamRequestBinding::Ptr& a, const bithorde::RouteTrace& requesters);
 	void clearAssets();

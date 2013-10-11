@@ -52,7 +52,7 @@ void UpstreamAsset::handleMessage(const bithorde::Read::Response& resp)
 
 ForwardedAsset::ForwardedAsset(Router& router, const BitHordeIds& ids) :
 	_router(router),
-	_ids(ids),
+	_requestedIds(ids),
 	_size(-1),
 	_upstream(),
 	_pendingReads()
@@ -96,7 +96,7 @@ void bithorded::router::ForwardedAsset::apply(const AssetRequestParameters& old,
 				dropUpstream(peername);
 			}
 		} else if (has_new_requesters) {
-			auto upstream = make_shared<UpstreamAsset>(f, _ids);
+			auto upstream = make_shared<UpstreamAsset>(f, _requestedIds);
 			auto self = boost::weak_ptr<ForwardedAsset>(shared_from_this());
 			upstream->statusUpdate.connect(boost::bind(boost::weak_fn(&ForwardedAsset::onUpstreamStatus, self), peername, bithorde::ASSET_ARG_STATUS));
 			upstream->dataArrived.connect(boost::bind(boost::weak_fn(&ForwardedAsset::onData, self),
@@ -108,32 +108,22 @@ void bithorded::router::ForwardedAsset::apply(const AssetRequestParameters& old,
 	updateStatus();
 }
 
-unordered_set< uint64_t > ForwardedAsset::servers() const
-{
-	auto res = bithorded::IAsset::servers();
-	for (auto iter = _upstream.begin(); iter != _upstream.end(); iter++) {
-		const auto& upstreamServers = iter->second->servers();
-		res.insert(upstreamServers.begin(), upstreamServers.end());
-	}
-	return res;
-}
-
 void bithorded::router::ForwardedAsset::onUpstreamStatus(const string& peername, const bithorde::AssetStatus& status)
 {
 	if (status.status() == bithorde::Status::SUCCESS) {
-		LOG4CPLUS_DEBUG(assetLogger, _ids << " Found upstream " << peername);
+		LOG4CPLUS_DEBUG(assetLogger, _requestedIds << " Found upstream " << peername);
 		if (status.has_size()) {
 			if (_size == -1) {
 				_size = status.size();
 			} else if (_size != (int64_t)status.size()) {
-				LOG4CPLUS_WARN(assetLogger, peername << " " << _ids << " responded with mismatching size, ignoring...");
+				LOG4CPLUS_WARN(assetLogger, peername << " " << _requestedIds << " responded with mismatching size, ignoring...");
 				dropUpstream(peername);
 			}
 		} else if (status.ids().size()) {
-			LOG4CPLUS_WARN(assetLogger, peername << " " << _ids << " SUCCESS response not accompanied with asset-size.");
+			LOG4CPLUS_WARN(assetLogger, peername << " " << _requestedIds << " SUCCESS response not accompanied with asset-size.");
 		}
 	} else {
-		LOG4CPLUS_DEBUG(assetLogger, _ids << "Failed upstream " << peername);
+		LOG4CPLUS_DEBUG(assetLogger, _requestedIds << "Failed upstream " << peername);
 		dropUpstream(peername);
 	}
 	updateStatus();
@@ -146,18 +136,32 @@ void bithorded::router::ForwardedAsset::updateStatus() {
 		if (asset->status == bithorde::Status::SUCCESS)
 			status = bithorde::Status::SUCCESS;
 	}
-	setStatus(status);
+	auto trx = this->status.change();
+	trx->set_size(_size);
+	trx->set_availability(1000);
+	trx->set_status(status);
+
+	unordered_set< uint64_t > servers;
+	servers.insert(sessionId());
+	for (auto iter = _upstream.begin(); iter != _upstream.end(); iter++) {
+		const auto& upstreamServers = iter->second->servers();
+		servers.insert(upstreamServers.begin(), upstreamServers.end());
+	}
+	setRepeatedField(trx->mutable_servers(), servers);
+
+	unordered_set< bithorde::Identifier > requestIds;
+	for (auto iter = _upstream.begin(); iter != _upstream.end(); iter++) {
+		const auto& upstreamRequestIds = iter->second->requestIds();
+		for (auto iter1 = upstreamRequestIds.begin(); iter1 != upstreamRequestIds.end(); iter1++) {
+			requestIds.insert(*iter1);
+		}
+	}
+	setRepeatedPtrField(trx->mutable_ids(), requestIds);
 }
 
 size_t bithorded::router::ForwardedAsset::can_read(uint64_t offset, size_t size)
 {
 	return size;
-}
-
-bool bithorded::router::ForwardedAsset::getIds(BitHordeIds& ids) const
-{
-	ids = _ids;
-	return true;
 }
 
 void bithorded::router::ForwardedAsset::async_read(uint64_t offset, size_t& size, uint32_t timeout, ReadCallback cb)

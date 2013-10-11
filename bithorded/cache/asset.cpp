@@ -25,13 +25,15 @@ using namespace bithorded::cache;
 bithorded::cache::CachedAsset::CachedAsset(GrandCentralDispatch& gcd, const boost::filesystem::path& metaFolder) :
 	StoredAsset(gcd, metaFolder, RandomAccessFile::READWRITE)
 {
-	setStatus(hasRootHash() ? bithorde::SUCCESS : bithorde::NOTFOUND);
+	auto trx = status.change();
+	trx->set_status(hasRootHash() ? bithorde::SUCCESS : bithorde::NOTFOUND);
 }
 
 bithorded::cache::CachedAsset::CachedAsset(GrandCentralDispatch& gcd, const boost::filesystem::path& metaFolder, uint64_t size) :
 	StoredAsset(gcd, metaFolder, RandomAccessFile::READWRITE, size)
 {
-	setStatus(bithorde::SUCCESS);
+	auto trx = status.change();
+	trx->set_status(bithorde::SUCCESS);
 }
 
 void bithorded::cache::CachedAsset::inspect(bithorded::management::InfoList& target) const
@@ -52,11 +54,11 @@ void bithorded::cache::CachedAsset::write(uint64_t offset, const std::string& da
 bithorded::cache::CachingAsset::CachingAsset(bithorded::cache::CacheManager& mgr, bithorded::router::ForwardedAsset::Ptr upstream, bithorded::cache::CachedAsset::Ptr cached) :
 	_manager(mgr),
 	_upstream(upstream),
-	_upstreamTracker(_upstream->statusChange.connect(boost::bind(&CachingAsset::upstreamStatusChange, this, _1))),
+	_upstreamTracker(_upstream->status.onChange.connect(boost::bind(&CachingAsset::upstreamStatusChange, this, _2))),
 	_cached(cached),
 	_delayedCreation(false)
 {
-	setStatus(_upstream->status);
+	status = *_upstream->status;
 }
 
 bithorded::cache::CachingAsset::~CachingAsset()
@@ -83,16 +85,6 @@ void bithorded::cache::CachingAsset::async_read(uint64_t offset, size_t& size, u
 	}
 }
 
-bool bithorded::cache::CachingAsset::getIds(BitHordeIds& ids) const
-{
-	if (_upstream)
-		return _upstream->getIds(ids);
-	else if (_cached)
-		return _cached->getIds(ids);
-	else
-		return false;
-}
-
 size_t bithorded::cache::CachingAsset::can_read(uint64_t offset, size_t size)
 {
 	if (_upstream)
@@ -111,14 +103,6 @@ uint64_t bithorded::cache::CachingAsset::size()
 		return _upstream->size();
 	else
 		return 0;
-}
-
-std::unordered_set< uint64_t > CachingAsset::servers() const
-{
-	if (_upstream)
-		return _upstream->servers();
-	else
-		return bithorded::IAsset::servers();
 }
 
 void CachingAsset::apply(const bithorded::AssetRequestParameters& old_parameters, const bithorded::AssetRequestParameters& new_parameters)
@@ -148,14 +132,16 @@ void bithorded::cache::CachingAsset::upstreamDataArrived(bithorded::IAsset::Read
 	}
 }
 
-void bithorded::cache::CachingAsset::upstreamStatusChange(bithorde::Status newStatus)
+void bithorded::cache::CachingAsset::upstreamStatusChange(const bithorde::AssetStatus& newStatus)
 {
-	if ((newStatus == bithorde::Status::SUCCESS) && !_cached && _upstream->size() > 0) {
+	if ((newStatus.status() == bithorde::Status::SUCCESS) && !_cached && _upstream->size() > 0) {
 		_delayedCreation = true;
 	}
-	if (_cached && _cached->hasRootHash())
-		newStatus = bithorde::Status::SUCCESS;
-	setStatus(newStatus);
+	if (_cached && _cached->hasRootHash()) {
+		status = *_cached->status;
+	} else {
+		status = newStatus;
+	}
 }
 
 void CachingAsset::releaseIfCached()
@@ -168,10 +154,8 @@ void CachingAsset::releaseIfCached()
 bithorded::cache::CachedAsset::Ptr bithorded::cache::CachingAsset::cached()
 {
 	if (_delayedCreation && _upstream) {
-		BitHordeIds ids;
 		_delayedCreation = false;
-		_upstream->getIds(ids);
-		_cached = _manager.prepareUpload(_upstream->size(), ids);
+		_cached = _manager.prepareUpload(_upstream->size(), _upstream->status->ids());
 	}
 	return _cached;
 }

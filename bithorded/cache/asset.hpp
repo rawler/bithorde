@@ -65,12 +65,9 @@ public:
 
 	virtual void async_read(uint64_t offset, size_t& size, uint32_t timeout, ReadCallback cb);
 
-	virtual bool getIds(BitHordeIds& ids) const;
-
 	virtual size_t can_read(uint64_t offset, size_t size);
 
 	virtual uint64_t size();
-	virtual std::unordered_set< uint64_t > servers() const;
 
 	virtual void apply(const AssetRequestParameters& old_parameters, const AssetRequestParameters& new_parameters);
 	
@@ -81,7 +78,7 @@ private:
 
 	void disconnect();
 	void upstreamDataArrived(bithorded::IAsset::ReadCallback cb, std::size_t requested_size, int64_t offset, const std::string& data);
-	void upstreamStatusChange(bithorde::Status newStatus);
+	void upstreamStatusChange(const bithorde::AssetStatus& newStatus);
 };
 	}
 }

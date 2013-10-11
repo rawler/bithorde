@@ -87,6 +87,19 @@ public:
 		return _store[TREE_ROOT_NODE];
 	}
 
+	uint8_t getCoveragePercent() const {
+		uint16_t res(0);
+		uint32_t layerSize = 128;
+		if (layerSize > _leaves)
+			layerSize = _leaves;
+		for (uint32_t i=0; i < layerSize; i++) {
+			if (_store[NodeIdx(i, layerSize)]->state == Node::State::SET) {
+				res += 100;
+			}
+		}
+		return res / layerSize;
+	}
+
 	void setData(uint32_t offset, const byte* input, size_t length) {
 		BOOST_ASSERT((length == BLOCKSIZE) || (offset == (_leaves-1)));
 		byte digest[DigestSize];

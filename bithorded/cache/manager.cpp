@@ -71,7 +71,7 @@ IAsset::Ptr CacheManager::openAsset(const bithorde::BindRead& req)
 	if (_baseDir.empty())
 		return IAsset::Ptr();
 	auto stored = boost::dynamic_pointer_cast<CachedAsset>(bithorded::store::AssetStore::openAsset(req));
-	if (stored && (stored->status == bithorde::Status::SUCCESS)) {
+	if (stored && (stored->status->status() == bithorde::Status::SUCCESS)) {
 		return stored;
 	} else {
 		auto upstream = _router.findAsset(req);
@@ -90,7 +90,7 @@ CachedAsset::Ptr CacheManager::prepareUpload(uint64_t size)
 
 		try {
 			auto asset = boost::make_shared<CachedAsset>(_gcd, assetFolder,size);
-			asset->statusChange.connect(boost::bind(&CacheManager::linkAsset, this, CachedAsset::WeakPtr(asset)));
+			asset->status.onChange.connect(boost::bind(&CacheManager::linkAsset, this, CachedAsset::WeakPtr(asset)));
 			return asset;
 		} catch (const std::ios::failure& e) {
 			LOG4CPLUS_ERROR(log, "Failed to create " << assetFolder << " for upload. Purging...");
@@ -146,8 +146,8 @@ fs::path CacheManager::pickLooser() {
 void CacheManager::linkAsset(CachedAsset::WeakPtr asset_)
 {
 	auto asset = asset_.lock();
-	BitHordeIds ids;
-	if (asset && asset->getIds(ids)) {
+	if (asset && asset->status->ids_size()) {
+		auto& ids = asset->status->ids();
 		LOG4CPLUS_DEBUG(log, "Linking " << ids << " to " << asset->folder());
 		const char *data_path = (asset->folder()/"data").c_str();
 		lutimes(data_path, NULL);

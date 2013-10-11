@@ -13,6 +13,7 @@ ADD_LIBRARY(bithorde
 	hashes.h hashes.cpp
 	keepalive.cpp
 	magneturi.h magneturi.cpp
+	protocolmessages.cpp
 	random.h random.cpp
 	timer.cpp
 	types.h types.cpp

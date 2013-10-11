@@ -25,7 +25,8 @@ using namespace bithorded::source;
 SourceAsset::SourceAsset(GrandCentralDispatch& gcd, const boost::filesystem::path& metaFolder) :
 	StoredAsset(gcd, metaFolder, RandomAccessFile::READ)
 {
-	setStatus(bithorde::SUCCESS);
+	auto trx = status.change();
+	trx->set_status(bithorde::SUCCESS);
 }
 
 void SourceAsset::inspect(management::InfoList& target) const

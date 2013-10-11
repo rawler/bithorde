@@ -84,7 +84,7 @@ UpstreamRequestBinding::Ptr Store::addAsset(const boost::filesystem::path& file)
 		try {
 			fs::create_relative_symlink(file, assetFolder/"data");
 			SourceAsset::Ptr asset = boost::make_shared<SourceAsset>(_gcd, assetFolder);
-			asset->statusChange.connect(boost::bind(&Store::_addAsset, this, SourceAsset::WeakPtr(asset)));
+			asset->status.onChange.connect(boost::bind(&Store::_addAsset, this, SourceAsset::WeakPtr(asset)));
 			asset->hash();
 			return boost::make_shared<UpstreamRequestBinding>(asset);
 		} catch (const std::ios::failure& e) {
@@ -105,12 +105,11 @@ UpstreamRequestBinding::Ptr Store::findAsset(const bithorde::BindRead& req)
 void Store::_addAsset(SourceAsset::WeakPtr asset_)
 {
 	auto asset = asset_.lock();
-	BitHordeIds ids;
-	if (asset && asset->getIds(ids)) {
+	if (asset && asset->status->ids_size()) {
 		auto data_path(asset->folder()/"data");
 		lutimes(data_path.c_str(), NULL);
 
-		AssetStore::update_links(ids, asset);
+		AssetStore::update_links(asset->status->ids(), asset);
 	}
 }
 
@@ -122,7 +121,7 @@ IAsset::Ptr Store::openAsset(const boost::filesystem::path& assetPath)
 		return asset;
 	} else {
 		LOG4CPLUS_WARN(log, "Unhashed asset detected, hashing");
-		asset->statusChange.connect(boost::bind(&Store::_addAsset, this, SourceAsset::WeakPtr(asset)));
+		asset->status.onChange.connect(boost::bind(&Store::_addAsset, this, SourceAsset::WeakPtr(asset)));
 		asset->hash();
 		return store::StoredAsset::Ptr();
 	}
