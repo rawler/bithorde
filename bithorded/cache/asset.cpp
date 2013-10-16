@@ -120,12 +120,15 @@ void bithorded::cache::CachingAsset::upstreamDataArrived(bithorded::IAsset::Read
 {
 	auto cached_ = cached();
 	if (data.size() >= requested_size) {
+		if (cached_) {
+			cached_->write(offset, data, boost::bind(&CachingAsset::releaseIfCached, shared_from_this()));
+		}
 		cb(offset, data);
 	} else if (cached_ && (cached_->can_read(offset, requested_size) == requested_size)) {
 		cached_->async_read(offset, requested_size, 0, cb);
+	} else {
+		cb(offset, data);
 	}
-	if (data.size() && cached_)
-		cached_->write(offset, data, boost::bind(&CachingAsset::releaseIfCached, shared_from_this()));
 }
 
 void bithorded::cache::CachingAsset::upstreamStatusChange(bithorde::Status newStatus)
