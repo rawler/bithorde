@@ -19,6 +19,7 @@
 #define WEAKMAP_HPP
 
 #include <unordered_map>
+#include <set>
 #include <boost/thread/pthread/mutex.hpp>
 #include <boost/thread/locks.hpp>
 #include <boost/weak_ptr.hpp>
@@ -125,6 +126,84 @@ private:
 				iter++;
 			else
 				iter = _map.erase(iter);
+		}
+		_dirtiness = 0;
+	}
+};
+
+template <typename LinkType, typename MutexType=boost::mutex>
+class WeakSet
+{
+	typedef boost::weak_ptr<LinkType> WeakPtr;
+	std::set<WeakPtr> _set;
+	uint32_t _scrubThreshold; // Will automatically perform a complete scrubbing after this amount of changes
+	uint32_t _dirtiness; // The amount of changes made since last scrubbing
+	MutexType _m;
+	typedef boost::lock_guard<MutexType> lock_guard;
+public:
+	typedef boost::shared_ptr<LinkType> Link;
+	WeakSet(int scrubThreshold=2000) :
+		_scrubThreshold(scrubThreshold),
+		_dirtiness(0)
+	{}
+
+	typename std::set<WeakPtr>::iterator begin() { return _set.begin(); }
+	typename std::set<WeakPtr>::const_iterator begin() const { return _set.begin(); }
+	typename std::set<WeakPtr>::iterator end() { return _set.end(); }
+	typename std::set<WeakPtr>::const_iterator end() const { return _set.end(); }
+
+	/**
+	 * Clears all keys
+	 */
+	void clear() {
+		lock_guard lock(_m);
+		_set.clear();
+	}
+
+	/**
+	 * Counts active link in map
+	 */
+	size_t size() const {
+		size_t res = 0;
+		for (auto iter=_set.begin(); iter != _set.end(); iter++) {
+			if ((*iter)->lock())
+				res++;
+		}
+		return res;
+	}
+
+	/**
+	 * Walks through all links in the map, purging any found inactive ones.
+	 */
+	size_t scrub() {
+		lock_guard lock(_m);
+		doScrub();
+		return _set.size();
+	}
+
+	/**
+	 * Will store the provided link as a weak link, available through get.
+	 */
+	void insert(const Link& link) {
+		lock_guard lock(_m);
+
+		BOOST_ASSERT(link);
+		_set.insert(link);
+		if (++_dirtiness >= _scrubThreshold)
+			doScrub();
+	}
+private:
+	/**
+	 * Caller MUST hold lock on _m.
+	 */
+	void doScrub() {
+		auto iter = _set.begin();
+		auto end = _set.end();
+		while (iter != end) {
+			if (iter->lock())
+				iter++;
+			else
+				iter = _set.erase(iter);
 		}
 		_dirtiness = 0;
 	}

@@ -75,7 +75,7 @@ static boost::arg<2> ASSET_ARG_DATA;
 static boost::arg<3> ASSET_ARG_TAG;
 
 class ReadAsset;
-class ReadRequestContext : public bithorde::Read_Request, public boost::enable_shared_from_this<ReadRequestContext> {
+class ReadRequestContext : boost::noncopyable, public bithorde::Read_Request, public boost::enable_shared_from_this<ReadRequestContext> {
 	ReadAsset* _asset;
 	Asset::ClientPointer _client;
 	boost::asio::deadline_timer _timer;

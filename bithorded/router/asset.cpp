@@ -24,6 +24,7 @@
 
 #include <lib/weak_fn.hpp>
 #include "lib/random.h"
+#include "lib/protocolmessages.hpp"
 
 #include <log4cplus/logger.h>
 #include <log4cplus/loggingmacros.h>
@@ -55,6 +56,7 @@ void UpstreamAsset::handleMessage(const bithorde::Read::Response& resp)
 ForwardedAsset::ForwardedAsset(Router& router, const BitHordeIds& ids) :
 	_router(router),
 	_requestedIds(ids),
+	_reqParameters(NULL),
 	_size(-1),
 	_upstream(),
 	_pendingReads()
@@ -72,18 +74,19 @@ bool bithorded::router::ForwardedAsset::hasUpstream(const std::string peername)
 	return _upstream.count(peername);
 }
 
-void bithorded::router::ForwardedAsset::apply(const AssetRequestParameters& old, const AssetRequestParameters& current)
+void bithorded::router::ForwardedAsset::apply(const bithorded::AssetRequestParameters& old, const bithorded::AssetRequestParameters& current)
 {
-	bool has_new_requesters = false;
+	bool bind_new = false;
 	for (auto iter=current.requesters.begin(); iter != current.requesters.end(); iter++) {
 		if (!old.requesters.count(*iter))
-			has_new_requesters = true;
+			bind_new = true;
 	}
 	auto requesters_ = requestTrace(current.requesters);
 	auto& friends = _router.connectedFriends();
+	_reqParameters = &current;
 
 	int32_t timeout(DEFAULT_TIMEOUT_MS);
-	if ((status->status() == bithorde::NONE) && (!current.deadline.is_special())) {
+	if ((status->status() != bithorde::SUCCESS) && (!current.deadline.is_special())) {
 		timeout = (current.deadline - boost::posix_time::microsec_clock::universal_time()).total_milliseconds();
 	}
 
@@ -102,23 +105,38 @@ void bithorded::router::ForwardedAsset::apply(const AssetRequestParameters& old,
 			} else {
 				dropUpstream(peername);
 			}
-		} else if (has_new_requesters) {
-			auto upstream = make_shared<UpstreamAsset>(f, _requestedIds);
-			auto self = boost::weak_ptr<ForwardedAsset>(shared_from_this());
-			upstream->statusUpdate.connect(boost::bind(boost::weak_fn(&ForwardedAsset::onUpstreamStatus, self), peername, bithorde::ASSET_ARG_STATUS));
-			upstream->dataArrived.connect(boost::bind(boost::weak_fn(&ForwardedAsset::onData, self),
-				bithorde::ASSET_ARG_OFFSET, bithorde::ASSET_ARG_DATA, bithorde::ASSET_ARG_TAG));
-			if (f->bind(*upstream, timeout, requesters_))
-				_upstream[peername] = upstream;
+		} else if (bind_new) {
+			addUpstream(f, timeout, requesters_);
 		}
 	}
 	updateStatus();
 }
 
+void ForwardedAsset::addUpstream(const bithorded::Client::Ptr& f)
+{
+	int32_t timeout(DEFAULT_TIMEOUT_MS);
+	if ((status->status() != bithorde::SUCCESS) && (!_reqParameters->deadline.is_special())) {
+		timeout = (_reqParameters->deadline - boost::posix_time::microsec_clock::universal_time()).total_milliseconds();
+	}
+	addUpstream(f, timeout, requestTrace(_reqParameters->requesters));
+}
+
+void bithorded::router::ForwardedAsset::addUpstream(const bithorded::Client::Ptr& f, int32_t timeout, const bithorde::RouteTrace requesters) {
+	const auto& peername = f->peerName();
+	BOOST_ASSERT( _router.connectedFriends().count(peername) );
+	auto upstream = make_shared<UpstreamAsset>(f, _requestedIds);
+	auto self = boost::weak_ptr<ForwardedAsset>(shared_from_this());
+	upstream->statusUpdate.connect(boost::bind(boost::weak_fn(&ForwardedAsset::onUpstreamStatus, self), peername, bithorde::ASSET_ARG_STATUS));
+	upstream->dataArrived.connect(boost::bind(boost::weak_fn(&ForwardedAsset::onData, self),
+		bithorde::ASSET_ARG_OFFSET, bithorde::ASSET_ARG_DATA, bithorde::ASSET_ARG_TAG));
+	if (f->bind(*upstream, timeout, requesters))
+		_upstream[peername] = upstream;
+}
+
 void bithorded::router::ForwardedAsset::onUpstreamStatus(const string& peername, const bithorde::AssetStatus& status)
 {
 	if (status.status() == bithorde::Status::SUCCESS) {
-		if ( overlaps(_reqParameters.requesters, status.servers().begin(), status.servers().end()) ) {
+		if ( overlaps(_reqParameters->requesters, status.servers().begin(), status.servers().end()) ) {
 			LOG4CPLUS_DEBUG(assetLogger, _requestedIds << "Loop detected " << peername);
 			dropUpstream(peername);
 		} else {

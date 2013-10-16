@@ -49,10 +49,10 @@ class ForwardedAsset : public bithorded::IAsset, public boost::noncopyable, publ
 {
 	Router& _router;
 	BitHordeIds _requestedIds;
+	const AssetRequestParameters* _reqParameters;
 	int64_t _size;
 	std::map<std::string, UpstreamAsset::Ptr> _upstream;
 	std::list<PendingRead> _pendingReads;
-	std::unordered_set<uint64_t> _requesters;
 public:
 	typedef boost::shared_ptr<ForwardedAsset> Ptr;
 	typedef boost::weak_ptr<ForwardedAsset> WeakPtr;
@@ -70,13 +70,16 @@ public:
 	virtual void inspect(management::InfoList& target) const;
 	void inspect_upstreams(management::InfoList& target) const;
 
-	void apply(const AssetRequestParameters& old, const AssetRequestParameters& current);
+	void apply(const bithorded::AssetRequestParameters& old, const bithorded::AssetRequestParameters& current);
+
+	void addUpstream(const bithorded::Client::Ptr& f);
 private:
-	void onUpstreamStatus(const std::string& peername, const bithorde::AssetStatus& status);
-	void updateStatus();
-	void onData(uint64_t offset, const std::string& data, int tag);
+	void addUpstream(const bithorded::Client::Ptr& f, int32_t timeout, const bithorde::RouteTrace requesters);
 	void dropUpstream(const std::string& peername);
+	void onData(uint64_t offset, const std::string& data, int tag);
+	void onUpstreamStatus(const std::string& peername, const bithorde::AssetStatus& status);
 	bithorde::RouteTrace requestTrace(const std::unordered_set< uint64_t >& requesters) const;
+	void updateStatus();
 };
 
 }

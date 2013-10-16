@@ -48,6 +48,7 @@ class Router : public AssetSessions, public management::DescriptiveDirectory
 
 	std::unordered_set<uint64_t> _blacklist;
 	std::queue< std::pair<boost::posix_time::ptime,uint64_t> > _blacklistQueue;
+	bithorded::WeakSet<ForwardedAsset> _openAssets;
 public:
 	Router(Server& server);
 

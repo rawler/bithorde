@@ -136,6 +136,11 @@ void Router::onConnected(const bithorded::Client::Ptr& client )
 			_connectors[peerName]->cancel();
 		_connectors.erase(peerName);
 		_connectedFriends[peerName] = client;
+		for (auto iter=_openAssets.begin(); iter != _openAssets.end(); iter++) {
+			if (auto forwardedAsset = iter->lock()) {
+				forwardedAsset->addUpstream(client);
+			}
+		}
 	}
 }
 
@@ -181,6 +186,7 @@ bithorded::IAsset::Ptr bithorded::router::Router::openAsset(const bithorde::Bind
 		throw bithorded::BindError(bithorde::WOULD_LOOP);
 
 	auto asset = boost::make_shared<ForwardedAsset, Router&, const BitHordeIds&>(*this, req.ids());
+	_openAssets.insert(asset);
 
 	ptime::ptime deadline;
 	if (req.has_timeout()) {

@@ -126,6 +126,7 @@ ADD_TEST_SCRIPT(RoundtripTest ${CMAKE_SOURCE_DIR}/tests/roundtrip/test_roundtrip
 ADD_TEST_SCRIPT(LinkSourceTest ${CMAKE_SOURCE_DIR}/tests/link_source/test_links.sh)
 ADD_TEST_SCRIPT(Proto_Basic ${CMAKE_SOURCE_DIR}/tests/proto/basic.py)
 ADD_TEST_SCRIPT(Proto_AssetTimeout ${CMAKE_SOURCE_DIR}/tests/proto/asset_timeout.py)
+ADD_TEST_SCRIPT(Proto_AssetReconnect ${CMAKE_SOURCE_DIR}/tests/proto/reconnect_asset.py)
 ADD_TEST_SCRIPT(Proto_Encryption ${CMAKE_SOURCE_DIR}/tests/proto/encryption.py)
 ADD_TEST_SCRIPT(Proto_LoopPrevention ${CMAKE_SOURCE_DIR}/tests/proto/loop_prevention.py)
 ADD_TEST_SCRIPT(TestRandomReads ${CMAKE_SOURCE_DIR}/tests/test_random_reads.py)
