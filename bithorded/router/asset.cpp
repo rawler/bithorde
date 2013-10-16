@@ -118,16 +118,21 @@ void bithorded::router::ForwardedAsset::apply(const AssetRequestParameters& old,
 void bithorded::router::ForwardedAsset::onUpstreamStatus(const string& peername, const bithorde::AssetStatus& status)
 {
 	if (status.status() == bithorde::Status::SUCCESS) {
-		LOG4CPLUS_DEBUG(assetLogger, _requestedIds << " Found upstream " << peername);
-		if (status.has_size()) {
-			if (_size == -1) {
-				_size = status.size();
-			} else if (_size != (int64_t)status.size()) {
-				LOG4CPLUS_WARN(assetLogger, peername << " " << _requestedIds << " responded with mismatching size, ignoring...");
-				dropUpstream(peername);
+		if ( overlaps(_reqParameters.requesters, status.servers().begin(), status.servers().end()) ) {
+			LOG4CPLUS_DEBUG(assetLogger, _requestedIds << "Loop detected " << peername);
+			dropUpstream(peername);
+		} else {
+			LOG4CPLUS_DEBUG(assetLogger, _requestedIds << " Found upstream " << peername);
+			if (status.has_size()) {
+				if (_size == -1) {
+					_size = status.size();
+				} else if (_size != (int64_t)status.size()) {
+					LOG4CPLUS_WARN(assetLogger, peername << " " << _requestedIds << " responded with mismatching size, ignoring...");
+					dropUpstream(peername);
+				}
+			} else if (status.ids().size()) {
+				LOG4CPLUS_WARN(assetLogger, peername << " " << _requestedIds << " SUCCESS response not accompanied with asset-size.");
 			}
-		} else if (status.ids().size()) {
-			LOG4CPLUS_WARN(assetLogger, peername << " " << _requestedIds << " SUCCESS response not accompanied with asset-size.");
 		}
 	} else {
 		LOG4CPLUS_DEBUG(assetLogger, _requestedIds << "Failed upstream " << peername);

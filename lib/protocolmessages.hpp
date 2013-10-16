@@ -25,6 +25,16 @@ bool operator!=(const bithorde::AssetStatus& a, const bithorde::AssetStatus& b);
 bool operator==(const bithorde::Identifier& a, const bithorde::Identifier& b);
 bool operator!=(const bithorde::Identifier& a, const bithorde::Identifier& b);
 
+template <class Set, typename Iterator>
+bool overlaps(const Set& set, const Iterator& begin, const Iterator& end) {
+	for (auto iter=begin; iter != end; iter++) {
+		if (set.count(*iter)) {
+			return true;
+		}
+	}
+	return false;
+}
+
 template <typename T, class S>
 void setRepeatedField(google::protobuf::RepeatedField<T>* tgt, const S& src) {
 	tgt->Clear();

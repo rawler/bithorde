@@ -72,3 +72,22 @@ if __name__ == '__main__':
     # Simulate late loop
     downstream1.send(message.BindRead(handle=1, ids=ASSET_IDS, timeout=500, requesters=req2.requesters))
     downstream1.expect(message.AssetStatus(status=message.WOULD_LOOP))
+
+    # Reset
+    for x in (upstream1, upstream2, downstream1, downstream2):
+        x.close()
+    upstream1 = TestConnection(bithorded, name='upstream1')
+    downstream1 = TestConnection(bithorded, name='downstream1')
+
+    # Test concurrent-request race-condition
+    downstream1.send(message.BindRead(handle=1, ids=ASSET_IDS, timeout=500, requesters=[123124]))
+    req = upstream1.expect(message.BindRead(handle=1, ids=ASSET_IDS))
+    assert 123124 in req.requesters
+
+    # Assume upstream1 had already sent this, unknowing that server would ask too.
+    upstream1.send(message.BindRead(handle=1, ids=ASSET_IDS, timeout=500, requesters=[123124, 421321]))
+    upstream1.send(message.AssetStatus(handle=req.handle, status=message.SUCCESS, ids=ASSET_IDS, size=15, servers=[1018,421321]))
+
+    # Server is now assumed to reject upstream1, since the same node appear as requester and server
+    upstream1.expect(message.BindRead(handle=1, ids=[]))
+    downstream1.expect(message.AssetStatus(handle=1, status=message.NOTFOUND))
