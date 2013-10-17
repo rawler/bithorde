@@ -108,7 +108,7 @@ void Client::onMessage(const bithorde::BindWrite& msg)
 		if (path.is_absolute()) {
 			if (auto asset = _server.async_linkAsset(path)) {
 				LOG4CPLUS_INFO(clientLogger, "Linking " << path);
-				assignAsset(msg.handle(), asset, bithorde::RouteTrace());
+				assignAsset(msg.handle(), asset, bithorde::RouteTrace(), boost::posix_time::neg_infin);
 			} else {
 				LOG4CPLUS_ERROR(clientLogger, "Upload did not match any allowed assetStore: " << path);
 				informAssetStatus(msg.handle(), bithorde::ERROR);
@@ -120,7 +120,7 @@ void Client::onMessage(const bithorde::BindWrite& msg)
 	} else {
 		if (auto asset = _server.prepareUpload(msg.size())) {
 			LOG4CPLUS_INFO(clientLogger, "Ready for upload");
-			assignAsset(msg.handle(), asset, bithorde::RouteTrace());
+			assignAsset(msg.handle(), asset, bithorde::RouteTrace(), boost::posix_time::neg_infin);
 		} else {
 			informAssetStatus(msg.handle(), bithorde::NORESOURCES);
 		}
@@ -154,10 +154,16 @@ void Client::onMessage(bithorde::BindRead& msg)
 		// Trying to open
 		try {
 			auto asset = _server.async_findAsset(msg);
-			if (asset)
-				assignAsset(h, asset, msg.requesters());
-			else
+			if (asset) {
+				boost::posix_time::ptime deadline(boost::posix_time::neg_infin);
+				if (msg.has_timeout()) {
+					auto now = boost::posix_time::microsec_clock::universal_time();
+					deadline = now + boost::posix_time::milliseconds(msg.timeout());
+				}
+				assignAsset(h, asset, msg.requesters(), deadline);
+			} else {
 				informAssetStatus(h, bithorde::NOTFOUND);
+			}
 		} catch (bithorded::BindError e) {
 			informAssetStatus(h, e.status);
 		}
@@ -230,6 +236,11 @@ void Client::onReadResponse(const bithorde::Read::Request& req, int64_t offset, 
 
 void Client::informAssetStatus(bithorde::Asset::Handle h, bithorde::Status s)
 {
+	size_t asset_idx = h;
+	if (asset_idx < _assets.size()) {
+		_assets[asset_idx].clearDeadline();
+	}
+
 	bithorde::AssetStatus resp;
 	resp.set_handle(h);
 	resp.set_status(s);
@@ -244,6 +255,7 @@ void Client::informAssetStatusUpdate(bithorde::Asset::Handle h, const IAsset::We
 	if ((asset_idx >= _assets.size()) || (_assets[asset_idx] != asset.lock()))
 		return;
 
+	_assets[asset_idx].clearDeadline();
 	bithorde::AssetStatus resp(status);
 	resp.set_handle(h);
 
@@ -252,7 +264,7 @@ void Client::informAssetStatusUpdate(bithorde::Asset::Handle h, const IAsset::We
 	sendMessage(bithorde::Connection::AssetStatus, resp);
 }
 
-void Client::assignAsset(bithorde::Asset::Handle handle_, const UpstreamRequestBinding::Ptr& a, const bithorde::RouteTrace& requesters)
+void Client::assignAsset(bithorde::Asset::Handle handle_, const UpstreamRequestBinding::Ptr& a, const bithorde::RouteTrace& requesters, const boost::posix_time::ptime& deadline)
 {
 	size_t handle = handle_;
 	if (handle >= _assets.size()) {
@@ -271,7 +283,7 @@ void Client::assignAsset(bithorde::Asset::Handle handle_, const UpstreamRequestB
 			_assets[i].setClient(self);
 		}
 	}
-	if (_assets[handle].bind(a, requesters)) {
+	if (_assets[handle].bind(a, requesters, deadline)) {
 		auto weak_asset = _assets[handle].weak();
 		// Remember to inform peer about changes in asset-status.
 		(*a)->status.onChange.connect(boost::bind(&Client::informAssetStatusUpdate, this, handle_, weak_asset, _2));

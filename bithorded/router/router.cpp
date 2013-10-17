@@ -29,11 +29,12 @@
 #include "../server/server.hpp"
 
 namespace asio = boost::asio;
+namespace ptime = boost::posix_time;
 using namespace bithorded;
 using namespace bithorded::router;
 using namespace std;
 
-const boost::posix_time::seconds RECONNECT_INTERVAL(5);
+const ptime::seconds RECONNECT_INTERVAL(5);
 
 namespace bithorded { namespace router {
 	log4cplus::Logger routerLog = log4cplus::Logger::getInstance("router");
@@ -70,7 +71,7 @@ public:
 	}
 
 private:
-	void scheduleRestart(boost::posix_time::time_duration delay=RECONNECT_INTERVAL) {
+	void scheduleRestart(ptime::time_duration delay=RECONNECT_INTERVAL) {
 		_timer.expires_from_now(delay);
 		_timer.async_wait(boost::bind(&FriendConnector::start, shared_from_this()));
 	}
@@ -174,24 +175,30 @@ void Router::describe(management::Info& target) const
 
 bithorded::IAsset::Ptr bithorded::router::Router::openAsset(const bithorde::BindRead& req)
 {
-	auto now = boost::posix_time::microsec_clock::universal_time();
+	auto now = ptime::microsec_clock::universal_time();
 
 	if (_isBlacklisted(now, req.requesters()))
 		throw bithorded::BindError(bithorde::WOULD_LOOP);
 
 	auto asset = boost::make_shared<ForwardedAsset, Router&, const BitHordeIds&>(*this, req.ids());
-	// TODO: Implement deadlines and use them instead.
-	_addToBlacklist(now + boost::posix_time::seconds(30), asset->sessionId());
+
+	ptime::ptime deadline;
+	if (req.has_timeout()) {
+		deadline = now + ptime::milliseconds(req.timeout()*2);
+	} else {
+		deadline = now + ptime::seconds(30);
+	}
+	_addToBlacklist(deadline, asset->sessionId());
 	return asset;
 }
 
-void Router::_addToBlacklist(const boost::posix_time::ptime& deadline, uint64_t uid)
+void Router::_addToBlacklist(const ptime::ptime& deadline, uint64_t uid)
 {
 	_blacklist.insert(uid);
-	_blacklistQueue.push(pair<boost::posix_time::ptime, uint64_t>(deadline, uid));
+	_blacklistQueue.push(pair<ptime::ptime, uint64_t>(deadline, uid));
 }
 
-bool Router::_isBlacklisted(const boost::posix_time::ptime& now, const google::protobuf::RepeatedField <google::protobuf::uint64 >& uids)
+bool Router::_isBlacklisted(const ptime::ptime& now, const google::protobuf::RepeatedField <google::protobuf::uint64 >& uids)
 {
 	while (_blacklistQueue.size() && _blacklistQueue.front().first <= now) {
 		_blacklist.erase(_blacklistQueue.front().second);

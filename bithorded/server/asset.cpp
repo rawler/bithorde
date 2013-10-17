@@ -27,13 +27,15 @@ using namespace bithorded;
 AssetBinding::AssetBinding() :
 	_client(NULL),
 	_ptr(),
-	_requesters()
+	_requesters(),
+	_deadline(boost::posix_time::neg_infin)
 {}
 
 AssetBinding::AssetBinding(const AssetBinding& other) :
 	_client(other._client),
 	_ptr(other._ptr),
-	_requesters(other._requesters)
+	_requesters(other._requesters),
+	_deadline(other.deadline())
 {
 	if (_ptr) {
 		_ptr->bindDownstream(this);
@@ -57,16 +59,17 @@ Client* AssetBinding::client() const
 
 bool AssetBinding::bind(const bithorde::RouteTrace& requesters)
 {
-	return bind(_ptr, requesters);
+	return bind(_ptr, requesters, boost::posix_time::neg_infin);
 }
 
-bool AssetBinding::bind(const boost::shared_ptr<UpstreamRequestBinding>& asset, const bithorde::RouteTrace& requesters)
+bool AssetBinding::bind(const boost::shared_ptr< UpstreamRequestBinding >& asset, const bithorde::RouteTrace& requesters, const boost::posix_time::ptime& deadline)
 {
 	if (_ptr) {
 		if (asset != _ptr)
 			_ptr->unbindDownstream(this);
 	}
 	_requesters = requesters;
+	_deadline = deadline;
 	if (_requesters.size() == 0)
 		_requesters.Add(rand64());
 	if (asset->bindDownstream(this)) {
@@ -86,6 +89,7 @@ void AssetBinding::reset()
 	}
 	_ptr.reset();
 	_requesters.Clear();
+	_deadline = boost::posix_time::neg_infin;
 }
 
 AssetBinding& AssetBinding::operator=(const AssetBinding& other)
@@ -150,6 +154,14 @@ bool bithorded::operator==(const AssetBinding& a, const boost::shared_ptr< IAsse
 bool bithorded::operator!=(const AssetBinding& a, const boost::shared_ptr< IAsset >& b)
 {
 	return a.get() != b.get();
+}
+
+void AssetBinding::clearDeadline()
+{
+	_deadline = boost::posix_time::neg_infin;
+	if (_ptr) {
+		_ptr->bindDownstream(this);
+	}
 }
 
 /**** AssetRequestParameters *****/
@@ -218,15 +230,20 @@ boost::weak_ptr< IAsset > UpstreamRequestBinding::weaken()
 
 void UpstreamRequestBinding::rebuild()
 {
+	auto& deadline = _parameters.deadline;
 	auto& requesters = _parameters.requesters;
 	auto& requesterClients = _parameters.requesterClients;
 	auto old = _parameters;
+	deadline = boost::posix_time::neg_infin;
 	requesters.clear();
 	requesterClients.clear();
 	for (auto iter=_downstreams.begin(); iter != _downstreams.end(); iter++) {
 		const auto& downstream_requesters = (*iter)->requesters();
 		requesters.insert(downstream_requesters.begin(), downstream_requesters.end());
 		requesterClients.insert((*iter)->client());
+		auto currentDeadline = (*iter)->deadline();
+		if (currentDeadline > deadline)
+			deadline = currentDeadline;
 	}
 	if (old != _parameters) {
 		_ptr->apply(old, _parameters);

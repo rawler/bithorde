@@ -41,6 +41,7 @@ class AssetBinding {
 	Client* _client; // Client owns us, so should always be valid.
 	boost::shared_ptr<UpstreamRequestBinding> _ptr;
 	bithorde::RouteTrace _requesters;
+	boost::posix_time::ptime _deadline;
 public:
 	AssetBinding();
 	AssetBinding(const AssetBinding& other);
@@ -50,7 +51,7 @@ public:
 	Client* client() const;
 
 	bool bind(const bithorde::RouteTrace& requesters);
-	bool bind(const boost::shared_ptr< bithorded::UpstreamRequestBinding >& asset, const bithorde::RouteTrace& requesters);
+	bool bind(const boost::shared_ptr< bithorded::UpstreamRequestBinding >& asset, const bithorde::RouteTrace& requesters, const boost::posix_time::ptime& deadline);
 	void reset();
 
 	AssetBinding& operator=(const AssetBinding& other);
@@ -63,6 +64,9 @@ public:
 	boost::weak_ptr< IAsset > weak() const;
 
 	const bithorde::RouteTrace& requesters() const { return _requesters; }
+
+	const boost::posix_time::ptime& deadline() const { return _deadline; }
+	void clearDeadline();
 };
 
 bool operator==(const bithorded::AssetBinding& a, const boost::shared_ptr< bithorded::IAsset >& b);
@@ -71,6 +75,7 @@ bool operator!=(const bithorded::AssetBinding& a, const boost::shared_ptr< bitho
 struct AssetRequestParameters {
 	std::unordered_set<uint64_t> requesters;
 	std::unordered_set<Client*> requesterClients;
+	boost::posix_time::ptime deadline;
 
 	bool isRequester(const boost::shared_ptr<Client>& client) const;
 	bool operator!=(const AssetRequestParameters& other) const;

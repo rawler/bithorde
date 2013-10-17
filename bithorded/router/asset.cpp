@@ -31,6 +31,8 @@
 using namespace bithorded::router;
 using namespace std;
 
+const int32_t DEFAULT_TIMEOUT_MS = 5000;
+
 namespace bithorded { namespace router {
 	log4cplus::Logger assetLogger = log4cplus::Logger::getInstance("router");
 } }
@@ -80,6 +82,11 @@ void bithorded::router::ForwardedAsset::apply(const AssetRequestParameters& old,
 	auto requesters_ = requestTrace(current.requesters);
 	auto& friends = _router.connectedFriends();
 
+	int32_t timeout(DEFAULT_TIMEOUT_MS);
+	if ((status->status() == bithorde::NONE) && (!current.deadline.is_special())) {
+		timeout = (current.deadline - boost::posix_time::microsec_clock::universal_time()).total_milliseconds();
+	}
+
 	for (auto iter = friends.begin(); iter != friends.end(); iter++) {
 		auto f = iter->second;
 
@@ -101,7 +108,7 @@ void bithorded::router::ForwardedAsset::apply(const AssetRequestParameters& old,
 			upstream->statusUpdate.connect(boost::bind(boost::weak_fn(&ForwardedAsset::onUpstreamStatus, self), peername, bithorde::ASSET_ARG_STATUS));
 			upstream->dataArrived.connect(boost::bind(boost::weak_fn(&ForwardedAsset::onData, self),
 				bithorde::ASSET_ARG_OFFSET, bithorde::ASSET_ARG_DATA, bithorde::ASSET_ARG_TAG));
-			if (f->bind(*upstream, requesters_))
+			if (f->bind(*upstream, timeout, requesters_))
 				_upstream[peername] = upstream;
 		}
 	}
