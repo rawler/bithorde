@@ -52,7 +52,7 @@ private:
 	void onTimeout();
 };
 
-class CipherConfig;
+struct CipherConfig;
 class Client
 {
 public:

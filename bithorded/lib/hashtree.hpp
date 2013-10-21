@@ -37,9 +37,10 @@ struct HashNode {
 
 	std::string base32Digest() {
 		std::string res;
-		CryptoPP::StringSource(digest, DigestSize, true,
+		CryptoPP::StringSource pipe(digest, DigestSize, false,
 			new RFC4648Base32Encoder(
 				new CryptoPP::StringSink(res)));
+		pipe.PumpAll();
 		return res;
 	}
 };

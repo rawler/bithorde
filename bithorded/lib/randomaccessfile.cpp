@@ -83,7 +83,7 @@ void RandomAccessFile::close()
 	if (is_open()) {
 		::close(_fd);
 		_fd = -1;
-		_path == "";
+		_path = "";
 	}
 }
 

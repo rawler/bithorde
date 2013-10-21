@@ -144,7 +144,7 @@ boost::filesystem::path AssetStore::resolveIds(const BitHordeIds& ids)
 	if (_tigerFolder.empty())
 		fs::path();
 	auto tigerId = findBithordeId(ids, bithorde::HashType::TREE_TIGER);
-	if (tigerId.size() >= 0) {
+	if (tigerId.size()) {
 		fs::path hashLink = _tigerFolder / base32encode(tigerId);
 		boost::system::error_code e;
 		auto assetFolder = fs::canonical(hashLink, e);

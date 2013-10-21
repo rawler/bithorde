@@ -39,7 +39,7 @@
 
 namespace bithorded {
 
-class Config;
+struct Config;
 
 class BindError : public std::runtime_error {
 public:
