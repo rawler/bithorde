@@ -1,7 +1,6 @@
 #ifndef INODE_H
 #define INODE_H
 
-#include <atomic>
 #include <map>
 #include <sys/stat.h>
 
@@ -15,8 +14,7 @@ class BHFuse;
 
 class INode {
 	// Counts references held to this INode. TODO: break out of INode alltogether.
-	std::atomic<int> _refCount;
-
+	int _refCount;
 public:
 	typedef boost::shared_ptr<INode> Ptr;
 
@@ -76,7 +74,7 @@ private:
 	void closeOne();
 private:
 	// Counter to determine whether the underlying asset needs to be held open.
-	std::atomic<int> _openCount;
+	int _openCount;
 	Timer _holdOpenTimer;
 	Timer _rebindTimer;
 	std::map<off_t, BHReadOperation> _readOperations;

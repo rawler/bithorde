@@ -17,6 +17,8 @@
 
 #include "protocolmessages.hpp"
 
+namespace bithorde {
+
 template<class T>
 bool operator!=(const ::google::protobuf::RepeatedPtrField<T>& a, const ::google::protobuf::RepeatedPtrField<T>& b) {
 	if (a.size() != b.size())
@@ -113,12 +115,4 @@ bool operator==(const bithorde::Identifier& a, const bithorde::Identifier& b)
 	return (a.id() == b.id()) && (a.type() == b.type());
 }
 
-bool std::operator!=(const bithorde::Identifier& a, const bithorde::Identifier& b)
-{
-	return (a.id() != b.id()) || (a.type() != b.type());
-}
-
-bool std::operator==(const bithorde::Identifier& a, const bithorde::Identifier& b)
-{
-	return (a.id() == b.id()) && (a.type() == b.type());
 }

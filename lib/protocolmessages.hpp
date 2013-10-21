@@ -20,11 +20,6 @@
 
 #include "bithorde.pb.h"
 
-bool operator==(const bithorde::AssetStatus& a, const bithorde::AssetStatus& b);
-bool operator!=(const bithorde::AssetStatus& a, const bithorde::AssetStatus& b);
-bool operator==(const bithorde::Identifier& a, const bithorde::Identifier& b);
-bool operator!=(const bithorde::Identifier& a, const bithorde::Identifier& b);
-
 template <class Set, typename Iterator>
 bool overlaps(const Set& set, const Iterator& begin, const Iterator& end) {
 	for (auto iter=begin; iter != end; iter++) {
@@ -53,12 +48,15 @@ void setRepeatedPtrField(google::protobuf::RepeatedPtrField<T>* tgt, const S& sr
 	}
 }
 
-namespace std
-{
-	// Silly C++/std-wabbit! std::_Hash seems to need comparison in std-namespace.
+namespace bithorde {
+	bool operator==(const bithorde::AssetStatus& a, const bithorde::AssetStatus& b);
+	bool operator!=(const bithorde::AssetStatus& a, const bithorde::AssetStatus& b);
 	bool operator==(const bithorde::Identifier& a, const bithorde::Identifier& b);
 	bool operator!=(const bithorde::Identifier& a, const bithorde::Identifier& b);
+}
 
+namespace std
+{
 	template<>
 	struct hash<bithorde::Identifier >
 	{
