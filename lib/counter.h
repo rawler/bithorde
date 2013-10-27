@@ -44,7 +44,6 @@ public:
 };
 
 class InertialValue : public TypedValue {
-	uint64_t _current;
 	float _inertia; // How much is the current data wheighted
 	const std::string unit;
 public:

@@ -47,6 +47,6 @@ void bithorde::Keepalive::run()
 		_client.sendMessage(Connection::Ping, ping);
 		_stale = true;
 		_timer.clear();
-		_timer.arm(MAX_PING_RESPONSE_TIME * 1.5);
+		_timer.arm(boost::posix_time::seconds(MAX_PING_RESPONSE_TIME.total_seconds() * 1.5));
 	}
 }

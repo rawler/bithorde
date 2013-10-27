@@ -51,7 +51,6 @@ class AssetMeta {
 
 	size_t _leafBlocks;
 	size_t _nodes_offset;
-	uint64_t _file_size;
 public:
 	typedef typename boost::shared_ptr<TigerNode> NodePtr;
 	AssetMeta(const boost::filesystem::path& path, uint32_t leafBlocks);
