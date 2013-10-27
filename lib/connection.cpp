@@ -116,7 +116,7 @@ public:
 		}
 		if (_sendWaiting) {
 			boost::asio::async_write(*_socket, buffers,
-				boost::bind(&Connection::onWritten, shared_from_this(),
+				boost::bind(&ConnectionImpl<Protocol>::onWritten, shared_from_this(),
 							asio::placeholders::error, asio::placeholders::bytes_transferred, queued)
 			);
 		}
@@ -125,7 +125,7 @@ public:
 
 	void tryRead() {
 		_socket->async_read_some(asio::buffer(_rcvBuf.allocate(MAX_MSG), MAX_MSG),
-			boost::bind(&Connection::onRead, shared_from_this(),
+			boost::bind(&ConnectionImpl<Protocol>::onRead, shared_from_this(),
 				asio::placeholders::error, asio::placeholders::bytes_transferred
 			)
 		);
