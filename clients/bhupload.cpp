@@ -92,6 +92,8 @@ void BHUpload::onStatusUpdate(const bithorde::AssetStatus& status)
 {
 	switch (status.status()) {
 	case bithorde::SUCCESS:
+		if (optDebug)
+			cerr << "DEBUG: Accepted bind ..." << endl;
 		if (status.ids_size()) {
 			cout << MagnetURI(status) << endl;
 			nextAsset();
