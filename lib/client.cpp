@@ -17,11 +17,7 @@
 #include "random.h"
 #include "weak_fn.hpp"
 
-const static boost::posix_time::millisec DEFAULT_ASSET_TIMEOUT(1500);
-const static boost::posix_time::millisec UPLOAD_ASSET_TIMEOUT(10000);
-const static boost::posix_time::millisec CLOSE_TIMEOUT(300);
 const static int LOTS_OF_MILLISECONDS(2^30);
-const static int MAX_ASSETS(1024);
 
 using namespace std;
 namespace asio = boost::asio;
@@ -30,6 +26,7 @@ namespace ptime = boost::posix_time;
 using namespace bithorde;
 
 namespace bithorde {
+
 struct CipherConfig {
 	CipherType type;
 	string iv;
@@ -467,7 +464,7 @@ bool Client::bind(ReadAsset& asset, int timeout_ms, const RouteTrace& requesters
 	return informBound(*_assetMap[asset._handle], timeout_ms);
 }
 
-bool Client::bind(UploadAsset & asset)
+bool Client::bind(UploadAsset & asset, int timeout_ms)
 {
 	BOOST_ASSERT(asset._client.get() == this);
 	BOOST_ASSERT(asset._handle < 0);
@@ -475,10 +472,12 @@ bool Client::bind(UploadAsset & asset)
 	auto handle = _handleAllocator.allocate();
 	if (handle >= MAX_ASSETS)
 		return false;
+	if (!timeout_ms)
+		timeout_ms = UPLOAD_ASSET_TIMEOUT.total_milliseconds();
 	asset._handle = handle;
 	auto& bind = _assetMap[asset._handle];
 	bind = boost::make_shared<AssetBinding>(this, &asset, asset._handle);
-	bind->setTimer(UPLOAD_ASSET_TIMEOUT);
+	bind->setTimer(boost::posix_time::milliseconds(timeout_ms));
 	bithorde::BindWrite msg;
 	msg.set_handle(asset._handle);
 	msg.set_size(asset.size());

@@ -17,6 +17,11 @@
 
 namespace bithorde {
 
+const boost::posix_time::millisec DEFAULT_ASSET_TIMEOUT(1500);
+const boost::posix_time::millisec UPLOAD_ASSET_TIMEOUT(15000);
+const boost::posix_time::millisec CLOSE_TIMEOUT(300);
+const int MAX_ASSETS(1024);
+
 class Client;
 class ClientKeepalive;
 
@@ -123,7 +128,7 @@ public:
 	bool bind(ReadAsset & asset, int timeout_ms);
 	bool bind(bithorde::ReadAsset& asset, const bithorde::RouteTrace& requesters);
 	bool bind(bithorde::ReadAsset& asset, int timeout_ms, const bithorde::RouteTrace& requesters);
-	bool bind(UploadAsset & asset);
+	bool bind(UploadAsset & asset, int timeout_ms = 0);
 
 	bool sendMessage(bithorde::Connection::MessageType type, const google::protobuf::Message& msg, const bithorde::Message::Deadline& expires=Message::NEVER, bool prioritized=false);
 
