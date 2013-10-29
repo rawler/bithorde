@@ -20,6 +20,7 @@ class BHUpload {
 	bool optLink;
 	std::string optMyName;
 	bool optQuiet;
+	int optBindTimeoutMs;
 
 	// Internal items
 	boost::asio::io_service _ioSvc;

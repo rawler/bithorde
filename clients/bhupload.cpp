@@ -22,6 +22,7 @@ BHUpload::BHUpload(boost::program_options::variables_map &args) :
 	optLink(args.count("link")),
 	optMyName(args["name"].as<string>()),
 	optQuiet(args.count("quiet")),
+	optBindTimeoutMs(args["bind-timeout"].as<int>()*1000),
 	_currentAsset(NULL),
 	_res(0),
 	optDebug(false)
@@ -81,7 +82,7 @@ void BHUpload::nextAsset() {
 		else
 			_currentAsset = new UploadAsset(_client, fs::file_size(p));
 		_currentAsset->statusUpdate.connect(boost::bind(&BHUpload::onStatusUpdate, this, _1));
-		_client->bind(*_currentAsset);
+		_client->bind(*_currentAsset, optBindTimeoutMs);
 
 		_currentOffset = 0;
 		_files.pop_front();
@@ -165,6 +166,8 @@ int main(int argc, char *argv[]) {
 			"Show version")
 		("name,n", po::value< string >()->default_value("bhupload"),
 			"Bithorde-name of this client")
+		("bind-timeout,t", po::value< int >()->default_value(bithorde::UPLOAD_ASSET_TIMEOUT.total_seconds()),
+			"How many seconds to wait for server to acknowledge bind")
 		("quiet,q",
 			"Don't show progressbar")
 		("url,u", po::value< string >()->default_value("/tmp/bithorde"),
