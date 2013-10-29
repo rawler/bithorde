@@ -47,12 +47,20 @@ public:
 	ConnectionImpl(boost::asio::io_service& ioSvc, const ConnectionStats::Ptr& stats, const EndPoint& addr)
 		: Connection(ioSvc, stats), _socket(new Socket(ioSvc))
 	{
+		std::ostringstream buf;
+		buf << addr; 
+		setLogTag(buf.str());
+
 		_socket->connect(addr);
 	}
 
 	ConnectionImpl(boost::asio::io_service& ioSvc, const ConnectionStats::Ptr& stats, boost::shared_ptr<Socket>& socket)
 		: Connection(ioSvc, stats)
 	{
+		std::ostringstream buf;
+		buf << socket->remote_endpoint(); 
+		setLogTag(buf.str());
+
 		_socket = socket;
 	}
 
@@ -282,7 +290,7 @@ void Connection::onRead(const boost::system::error_code& err, size_t count)
 		case Ping:
 			res = dequeue<bithorde::Ping>(Ping, stream); break;
 		default:
-			cerr << "BitHorde protocol warning: unknown message tag" << endl;
+			cerr << _logTag << ": BitHorde protocol warning: unknown message tag" << endl;
 			res = ::google::protobuf::internal::WireFormatLite::SkipMessage(&stream);
 		}
 	}
@@ -328,6 +336,11 @@ ConnectionStats::Ptr Connection::stats()
 	return _stats;
 }
 
+void Connection::setLogTag(const std::string& tag)
+{
+	_logTag = tag;
+}
+
 bool Connection::sendMessage(Connection::MessageType type, const google::protobuf::Message& msg, const Message::Deadline& expires, bool prioritized)
 {
 	size_t bufLimit = prioritized ? SEND_BUF_EMERGENCY : SEND_BUF;
@@ -366,7 +379,7 @@ void Connection::onWritten(const boost::system::error_code& err, size_t written,
 		if (_sndQueue.size() < SEND_BUF_LOW_WATER_MARK)
 			writable();
 	} else {
-		cerr << "Failed to write. Disconnecting..." << endl;
+		cerr << _logTag << ": Failed to write. Disconnecting..." << endl;
 		close();
 	}
 }

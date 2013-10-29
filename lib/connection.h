@@ -100,6 +100,7 @@ public:
 	VoidSignal writable;
 
 	ConnectionStats::Ptr stats();
+	void setLogTag(const std::string& tag);
 
 	bool sendMessage(MessageType type, const ::google::protobuf::Message & msg, const Message::Deadline& expires, bool prioritized);
 
@@ -119,6 +120,7 @@ protected:
 	boost::asio::io_service& _ioSvc;
 	ConnectionStats::Ptr _stats;
 	std::unique_ptr<Keepalive> _keepAlive;
+	std::string _logTag;
 
 	Buffer _rcvBuf;
 	MessageQueue _sndQueue;

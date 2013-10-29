@@ -147,6 +147,7 @@ void Client::hookup(Connection::Pointer newConn)
 
 void Client::connect(Connection::Pointer newConn, const std::string& expectedPeer) {
 	_peerName = expectedPeer;
+	newConn->setLogTag(_peerName);
 	hookup(newConn);
 	sayHello();
 }
@@ -279,6 +280,7 @@ void Client::onMessage(const bithorde::HandShake &msg)
 
 	if (_peerName.empty()) {
 		_peerName = msg.name();
+		_connection->setLogTag(_peerName);
 	} else if (_peerName != msg.name()) {
 		cerr << "Error: Expected " << _peerName << " but was greeted by " << msg.name() << endl;
 		return close();
