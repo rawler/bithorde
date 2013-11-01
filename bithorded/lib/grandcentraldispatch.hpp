@@ -30,7 +30,7 @@ namespace bithorded {
  * and to utilize parallelism in a controlled manner. Jobs sent to the GCD is assumed to
  * be const, and have no locking or other threading-issues.
  */
-class GrandCentralDispatch
+class GrandCentralDispatch : boost::noncopyable
 {
 	boost::asio::io_service& _controller;
 	boost::asio::io_service _jobService;
@@ -38,6 +38,7 @@ class GrandCentralDispatch
 	boost::thread_group _workers;
 public:
 	GrandCentralDispatch(boost::asio::io_service& controller, int parallel);
+	virtual ~GrandCentralDispatch();
 
 	boost::asio::io_service& ioService() const { return _controller; }
 

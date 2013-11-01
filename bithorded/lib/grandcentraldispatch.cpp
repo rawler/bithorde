@@ -25,3 +25,8 @@ GrandCentralDispatch::GrandCentralDispatch(boost::asio::io_service& controller, 
 	for (int i = 0; i < parallel; ++i)
 		_workers.create_thread(boost::bind(&boost::asio::io_service::run, &_jobService));
 }
+
+GrandCentralDispatch::~GrandCentralDispatch() {
+	_jobService.stop();
+	_workers.join_all();
+}
