@@ -19,7 +19,7 @@
 #include "client.h"
 
 const static boost::posix_time::seconds MINIMUM_PACKET_INTERVAL(90);
-const static boost::posix_time::seconds MAX_PING_RESPONSE_TIME(5);
+const static boost::posix_time::seconds MAX_PING_RESPONSE_TIME(15);
 
 using namespace std;
 
