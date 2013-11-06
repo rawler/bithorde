@@ -40,11 +40,17 @@ int BHUpload::main(const std::vector<std::string>& args) {
 
 	_client = Client::create(_ioSvc, optMyName);
 	_client->authenticated.connect(boost::bind(&BHUpload::onAuthenticated, this, _1, _2));
+	_client->disconnected.connect(boost::bind(&BHUpload::onDisconnected, this));
 	_client->connect(optConnectUrl);
 
 	_ioSvc.run();
 
 	return _res;
+}
+
+void BHUpload::onDisconnected() {
+	_res = -1;
+	_ioSvc.stop();
 }
 
 bool BHUpload::queueFile(const std::string& path) {
@@ -136,6 +142,8 @@ bool BHUpload::tryWrite() {
 	}
 
 	if (_currentAsset->tryWrite(_currentOffset, _readBuf.ptr, _readBuf.size)) {
+		if (optDebug)
+			cerr << "DEBUG: Wrote " << _readBuf.size << " from " << _currentOffset << endl;
 		_currentOffset += _readBuf.size;
 		// TODO: Update progressbar
 		_readBuf.pop(_readBuf.size);

@@ -43,6 +43,7 @@ private:
 	void onAuthenticated(bithorde::Client& c, const std::string& peerName);
 	void onStatusUpdate(const bithorde::AssetStatus&);
 	void onWritable();
+	void onDisconnected();
 
 	ssize_t readNext();
 	bool tryWrite();
