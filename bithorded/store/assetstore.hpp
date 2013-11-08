@@ -37,6 +37,8 @@ class AssetStore : public AssetSessions
 public:
 	AssetStore(const boost::filesystem::path& baseDir);
 
+	const boost::filesystem::path& assetsFolder();
+
 	void openOrCreate();
 
 	boost::filesystem::path newAssetDir();

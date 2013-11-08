@@ -36,8 +36,7 @@ typedef HashTree<AssetMeta> Hasher;
 class StoredAsset : public IAsset, public boost::enable_shared_from_this<StoredAsset> {
 protected:
 	GrandCentralDispatch& _gcd;
-	const boost::filesystem::path _assetFolder;
-	boost::filesystem::path _metaFolder;
+	const std::string _id;
 	RandomAccessFile _file;
 	AssetMeta _metaStore;
 	Hasher _hasher;
@@ -66,11 +65,6 @@ public:
 	virtual size_t can_read(uint64_t offset, size_t size);
 
 	/**
-	 * Get the path to the folder containing file data + metadata
-	 */
-	boost::filesystem::path folder();
-
-	/**
 	 * Is the root hash known yet?
 	 */
 	bool hasRootHash();
@@ -79,6 +73,11 @@ public:
 	 * Notify that given range of the file is available for hashing. Should respect BLOCKSIZE
 	 */
 	void notifyValidRange(uint64_t offset, uint64_t size, std::function< void() > whenDone=0);
+
+	/**
+	 * Unique local ID for this asset
+	 */
+	const std::string& id() const;
 
 	/**
 	 * The size of the asset, in bytes

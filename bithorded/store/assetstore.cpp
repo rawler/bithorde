@@ -50,6 +50,10 @@ AssetStore::AssetStore(const boost::filesystem::path& baseDir) :
 {
 }
 
+const boost::filesystem::path& AssetStore::assetsFolder() {
+	return _assetsFolder;
+}
+
 void AssetStore::openOrCreate()
 {
 	if (!fs::exists(_assetsFolder))
@@ -71,7 +75,7 @@ boost::filesystem::path AssetStore::newAssetDir()
 void AssetStore::purge_links(const boost::shared_ptr< StoredAsset >& asset, const BitHordeIds& except)
 {
 	fs::directory_iterator end;
-	auto tgt = asset->folder();
+	auto tgt = _assetsFolder / asset->id();
 	boost::system::error_code ec;
 	std::set<fs::path> exceptions;
 	for (auto iter = except.begin(); iter != except.end(); ++iter) {
@@ -97,7 +101,7 @@ void AssetStore::update_links(const BitHordeIds& ids, const boost::shared_ptr<St
 	if (fs::exists(fs::symlink_status(link)))
 		fs::remove(link);
 
-	fs::create_relative_symlink(asset->folder(), link);
+	fs::create_relative_symlink(_assetsFolder / asset->id(), link);
 }
 
 enum LinkStatus{

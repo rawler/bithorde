@@ -34,7 +34,7 @@ using namespace bithorded::store;
 
 StoredAsset::StoredAsset(GrandCentralDispatch& gcd, const boost::filesystem::path& metaFolder, RandomAccessFile::Mode mode) :
 	_gcd(gcd),
-	_metaFolder(metaFolder),
+	_id(metaFolder.filename().native()),
 	_file(metaFolder/"data", mode),
 	_metaStore(metaFolder/"meta", _file.blocks(BLOCKSIZE)),
 	_hasher(_metaStore, 0)
@@ -44,7 +44,7 @@ StoredAsset::StoredAsset(GrandCentralDispatch& gcd, const boost::filesystem::pat
 
 StoredAsset::StoredAsset(GrandCentralDispatch& gcd, const boost::filesystem::path& metaFolder, RandomAccessFile::Mode mode, uint64_t size) :
 	_gcd(gcd),
-	_metaFolder(metaFolder),
+	_id(metaFolder.filename().native()),
 	_file(metaFolder/"data", mode, size),
 	_metaStore(metaFolder/"meta", _file.blocks(BLOCKSIZE)),
 	_hasher(_metaStore, 0)
@@ -103,13 +103,12 @@ void StoredAsset::notifyValidRange(uint64_t offset, uint64_t size, std::function
 	updateHash(offset, end, whenDone);
 }
 
-uint64_t StoredAsset::size() {
-	return _file.size();
+const string& StoredAsset::id() const {
+	return _id;
 }
 
-boost::filesystem::path StoredAsset::folder()
-{
-	return _metaFolder;
+uint64_t StoredAsset::size() {
+	return _file.size();
 }
 
 void StoredAsset::updateStatus()

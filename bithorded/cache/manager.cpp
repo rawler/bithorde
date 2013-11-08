@@ -148,9 +148,10 @@ void CacheManager::linkAsset(CachedAsset::WeakPtr asset_)
 	auto asset = asset_.lock();
 	if (asset && asset->status->ids_size()) {
 		auto& ids = asset->status->ids();
-		LOG4CPLUS_DEBUG(log, "Linking " << ids << " to " << asset->folder());
-		const char *data_path = (asset->folder()/"data").c_str();
-		lutimes(data_path, NULL);
+		auto assetFolder = (assetsFolder() / asset->id());
+		LOG4CPLUS_DEBUG(log, "Linking " << ids << " to " << assetFolder);
+		auto dataPath(assetFolder / "data");
+		lutimes(dataPath.c_str(), NULL);
 
 		AssetStore::update_links(ids, asset);
 	}

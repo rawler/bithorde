@@ -106,7 +106,7 @@ void Store::_addAsset(SourceAsset::WeakPtr asset_)
 {
 	auto asset = asset_.lock();
 	if (asset && asset->status->ids_size()) {
-		auto data_path(asset->folder()/"data");
+		auto data_path(assetsFolder() / asset->id() / "data");
 		lutimes(data_path.c_str(), NULL);
 
 		AssetStore::update_links(asset->status->ids(), asset);
