@@ -265,6 +265,7 @@ void Connection::onRead(const boost::system::error_code& err, size_t count)
 	google::protobuf::io::CodedInputStream stream((::google::protobuf::uint8*)_rcvBuf.ptr, _rcvBuf.size);
 	bool res = true;
 	size_t remains;
+	size_t msgs_processed(0);
 	while (res) {
 		remains = stream.BytesUntilLimit();
 		uint32_t tag = stream.ReadTag();
@@ -272,21 +273,21 @@ void Connection::onRead(const boost::system::error_code& err, size_t count)
 			break;
 		switch (::google::protobuf::internal::WireFormatLite::GetTagFieldNumber(tag)) {
 		case HandShake:
-			res = dequeue<bithorde::HandShake>(HandShake, stream); break;
+			res = dequeue<bithorde::HandShake>(HandShake, stream); msgs_processed++; break;
 		case BindRead:
-			res = dequeue<bithorde::BindRead>(BindRead, stream); break;
+			res = dequeue<bithorde::BindRead>(BindRead, stream); msgs_processed++; break;
 		case AssetStatus:
-			res = dequeue<bithorde::AssetStatus>(AssetStatus, stream); break;
+			res = dequeue<bithorde::AssetStatus>(AssetStatus, stream); msgs_processed++; break;
 		case ReadRequest:
-			res = dequeue<bithorde::Read::Request>(ReadRequest, stream); break;
+			res = dequeue<bithorde::Read::Request>(ReadRequest, stream); msgs_processed++; break;
 		case ReadResponse:
-			res = dequeue<bithorde::Read::Response>(ReadResponse, stream); break;
+			res = dequeue<bithorde::Read::Response>(ReadResponse, stream); msgs_processed++; break;
 		case BindWrite:
-			res = dequeue<bithorde::BindWrite>(BindWrite, stream); break;
+			res = dequeue<bithorde::BindWrite>(BindWrite, stream); msgs_processed++; break;
 		case DataSegment:
-			res = dequeue<bithorde::DataSegment>(DataSegment, stream); break;
+			res = dequeue<bithorde::DataSegment>(DataSegment, stream); msgs_processed++; break;
 		case HandShakeConfirmed:
-			res = dequeue<bithorde::HandShakeConfirmed>(HandShakeConfirmed, stream); break;
+			res = dequeue<bithorde::HandShakeConfirmed>(HandShakeConfirmed, stream); msgs_processed++; break;
 		case Ping:
 			res = dequeue<bithorde::Ping>(Ping, stream); break;
 		default:
@@ -295,7 +296,7 @@ void Connection::onRead(const boost::system::error_code& err, size_t count)
 		}
 	}
 
-	if (_keepAlive)
+	if (msgs_processed && _keepAlive)
 		_keepAlive->reset();
 	_rcvBuf.pop(_rcvBuf.size-remains);
 
