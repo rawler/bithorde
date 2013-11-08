@@ -56,7 +56,7 @@ public:
 	 * Will read up to /size/ bytes from underlying file, and send to callback.
      * TODO: refactor into passing along single AsyncRead-message.
 	 */
-	virtual void async_read(uint64_t offset, size_t& size, uint32_t timeout, ReadCallback cb);
+	virtual void async_read( uint64_t offset, size_t size, uint32_t timeout, IAsset::ReadCallback cb );
 
 	/**
 	 * Returns the amount readable, starting at /offset/, and up to size.

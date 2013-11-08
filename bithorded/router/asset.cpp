@@ -194,7 +194,7 @@ size_t bithorded::router::ForwardedAsset::can_read(uint64_t offset, size_t size)
 	return size;
 }
 
-void bithorded::router::ForwardedAsset::async_read(uint64_t offset, size_t& size, uint32_t timeout, ReadCallback cb)
+void bithorded::router::ForwardedAsset::async_read(uint64_t offset, size_t size, uint32_t timeout, ReadCallback cb)
 {
 	if (_upstream.empty())
 		return cb(-1, string());

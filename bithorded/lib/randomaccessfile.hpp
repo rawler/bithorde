@@ -20,10 +20,39 @@
 
 #include <boost/filesystem/path.hpp>
 #include <boost/noncopyable.hpp>
+#include <boost/shared_ptr.hpp>
 
 #include "lib/types.h"
 
-class RandomAccessFile : boost::noncopyable {
+namespace bithorded {
+
+class IDataArray {
+public:
+	virtual uint64_t size() const = 0;
+
+	/**
+	 * Reads up to /size/ bytes from file and returns amount read.
+	 *
+	 * @arg offset - to read from
+	 * @arg buf - a buffer allocated with at least /size/ capacity
+	 * @arg size - size of buf
+	 * @returns pointer to data, may or may not be pointer to /buf/
+	 */
+	virtual ssize_t read(uint64_t offset, size_t size, byte* buf) const = 0;
+
+	/**
+	 * Writes /size/ bytes to file beginning at /offset/.
+	 */
+	virtual ssize_t write(uint64_t offset, const void* src, size_t size) = 0;
+
+	/**
+	 * Writes a given string-buf to file beginning at /offset/.
+	 */
+	virtual ssize_t write(uint64_t offset, const std::string& buf);
+
+};
+
+class RandomAccessFile : boost::noncopyable, public IDataArray {
 	int _fd;
 	boost::filesystem::path _path;
 	uint64_t _size;
@@ -56,36 +85,33 @@ public:
 	/**
 	 * The number of bytes in the open file
 	 */
-	uint64_t size() const;
+	virtual uint64_t size() const;
 
 	/**
 	 * The number of blocks of /blockSize/ required to hold all file content
 	 */
 	uint32_t blocks(size_t blockSize) const;
 
-	/**
-	 * Reads up to /size/ bytes from file and returns a pointer to the data.
-	 *
-	 * @arg buf - a buffer allocated with at least /size/ capacity
-	 * @arg size - will be updated with actual read amount
-	 * @returns pointer to data, may or may not be pointer to /buf/
-	 */
-	byte* read(uint64_t offset, size_t& size, byte* buf) const;
-
-	/**
-	 * Writes /size/ bytes to file beginning at /offset/.
-	 */
-	ssize_t write(uint64_t offset, const void* src, size_t size);
-
-	/**
-	 * Writes a given string-buf to file beginning at /offset/.
-	 */
-	ssize_t write(uint64_t offset, const std::string& buf);
+	/// Implement IDataArray
+	virtual ssize_t read(uint64_t offset, size_t size, byte* buf) const;
+	virtual ssize_t write(uint64_t offset, const void* src, size_t size);
 
 	/**
 	 * Return the path used to open the file
 	 */
 	const boost::filesystem::path& path() const;
 };
+
+class RandomAccessFileSlice : boost::noncopyable, public IDataArray {
+	boost::shared_ptr<RandomAccessFile> _file;
+	uint64_t _offset, _size;
+public:
+	RandomAccessFileSlice(boost::shared_ptr< RandomAccessFile > file, uint64_t offset, uint64_t size);
+	virtual uint64_t size() const;
+	virtual ssize_t read ( uint64_t offset, size_t size, byte* buf ) const;
+	virtual ssize_t write ( uint64_t offset, const void* src, size_t size );
+};
+
+}
 
 #endif // BITHORDED_RANDOMACCESSFILE_H

@@ -21,13 +21,18 @@
 #include <boost/filesystem.hpp>
 #include <fcntl.h>
 #include <ios>
-#include <sys/stat.h>
 #include <sstream>
+#include <sys/stat.h>
 
 using namespace std;
+using namespace bithorded;
 
 namespace bsys = boost::system;
 namespace fs = boost::filesystem;
+
+ssize_t IDataArray::write ( uint64_t offset, const string& buf ) {
+	return write(offset, buf.data(), buf.length());
+}
 
 RandomAccessFile::RandomAccessFile() :
 	_fd(-1), _path(""), _size(0)
@@ -103,16 +108,10 @@ uint32_t RandomAccessFile::blocks(size_t blockSize) const
 	return (size() + blockSize - 1) / blockSize;
 }
 
-byte* RandomAccessFile::read(uint64_t offset, size_t& size, byte* buf) const
-{
-	ssize_t read = pread(_fd, buf, size, offset);
-	if ( read > 0 ) {
-		size = read;
-		return buf;
-	} else {
-		size = 0;
-		return NULL;
-	}
+ssize_t RandomAccessFile::read ( uint64_t offset, size_t size, byte* buf ) const {
+	BOOST_ASSERT(buf);
+	BOOST_ASSERT(offset+size <= _size);
+	return pread(_fd, buf, size, offset);
 }
 
 ssize_t RandomAccessFile::write(uint64_t offset, const void* src, size_t size)
@@ -123,14 +122,28 @@ ssize_t RandomAccessFile::write(uint64_t offset, const void* src, size_t size)
 	return written;
 }
 
-ssize_t RandomAccessFile::write(uint64_t offset, const string& buf)
-{
-	return write(offset, buf.data(), buf.length());
-}
-
 const boost::filesystem::path& RandomAccessFile::path() const
 {
 	return _path;
 }
 
+RandomAccessFileSlice::RandomAccessFileSlice ( boost::shared_ptr< RandomAccessFile > file, uint64_t offset, uint64_t size ) :
+	_file(file),
+	_offset(offset),
+	_size(size)
+{
+	BOOST_ASSERT(offset + size <= _file->size());
+}
 
+uint64_t RandomAccessFileSlice::size() const {
+	return _size;
+}
+
+ssize_t RandomAccessFileSlice::read ( uint64_t offset, size_t size, byte* buf ) const {
+	return _file->read(_offset + offset, size, buf);
+}
+
+ssize_t RandomAccessFileSlice::write ( uint64_t offset, const void* src, size_t size ) {
+	BOOST_ASSERT(offset + size <= _size);
+	return _file->write(_offset + offset, src, size);
+}

@@ -63,7 +63,7 @@ public:
 
 	virtual void inspect(management::InfoList& target) const;
 
-	virtual void async_read(uint64_t offset, size_t& size, uint32_t timeout, ReadCallback cb);
+	virtual void async_read(uint64_t offset, size_t size, uint32_t timeout, ReadCallback cb);
 
 	virtual size_t can_read(uint64_t offset, size_t size);
 

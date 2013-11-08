@@ -52,12 +52,12 @@ StoredAsset::StoredAsset(GrandCentralDispatch& gcd, const boost::filesystem::pat
 	updateStatus();
 }
 
-void StoredAsset::async_read(uint64_t offset, size_t& size, uint32_t timeout, bithorded::IAsset::ReadCallback cb)
+void StoredAsset::async_read(uint64_t offset, size_t size, uint32_t timeout, bithorded::IAsset::ReadCallback cb)
 {
 	byte buf[MAX_CHUNK];
-	const byte* data = _file.read(offset, size, buf);
-	if (data)
-		cb(offset, std::string((char*)data, size));
+	auto read = _file.read(offset, size, buf);
+	if (read > 0)
+		cb(offset, std::string((char*)buf, read));
 	else
 		cb(offset, std::string());
 }
@@ -131,13 +131,12 @@ boost::shared_array<byte> crunch_piece(RandomAccessFile* file, uint64_t offset, 
 	byte BUF[StoredAsset::BLOCKSIZE];
 	byte* res = new byte[Hasher::DigestSize];
 
-	size_t got(size);
-	byte* buf = file->read(offset, got, BUF);
-	if (got != size) {
+	auto got = file->read(offset, size, BUF);
+	if (got != static_cast<ssize_t>(size)) {
 		throw ios_base::failure("Unexpected read error");
 	}
 
-	Hasher::computeLeaf(buf, got, res);
+	Hasher::computeLeaf(BUF, got, res);
 	return boost::shared_array<byte>(res);
 }
 

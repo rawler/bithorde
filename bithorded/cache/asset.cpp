@@ -46,7 +46,7 @@ void CachedAsset::apply(const bithorded::AssetRequestParameters& old_parameters,
 
 void bithorded::cache::CachedAsset::write(uint64_t offset, const std::string& data, const std::function< void() > whenDone)
 {
-	auto job = boost::bind(&RandomAccessFile::write, &_file, offset, data);
+	auto job = boost::bind(&IDataArray::write, &_file, offset, data);
 	auto completion = boost::bind(&StoredAsset::notifyValidRange, shared_from_this(), offset, _1, whenDone);
 	_gcd.submit(job, completion);
 }
@@ -73,7 +73,7 @@ void bithorded::cache::CachingAsset::inspect(bithorded::management::InfoList& ta
 		_upstream->inspect_upstreams(target);
 }
 
-void bithorded::cache::CachingAsset::async_read(uint64_t offset, size_t& size, uint32_t timeout, bithorded::IAsset::ReadCallback cb)
+void bithorded::cache::CachingAsset::async_read(uint64_t offset, size_t size, uint32_t timeout, bithorded::IAsset::ReadCallback cb)
 {
 	auto cached_ = cached();
 	if (cached_ && (cached_->can_read(offset, size) == size)) {
