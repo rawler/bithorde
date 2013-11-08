@@ -44,9 +44,14 @@ void bithorde::Keepalive::run()
 	} else {
 		Ping ping;
 		ping.set_timeout(MAX_PING_RESPONSE_TIME.total_milliseconds());
-		_client.sendMessage(Connection::Ping, ping);
-		_stale = true;
-		_timer.clear();
-		_timer.arm(boost::posix_time::seconds(MAX_PING_RESPONSE_TIME.total_seconds() * 1.5));
+
+		if (_client.sendMessage(Connection::Ping, ping, Message::NEVER, true)) {
+			_stale = true;
+			_timer.clear();
+			_timer.arm(boost::posix_time::seconds(MAX_PING_RESPONSE_TIME.total_seconds() * 1.5));
+		} else {
+			cerr << "WARNING: " << _client.peerName() << " without input, failed to send prioritized ping. Disconnecting..." << endl;
+			return _client.close();
+		}
 	}
 }
