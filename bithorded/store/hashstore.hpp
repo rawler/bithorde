@@ -15,8 +15,8 @@
 */
 
 
-#ifndef BITHORDED_ASSETMETA_H
-#define BITHORDED_ASSETMETA_H
+#ifndef BITHORDED_HASHSTORE_HPP
+#define BITHORDED_HASHSTORE_HPP
 
 #include <boost/filesystem/path.hpp>
 #include <boost/interprocess/sync/null_mutex.hpp>
@@ -34,34 +34,36 @@ namespace bithorded { namespace store {
 
 typedef HashNode<CryptoPP::Tiger> TigerBaseNode;
 
-class AssetMeta;
+class HashStore;
 
 class TigerNode : public TigerBaseNode, private boost::noncopyable {
-	AssetMeta& _metaFile;
+	HashStore& _metaFile;
 	size_t _offset;
 	TigerBaseNode _unmodified;
 public:
-	TigerNode(AssetMeta& metaFile, size_t offset);
+	TigerNode(HashStore& metaFile, size_t offset);
 	virtual ~TigerNode();
 };
 
-class AssetMeta {
-	RandomAccessFile _file;
+class HashStore {
+	IDataArray::Ptr _storage;
 	WeakMap<std::size_t, TigerNode, boost::interprocess::null_mutex> _nodeMap;
-
-	size_t _leafBlocks;
-	size_t _nodes_offset;
 public:
 	typedef TigerBaseNode Node;
 	typedef typename boost::shared_ptr<TigerNode> NodePtr;
-	AssetMeta(const boost::filesystem::path& path, uint32_t leafBlocks);
+	typedef boost::shared_ptr<HashStore> Ptr;
+	explicit HashStore(const IDataArray::Ptr& storage);
 
 	NodePtr operator[](const std::size_t offset);
 	size_t size() const;
 
 	TigerBaseNode read(size_t offset) const;
 	void write(size_t offset, const TigerBaseNode& node);
+
+	static uint64_t leaves_needed(uint64_t content_size, uint8_t levelsSkipped=0);
+	static uint64_t nodes_needed(uint64_t content_size, uint8_t levelsSkipped=0);
+	static uint64_t size_needed(uint64_t content_size, uint8_t levelsSkipped=0);
 };
 
 } }
-#endif // BITHORDED_ASSETMETA_H
+#endif // BITHORDED_HASHSTORE_HPP

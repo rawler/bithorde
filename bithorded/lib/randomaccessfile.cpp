@@ -122,28 +122,47 @@ ssize_t RandomAccessFile::write(uint64_t offset, const void* src, size_t size)
 	return written;
 }
 
+string RandomAccessFile::describe() {
+	return _path.string();
+}
+
 const boost::filesystem::path& RandomAccessFile::path() const
 {
 	return _path;
 }
 
-RandomAccessFileSlice::RandomAccessFileSlice ( boost::shared_ptr< RandomAccessFile > file, uint64_t offset, uint64_t size ) :
-	_file(file),
+DataArraySlice::DataArraySlice ( const IDataArray::Ptr& parent, uint64_t offset, uint64_t size ) :
+	_parent(parent),
 	_offset(offset),
 	_size(size)
 {
-	BOOST_ASSERT(offset + size <= _file->size());
+	BOOST_ASSERT(offset + size <= _parent->size());
 }
 
-uint64_t RandomAccessFileSlice::size() const {
+DataArraySlice::DataArraySlice ( const IDataArray::Ptr& parent, uint64_t offset ) :
+	_parent(parent),
+	_offset(offset),
+	_size(parent->size()-offset)
+{
+	BOOST_ASSERT(offset <= _parent->size());
+}
+
+uint64_t DataArraySlice::size() const {
 	return _size;
 }
 
-ssize_t RandomAccessFileSlice::read ( uint64_t offset, size_t size, byte* buf ) const {
-	return _file->read(_offset + offset, size, buf);
+ssize_t DataArraySlice::read ( uint64_t offset, size_t size, byte* buf ) const {
+	BOOST_ASSERT(offset + size <= _size);
+	return _parent->read(_offset + offset, size, buf);
 }
 
-ssize_t RandomAccessFileSlice::write ( uint64_t offset, const void* src, size_t size ) {
+ssize_t DataArraySlice::write ( uint64_t offset, const void* src, size_t size ) {
 	BOOST_ASSERT(offset + size <= _size);
-	return _file->write(_offset + offset, src, size);
+	return _parent->write(_offset + offset, src, size);
+}
+
+string DataArraySlice::describe() {
+	ostringstream buf;
+	buf << _parent->describe() << '[' << _offset << ':' << _size << ']';
+	return buf.str();
 }

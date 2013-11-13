@@ -28,6 +28,8 @@ namespace bithorded {
 
 class IDataArray {
 public:
+	typedef boost::shared_ptr<IDataArray> Ptr;
+
 	virtual uint64_t size() const = 0;
 
 	/**
@@ -50,6 +52,10 @@ public:
 	 */
 	virtual ssize_t write(uint64_t offset, const std::string& buf);
 
+	/**
+	 * Describe the DataArray I.E. the name of the file
+	 */
+	virtual std::string describe() = 0;
 };
 
 class RandomAccessFile : boost::noncopyable, public IDataArray {
@@ -69,6 +75,8 @@ public:
 
 	/**
 	 * Open the given file. May throw std::ios_base::failure.
+	 *
+	 * non-zero size means open and create file of this size
 	 */
 	void open(const boost::filesystem::path& path, RandomAccessFile::Mode mode = READ, uint64_t size = 0);
 
@@ -95,6 +103,7 @@ public:
 	/// Implement IDataArray
 	virtual ssize_t read(uint64_t offset, size_t size, byte* buf) const;
 	virtual ssize_t write(uint64_t offset, const void* src, size_t size);
+	virtual std::string describe();
 
 	/**
 	 * Return the path used to open the file
@@ -102,14 +111,16 @@ public:
 	const boost::filesystem::path& path() const;
 };
 
-class RandomAccessFileSlice : boost::noncopyable, public IDataArray {
-	boost::shared_ptr<RandomAccessFile> _file;
+class DataArraySlice : boost::noncopyable, public IDataArray {
+	IDataArray::Ptr _parent;
 	uint64_t _offset, _size;
 public:
-	RandomAccessFileSlice(boost::shared_ptr< RandomAccessFile > file, uint64_t offset, uint64_t size);
+	DataArraySlice(const IDataArray::Ptr& parent, uint64_t offset, uint64_t size);
+	DataArraySlice(const IDataArray::Ptr& parent, uint64_t offset);
 	virtual uint64_t size() const;
 	virtual ssize_t read ( uint64_t offset, size_t size, byte* buf ) const;
 	virtual ssize_t write ( uint64_t offset, const void* src, size_t size );
+    virtual std::string describe();
 };
 
 }

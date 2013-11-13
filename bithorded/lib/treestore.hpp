@@ -34,6 +34,7 @@ inline uint32_t parentlayersize(uint32_t nodes) {
 		return 0;
 }
 
+// Calculates the required number of nodes in a tree, with a leaf-layer of n leaves
 inline uint32_t treesize(uint32_t leafs) {
 	if (leafs > 1)
 		return leafs + treesize(parentlayersize(leafs));

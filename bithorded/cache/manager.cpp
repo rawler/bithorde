@@ -62,8 +62,7 @@ void CacheManager::inspect(management::InfoList& target) const
 
 IAsset::Ptr CacheManager::openAsset(const boost::filesystem::path& assetPath)
 {
-	auto res = boost::make_shared<CachedAsset>(_gcd, assetPath);
-	return IAsset::Ptr(res);
+	return CachedAsset::open(_gcd, assetPath);
 }
 
 IAsset::Ptr CacheManager::openAsset(const bithorde::BindRead& req)
@@ -89,11 +88,11 @@ CachedAsset::Ptr CacheManager::prepareUpload(uint64_t size)
 		fs::path assetFolder(AssetStore::newAssetDir());
 
 		try {
-			auto asset = boost::make_shared<CachedAsset>(_gcd, assetFolder,size);
+			auto asset = CachedAsset::create(_gcd, assetFolder, size);
 			asset->status.onChange.connect(boost::bind(&CacheManager::linkAsset, this, CachedAsset::WeakPtr(asset)));
 			return asset;
 		} catch (const std::ios::failure& e) {
-			LOG4CPLUS_ERROR(log, "Failed to create " << assetFolder << " for upload. Purging...");
+			LOG4CPLUS_ERROR(log, "Failed to create " << assetFolder << " for upload (" << e.what() << "). Purging...");
 			AssetStore::removeAsset(assetFolder);
 			return CachedAsset::Ptr();
 		}

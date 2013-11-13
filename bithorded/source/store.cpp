@@ -24,7 +24,6 @@
 #include <log4cplus/logger.h>
 #include <log4cplus/loggingmacros.h>
 
-#include "../lib/relativepath.hpp"
 #include "../lib/grandcentraldispatch.hpp"
 
 using namespace std;
@@ -34,6 +33,7 @@ namespace fs = boost::filesystem;
 
 using namespace bithorded;
 using namespace bithorded::source;
+using namespace bithorded::store;
 
 const fs::path META_DIR = ".bh_meta";
 
@@ -71,19 +71,19 @@ const string& Store::label() const
 }
 
 bool path_is_in(const fs::path& path, const fs::path& folder) {
-	string path_(fs::absolute(path).string());
-	string folder_(fs::absolute(folder).string()+'/');
+	string path_(fs::canonical(path).string());
+	string folder_(fs::canonical(folder).string()+'/');
 	return boost::starts_with(path_, folder_);
 }
 
-UpstreamRequestBinding::Ptr Store::addAsset(const boost::filesystem::path& file)
+UpstreamRequestBinding::Ptr Store::addAsset(const boost::filesystem::path& file_)
 {
+	auto file = fs::canonical(file_);
 	if (path_is_in(file, _baseDir)) {
 		fs::path assetFolder(AssetStore::newAssetDir());
 
 		try {
-			fs::create_relative_symlink(file, assetFolder/"data");
-			SourceAsset::Ptr asset = boost::make_shared<SourceAsset>(_gcd, assetFolder);
+			SourceAsset::Ptr asset = SourceAsset::link(_gcd, assetFolder, file);
 			asset->status.onChange.connect(boost::bind(&Store::_addAsset, this, SourceAsset::WeakPtr(asset)));
 			asset->hash();
 			return boost::make_shared<UpstreamRequestBinding>(asset);
@@ -116,7 +116,7 @@ void Store::_addAsset(SourceAsset::WeakPtr asset_)
 
 IAsset::Ptr Store::openAsset(const boost::filesystem::path& assetPath)
 {
-	auto asset = boost::make_shared<SourceAsset>(_gcd, assetPath);
+	auto asset = SourceAsset::open(_gcd, assetPath);
 	if (asset->hasRootHash()) {
 		return asset;
 	} else {

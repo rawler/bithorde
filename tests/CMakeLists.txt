@@ -8,7 +8,7 @@ ADD_EXECUTABLE( unittests
 	../lib/timer.cpp test_timer.cpp
 	../lib/connection.cpp test_message_queue.cpp
 	../bithorded/lib/treestore.cpp test_treestore.cpp
-	../bithorded/store/assetmeta.cpp test_assetmeta.cpp
+	../bithorded/store/hashstore.cpp test_hashstore.cpp
 )
 
 TARGET_LINK_LIBRARIES( unittests

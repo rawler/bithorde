@@ -20,20 +20,15 @@
 
 #include <bithorded/lib/grandcentraldispatch.hpp>
 
+using namespace bithorded;
 using namespace bithorded::cache;
+using namespace bithorded::store;
 
-bithorded::cache::CachedAsset::CachedAsset(GrandCentralDispatch& gcd, const boost::filesystem::path& metaFolder) :
-	StoredAsset(gcd, metaFolder, RandomAccessFile::READWRITE)
+bithorded::cache::CachedAsset::CachedAsset(GrandCentralDispatch& gcd, const std::string& id, const store::HashStore::Ptr& hashStore, const IDataArray::Ptr& data) :
+	StoredAsset(gcd, id, hashStore, data)
 {
 	auto trx = status.change();
 	trx->set_status(hasRootHash() ? bithorde::SUCCESS : bithorde::NOTFOUND);
-}
-
-bithorded::cache::CachedAsset::CachedAsset(GrandCentralDispatch& gcd, const boost::filesystem::path& metaFolder, uint64_t size) :
-	StoredAsset(gcd, metaFolder, RandomAccessFile::READWRITE, size)
-{
-	auto trx = status.change();
-	trx->set_status(bithorde::SUCCESS);
 }
 
 void bithorded::cache::CachedAsset::inspect(bithorded::management::InfoList& target) const
@@ -46,9 +41,29 @@ void CachedAsset::apply(const bithorded::AssetRequestParameters& old_parameters,
 
 void bithorded::cache::CachedAsset::write(uint64_t offset, const std::string& data, const std::function< void() > whenDone)
 {
-	auto job = boost::bind(&IDataArray::write, &_file, offset, data);
+	auto job = boost::bind(&IDataArray::write, _data, offset, data);
 	auto completion = boost::bind(&StoredAsset::notifyValidRange, shared_from_this(), offset, _1, whenDone);
 	_gcd.submit(job, completion);
+}
+
+CachedAsset::Ptr CachedAsset::open(GrandCentralDispatch& gcd, const boost::filesystem::path& path ) {
+	HashStore::Ptr hashStore;
+	IDataArray::Ptr dataStore;
+
+
+	if (bithorded::store::openAsset(path, hashStore, dataStore)) {
+		return boost::make_shared<CachedAsset>(gcd, path.filename().native(), hashStore, dataStore);
+	}
+	return CachedAsset::Ptr();
+}
+
+CachedAsset::Ptr CachedAsset::create( GrandCentralDispatch& gcd, const boost::filesystem::path& path, uint64_t size ) {
+	HashStore::Ptr hashStore = createMetaFile(path, size);
+	IDataArray::Ptr dataStore = boost::make_shared<RandomAccessFile>(path/"data", RandomAccessFile::READWRITE, size);
+
+	auto ptr = boost::make_shared<CachedAsset>(gcd, path.filename().native(), hashStore, dataStore);
+	ptr->status.change()->set_status(bithorde::SUCCESS);
+	return ptr;
 }
 
 bithorded::cache::CachingAsset::CachingAsset(bithorded::cache::CacheManager& mgr, bithorded::router::ForwardedAsset::Ptr upstream, bithorded::cache::CachedAsset::Ptr cached) :

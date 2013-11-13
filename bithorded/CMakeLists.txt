@@ -34,8 +34,8 @@ ADD_EXECUTABLE(bithorded
 	source/store.cpp
 
 	store/asset.cpp
-	store/assetmeta.cpp
 	store/assetstore.cpp
+	store/hashstore.cpp
 
 	main.cpp
 

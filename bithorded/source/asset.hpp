@@ -40,7 +40,7 @@ public:
 	 *  "data" which is an actual data-file or symlink to the data-file, and
 	 *  "meta" which holds info about blocks indexed, hashtree indexes etc.
 	 */
-	SourceAsset(GrandCentralDispatch& gcd, const boost::filesystem::path& metaFolder);
+	SourceAsset(bithorded::GrandCentralDispatch& gcd, const std::string& id, const store::HashStore::Ptr& hashStore, const bithorded::IDataArray::Ptr& data);
 
 	virtual void inspect(management::InfoList& target) const;
 
@@ -50,6 +50,9 @@ public:
 	 * Starts background job building a hashtree of the content in the asset
 	 */
 	void hash();
+
+	static Ptr open( bithorded::GrandCentralDispatch& gcd, const boost::filesystem::path& path );
+	static Ptr link( bithorded::GrandCentralDispatch& gcd, const boost::filesystem::path& path, const boost::filesystem::path& target );
 };
 
 	}

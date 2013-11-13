@@ -20,7 +20,7 @@
 
 #include <boost/enable_shared_from_this.hpp>
 
-#include "assetmeta.hpp"
+#include "hashstore.hpp"
 #include "../../lib/hashes.h"
 #include "../lib/randomaccessfile.hpp"
 #include "../server/asset.hpp"
@@ -31,14 +31,14 @@ class GrandCentralDispatch;
 
 namespace store {
 
-typedef HashTree<AssetMeta> Hasher;
+typedef HashTree<HashStore> Hasher;
 
 class StoredAsset : public IAsset, public boost::enable_shared_from_this<StoredAsset> {
 protected:
 	GrandCentralDispatch& _gcd;
 	const std::string _id;
-	RandomAccessFile _file;
-	AssetMeta _metaStore;
+	IDataArray::Ptr _data;
+	HashStore::Ptr _hashStore;
 	Hasher _hasher;
 public:
 	typedef typename boost::shared_ptr<StoredAsset> Ptr;
@@ -48,8 +48,7 @@ public:
 	 */
 	const static int BLOCKSIZE = Hasher::Hasher::UNITSIZE;
 
-	StoredAsset(GrandCentralDispatch& gcd, const boost::filesystem::path& metaFolder, RandomAccessFile::Mode mode);
-	StoredAsset(GrandCentralDispatch& gcd, const boost::filesystem::path& metaFolder, RandomAccessFile::Mode mode, uint64_t size);
+	StoredAsset(GrandCentralDispatch& gcd, const std::string& id, const HashStore::Ptr hashStore, const IDataArray::Ptr& data);
 
 	/**
 	 * Will read up to /size/ bytes from underlying file, and send to callback.
@@ -92,6 +91,9 @@ public:
 private:
 	void updateHash(uint64_t offset, uint64_t end, std::function< void() > whenDone);
 };
+
+bool openAsset( const boost::filesystem::path& path, bithorded::store::HashStore::Ptr& hashStore, bithorded::IDataArray::Ptr& dataStore );
+HashStore::Ptr createMetaFile( const boost::filesystem::path& assetPath, uint64_t assetSize );
 
 }}
 
