@@ -291,7 +291,7 @@ void Connection::onRead(const boost::system::error_code& err, size_t count)
 		case HandShakeConfirmed:
 			res = dequeue<bithorde::HandShakeConfirmed>(HandShakeConfirmed, stream); msgs_processed++; break;
 		case Ping:
-			res = dequeue<bithorde::Ping>(Ping, stream); break;
+			res = dequeue<bithorde::Ping>(Ping, stream); msgs_processed++; break;
 		default:
 			cerr << _logTag << ": BitHorde protocol warning: unknown message tag" << endl;
 			if (++_errors > MAX_ERRORS) {

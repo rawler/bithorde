@@ -24,7 +24,7 @@ namespace bithorde {
 
 class Client;
 
-class Keepalive {
+class Keepalive : boost::noncopyable {
 	Client& _client; // We are fully owned by client, so references to client should always be intact
 	Timer _timer;
 	bool _stale;
