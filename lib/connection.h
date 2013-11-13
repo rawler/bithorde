@@ -125,6 +125,7 @@ protected:
 	Buffer _rcvBuf;
 	MessageQueue _sndQueue;
 	size_t _sendWaiting;
+	uint32_t _errors;
 private:
 	template <class T> bool dequeue(MessageType type, ::google::protobuf::io::CodedInputStream &stream);
 };

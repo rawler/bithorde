@@ -22,6 +22,7 @@
 const size_t K = 1024;
 const size_t M = 1024*K;
 const size_t MAX_MSG = 130*K;
+const size_t MAX_ERRORS = 5;
 const size_t SEND_BUF = 1024*K;
 const size_t SEND_BUF_EMERGENCY = SEND_BUF + 64*K;
 const size_t SEND_BUF_LOW_WATER_MARK = SEND_BUF/4;
@@ -220,7 +221,8 @@ ConnectionStats::ConnectionStats(const TimerService::Ptr& ts) :
 Connection::Connection(asio::io_service & ioSvc, const ConnectionStats::Ptr& stats) :
 	_ioSvc(ioSvc),
 	_stats(stats),
-	_sendWaiting(0)
+	_sendWaiting(0),
+	_errors(0)
 {
 }
 
@@ -292,12 +294,18 @@ void Connection::onRead(const boost::system::error_code& err, size_t count)
 			res = dequeue<bithorde::Ping>(Ping, stream); break;
 		default:
 			cerr << _logTag << ": BitHorde protocol warning: unknown message tag" << endl;
+			if (++_errors > MAX_ERRORS) {
+				cerr << _logTag << ": Excessive errors. Closing." << endl;
+				return close();
+			}
 			res = ::google::protobuf::internal::WireFormatLite::SkipMessage(&stream);
 		}
 	}
 
-	if (msgs_processed && _keepAlive)
+	if (msgs_processed && _keepAlive) {
+		_errors = 0;
 		_keepAlive->reset();
+	}
 	_rcvBuf.pop(_rcvBuf.size-remains);
 
 	tryRead();
