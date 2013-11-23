@@ -110,5 +110,5 @@ BOOST_AUTO_TEST_CASE( wild_index_jump )
 		auto current = store[i];
 		current->state = 0;
 	}
-	BOOST_ASSERT(first->state == 99 );
+	BOOST_CHECK_EQUAL( first->state, 99 );
 }
