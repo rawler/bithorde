@@ -66,7 +66,7 @@ CachedAsset::Ptr CachedAsset::create( GrandCentralDispatch& gcd, const boost::fi
 	return ptr;
 }
 
-bithorded::cache::CachingAsset::CachingAsset(bithorded::cache::CacheManager& mgr, bithorded::router::ForwardedAsset::Ptr upstream, bithorded::cache::CachedAsset::Ptr cached) :
+bithorded::cache::CachingAsset::CachingAsset( CacheManager& mgr, const IAsset::Ptr& upstream, const CachedAsset::Ptr& cached ) :
 	_manager(mgr),
 	_upstream(upstream),
 	_upstreamTracker(_upstream->status.onChange.connect(boost::bind(&CachingAsset::upstreamStatusChange, this, _2))),
@@ -85,7 +85,7 @@ void bithorded::cache::CachingAsset::inspect(bithorded::management::InfoList& ta
 {
 	target.append("type") << "caching";
 	if (_upstream)
-		_upstream->inspect_upstreams(target);
+		_upstream->inspect(target);
 }
 
 void bithorded::cache::CachingAsset::async_read(uint64_t offset, size_t size, uint32_t timeout, bithorded::IAsset::ReadCallback cb)

@@ -55,12 +55,12 @@ public:
 
 class CachingAsset : boost::noncopyable, public IAsset, public boost::enable_shared_from_this<CachingAsset> {
 	CacheManager& _manager;
-	router::ForwardedAsset::Ptr _upstream;
+	bithorded::IAsset::Ptr _upstream;
 	boost::signals2::scoped_connection _upstreamTracker;
 	CachedAsset::Ptr _cached;
 	bool _delayedCreation;
 public:
-	CachingAsset(CacheManager& mgr, bithorded::router::ForwardedAsset::Ptr upstream, bithorded::cache::CachedAsset::Ptr cached);
+	CachingAsset(CacheManager& mgr, const bithorded::IAsset::Ptr& upstream, const bithorded::cache::CachedAsset::Ptr& cached);
 	virtual ~CachingAsset();
 
 	virtual void inspect(management::InfoList& target) const;

@@ -142,9 +142,10 @@ public:
 	virtual void describe(management::Info& target) const;
 };
 
-class IAssetStore
+class IAssetSource
 {
-	virtual boost::shared_ptr<IAsset> findAsset(const BitHordeIds& ids) = 0;
+public:
+	virtual UpstreamRequestBinding::Ptr findAsset(const bithorde::BindRead& req) = 0;
 };
 
 }

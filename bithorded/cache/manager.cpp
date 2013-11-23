@@ -34,9 +34,7 @@ namespace bithorded {
 	}
 }
 
-CacheManager::CacheManager(GrandCentralDispatch& gcd,
-                           bithorded::router::Router& router,
-                           const boost::filesystem::path& baseDir, intmax_t size) :
+CacheManager::CacheManager( GrandCentralDispatch& gcd, IAssetSource& router, const boost::filesystem::path& baseDir, intmax_t size ) :
 	bithorded::store::AssetStore(baseDir),
 	_baseDir(baseDir),
 	_gcd(gcd),
@@ -74,7 +72,7 @@ IAsset::Ptr CacheManager::openAsset(const bithorde::BindRead& req)
 		return stored;
 	} else {
 		auto upstream = _router.findAsset(req);
-		if (auto upstream_ = boost::dynamic_pointer_cast<router::ForwardedAsset>(upstream->shared())) {
+		if (auto upstream_ = boost::dynamic_pointer_cast<bithorded::IAsset>(upstream->shared())) {
 			return boost::make_shared<CachingAsset>(*this, upstream_, stored);
 		} else {
 			return upstream->shared();

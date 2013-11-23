@@ -236,6 +236,7 @@ uint64_t bithorded::router::ForwardedAsset::size()
 void ForwardedAsset::inspect(bithorded::management::InfoList& target) const
 {
 	target.append("type") << "forwarded";
+	inspect_upstreams(target);
 }
 
 void ForwardedAsset::inspect_upstreams(bithorded::management::InfoList& target) const
@@ -246,7 +247,6 @@ void ForwardedAsset::inspect_upstreams(bithorded::management::InfoList& target) 
 		target.append(buf.str()) << bithorde::Status_Name(iter->second->status) << ", responseTime: " << iter->second->readResponseTime;
 	}
 }
-
 
 void ForwardedAsset::dropUpstream(const string& peername)
 {
