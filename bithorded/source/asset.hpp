@@ -18,6 +18,7 @@
 #ifndef BITHORDED_SOURCE_ASSET_H
 #define BITHORDED_SOURCE_ASSET_H
 
+#include <ios>
 #include <boost/filesystem/path.hpp>
 #include <boost/shared_ptr.hpp>
 
@@ -28,6 +29,17 @@
 
 namespace bithorded {
 	namespace source {
+
+class AssetError : public ::std::ios_base::failure {
+public:
+	enum Cause {
+		GONE,
+		OUTDATED,
+	};
+
+	Cause cause;
+	explicit AssetError ( Cause cause, const std::string& msg );
+};
 
 class SourceAsset : public store::StoredAsset
 {
@@ -40,7 +52,7 @@ public:
 	 *  "data" which is an actual data-file or symlink to the data-file, and
 	 *  "meta" which holds info about blocks indexed, hashtree indexes etc.
 	 */
-	SourceAsset(bithorded::GrandCentralDispatch& gcd, const std::string& id, const store::HashStore::Ptr& hashStore, const bithorded::IDataArray::Ptr& data);
+	explicit SourceAsset(bithorded::GrandCentralDispatch& gcd, const std::string& id, const store::HashStore::Ptr& hashStore, const bithorded::IDataArray::Ptr& data);
 
 	virtual void inspect(management::InfoList& target) const;
 

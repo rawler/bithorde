@@ -29,6 +29,11 @@ using namespace bithorded;
 using namespace bithorded::source;
 using namespace bithorded::store;
 
+AssetError::AssetError( Cause cause, const std::string& msg )
+	: failure(msg), cause(cause)
+{
+}
+
 SourceAsset::SourceAsset( GrandCentralDispatch& gcd, const string& id, const store::HashStore::Ptr& hashStore, const IDataArray::Ptr& data ) :
 	StoredAsset(gcd, id, hashStore, data)
 {
@@ -53,6 +58,16 @@ void SourceAsset::hash()
 SourceAsset::Ptr SourceAsset::open ( GrandCentralDispatch& gcd, const boost::filesystem::path& path ) {
 	HashStore::Ptr hashStore;
 	IDataArray::Ptr dataStore;
+
+	const fs::path link_path(path/"data");
+
+	if (!fs::exists(link_path)) {
+		throw AssetError(AssetError::GONE, path.native() + std::string("link target gone"));
+	}
+
+	if ( fs::last_write_time(path) < fs::last_write_time(link_path) ) {
+		throw AssetError(AssetError::OUTDATED, path.native() + std::string("Asset link is not newer than target"));
+	}
 
 	if (bithorded::store::openAsset(path, hashStore, dataStore)) {
 		return boost::make_shared<SourceAsset>(gcd, path.filename().native(), hashStore, dataStore);
