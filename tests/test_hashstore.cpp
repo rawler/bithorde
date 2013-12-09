@@ -62,7 +62,7 @@ BOOST_AUTO_TEST_CASE( assetmeta_random_sequence )
 		HashStore store(array);
 		TigerTree tree(store, 0);
 
-		const auto unit_size = TigerTree::TreeHasher::UNITSIZE;
+		const auto unit_size = TigerTree::Hasher::ATOMSIZE;
 		byte block[unit_size];
 		bzero(block, sizeof(block));
 

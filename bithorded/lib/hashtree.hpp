@@ -66,12 +66,12 @@ template <typename HashAlgorithm>
 struct TreeHasher {
 	const static size_t DigestSize = HashAlgorithm::DIGESTSIZE;
 
-	const static size_t UNITSIZE = 1024;
+	const static size_t ATOMSIZE = 1024;
 	const static byte TREE_INTERNAL_PREFIX = 0x01;
 	const static byte TREE_LEAF_PREFIX = 0x00;
 
 	static void leafDigest(const byte* input, size_t length, byte* output) {
-		BOOST_ASSERT(length <= UNITSIZE);
+		BOOST_ASSERT(length <= ATOMSIZE);
 		HashAlgorithm hasher;
 		hasher.Update(&TREE_LEAF_PREFIX, 1);
 		hasher.Update(input, length);
@@ -79,8 +79,8 @@ struct TreeHasher {
 	}
 
 	static size_t calcSplit(size_t length) {
-		size_t leaves = (length + UNITSIZE-1) / UNITSIZE;
-		size_t res(UNITSIZE);
+		size_t leaves = (length + ATOMSIZE-1) / ATOMSIZE;
+		size_t res(ATOMSIZE);
 		leaves -= 1;
 		while (leaves > 1) {
 			leaves >>= 1;
@@ -90,7 +90,7 @@ struct TreeHasher {
 	}
 
 	static void rootDigest(const byte* input, size_t length, byte* output) {
-		if (length <= UNITSIZE) {
+		if (length <= ATOMSIZE) {
 			leafDigest(input, length, output);
 		} else {
 			size_t split(calcSplit(length));
@@ -111,7 +111,7 @@ struct TreeHasher {
 	}
 };
 
-template<typename HashAlgorithm> const size_t TreeHasher<HashAlgorithm>::UNITSIZE;
+template<typename HashAlgorithm> const size_t TreeHasher<HashAlgorithm>::ATOMSIZE;
 template<typename HashAlgorithm> const byte TreeHasher<HashAlgorithm>::TREE_INTERNAL_PREFIX;
 template<typename HashAlgorithm> const byte TreeHasher<HashAlgorithm>::TREE_LEAF_PREFIX;
 
@@ -129,7 +129,7 @@ public:
 		_store(store),
 		_hasher(),
 		_leaves(calc_leaves(store.size())),
-		_leafSize(Hasher::UNITSIZE << skipLevels)
+		_leafSize(Hasher::ATOMSIZE << skipLevels)
 	{
 	}
 

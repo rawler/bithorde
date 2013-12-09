@@ -41,7 +41,7 @@ public:
 
 	void openOrCreate();
 
-	boost::filesystem::path newAssetDir();
+	boost::filesystem::path newAsset();
 
 	void purge_links(const boost::shared_ptr<StoredAsset>& asset, const BitHordeIds& except);
 	void update_links(const BitHordeIds& ids, const boost::shared_ptr<StoredAsset>& asset);

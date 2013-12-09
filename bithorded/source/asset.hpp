@@ -30,17 +30,6 @@
 namespace bithorded {
 	namespace source {
 
-class AssetError : public ::std::ios_base::failure {
-public:
-	enum Cause {
-		GONE,
-		OUTDATED,
-	};
-
-	Cause cause;
-	explicit AssetError ( Cause cause, const std::string& msg );
-};
-
 class SourceAsset : public store::StoredAsset
 {
 public:
@@ -62,9 +51,6 @@ public:
 	 * Starts background job building a hashtree of the content in the asset
 	 */
 	void hash();
-
-	static Ptr open( bithorded::GrandCentralDispatch& gcd, const boost::filesystem::path& path );
-	static Ptr link( bithorded::GrandCentralDispatch& gcd, const boost::filesystem::path& path, const boost::filesystem::path& target );
 };
 
 	}

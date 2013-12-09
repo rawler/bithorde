@@ -26,6 +26,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/make_shared.hpp>
 #include <boost/shared_array.hpp>
+#include <stdexcept>
 
 const size_t MAX_CHUNK = 64*1024;
 const size_t PARALLEL_HASH_JOBS = 64;
@@ -43,6 +44,7 @@ StoredAsset::StoredAsset( GrandCentralDispatch& gcd, const string& id, const Has
 	_hashStore(hashStore),
 	_hasher(*hashStore, 0)
 {
+// TODO: Check data->size() against size of HashStore
 	updateStatus();
 }
 
@@ -192,6 +194,21 @@ void StoredAsset::updateHash(uint64_t offset, uint64_t end, std::function< void(
 	}
 }
 
+template <typename T>
+static inline T
+hton_any(const T &input)
+{
+    T output(0);
+    const std::size_t size = sizeof(T);
+    uint8_t *data = reinterpret_cast<uint8_t *>(&output);
+
+    for (std::size_t i = 1; i <= size; i++) {
+        data[i-1] = input >> ((size - i) * 8);
+    }
+
+    return output;
+}
+
 #pragma pack(push, 1)
 struct V1Header {
 	uint8_t format;
@@ -206,49 +223,78 @@ struct V1Header {
 		return val;
 	}
 };
+
+struct V2Header {
+	uint8_t format;
+	uint64_t _atoms;
+	uint8_t hashLevelsSkipped;
+
+	uint64_t atoms() {
+		return hton_any( _atoms );
+	}
+
+	uint64_t atoms(uint64_t val) {
+		_atoms = hton_any(val);
+		return val;
+	}
+
+	uint64_t storedLeaves() {
+		auto x = atoms();
+		auto res = x >> hashLevelsSkipped;
+		if (x != (res << hashLevelsSkipped)) // Check for overflowing blocks
+			res += 1;
+		return res;
+	}
+};
 #pragma pack(pop)
 
-bool openAssetV1 (const boost::filesystem::path& path, RandomAccessFile::Mode mode, HashStore::Ptr& hashStore, IDataArray::Ptr& dataStore) {
-	auto metaFile = boost::make_shared<RandomAccessFile>(path/"meta", RandomAccessFile::READWRITE);
+HashStore::Ptr store::openV1AssetMeta ( const boost::filesystem::path& path ) {
+	auto metaFile = boost::make_shared<RandomAccessFile>( path, RandomAccessFile::READWRITE);
 
 	V1Header hdr;
 	auto read = metaFile->read(0, sizeof(V1Header), (byte*)&hdr);
 	if (read != sizeof(V1Header))
 		throw ios_base::failure("Failed to read header from "+path.string());
-	if (hdr.format != 0x01)
+	if (hdr.format != FileFormatVersion::V1FORMAT)
 		throw ios_base::failure("Unknown format of file "+path.string());
-	hashStore = boost::make_shared<HashStore>(boost::make_shared<DataArraySlice>(metaFile, sizeof(hdr)));
-	dataStore = boost::make_shared<RandomAccessFile>(path/"data", mode);
 
-	return true;
+	return boost::make_shared<HashStore>(boost::make_shared<DataArraySlice>(metaFile, sizeof(hdr)));
 }
 
-bool bithorded::store::openAsset( const boost::filesystem::path& path, HashStore::Ptr& hashStore, IDataArray::Ptr& dataStore ) {
-	switch (fs::status(path/"data").type()) {
-	case boost::filesystem::file_not_found:
-		return false;
-	case boost::filesystem::symlink_file:
-		return openAssetV1(path, RandomAccessFile::READ, hashStore, dataStore);
-	case boost::filesystem::regular_file:
-		return openAssetV1(path, RandomAccessFile::READWRITE, hashStore, dataStore);
-	default:
-		return false;
-	}
+HashStore::Ptr store::openV2AssetMeta ( const boost::filesystem::path& path, IDataArray::Ptr& tail ) {
+	auto file = boost::make_shared<RandomAccessFile>( path, RandomAccessFile::READWRITE);
+
+	V2Header hdr;
+	if (file->read(0, sizeof(hdr), (byte*)&hdr) != sizeof(hdr))
+		throw ios_base::failure("Failed to read header from "+path.string());
+	if ((hdr.format != FileFormatVersion::V2CACHE) && (hdr.format != FileFormatVersion::V2LINKED))
+		throw ios_base::failure("Unknown format of file "+path.string());
+
+	uint64_t metaSize = HashStore::size_needed_for_atoms(hdr.atoms(), hdr.hashLevelsSkipped);
+	tail = boost::make_shared<DataArraySlice>(file, sizeof(hdr) + metaSize);
+
+	return boost::make_shared<HashStore>(boost::make_shared<DataArraySlice>(file, sizeof(hdr), metaSize ));
 }
 
-HashStore::Ptr bithorded::store::createMetaFile(const boost::filesystem::path& assetPath, uint64_t assetSize) {
-	uint64_t leafBlocks = HashStore::leaves_needed(assetSize);
-	uint64_t allBlocks = treesize(leafBlocks);
-	auto file = boost::make_shared<RandomAccessFile>(assetPath/"meta", RandomAccessFile::READWRITE, sizeof(V1Header)+(allBlocks*sizeof(HashStore::Node)));
+void store::createAssetMeta ( const boost::filesystem::path& path, FileFormatVersion version, uint64_t dataSize, uint8_t levelsSkipped, uint64_t tailSize, HashStore::Ptr& hashStore, IDataArray::Ptr& tailStore ) {
+	uint64_t atoms = HashStore::atoms_needed_for_content(dataSize);
+	uint64_t hashesSize = HashStore::size_needed_for_atoms(atoms, levelsSkipped);
 
-	V1Header hdr;
-	hdr.format = 0x01;
-	hdr.leafBlocks(leafBlocks);
+	if ((version != store::V2CACHE) && (version != store::V2LINKED))
+		throw std::invalid_argument("Failed to write header to "+path.native());
+
+	auto file = boost::make_shared<RandomAccessFile>(path, RandomAccessFile::READWRITE, sizeof(V2Header) + hashesSize + tailSize);
+
+	V2Header hdr;
+	hdr.format = version;
+	hdr.atoms(atoms);
+	hdr.hashLevelsSkipped = levelsSkipped;
 	if (file->write(0, &hdr, sizeof(hdr)) != sizeof(hdr))
-		throw ios_base::failure("Failed to write header to "+assetPath.string());
+		throw ios_base::failure("Failed to write header to "+path.native());
 
-	auto hashSlice = boost::make_shared<DataArraySlice>(file, sizeof(hdr));
-	return boost::make_shared<HashStore>(hashSlice);
+	auto hashSlice = boost::make_shared<DataArraySlice>(file, sizeof(hdr), hashesSize);
+	hashStore = boost::make_shared<HashStore>(hashSlice);
+
+	tailStore = boost::make_shared<DataArraySlice>(file, sizeof(hdr)+hashesSize);
+	BOOST_ASSERT(tailStore->size() == tailSize);
 }
-
-

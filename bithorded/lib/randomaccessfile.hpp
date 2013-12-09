@@ -58,6 +58,8 @@ public:
 	virtual std::string describe() = 0;
 };
 
+std::string dataArrayToString(const IDataArray& dataarray);
+
 class RandomAccessFile : boost::noncopyable, public IDataArray {
 	int _fd;
 	boost::filesystem::path _path;

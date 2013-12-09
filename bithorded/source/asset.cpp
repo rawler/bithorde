@@ -19,20 +19,23 @@
 
 #include <boost/make_shared.hpp>
 #include <boost/filesystem.hpp>
+#include <vector>
+
+#include <log4cplus/logger.h>
+#include <log4cplus/loggingmacros.h>
 
 #include "../lib/relativepath.hpp"
 
 using namespace std;
 namespace fs = boost::filesystem;
 
+namespace bithorded { namespace source {
+	log4cplus::Logger assetLog = log4cplus::Logger::getInstance("sourceAsset");
+} }
+
 using namespace bithorded;
 using namespace bithorded::source;
 using namespace bithorded::store;
-
-AssetError::AssetError( Cause cause, const std::string& msg )
-	: failure(msg), cause(cause)
-{
-}
 
 SourceAsset::SourceAsset( GrandCentralDispatch& gcd, const string& id, const store::HashStore::Ptr& hashStore, const IDataArray::Ptr& data ) :
 	StoredAsset(gcd, id, hashStore, data)
@@ -54,35 +57,3 @@ void SourceAsset::hash()
 {
 	notifyValidRange(0, size());
 }
-
-SourceAsset::Ptr SourceAsset::open ( GrandCentralDispatch& gcd, const boost::filesystem::path& path ) {
-	HashStore::Ptr hashStore;
-	IDataArray::Ptr dataStore;
-
-	const fs::path link_path(path/"data");
-
-	if (!fs::exists(link_path)) {
-		throw AssetError(AssetError::GONE, path.native() + std::string("link target gone"));
-	}
-
-	if ( fs::last_write_time(path) < fs::last_write_time(link_path) ) {
-		throw AssetError(AssetError::OUTDATED, path.native() + std::string("Asset link is not newer than target"));
-	}
-
-	if (bithorded::store::openAsset(path, hashStore, dataStore)) {
-		return boost::make_shared<SourceAsset>(gcd, path.filename().native(), hashStore, dataStore);
-	}
-	return SourceAsset::Ptr();
-}
-
-SourceAsset::Ptr SourceAsset::link ( GrandCentralDispatch& gcd, const boost::filesystem::path& assetFolder, const boost::filesystem::path& target ) {
-	fs::create_relative_symlink(target, assetFolder/"data");
-
-	IDataArray::Ptr dataStore = boost::make_shared<RandomAccessFile>(assetFolder/"data", RandomAccessFile::READ);
-	HashStore::Ptr hashStore = createMetaFile(assetFolder, dataStore->size());
-
-	auto ptr = boost::make_shared<SourceAsset>(gcd, assetFolder.filename().native(), hashStore, dataStore);
-	ptr->status.change()->set_status(bithorde::SUCCESS);
-	return ptr;
-}
-

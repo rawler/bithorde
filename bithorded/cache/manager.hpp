@@ -58,11 +58,10 @@ public:
 	 * Finds an asset by bithorde HashId. (Only the tiger-hash is actually used)
 	 */
 	UpstreamRequestBinding::Ptr findAsset(const bithorde::BindRead& req);
-protected:
-	/**
-	 * Finds an asset by bithorde HashId. (Only the tiger-hash is actually used)
-	 */
+
 	IAsset::Ptr openAsset(const boost::filesystem::path& assetPath);
+
+protected:
 
 	virtual IAsset::Ptr openAsset(const bithorde::BindRead& req);
 

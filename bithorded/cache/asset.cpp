@@ -20,9 +20,18 @@
 
 #include <bithorded/lib/grandcentraldispatch.hpp>
 
+#include <log4cplus/logger.h>
+#include <log4cplus/loggingmacros.h>
+
 using namespace bithorded;
 using namespace bithorded::cache;
 using namespace bithorded::store;
+
+namespace fs = boost::filesystem;
+
+namespace bithorded { namespace cache {
+	log4cplus::Logger assetLog = log4cplus::Logger::getInstance("cacheAsset");
+} }
 
 bithorded::cache::CachedAsset::CachedAsset(GrandCentralDispatch& gcd, const std::string& id, const store::HashStore::Ptr& hashStore, const IDataArray::Ptr& data) :
 	StoredAsset(gcd, id, hashStore, data)
@@ -50,16 +59,29 @@ CachedAsset::Ptr CachedAsset::open(GrandCentralDispatch& gcd, const boost::files
 	HashStore::Ptr hashStore;
 	IDataArray::Ptr dataStore;
 
-
-	if (bithorded::store::openAsset(path, hashStore, dataStore)) {
-		return boost::make_shared<CachedAsset>(gcd, path.filename().native(), hashStore, dataStore);
+	switch (fs::status(path).type()) {
+	case boost::filesystem::directory_file:
+		hashStore = store::openV1AssetMeta(path/"meta");
+		dataStore = boost::make_shared<RandomAccessFile>(path/"data");
+		break;
+	case boost::filesystem::regular_file:
+		hashStore = store::openV2AssetMeta(path, dataStore);
+		break;
+	case boost::filesystem::file_not_found:
+		return CachedAsset::Ptr();
+	default:
+		LOG4CPLUS_WARN(assetLog, "Asset of unknown type: " << path);
+		return CachedAsset::Ptr();
 	}
-	return CachedAsset::Ptr();
+
+	return boost::make_shared<CachedAsset>(gcd, path.filename().native(), hashStore, dataStore);
 }
 
 CachedAsset::Ptr CachedAsset::create( GrandCentralDispatch& gcd, const boost::filesystem::path& path, uint64_t size ) {
-	HashStore::Ptr hashStore = createMetaFile(path, size);
-	IDataArray::Ptr dataStore = boost::make_shared<RandomAccessFile>(path/"data", RandomAccessFile::READWRITE, size);
+	HashStore::Ptr hashStore;
+	IDataArray::Ptr dataStore;
+
+	store::createAssetMeta(path, store::V2CACHE, size, 0, size, hashStore, dataStore);
 
 	auto ptr = boost::make_shared<CachedAsset>(gcd, path.filename().native(), hashStore, dataStore);
 	ptr->status.change()->set_status(bithorde::SUCCESS);

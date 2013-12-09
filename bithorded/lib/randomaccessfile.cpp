@@ -34,6 +34,12 @@ ssize_t IDataArray::write ( uint64_t offset, const string& buf ) {
 	return write(offset, buf.data(), buf.length());
 }
 
+string bithorded::dataArrayToString ( const IDataArray& dataarray ) {
+	std::vector<byte> buf(dataarray.size());
+	dataarray.read(0, dataarray.size(), buf.data());
+	return string(reinterpret_cast<char*>(buf.data()), buf.size());
+}
+
 RandomAccessFile::RandomAccessFile() :
 	_fd(-1), _path(""), _size(0)
 {}

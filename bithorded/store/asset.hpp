@@ -46,7 +46,7 @@ public:
 	/**
 	 * All writes must be aligned on this BLOCKSIZE, or the data might be trimmed in the ends.
 	 */
-	const static int BLOCKSIZE = Hasher::Hasher::UNITSIZE;
+	const static int BLOCKSIZE = Hasher::Hasher::ATOMSIZE;
 
 	StoredAsset(GrandCentralDispatch& gcd, const std::string& id, const HashStore::Ptr hashStore, const IDataArray::Ptr& data);
 
@@ -92,8 +92,22 @@ private:
 	void updateHash(uint64_t offset, uint64_t end, std::function< void() > whenDone);
 };
 
-bool openAsset( const boost::filesystem::path& path, bithorded::store::HashStore::Ptr& hashStore, bithorded::IDataArray::Ptr& dataStore );
-HashStore::Ptr createMetaFile( const boost::filesystem::path& assetPath, uint64_t assetSize );
+enum FileFormatVersion {
+	V1FORMAT = 0x01,
+	V2CACHE = 0x02,
+	V2LINKED = 0x03,
+};
+
+HashStore::Ptr openV1AssetMeta( const boost::filesystem::path& path );
+HashStore::Ptr openV2AssetMeta( const boost::filesystem::path& path, bithorded::IDataArray::Ptr& tail );
+
+void createAssetMeta( const boost::filesystem::path& path,
+                  FileFormatVersion version,
+                  uint64_t dataSize,
+                  uint8_t levelsSkipped,
+                  uint64_t tailSize,
+                  bithorded::store::HashStore::Ptr& hashStore,
+                  bithorded::IDataArray::Ptr& tailStore);
 
 }}
 

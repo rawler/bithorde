@@ -38,7 +38,7 @@ class Store : private bithorded::store::AssetStore, public bithorded::management
 	std::string _label;
 	boost::filesystem::path _baseDir;
 public:
-	Store(GrandCentralDispatch& gcd, const std::string label, const boost::filesystem::path& baseDir);
+	Store(GrandCentralDispatch& gcd, const std::string& label, const boost::filesystem::path& baseDir);
 
 	virtual void describe(management::Info& target) const;
 	virtual void inspect(management::InfoList& target) const;
@@ -59,10 +59,7 @@ public:
 	 * Finds an asset by bithorde HashId. (Only the tiger-hash is actually used)
 	 */
 	UpstreamRequestBinding::Ptr findAsset(const bithorde::BindRead& req);
-protected:
-	/**
-	 * Finds an asset by bithorde HashId. (Only the tiger-hash is actually used)
-	 */
+
 	IAsset::Ptr openAsset(const boost::filesystem::path& assetPath);
 private:
 	void _addAsset( bithorded::source::SourceAsset::WeakPtr asset);

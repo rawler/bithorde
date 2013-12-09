@@ -96,23 +96,35 @@ void HashStore::write(size_t offset, const TigerBaseNode& node)
 	}
 }
 
-uint64_t HashStore::leaves_needed ( uint64_t content_size, uint8_t levelsSkipped ) {
-	auto blockSize = TreeHasher<Node::HashAlgorithm>::UNITSIZE;
-	auto leaves = (content_size + blockSize - 1) / blockSize;
-	auto stored_leaves = leaves >> levelsSkipped;
-	if ((stored_leaves >> levelsSkipped) == leaves) {
-		// Exact match
-		return stored_leaves;
-	} else {
-		// There were overflow
-		return stored_leaves + 1;
+uint64_t HashStore::atoms_needed_for_content ( uint64_t content_size ) {
+	auto atomSize = TreeHasher<Node::HashAlgorithm>::ATOMSIZE;
+	return (content_size + atomSize - 1) / atomSize;
+}
+
+uint64_t HashStore::leaves_needed_for_atoms ( uint64_t atoms, uint8_t levelsSkipped ) {
+	auto stored_leaves = atoms >> levelsSkipped;
+	if ((stored_leaves << levelsSkipped) != atoms) { // Check for overflow
+		stored_leaves += 1;
 	}
+	return stored_leaves;
 }
 
-uint64_t HashStore::nodes_needed ( uint64_t content_size, uint8_t levelsSkipped ) {
-	return treesize(leaves_needed(content_size, levelsSkipped));
+uint64_t HashStore::leaves_needed_for_content ( uint64_t content_size, uint8_t levelsSkipped ) {
+	return leaves_needed_for_atoms(atoms_needed_for_content(content_size), levelsSkipped);
 }
 
-uint64_t HashStore::size_needed ( uint64_t content_size, uint8_t levelsSkipped ) {
-	return nodes_needed(content_size, levelsSkipped) * Node::DigestSize;
+uint64_t HashStore::nodes_needed_for_atoms ( uint64_t atoms, uint8_t levelsSkipped ) {
+	return treesize(leaves_needed_for_atoms(atoms));
+}
+
+uint64_t HashStore::nodes_needed_for_content ( uint64_t content_size, uint8_t levelsSkipped ) {
+	return nodes_needed_for_atoms(atoms_needed_for_content(content_size), levelsSkipped);
+}
+
+uint64_t HashStore::size_needed_for_atoms ( uint64_t atoms, uint8_t levelsSkipped ) {
+	return nodes_needed_for_atoms(atoms, levelsSkipped) * sizeof(Node);
+}
+
+uint64_t HashStore::size_needed_for_content ( uint64_t content_size, uint8_t levelsSkipped ) {
+	return size_needed_for_atoms(atoms_needed_for_content(content_size), levelsSkipped);
 }

@@ -62,14 +62,13 @@ void AssetStore::openOrCreate()
 		fs::create_directories(_tigerFolder);
 }
 
-boost::filesystem::path AssetStore::newAssetDir()
+boost::filesystem::path AssetStore::newAsset()
 {
-	fs::path assetFolder;
+	fs::path assetPath;
 	do {
-		assetFolder = _assetsFolder / randomAlphaNumeric(20);
-	} while (fs::exists(assetFolder));
-	fs::create_directory(assetFolder);
-	return assetFolder;
+		assetPath = _assetsFolder / randomAlphaNumeric(20);
+	} while (fs::exists( assetPath ));
+	return assetPath;
 }
 
 void AssetStore::purge_links(const boost::shared_ptr< StoredAsset >& asset, const BitHordeIds& except)
@@ -104,58 +103,18 @@ void AssetStore::update_links(const BitHordeIds& ids, const boost::shared_ptr<St
 	fs::create_relative_symlink(_assetsFolder / asset->id(), link);
 }
 
-enum LinkStatus{
-	OK,
-	BROKEN,
-	OUTDATED,
-};
-
-LinkStatus validateData(const fs::path& assetDataPath) {
-	struct stat linkStat, dataStat;
-
-	const char* c_path = assetDataPath.c_str();
-	if (lstat(c_path, &linkStat) ||
-	    !(S_ISLNK(linkStat.st_mode) || S_ISREG(linkStat.st_mode)) ||
-	    stat(c_path, &dataStat) ||
-	    !S_ISREG(dataStat.st_mode))
-		return BROKEN;
-	if (linkStat.st_mtime >= dataStat.st_mtime)
-		return OK;
-	else
-		return OUTDATED;
-}
-
-bool checkAssetFolder(const fs::path& referrer, const fs::path& assetFolder) {
-	auto assetDataPath = assetFolder/"data";
-	switch (validateData(assetDataPath)) {
-	case OK:
-		return true;
-	case OUTDATED:
-		LOG4CPLUS_WARN(bithorded::storeLog, "outdated asset detected, " << assetFolder);
-		AssetStore::unlink(referrer);
-		fs::remove(referrer/"meta");
-		return false;
-	case BROKEN:
-		LOG4CPLUS_WARN(bithorded::storeLog, "broken asset detected, " << assetFolder);
-		AssetStore::unlinkAndRemove(referrer);
-		return false;
-	}
-	return false;
-}
 
 boost::filesystem::path AssetStore::resolveIds(const BitHordeIds& ids)
 {
-	if (_tigerFolder.empty())
-		fs::path();
 	auto tigerId = findBithordeId(ids, bithorde::HashType::TREE_TIGER);
 	if (tigerId.size()) {
 		fs::path hashLink = _tigerFolder / base32encode(tigerId);
-		boost::system::error_code e;
-		auto assetFolder = fs::canonical(hashLink, e);
-		if (e || !fs::is_directory(assetFolder)) {
-			unlink(hashLink);
-		} else if (checkAssetFolder(hashLink, assetFolder)) {
-			return assetFolder;
+		switch (fs::status(hashLink).type()) {
+			case fs::file_type::regular_file:
+			case fs::file_type::directory_file:
+				return fs::canonical(hashLink);
+			default:
+				unlink(hashLink);
 		}
 	}
 	return fs::path();
@@ -181,11 +140,24 @@ uintmax_t AssetStore::size() const
 uintmax_t AssetStore::assetFullSize(const boost::filesystem::path& path) const
 {
 	uintmax_t res=0;
-	fs::directory_iterator end;
-	for (fs::directory_iterator iter(path); iter != end; iter++) {
-		struct stat res_stat;
-		if (stat(iter->path().c_str(), &res_stat) == 0)
-			res += res_stat.st_blocks * 512;
+	struct stat res_stat;
+	if (stat(path.c_str(), &res_stat) != 0) {
+		LOG4CPLUS_WARN(bithorded::storeLog, "failed stat:ing asset " << path.native());
+		return 0;
+	}
+	if (S_ISREG(res_stat.st_mode)) {
+		res += res_stat.st_blocks * 512;
+	} else if (S_ISDIR(res_stat.st_mode)) {
+		fs::directory_iterator end;
+		for (fs::directory_iterator iter(path); iter != end; iter++) {
+			if (stat(iter->path().c_str(), &res_stat) == 0) {
+				res += res_stat.st_blocks * 512;
+			} else {
+				LOG4CPLUS_WARN(bithorded::storeLog, "failed stat:ing asset-part " << iter->path().native());
+			}
+		}
+	} else {
+		LOG4CPLUS_WARN(bithorded::storeLog, "unknown type for asset " << path.native());
 	}
 	return res;
 }

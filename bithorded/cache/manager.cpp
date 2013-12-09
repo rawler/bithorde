@@ -83,15 +83,15 @@ IAsset::Ptr CacheManager::openAsset(const bithorde::BindRead& req)
 CachedAsset::Ptr CacheManager::prepareUpload(uint64_t size)
 {
 	if ((!_baseDir.empty()) && makeRoom(size)) {
-		fs::path assetFolder(AssetStore::newAssetDir());
+		fs::path assetPath(AssetStore::newAsset());
 
 		try {
-			auto asset = CachedAsset::create(_gcd, assetFolder, size);
+			auto asset = CachedAsset::create(_gcd, assetPath, size);
 			asset->status.onChange.connect(boost::bind(&CacheManager::linkAsset, this, CachedAsset::WeakPtr(asset)));
 			return asset;
 		} catch (const std::ios::failure& e) {
-			LOG4CPLUS_ERROR(log, "Failed to create " << assetFolder << " for upload (" << e.what() << "). Purging...");
-			AssetStore::removeAsset(assetFolder);
+			LOG4CPLUS_ERROR(log, "Failed to create " << assetPath << " for upload (" << e.what() << "). Purging...");
+			AssetStore::removeAsset(assetPath);
 			return CachedAsset::Ptr();
 		}
 	} else {
@@ -145,10 +145,9 @@ void CacheManager::linkAsset(CachedAsset::WeakPtr asset_)
 	auto asset = asset_.lock();
 	if (asset && asset->status->ids_size()) {
 		auto& ids = asset->status->ids();
-		auto assetFolder = (assetsFolder() / asset->id());
-		LOG4CPLUS_DEBUG(log, "Linking " << ids << " to " << assetFolder);
-		auto dataPath(assetFolder / "data");
-		lutimes(dataPath.c_str(), NULL);
+		auto assetPath = (assetsFolder() / asset->id());
+		LOG4CPLUS_DEBUG(log, "Linking " << ids << " to " << assetPath);
+		lutimes(assetPath.c_str(), NULL);
 
 		AssetStore::update_links(ids, asset);
 	}
