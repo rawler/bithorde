@@ -388,7 +388,11 @@ void Connection::onWritten(const boost::system::error_code& err, size_t written,
 		if (_sndQueue.size() < SEND_BUF_LOW_WATER_MARK)
 			writable();
 	} else {
-		cerr << _logTag << ": Failed to write. Disconnecting..." << endl;
+		if (err == boost::system::errc::broken_pipe) {
+			cerr << _logTag << ": Disconnected..." << endl;
+		} else {
+			cerr << _logTag << ": Failed to write. (" << err.message() << ") Disconnecting..." << endl;
+		}
 		close();
 	}
 }
