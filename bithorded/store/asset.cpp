@@ -37,7 +37,7 @@ StoredAsset::StoredAsset(GrandCentralDispatch& gcd, const boost::filesystem::pat
 	_metaFolder(metaFolder),
 	_file(metaFolder/"data", mode),
 	_metaStore(metaFolder/"meta", _file.blocks(BLOCKSIZE)),
-	_hasher(_metaStore)
+	_hasher(_metaStore, 0)
 {
 	updateStatus();
 }
@@ -47,7 +47,7 @@ StoredAsset::StoredAsset(GrandCentralDispatch& gcd, const boost::filesystem::pat
 	_metaFolder(metaFolder),
 	_file(metaFolder/"data", mode, size),
 	_metaStore(metaFolder/"meta", _file.blocks(BLOCKSIZE)),
-	_hasher(_metaStore)
+	_hasher(_metaStore, 0)
 {
 	updateStatus();
 }
@@ -136,7 +136,7 @@ boost::shared_array<byte> crunch_piece(RandomAccessFile* file, uint64_t offset, 
 		throw ios_base::failure("Unexpected read error");
 	}
 
-	Hasher::computeLeaf(BUF, got, res);
+	Hasher::Hasher::leafDigest(BUF, got, res);
 	return boost::shared_array<byte>(res);
 }
 

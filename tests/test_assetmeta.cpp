@@ -14,7 +14,7 @@ namespace fs = boost::filesystem;
 using namespace bithorded::store;
 
 typedef HashNode< CryptoPP::Tiger > MyNode;
-typedef HashTree< MyNode, AssetMeta > TigerTree;
+typedef HashTree< AssetMeta > TigerTree;
 
 const fs::path TEST_FILE("/tmp/assetmeta_test");
 
@@ -27,25 +27,26 @@ BOOST_AUTO_TEST_CASE( assetmeta_random_sequence )
 
 	{
 		AssetMeta store(TEST_FILE, LEAVES);
-		TigerTree tree(store);
+		TigerTree tree(store, 0);
 
-		byte block[TigerTree::BLOCKSIZE];
+		const auto unit_size = TigerTree::Hasher::UNITSIZE;
+		byte block[unit_size];
 		bzero(block, sizeof(block));
 
 		auto root = tree.getRoot();
 
-		tree.setData(0, block, sizeof(block));
-		tree.setData(1, block, sizeof(block));
+		tree.setData(0*unit_size, block, sizeof(block));
+		tree.setData(1*unit_size, block, sizeof(block));
 
-		tree.setData(6, block, sizeof(block));
+		tree.setData(6*unit_size, block, sizeof(block));
 
-		tree.setData(4, block, sizeof(block));
-		tree.setData(5, block, sizeof(block));
-		tree.setData(3, block, sizeof(block));
+		tree.setData(4*unit_size, block, sizeof(block));
+		tree.setData(5*unit_size, block, sizeof(block));
+		tree.setData(3*unit_size, block, sizeof(block));
 
 		BOOST_CHECK_EQUAL( root->state, MyNode::State::EMPTY);
 
-		tree.setData(2, block, sizeof(block));
+		tree.setData(2*unit_size, block, sizeof(block));
 
 		BOOST_CHECK_EQUAL( root->state, MyNode::State::SET );
 		BOOST_CHECK_EQUAL( root->base32Digest(), "FPSZ35773WS4WGBVXM255KWNETQZXMTEJGFMLTA" );
@@ -53,7 +54,7 @@ BOOST_AUTO_TEST_CASE( assetmeta_random_sequence )
 
 	{
 		AssetMeta store(TEST_FILE, LEAVES);
-		TigerTree tree(store);
+		TigerTree tree(store, 0);
 		auto root = tree.getRoot();
 
 		BOOST_CHECK_EQUAL( root->state, MyNode::State::SET );

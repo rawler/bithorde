@@ -61,24 +61,77 @@ bool operator!=(const HashNode< HashAlgorithm >& a, const HashNode< HashAlgorith
 	return !(a == b);
 }
 
-const static byte TREE_INTERNAL_PREFIX = 0x01;
-const static byte TREE_LEAF_PREFIX = 0x00;
 
-template <typename HashNode, typename BackingStore>
+template <typename HashAlgorithm>
+struct TreeHasher {
+	const static size_t DigestSize = HashAlgorithm::DIGESTSIZE;
+
+	const static size_t UNITSIZE = 1024;
+	const static byte TREE_INTERNAL_PREFIX = 0x01;
+	const static byte TREE_LEAF_PREFIX = 0x00;
+
+	static void leafDigest(const byte* input, size_t length, byte* output) {
+		BOOST_ASSERT(length <= UNITSIZE);
+		HashAlgorithm hasher;
+		hasher.Update(&TREE_LEAF_PREFIX, 1);
+		hasher.Update(input, length);
+		hasher.Final(output);
+	}
+
+	static size_t calcSplit(size_t length) {
+		size_t leaves = (length + UNITSIZE-1) / UNITSIZE;
+		size_t res(UNITSIZE);
+		leaves -= 1;
+		while (leaves > 1) {
+			leaves >>= 1;
+			res <<= 1;
+		}
+		return res;
+	}
+
+	static void rootDigest(const byte* input, size_t length, byte* output) {
+		if (length <= UNITSIZE) {
+			leafDigest(input, length, output);
+		} else {
+			size_t split(calcSplit(length));
+			byte buf[DigestSize];
+			HashAlgorithm hasher;
+			hasher.Update(&TREE_INTERNAL_PREFIX, 1);
+
+			// Left subtree
+			rootDigest(input, split, buf);
+			hasher.Update(buf, sizeof(buf));
+
+			// Right subtree
+			rootDigest(input+split, length-split, buf);
+			hasher.Update(buf, sizeof(buf));
+
+			hasher.Final(output);
+		}
+	}
+};
+
+template<typename HashAlgorithm> const size_t TreeHasher<HashAlgorithm>::UNITSIZE;
+template<typename HashAlgorithm> const byte TreeHasher<HashAlgorithm>::TREE_INTERNAL_PREFIX;
+template<typename HashAlgorithm> const byte TreeHasher<HashAlgorithm>::TREE_LEAF_PREFIX;
+
+template <typename BackingStore>
 class HashTree
 {
 public:
-	typedef HashNode Node;
+	typedef typename BackingStore::Node Node;
 	typedef typename BackingStore::NodePtr NodePtr;
-	typedef typename HashNode::HashAlgorithm HashAlgorithm;
-	const static size_t DigestSize = HashNode::DigestSize;
-	const static size_t BLOCKSIZE = 1024;
+	typedef typename Node::HashAlgorithm HashAlgorithm;
+	typedef TreeHasher<HashAlgorithm> Hasher;
+	const static size_t DigestSize = Node::DigestSize;
 
-	HashTree(BackingStore& store) :
+	HashTree(BackingStore& store, uint8_t skipLevels) :
 		_store(store),
 		_hasher(),
-		_leaves(calc_leaves(store.size()))
-	{}
+		_leaves(calc_leaves(store.size())),
+		_leafSize(Hasher::UNITSIZE << skipLevels)
+	{
+	}
 
 	NodePtr getRoot() {
 		return _store[TREE_ROOT_NODE];
@@ -101,11 +154,19 @@ public:
 		return res / layerSize;
 	}
 
-	void setData(uint32_t offset, const byte* input, size_t length) {
-		BOOST_ASSERT((length == BLOCKSIZE) || (offset == (_leaves-1)));
+	void setData(uint64_t offset, const byte* input, size_t length) {
+		BOOST_ASSERT(!(offset % _leafSize));
+		BOOST_ASSERT(!(length % _leafSize) || ((offset+length)/_leafSize == (_leaves-1)));
 		byte digest[DigestSize];
-		_computeLeaf(input, length, digest);
-		setLeaf(offset, digest);
+		while (length) {
+			size_t blockLength = std::min(length, _leafSize);
+			Hasher::rootDigest(input, blockLength, digest);
+			setLeaf(offset/_leafSize, digest);
+
+			offset += blockLength;
+			input += blockLength;
+			length -= blockLength;
+		}
 	}
 
 	void propagate(const NodeIdx& currentIdx, const NodePtr& current) {
@@ -150,25 +211,12 @@ public:
 		if (idx >= _leaves)
 			return false;
 		else
-			return _store[block]->state == HashNode::State::SET;
-	}
-
-	static void computeLeaf(const byte* input, size_t length, byte* output) {
-		HashAlgorithm hasher;
-		hasher.Update(&TREE_LEAF_PREFIX, 1);
-		hasher.Update(input, length);
-		hasher.Final(output);
+			return _store[block]->state == Node::State::SET;
 	}
 
 private:
-	void _computeLeaf(const byte* input, size_t length, byte* output) {
-		_hasher.Update(&TREE_LEAF_PREFIX, 1);
-		_hasher.Update(input, length);
-		_hasher.Final(output);
-	}
-
 	void _computeInternal(const Node& leftChild, const Node& rightChild, Node& output) {
-		_hasher.Update(&TREE_INTERNAL_PREFIX, 1);
+		_hasher.Update(&Hasher::TREE_INTERNAL_PREFIX, 1);
 		_hasher.Update(leftChild.digest, DigestSize);
 		_hasher.Update(rightChild.digest, DigestSize);
 		_hasher.Final(output.digest);
@@ -176,7 +224,8 @@ private:
 
 	TreeStore< Node, BackingStore > _store;
 	HashAlgorithm _hasher;
-	uint32_t _leaves;
+	size_t _leaves;
+	size_t _leafSize;
 };
 
 #endif // BITHORDED_HASHTREE_H

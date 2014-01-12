@@ -96,12 +96,12 @@ AssetMeta::NodePtr AssetMeta::operator[](const size_t offset)
 	}
 }
 
-size_t AssetMeta::size()
+size_t AssetMeta::size() const
 {
 	return (_file.size() - _nodes_offset) / sizeof(TigerBaseNode);
 }
 
-TigerBaseNode AssetMeta::read(size_t offset)
+TigerBaseNode AssetMeta::read(size_t offset) const
 {
 	uint64_t f_offset = _nodes_offset + offset*sizeof(TigerBaseNode);
 	TigerBaseNode res;

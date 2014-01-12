@@ -52,13 +52,14 @@ class AssetMeta {
 	size_t _leafBlocks;
 	size_t _nodes_offset;
 public:
+	typedef TigerBaseNode Node;
 	typedef typename boost::shared_ptr<TigerNode> NodePtr;
 	AssetMeta(const boost::filesystem::path& path, uint32_t leafBlocks);
 
 	NodePtr operator[](const std::size_t offset);
-	size_t size();
+	size_t size() const;
 
-	TigerBaseNode read(size_t offset);
+	TigerBaseNode read(size_t offset) const;
 	void write(size_t offset, const TigerBaseNode& node);
 };
 

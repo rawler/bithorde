@@ -31,7 +31,7 @@ class GrandCentralDispatch;
 
 namespace store {
 
-typedef HashTree<TigerNode, AssetMeta> Hasher;
+typedef HashTree<AssetMeta> Hasher;
 
 class StoredAsset : public IAsset, public boost::enable_shared_from_this<StoredAsset> {
 protected:
@@ -47,7 +47,7 @@ public:
 	/**
 	 * All writes must be aligned on this BLOCKSIZE, or the data might be trimmed in the ends.
 	 */
-	const static int BLOCKSIZE = Hasher::BLOCKSIZE;
+	const static int BLOCKSIZE = Hasher::Hasher::UNITSIZE;
 
 	StoredAsset(GrandCentralDispatch& gcd, const boost::filesystem::path& metaFolder, RandomAccessFile::Mode mode);
 	StoredAsset(GrandCentralDispatch& gcd, const boost::filesystem::path& metaFolder, RandomAccessFile::Mode mode, uint64_t size);
