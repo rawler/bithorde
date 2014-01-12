@@ -82,13 +82,10 @@ UpstreamRequestBinding::Ptr Store::addAsset(const boost::filesystem::path& file)
 		try {
 			auto asset_data = boost::make_shared<RandomAccessFile>(target);
 
-			HashStore::Ptr hashStore;
-			IDataArray::Ptr tailStore;
+			auto meta = store::createAssetMeta(assetPath, store::V2LINKED, asset_data->size(), store::DEFAULT_HASH_LEVELS_SKIPPED, relativepath.size());
+			meta.tail->write(0, relativepath);
 
-			store::createAssetMeta(assetPath, store::V2LINKED, asset_data->size(), 0, relativepath.size(), hashStore, tailStore);
-			tailStore->write(0, relativepath);
-
-			auto asset = boost::make_shared<SourceAsset>(_gcd, assetPath.filename().native(), hashStore, asset_data);
+			auto asset = boost::make_shared<SourceAsset>(_gcd, assetPath.filename().native(), meta.hashStore, asset_data);
 			{
 				asset->status.change()->set_status(bithorde::SUCCESS);
 			}
@@ -124,19 +121,18 @@ void Store::_addAsset(SourceAsset::WeakPtr asset_)
 
 IAsset::Ptr Store::openAsset(const boost::filesystem::path& assetPath)
 {
-	HashStore::Ptr hashStore;
+	AssetMeta meta;
 	fs::path dataPath;
 
 	switch (fs::status(assetPath).type()) {
 	case boost::filesystem::directory_file:
-		hashStore = store::openV1AssetMeta(assetPath/"meta");
+		meta = store::openV1AssetMeta(assetPath/"meta");
 		dataPath = fs::canonical(assetPath/"data", assetPath);
 		break;
-	case boost::filesystem::regular_file: {
-		IDataArray::Ptr tail;
-		hashStore = store::openV2AssetMeta(assetPath, tail);
-		dataPath = fs::canonical(dataArrayToString(*tail), _baseDir);
-		} break;
+	case boost::filesystem::regular_file:
+		meta = store::openV2AssetMeta(assetPath);
+		dataPath = fs::canonical(dataArrayToString(*meta.tail), _baseDir);
+		break;
 	case boost::filesystem::file_not_found:
 		throw bsys::system_error(bsys::errc::make_error_code(bsys::errc::no_such_file_or_directory), "Missing asset-link detected");
 	default:
@@ -144,7 +140,7 @@ IAsset::Ptr Store::openAsset(const boost::filesystem::path& assetPath)
 	}
 
 	auto dataStore = boost::make_shared<RandomAccessFile>(dataPath);
-	auto asset = boost::make_shared<SourceAsset>(_gcd, assetPath.filename().native(), hashStore, dataStore);
+	auto asset = boost::make_shared<SourceAsset>(_gcd, assetPath.filename().native(), meta.hashStore, dataStore);
 
 	if ( fs::last_write_time(assetPath) < fs::last_write_time(dataPath) ) {
 		LOG4CPLUS_INFO(log, "Stale asset detected, hashing");

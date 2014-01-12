@@ -46,8 +46,8 @@ bithorded::store::TigerNode::~TigerNode()
 	}
 }
 
-HashStore::HashStore( const bithorded::IDataArray::Ptr& storage )
-	: _storage(storage)
+HashStore::HashStore( const bithorded::IDataArray::Ptr& storage, uint8_t hashLevelsSkipped )
+	: _storage(storage), _hashLevelsSkipped(hashLevelsSkipped)
 {
 	if (_storage->size() == 0) {
 		throw ios_base::failure("Hash storage of size 0 is pointless; "+storage->describe());
@@ -114,7 +114,7 @@ uint64_t HashStore::leaves_needed_for_content ( uint64_t content_size, uint8_t l
 }
 
 uint64_t HashStore::nodes_needed_for_atoms ( uint64_t atoms, uint8_t levelsSkipped ) {
-	return treesize(leaves_needed_for_atoms(atoms));
+	return treesize(leaves_needed_for_atoms(atoms, levelsSkipped));
 }
 
 uint64_t HashStore::nodes_needed_for_content ( uint64_t content_size, uint8_t levelsSkipped ) {

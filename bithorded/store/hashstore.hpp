@@ -48,14 +48,22 @@ public:
 class HashStore {
 	IDataArray::Ptr _storage;
 	WeakMap<std::size_t, TigerNode, boost::interprocess::null_mutex> _nodeMap;
+	uint8_t _hashLevelsSkipped;
 public:
 	typedef TigerBaseNode Node;
 	typedef typename boost::shared_ptr<TigerNode> NodePtr;
 	typedef boost::shared_ptr<HashStore> Ptr;
-	explicit HashStore(const IDataArray::Ptr& storage);
+	explicit HashStore(const IDataArray::Ptr& storage, uint8_t hashLevelsSkipped=0);
 
 	NodePtr operator[](const std::size_t offset);
 	size_t size() const;
+
+	uint8_t hashLevelsSkipped() const { return _hashLevelsSkipped; }
+
+	/**
+	 * The size of the block of data for the leaves.
+	 */
+	size_t leafBlockSize() const { return TreeHasher< Node::HashAlgorithm >::ATOMSIZE << _hashLevelsSkipped; }
 
 	TigerBaseNode read(size_t offset) const;
 	void write(size_t offset, const TigerBaseNode& node);

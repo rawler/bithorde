@@ -56,16 +56,15 @@ void bithorded::cache::CachedAsset::write(uint64_t offset, const std::string& da
 }
 
 CachedAsset::Ptr CachedAsset::open(GrandCentralDispatch& gcd, const boost::filesystem::path& path ) {
-	HashStore::Ptr hashStore;
-	IDataArray::Ptr dataStore;
+	AssetMeta meta;
 
 	switch (fs::status(path).type()) {
 	case boost::filesystem::directory_file:
-		hashStore = store::openV1AssetMeta(path/"meta");
-		dataStore = boost::make_shared<RandomAccessFile>(path/"data");
+		meta = store::openV1AssetMeta(path/"meta");
+		meta.tail = boost::make_shared<RandomAccessFile>(path/"data");
 		break;
 	case boost::filesystem::regular_file:
-		hashStore = store::openV2AssetMeta(path, dataStore);
+		meta = store::openV2AssetMeta(path);
 		break;
 	case boost::filesystem::file_not_found:
 		return CachedAsset::Ptr();
@@ -74,16 +73,13 @@ CachedAsset::Ptr CachedAsset::open(GrandCentralDispatch& gcd, const boost::files
 		return CachedAsset::Ptr();
 	}
 
-	return boost::make_shared<CachedAsset>(gcd, path.filename().native(), hashStore, dataStore);
+	return boost::make_shared<CachedAsset>(gcd, path.filename().native(), meta.hashStore, meta.tail);
 }
 
 CachedAsset::Ptr CachedAsset::create( GrandCentralDispatch& gcd, const boost::filesystem::path& path, uint64_t size ) {
-	HashStore::Ptr hashStore;
-	IDataArray::Ptr dataStore;
+	auto meta = store::createAssetMeta(path, store::V2CACHE, size, store::DEFAULT_HASH_LEVELS_SKIPPED, size);
 
-	store::createAssetMeta(path, store::V2CACHE, size, 0, size, hashStore, dataStore);
-
-	auto ptr = boost::make_shared<CachedAsset>(gcd, path.filename().native(), hashStore, dataStore);
+	auto ptr = boost::make_shared<CachedAsset>(gcd, path.filename().native(), meta.hashStore, meta.tail);
 	ptr->status.change()->set_status(bithorde::SUCCESS);
 	return ptr;
 }

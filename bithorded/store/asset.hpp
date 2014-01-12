@@ -31,6 +31,8 @@ class GrandCentralDispatch;
 
 namespace store {
 
+const uint8_t DEFAULT_HASH_LEVELS_SKIPPED = 6;
+
 typedef HashTree<HashStore> Hasher;
 
 class StoredAsset : public IAsset, public boost::enable_shared_from_this<StoredAsset> {
@@ -42,11 +44,6 @@ protected:
 	Hasher _hasher;
 public:
 	typedef typename boost::shared_ptr<StoredAsset> Ptr;
-
-	/**
-	 * All writes must be aligned on this BLOCKSIZE, or the data might be trimmed in the ends.
-	 */
-	const static int BLOCKSIZE = Hasher::Hasher::ATOMSIZE;
 
 	StoredAsset(GrandCentralDispatch& gcd, const std::string& id, const HashStore::Ptr hashStore, const IDataArray::Ptr& data);
 
@@ -98,16 +95,17 @@ enum FileFormatVersion {
 	V2LINKED = 0x03,
 };
 
-HashStore::Ptr openV1AssetMeta( const boost::filesystem::path& path );
-HashStore::Ptr openV2AssetMeta( const boost::filesystem::path& path, bithorded::IDataArray::Ptr& tail );
+struct AssetMeta {
+	uint8_t hashLevelsSkipped;
+	uint64_t atoms;
+	HashStore::Ptr hashStore;
+	IDataArray::Ptr tail;
+};
 
-void createAssetMeta( const boost::filesystem::path& path,
-                  FileFormatVersion version,
-                  uint64_t dataSize,
-                  uint8_t levelsSkipped,
-                  uint64_t tailSize,
-                  bithorded::store::HashStore::Ptr& hashStore,
-                  bithorded::IDataArray::Ptr& tailStore);
+AssetMeta openV1AssetMeta( const boost::filesystem::path& path );
+AssetMeta openV2AssetMeta( const boost::filesystem::path& path );
+
+AssetMeta createAssetMeta( const boost::filesystem::path& path, bithorded::store::FileFormatVersion version, uint64_t dataSize, uint8_t levelsSkipped, uint64_t tailSize );
 
 }}
 
