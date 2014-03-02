@@ -133,6 +133,8 @@ void read_client(const OptionGroup& options, bithorded::Config::Client& c) {
 
 bithorded::Config::Config(int argc, char* argv[])
 {
+	auto hardwareCores = sysconf( _SC_NPROCESSORS_ONLN );
+
 	cli_options.add_options()
 		("version,v", "print version string")
 		("help", "produce help message")
@@ -152,7 +154,7 @@ bithorded::Config::Config(int argc, char* argv[])
 			"Path to UNIX-socket to listen on")
 		("server.unixPerms", po::value<string>(&unixPerms)->default_value("0666"),
 			"Permissions for the created UNIX-socket.")
-		("server.parallel", po::value<uint16_t>(&parallel)->default_value(16),
+		("server.parallel", po::value<uint16_t>(&parallel)->default_value(hardwareCores),
 			"How many workers to run for parallel job processing.")
 	;
 
