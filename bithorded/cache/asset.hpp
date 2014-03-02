@@ -47,7 +47,7 @@ public:
 	 *        a callback to /whenDone/
 	 *  whenDone - called when written content is completely processed
 	 */
-	void write(uint64_t offset, const std::string& data, const std::function< void() > whenDone = 0);
+	void write(uint64_t offset, const boost::shared_ptr<bithorde::IBuffer>& data, const std::function< void() > whenDone = 0);
 
 	static Ptr open( bithorded::GrandCentralDispatch& gcd, const boost::filesystem::path& path );
 	static Ptr create( bithorded::GrandCentralDispatch& gcd, const boost::filesystem::path& path, uint64_t size );
@@ -79,7 +79,7 @@ private:
 	void releaseIfCached();
 
 	void disconnect();
-	void upstreamDataArrived(bithorded::IAsset::ReadCallback cb, std::size_t requested_size, int64_t offset, const std::string& data);
+	void upstreamDataArrived( bithorded::IAsset::ReadCallback cb, std::size_t requested_size, int64_t offset, const boost::shared_ptr<bithorde::IBuffer>& data );
 	void upstreamStatusChange(const bithorde::AssetStatus& newStatus);
 };
 	}

@@ -6,6 +6,8 @@
 #include <sstream>
 #include <utility>
 
+#include <lib/buffer.hpp>
+
 #include "buildconf.hpp"
 
 namespace asio = boost::asio;
@@ -183,10 +185,10 @@ void BHGet::requestMore()
 	}
 }
 
-void BHGet::onDataChunk(uint64_t offset, const string& data, int tag)
+void BHGet::onDataChunk(uint64_t offset, const boost::shared_ptr<bithorde::IBuffer>& data, int tag)
 {
-	if ((data.size() < BLOCK_SIZE) && ((offset+data.size()) < _asset->size())) {
-		cerr << "WARNING: got unexpectedly small data-block at offset " << offset << ", " << data.size() << " vs. " << BLOCK_SIZE << endl;
+	if ((data->size() < BLOCK_SIZE) && ((offset+data->size()) < _asset->size())) {
+		cerr << "WARNING: got unexpectedly small data-block at offset " << offset << ", " << data->size() << " vs. " << BLOCK_SIZE << endl;
 		if (++_failures < BLOCK_RETRIES) {
 			cerr << "Retrying..." << endl;
 			_asset->aSyncRead(offset, BLOCK_SIZE);
@@ -196,7 +198,8 @@ void BHGet::onDataChunk(uint64_t offset, const string& data, int tag)
 			return;
 		}
 	}
-	_outQueue->send(offset, data);
+	string buf(reinterpret_cast<char*>(**data), data->size());
+	_outQueue->send(offset, buf);
 	if (_outQueue->position < _asset->size()) {
 		requestMore();
 	} else {

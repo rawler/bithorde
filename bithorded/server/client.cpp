@@ -17,14 +17,16 @@
 #include "client.hpp"
 
 #include <boost/assert.hpp>
+#include <boost/pointer_cast.hpp>
 #include <iostream>
 
 #include <log4cplus/logger.h>
 #include <log4cplus/loggingmacros.h>
 
 #include "server.hpp"
-#include "../../lib/magneturi.h"
-#include "../../lib/random.h"
+#include <lib/magneturi.h>
+#include <lib/random.h>
+#include <lib/buffer.hpp>
 
 const size_t MAX_ASSETS = 1024;
 const size_t MAX_CHUNK = 64*1024;
@@ -42,6 +44,10 @@ Client::Client( Server& server) :
 	bithorde::Client(server.ioService(), server.name()),
 	_server(server)
 {
+}
+
+Client::Ptr Client::shared_from_this() {
+	return boost::static_pointer_cast<Client>(bithorde::Client::shared_from_this());
 }
 
 size_t Client::serverAssets() const
@@ -86,49 +92,52 @@ void Client::inspect(management::InfoList& tgt) const
 	}
 }
 
-void Client::onMessage(const bithorde::HandShake& msg)
+void Client::onMessage( const boost::shared_ptr< bithorde::MessageContext< bithorde::HandShake > >& msgCtx )
 {
+	const auto& msg = msgCtx->message();
 	if (!(state() & SaidHello)) {
-		auto client_config = _server.getClientConfig(msg.name());
+		auto client_config = _server.getClientConfig( msg.name());
 		setSecurity(client_config.key, (bithorde::CipherType)client_config.cipher);
 		sayHello();
 	}
 	LOG4CPLUS_INFO(clientLogger, "Connected: " << msg.name());
-	bithorde::Client::onMessage(msg);
+	bithorde::Client::onMessage( msgCtx );
 }
 
-void Client::onMessage(const bithorde::BindWrite& msg)
+void Client::onMessage( const boost::shared_ptr< bithorde::MessageContext< bithorde::BindWrite > >& msgCtx )
 {
+	const auto& msg = msgCtx->message();
 	auto h = msg.handle();
 	if ((_assets.size() > h) && _assets[h]) {
 		clearAsset(h);
 	}
-	if (msg.has_linkpath()) {
-		fs::path path(msg.linkpath());
+	if ( msg.has_linkpath()) {
+		fs::path path( msg.linkpath());
 		if (path.is_absolute()) {
 			if (auto asset = _server.async_linkAsset(path)) {
 				LOG4CPLUS_INFO(clientLogger, "Linking " << path);
-				assignAsset(msg.handle(), asset, bithorde::RouteTrace(), boost::posix_time::neg_infin);
+				assignAsset( msg.handle(), asset, bithorde::RouteTrace(), boost::posix_time::neg_infin);
 			} else {
 				LOG4CPLUS_ERROR(clientLogger, "Upload did not match any allowed assetStore: " << path);
-				informAssetStatus(msg.handle(), bithorde::ERROR);
+				informAssetStatus( msg.handle(), bithorde::ERROR);
 			}
 		} else {
 			LOG4CPLUS_ERROR(clientLogger, "Relative links not supported" << path);
-			informAssetStatus(msg.handle(), bithorde::ERROR);
+			informAssetStatus( msg.handle(), bithorde::ERROR);
 		}
 	} else {
-		if (auto asset = _server.prepareUpload(msg.size())) {
+		if (auto asset = _server.prepareUpload( msg.size())) {
 			LOG4CPLUS_INFO(clientLogger, "Ready for upload");
-			assignAsset(msg.handle(), asset, bithorde::RouteTrace(), boost::posix_time::neg_infin);
+			assignAsset( msg.handle(), asset, bithorde::RouteTrace(), boost::posix_time::neg_infin);
 		} else {
-			informAssetStatus(msg.handle(), bithorde::NORESOURCES);
+			informAssetStatus( msg.handle(), bithorde::NORESOURCES);
 		}
 	}
 }
 
-void Client::onMessage(bithorde::BindRead& msg)
+void Client::onMessage( const boost::shared_ptr< bithorde::MessageContext< bithorde::BindRead > >& msgCtx )
 {
+	const auto& msg = msgCtx->message();
 	auto h = msg.handle();
 
 	if (msg.ids_size() > 0) {
@@ -173,8 +182,9 @@ void Client::onMessage(bithorde::BindRead& msg)
 	}
 }
 
-void Client::onMessage(const bithorde::Read::Request& msg)
+void Client::onMessage( const boost::shared_ptr< bithorde::MessageContext< bithorde::Read::Request > >& msgCtx )
 {
+	const auto& msg = msgCtx->message();
 	const AssetBinding& asset = getAsset(msg.handle());
 	if (asset) {
 		uint64_t offset = msg.offset();
@@ -183,7 +193,7 @@ void Client::onMessage(const bithorde::Read::Request& msg)
 			size = MAX_CHUNK;
 
 		// Raw pointer to this should be fine here, since asset has ownership of this. (Through member Ptr client)
-		auto onComplete = boost::bind(&Client::onReadResponse, this, msg, _1, _2, bithorde::Message::in(msg.timeout()));
+		auto onComplete = boost::bind(&Client::onReadResponse, this, msgCtx, _1, _2, bithorde::Message::in(msg.timeout()));
 		asset->async_read(offset, size, msg.timeout(), onComplete);
 	} else {
 		bithorde::Read::Response resp;
@@ -193,13 +203,14 @@ void Client::onMessage(const bithorde::Read::Request& msg)
 	}
 }
 
-void Client::onMessage(const bithorde::DataSegment& msg)
+void Client::onMessage( const boost::shared_ptr< bithorde::MessageContext< bithorde::DataSegment > >& msgCtx )
 {
+	const auto& msg = msgCtx->message();
 	const AssetBinding& asset_ = getAsset(msg.handle());
 	if (asset_) {
 		bithorded::cache::CachedAsset::Ptr asset = dynamic_pointer_cast<bithorded::cache::CachedAsset>(asset_.shared());
 		if (asset) {
-			asset->write(msg.offset(), msg.content());
+			asset->write(msg.offset(), boost::make_shared<bithorde::DataSegmentCtxBuffer>(msgCtx));
 		} else {
 			LOG4CPLUS_ERROR(clientLogger, peerName() << ':' << msg.handle() << " is not an upload-asset");
 		}
@@ -219,13 +230,14 @@ void Client::setAuthenticated(const string peerName_)
 	}
 }
 
-void Client::onReadResponse(const bithorde::Read::Request& req, int64_t offset, const std::string& data, bithorde::Message::Deadline t) {
+void Client::onReadResponse(const boost::shared_ptr< bithorde::MessageContext<bithorde::Read::Request> >& reqCtx, int64_t offset, const boost::shared_ptr<bithorde::IBuffer>& data, bithorde::Message::Deadline t) {
 	bithorde::Read::Response resp;
-	resp.set_reqid(req.reqid());
-	if ((offset >= 0) && (data.size() > 0)) {
+	resp.set_reqid( reqCtx->message().reqid());
+	auto size = data->size();
+	if ((offset >= 0) && (size > 0)) {
 		resp.set_status(bithorde::SUCCESS);
 		resp.set_offset(offset);
-		resp.set_content(data);
+		resp.set_content(**data, size);
 	} else {
 		resp.set_status(bithorde::NOTFOUND);
 	}
@@ -278,7 +290,7 @@ void Client::assignAsset(bithorde::Asset::Handle handle_, const UpstreamRequestB
 		if (new_size > MAX_ASSETS)
 			new_size = MAX_ASSETS;
 		_assets.resize(new_size);
-		auto self = shared_from_this();
+		auto self = bithorded::Client::shared_from_this();
 		for (auto i=old_size; i < new_size; i++) {
 			_assets[i].setClient(self);
 		}

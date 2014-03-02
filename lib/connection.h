@@ -94,7 +94,7 @@ public:
 	void setKeepalive(Keepalive* keepalive);
 
 	typedef boost::signals2::signal<void ()> VoidSignal;
-	typedef boost::signals2::signal<void (MessageType, ::google::protobuf::Message&)> MessageSignal;
+	typedef boost::signals2::signal<void (MessageType, const ::google::protobuf::Message&)> MessageSignal;
 	VoidSignal disconnected;
 	MessageSignal message;
 	VoidSignal writable;
@@ -103,6 +103,8 @@ public:
 	void setLogTag(const std::string& tag);
 
 	bool sendMessage(MessageType type, const ::google::protobuf::Message & msg, const Message::Deadline& expires, bool prioritized);
+
+	void setListening(bool listening);
 
 	virtual void close() = 0;
 
@@ -122,6 +124,8 @@ protected:
 	std::unique_ptr<Keepalive> _keepAlive;
 	std::string _logTag;
 
+	bool _listening;
+	byte* _readWindow;
 	Buffer _rcvBuf;
 	MessageQueue _sndQueue;
 	size_t _sendWaiting;

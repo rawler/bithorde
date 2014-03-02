@@ -29,6 +29,10 @@
 #include "../lib/management.hpp"
 #include "../lib/subscribable.hpp"
 
+namespace bithorde {
+class IBuffer;
+}
+
 namespace bithorded
 {
 
@@ -108,7 +112,7 @@ class IAsset : public management::DescriptiveDirectory
 {
 	uint64_t _sessionId;
 public:
-	typedef boost::function<void(int64_t offset, const std::string& data)> ReadCallback;
+	typedef boost::function<void(int64_t offset, const boost::shared_ptr<bithorde::IBuffer>& data)> ReadCallback;
 
 	IAsset();
 

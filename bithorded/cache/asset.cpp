@@ -18,6 +18,7 @@
 #include "asset.hpp"
 #include "manager.hpp"
 
+#include <lib/buffer.hpp>
 #include <bithorded/lib/grandcentraldispatch.hpp>
 
 #include <log4cplus/logger.h>
@@ -48,9 +49,20 @@ void bithorded::cache::CachedAsset::inspect(bithorded::management::InfoList& tar
 void CachedAsset::apply(const bithorded::AssetRequestParameters& old_parameters, const bithorded::AssetRequestParameters& new_parameters)
 {}
 
-void bithorded::cache::CachedAsset::write(uint64_t offset, const std::string& data, const std::function< void() > whenDone)
+ssize_t _write_held_buffer(const IDataArray::Ptr& storage, uint64_t offset, const boost::shared_ptr<bithorde::IBuffer>& data) {
+	return storage->write(offset, **data, data->size());
+}
+
+// Dummy function used to hold the buffer in RAM until it's processed.
+// Ensure we don't resume reading from client until all data is really processed
+void whenDoneWrapper(const std::function< void() > whenDone, const boost::shared_ptr<bithorde::IBuffer>& dataHolder) {
+	whenDone();
+}
+
+void bithorded::cache::CachedAsset::write(uint64_t offset, const boost::shared_ptr<bithorde::IBuffer>& data, const std::function< void() > whenDone )
 {
-	auto job = boost::bind(&IDataArray::write, _data, offset, data);
+	auto job = boost::bind(&_write_held_buffer, _data, offset, data);
+	boost::function< void() > wrappedDone = boost::bind(&whenDoneWrapper, whenDone, data);
 	auto completion = boost::bind(&StoredAsset::notifyValidRange, shared_from_this(), offset, _1, whenDone);
 	_gcd.submit(job, completion);
 }
@@ -114,7 +126,7 @@ void bithorded::cache::CachingAsset::async_read(uint64_t offset, size_t size, ui
 	} else if (_upstream) {
 		_upstream->async_read(offset, size, timeout, boost::bind(&CachingAsset::upstreamDataArrived, shared_from_this(), cb, size, _1, _2));
 	} else {
-		cb(-1, "");
+		cb(-1, bithorde::NullBuffer::instance);
 	}
 }
 
@@ -150,10 +162,10 @@ void bithorded::cache::CachingAsset::disconnect()
 	_upstream.reset();
 }
 
-void bithorded::cache::CachingAsset::upstreamDataArrived(bithorded::IAsset::ReadCallback cb, std::size_t requested_size, int64_t offset, const std::string& data)
+void bithorded::cache::CachingAsset::upstreamDataArrived( IAsset::ReadCallback cb, std::size_t requested_size, int64_t offset, const boost::shared_ptr< bithorde::IBuffer >& data )
 {
 	auto cached_ = cached();
-	if (data.size() >= requested_size) {
+	if (data->size() >= requested_size) {
 		if (cached_) {
 			cached_->write(offset, data, boost::bind(&CachingAsset::releaseIfCached, shared_from_this()));
 		}

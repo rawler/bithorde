@@ -23,8 +23,9 @@
 #include <utility>
 
 #include <lib/weak_fn.hpp>
-#include "lib/random.h"
-#include "lib/protocolmessages.hpp"
+#include <lib/buffer.hpp>
+#include <lib/protocolmessages.hpp>
+#include <lib/random.h>
 
 #include <log4cplus/logger.h>
 #include <log4cplus/loggingmacros.h>
@@ -40,17 +41,17 @@ namespace bithorded { namespace router {
 
 void PendingRead::cancel()
 {
-	cb(offset, "");
+	cb(offset, bithorde::NullBuffer::instance);
 }
 
 UpstreamAsset::UpstreamAsset(const bithorde::ReadAsset::ClientPointer& client, const BitHordeIds& requestIds)
 	: ReadAsset(client, requestIds)
 {}
 
-void UpstreamAsset::handleMessage(const bithorde::Read::Response& resp)
+void UpstreamAsset::handleMessage( const boost::shared_ptr< bithorde::MessageContext< bithorde::Read::Response > >& msgCtx )
 {
 	auto self_ref = shared_from_this();
-	bithorde::ReadAsset::handleMessage(resp);
+	bithorde::ReadAsset::handleMessage(msgCtx);
 }
 
 ForwardedAsset::ForwardedAsset(Router& router, const BitHordeIds& ids) :
@@ -197,7 +198,7 @@ size_t bithorded::router::ForwardedAsset::can_read(uint64_t offset, size_t size)
 void bithorded::router::ForwardedAsset::async_read(uint64_t offset, size_t size, uint32_t timeout, ReadCallback cb)
 {
 	if (_upstream.empty())
-		return cb(-1, string());
+		return cb(-1, bithorde::NullBuffer::instance);
 	auto chosen = _upstream.begin();
 	uint32_t current_best = 1000*60*60*24;
 	for (auto iter = _upstream.begin(); iter != _upstream.end(); iter++) {
@@ -217,7 +218,7 @@ void bithorded::router::ForwardedAsset::async_read(uint64_t offset, size_t size,
 	chosen->second->aSyncRead(offset, size, timeout);
 }
 
-void bithorded::router::ForwardedAsset::onData(uint64_t offset, const std::string& data, int tag) {
+void bithorded::router::ForwardedAsset::onData( uint64_t offset, const boost::shared_ptr<bithorde::IBuffer>& data, int tag ) {
 	for (auto iter=_pendingReads.begin(); iter != _pendingReads.end(); ) {
 		if (iter->offset == offset) {
 			iter->cb(offset, data);

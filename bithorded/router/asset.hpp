@@ -42,7 +42,7 @@ class UpstreamAsset : public bithorde::ReadAsset, public boost::enable_shared_fr
 public:
 	typedef boost::shared_ptr<UpstreamAsset> Ptr;
 	explicit UpstreamAsset(const ClientPointer& client, const BitHordeIds& requestIds);
-	virtual void handleMessage(const bithorde::Read::Response& resp);
+	virtual void handleMessage ( const boost::shared_ptr< bithorde::MessageContext< bithorde::Read::Response > >& msgCtx );
 };
 
 class ForwardedAsset : public bithorded::IAsset, public boost::noncopyable, public boost::enable_shared_from_this<ForwardedAsset>
@@ -76,7 +76,7 @@ public:
 private:
 	void addUpstream(const bithorded::Client::Ptr& f, int32_t timeout, const bithorde::RouteTrace requesters);
 	void dropUpstream(const std::string& peername);
-	void onData(uint64_t offset, const std::string& data, int tag);
+	void onData(uint64_t offset, const boost::shared_ptr<bithorde::IBuffer>& data, int tag);
 	void onUpstreamStatus(const std::string& peername, const bithorde::AssetStatus& status);
 	bithorde::RouteTrace requestTrace(const std::unordered_set< uint64_t >& requesters) const;
 	void updateStatus();

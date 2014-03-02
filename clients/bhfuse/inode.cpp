@@ -4,6 +4,7 @@
 #include <errno.h>
 #include <iostream>
 
+#include <lib/buffer.hpp>
 #include <lib/client.h>
 
 static const uint32_t ATTR_TIMEOUT = 2;
@@ -192,17 +193,17 @@ void FUSEAsset::tryRebind()
 	}
 }
 
-void FUSEAsset::onDataArrived(uint64_t offset, const std::string& data, int tag) {
+void FUSEAsset::onDataArrived( uint64_t offset, const boost::shared_ptr< IBuffer >& data, int tag ) {
 	if (_readOperations.count(tag)) {
 		BHReadOperation &op = _readOperations[tag];
 		if (_connected) {
-			op.res += data;
-			if ((data.size() < op.size) && ((off_t)(op.off + data.size()) < (off_t)asset->size())) {
+			op.res.append(reinterpret_cast<char*>(**data), data->size());
+			if ((data->size() < op.size) && ((off_t)(op.off + data->size()) < (off_t)asset->size())) {
 				BHReadOperation opCopy = op;
 				_readOperations.erase(tag);
 				if (op.retries < READ_RETRIES) {
-					opCopy.off += data.size();
-					opCopy.size -= data.size();
+					opCopy.off += data->size();
+					opCopy.size -= data->size();
 					queueRead(opCopy);
 				} else {
 					fuse_reply_err(opCopy.req, EIO);

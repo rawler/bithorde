@@ -67,7 +67,7 @@ public:
 protected:
 	virtual void fill_stat_t(struct stat & s);
 private:
-	void onDataArrived(uint64_t offset, const std::string& data, int tag);
+	void onDataArrived( uint64_t offset, const boost::shared_ptr<bithorde::IBuffer>& data, int tag );
 	void onStatusChanged(const bithorde::AssetStatus& s);
 	void queueRead(const BHReadOperation& read);
 	void tryRebind();

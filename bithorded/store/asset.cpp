@@ -20,6 +20,7 @@
 
 #include "../lib/grandcentraldispatch.hpp"
 #include "../lib/rounding.hpp"
+#include <lib/buffer.hpp>
 
 #include <boost/bind/protect.hpp>
 #include <boost/enable_shared_from_this.hpp>
@@ -50,12 +51,14 @@ StoredAsset::StoredAsset( GrandCentralDispatch& gcd, const string& id, const Has
 
 void StoredAsset::async_read(uint64_t offset, size_t size, uint32_t timeout, bithorded::IAsset::ReadCallback cb)
 {
-	byte buf[MAX_CHUNK];
-	auto read = _data->read(offset, size, buf);
-	if (read > 0)
-		cb(offset, std::string((char*)buf, read));
-	else
-		cb(offset, std::string());
+	auto buf = boost::make_shared<bithorde::MemoryBuffer>(size);
+	auto read = _data->read(offset, size, **buf);
+	if (read > 0) {
+		buf->trim(read);
+		cb(offset, buf);
+	} else {
+		cb(offset, bithorde::NullBuffer::instance);
+	}
 }
 
 size_t StoredAsset::can_read(uint64_t offset, size_t size)
@@ -159,10 +162,17 @@ struct HashTail : public boost::enable_shared_from_this<HashTail> {
 		whenDone(whenDone)
 	{}
 
-	~HashTail() {
+	// Function to run asynchronously from main-thread, to force update asset-status,
+	// and possibly call callback when done.
+	static void whenDoneWrapper(const boost::shared_ptr<StoredAsset>& asset, std::function<void()> whenDone) {
 		asset->updateStatus();
-		if (whenDone)
+		if (whenDone) {
 			whenDone();
+		}
+	}
+
+	~HashTail() {
+		gcd.ioService().post(boost::bind(&HashTail::whenDoneWrapper, asset, whenDone));
 	}
 	
 	bool empty() const { return offset >= end; }

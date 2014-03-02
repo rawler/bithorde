@@ -57,8 +57,12 @@ private:
 	void onTimeout();
 };
 
+template <typename T>
+class MessageContext;
+
 struct CipherConfig;
 class Client
+	: boost::noncopyable, public boost::enable_shared_from_this<Client>
 {
 public:
 	enum State {
@@ -94,6 +98,7 @@ private:
 	CachedAllocator<int> _rpcIdAllocator;
 
 	uint8_t _protoVersion;
+	size_t _bytesAllocated;
 public:
 	typedef boost::shared_ptr<Client> Pointer;
 	typedef boost::weak_ptr<Client> WeakPtr;
@@ -132,6 +137,9 @@ public:
 
 	bool sendMessage(bithorde::Connection::MessageType type, const google::protobuf::Message& msg, const bithorde::Message::Deadline& expires=Message::NEVER, bool prioritized=false);
 
+	void bytesAllocated(size_t bytes);
+	void bytesFreed(size_t bytes);
+
 	/**
 	 * Signal to indicate authentication has been performed.
 	 * the second argument is the peerName. Empty peerName means authentication failed.
@@ -149,22 +157,23 @@ protected:
 	void sayHello();
 
 	virtual void onDisconnected();
-	void onIncomingMessage(Connection::MessageType type, ::google::protobuf::Message& msg);
+	void onIncomingMessage( bithorde::Connection::MessageType type, const google::protobuf::Message& msg );
 
-	virtual void onMessage(const bithorde::HandShake & msg);
-	virtual void onMessage(bithorde::BindRead& msg);
-	virtual void onMessage(const bithorde::AssetStatus & msg);
-	virtual void onMessage(const bithorde::Read::Request & msg);
-	virtual void onMessage(const bithorde::Read::Response & msg);
-	virtual void onMessage(const bithorde::BindWrite & msg);
-	virtual void onMessage(const bithorde::DataSegment & msg);
-	virtual void onMessage(const bithorde::HandShakeConfirmed & msg);
-	virtual void onMessage(const bithorde::Ping & msg);
+	virtual void onMessage(const boost::shared_ptr< MessageContext<bithorde::HandShake> >& msgCtx);
+	virtual void onMessage(const boost::shared_ptr< MessageContext<bithorde::BindRead> >& msgCtx);
+	virtual void onMessage(const boost::shared_ptr< MessageContext<bithorde::AssetStatus> >& msgCtx);
+	virtual void onMessage(const boost::shared_ptr< MessageContext<bithorde::Read::Request> >& msgCtx);
+	virtual void onMessage(const boost::shared_ptr< MessageContext<bithorde::Read::Response> >& msgCtx);
+	virtual void onMessage(const boost::shared_ptr< MessageContext<bithorde::BindWrite > >& msgCtx );
+	virtual void onMessage(const boost::shared_ptr< MessageContext<bithorde::DataSegment> >& msgCtx);
+	virtual void onMessage(const boost::shared_ptr< MessageContext<bithorde::HandShakeConfirmed> >& msgCtx);
+	virtual void onMessage(const boost::shared_ptr< MessageContext<bithorde::Ping> >& msgCtx);
 
 	virtual void addStateFlag(State s);
 	virtual void setAuthenticated(const std::string peerName);
 private:
 	bool release(Asset & a);
+	void trackAllocation(ssize_t change);
 
 	boost::signals2::scoped_connection _messageConnection;
 	boost::signals2::scoped_connection _writableConnection;
@@ -173,6 +182,36 @@ private:
 	bool informBound(const bithorde::AssetBinding& asset, int timeout_ms);
 	int allocRPCRequest(Asset::Handle asset);
 	void releaseRPCRequest(int reqId);
+};
+
+template <typename T>
+class MessageContext {
+	const Client::Pointer _client;
+	const T _msg;
+public:
+	typedef boost::shared_ptr< MessageContext<T> > Ptr;
+
+	MessageContext(const Client::Pointer& client, const T& msg) :
+		_client ( client ), _msg(msg)
+	{
+		_client->bytesAllocated(_msg.ByteSize());
+	}
+
+	~MessageContext() {
+		_client->bytesFreed(_msg.ByteSize());
+	}
+
+	const T& message() const {
+		return _msg;
+	}
+
+	const boost::shared_ptr<Client>& client() const {
+		return _client;
+	}
+
+	operator T() {
+		return _msg;
+	}
 };
 
 }

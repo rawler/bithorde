@@ -28,7 +28,7 @@
 namespace bithorded {
 
 class Server;
-class Client : public bithorde::Client, public boost::enable_shared_from_this<Client>, public management::DescriptiveDirectory
+class Client : public bithorde::Client, public management::DescriptiveDirectory
 {
 	Server& _server;
 	std::vector< AssetBinding > _assets;
@@ -38,6 +38,8 @@ public:
 	static Ptr create(Server& server) {
 		return Ptr(new Client(server));
 	}
+
+	Ptr shared_from_this();
 
 	size_t serverAssets() const;
 
@@ -51,17 +53,17 @@ protected:
 
 	virtual void onDisconnected();
 
-	virtual void onMessage(const bithorde::HandShake& msg);
-	virtual void onMessage(const bithorde::BindWrite& msg);
-	virtual void onMessage(bithorde::BindRead& msg);
-	virtual void onMessage(const bithorde::Read::Request& msg);
-	virtual void onMessage(const bithorde::DataSegment& msg);
+	virtual void onMessage(const boost::shared_ptr<bithorde::MessageContext<bithorde::HandShake> >& msgCtx);
+	virtual void onMessage(const boost::shared_ptr<bithorde::MessageContext<bithorde::BindWrite> >& msgCtx);
+	virtual void onMessage(const boost::shared_ptr<bithorde::MessageContext<bithorde::BindRead> >& msgCtx);
+	virtual void onMessage(const boost::shared_ptr<bithorde::MessageContext<bithorde::Read::Request> >& msgCtx);
+	virtual void onMessage(const boost::shared_ptr<bithorde::MessageContext<bithorde::DataSegment> >& msgCtx);
 
 	virtual void setAuthenticated(const std::string peerName);
 private:
 	void informAssetStatus(bithorde::Asset::Handle h, bithorde::Status s);
 	void informAssetStatusUpdate(bithorde::Asset::Handle h, const bithorded::IAsset::WeakPtr& asset, const bithorde::AssetStatus& status);
-	void onReadResponse( const bithorde::Read::Request& req, int64_t offset, const std::string& data, bithorde::Message::Deadline t);
+	void onReadResponse( const boost::shared_ptr< bithorde::MessageContext< bithorde::Read::Request > >& reqCtx, int64_t offset, const boost::shared_ptr< bithorde::IBuffer >& data, bithorde::Message::Deadline t );
 	void assignAsset(bithorde::Asset::Handle handle_, const UpstreamRequestBinding::Ptr& a, const bithorde::RouteTrace& requesters, const boost::posix_time::ptime& deadline);
 	void clearAssets();
 	void clearAsset(bithorde::Asset::Handle handle);

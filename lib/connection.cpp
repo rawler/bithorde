@@ -1,6 +1,7 @@
 #include "connection.h"
 
 #include "keepalive.hpp"
+#include "weak_fn.hpp"
 
 #include <boost/asio.hpp>
 #include <boost/bind.hpp>
@@ -133,11 +134,14 @@ public:
 	}
 
 	void tryRead() {
-		_socket->async_read_some(asio::buffer(_rcvBuf.allocate(MAX_MSG), MAX_MSG),
-			boost::bind(&ConnectionImpl<Protocol>::onRead, shared_from_this(),
-				asio::placeholders::error, asio::placeholders::bytes_transferred
-			)
-		);
+		if (_listening && !_readWindow) {
+			_readWindow = _rcvBuf.allocate(MAX_MSG);
+			_socket->async_read_some(asio::buffer(_readWindow, MAX_MSG),
+				boost::bind(&ConnectionImpl<Protocol>::onRead, shared_from_this(),
+					asio::placeholders::error, asio::placeholders::bytes_transferred
+				)
+			);
+		}
 	}
 
 	virtual void decrypt(byte* buf, size_t size) {
@@ -221,6 +225,8 @@ ConnectionStats::ConnectionStats(const TimerService::Ptr& ts) :
 Connection::Connection(asio::io_service & ioSvc, const ConnectionStats::Ptr& stats) :
 	_ioSvc(ioSvc),
 	_stats(stats),
+	_listening(true),
+	_readWindow(NULL),
 	_sendWaiting(0),
 	_errors(0)
 {
@@ -306,6 +312,7 @@ void Connection::onRead(const boost::system::error_code& err, size_t count)
 		_errors = 0;
 		_keepAlive->reset();
 	}
+	_readWindow = NULL;
 	_rcvBuf.pop(_rcvBuf.size-remains);
 
 	tryRead();
@@ -376,6 +383,13 @@ bool Connection::sendMessage(Connection::MessageType type, const google::protobu
 	return true;
 }
 
+void Connection::setListening ( bool listening ) {
+	_listening = listening;
+	if (listening) {
+		tryRead();
+	}
+}
+
 void Connection::onWritten(const boost::system::error_code& err, size_t written, const MessageQueue::MessageList& queued) {
 	size_t queued_bytes(0);
 	for (auto iter=queued.begin(); iter != queued.end(); iter++) {
@@ -388,7 +402,7 @@ void Connection::onWritten(const boost::system::error_code& err, size_t written,
 		if (_sndQueue.size() < SEND_BUF_LOW_WATER_MARK)
 			writable();
 	} else {
-		cerr << _logTag << ": Failed to write. Disconnecting..." << endl;
+		cerr << _logTag << ": Failed to write. (" << written << '/' << queued_bytes << ", " << err.message() << ") Disconnecting..." << endl;
 		close();
 	}
 }
