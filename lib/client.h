@@ -137,8 +137,9 @@ public:
 
 	bool sendMessage(bithorde::Connection::MessageType type, const google::protobuf::Message& msg, const bithorde::Message::Deadline& expires=Message::NEVER, bool prioritized=false);
 
-	void bytesAllocated(size_t bytes);
-	void bytesFreed(size_t bytes);
+	void allocateBytes(size_t bytes);
+	void freeBytes(size_t bytes);
+	size_t bytesAllocated() const;
 
 	/**
 	 * Signal to indicate authentication has been performed.
@@ -194,11 +195,11 @@ public:
 	MessageContext(const Client::Pointer& client, const T& msg) :
 		_client ( client ), _msg(msg)
 	{
-		_client->bytesAllocated(_msg.ByteSize());
+		_client->allocateBytes(_msg.ByteSize());
 	}
 
 	~MessageContext() {
-		_client->bytesFreed(_msg.ByteSize());
+		_client->freeBytes(_msg.ByteSize());
 	}
 
 	const T& message() const {

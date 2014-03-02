@@ -74,6 +74,7 @@ void Client::inspect(management::InfoList& tgt) const
 	tgt.append("incomingTotal") << stats->incomingBytes.autoScale() << ", " << stats->incomingMessages.autoScale();
 	tgt.append("outgoingTotal") << stats->outgoingBytes.autoScale() << ", " << stats->outgoingMessages.autoScale();
 	tgt.append("assetResponseTime") << assetResponseTime;
+	tgt.append("bytesAllocated") << bytesAllocated();
 	for (auto iter=clientAssets().begin(); iter != clientAssets().end(); iter++) {
 		ostringstream name;
 		name << '+' << iter->first;

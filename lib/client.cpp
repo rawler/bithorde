@@ -229,12 +229,12 @@ bool Client::sendMessage(Connection::MessageType type, const google::protobuf::M
 		return false;
 }
 
-void Client::bytesAllocated ( size_t bytes ) {
+void Client::allocateBytes ( size_t bytes ) {
 	Client::WeakPtr self(shared_from_this());
 	_ioSvc.post(boost::bind(boost::weak_fn(&Client::trackAllocation, self), bytes));
 }
 
-void Client::bytesFreed ( size_t bytes ) {
+void Client::freeBytes ( size_t bytes ) {
 	Client::WeakPtr self(shared_from_this());
 	_ioSvc.post(boost::bind(boost::weak_fn(&Client::trackAllocation, self), -bytes));
 }
@@ -244,6 +244,10 @@ void Client::trackAllocation ( ssize_t change ) {
 	if (_connection) {
 		_connection->setListening(_bytesAllocated < MAX_BYTES_ALLOCATED);
 	}
+}
+
+size_t Client::bytesAllocated() const {
+	return _bytesAllocated;
 }
 
 void Client::sayHello() {
