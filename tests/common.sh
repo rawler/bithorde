@@ -45,11 +45,19 @@ function verify_done() {
     [ ! -e "$1.idx" ]
 }
 
+function grep_count {
+    # Wraps grep -c with a fault-handler printing 0 for failures
+    grep -s -c "$1" "$2"
+    if [ $? -gt 1 ]; then
+        echo 0
+    fi
+}
+
 function wait_until_found() {
     # Waits for file to contain pattern
     # $1 - file
     # $2 - pattern
-    while [ $(grep -c "$2" "$1") -eq 0 ]; do
+    while [ $(grep_count "$2" "$1") -eq 0 ]; do
       sleep 0.1
     done
 }
