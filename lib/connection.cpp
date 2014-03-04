@@ -384,8 +384,11 @@ bool Connection::sendMessage(Connection::MessageType type, const google::protobu
 }
 
 void Connection::setListening ( bool listening ) {
+	if (_listening == listening )
+		return;
+
 	_listening = listening;
-	if (listening) {
+	if (_listening) {
 		tryRead();
 	}
 }
