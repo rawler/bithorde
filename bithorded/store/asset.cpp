@@ -180,7 +180,7 @@ struct HashTail : public boost::enable_shared_from_this<HashTail> {
 	void chewNext() {
 		if (empty())
 			return;
-		auto blockSize_ = std::min(static_cast<std::size_t>(blockSize), static_cast<std::size_t>(end - offset));
+		auto blockSize_ = std::min(static_cast<uint64_t>(blockSize), static_cast<uint64_t>(end - offset));
 		
 		auto job_handler = boost::bind(&crunch_piece, data.get(), offset, blockSize_);
 		auto result_handler = boost::bind(&HashTail::add_piece, shared_from_this(), (uint32_t)(offset/blockSize), _1);
