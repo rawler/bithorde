@@ -112,9 +112,6 @@ void Store::_addAsset(SourceAsset::WeakPtr asset_)
 {
 	auto asset = asset_.lock();
 	if (asset && asset->status->ids_size()) {
-		auto data_path(assetsFolder() / asset->id() / "data");
-		lutimes(data_path.c_str(), NULL);
-
 		AssetStore::update_links(asset->status->ids(), asset);
 	}
 }
@@ -139,15 +136,16 @@ IAsset::Ptr Store::openAsset(const boost::filesystem::path& assetPath)
 		throw bsys::system_error(bsys::errc::make_error_code(bsys::errc::not_supported), "Asset of unknown type");
 	}
 
-	auto dataStore = boost::make_shared<RandomAccessFile>(dataPath);
-	auto asset = boost::make_shared<SourceAsset>(_gcd, assetPath.filename().native(), meta.hashStore, dataStore);
-
 	if ( fs::last_write_time(assetPath) < fs::last_write_time(dataPath) ) {
 		LOG4CPLUS_INFO(log, "Stale asset detected, hashing");
-		asset->status.onChange.connect(boost::bind(&Store::_addAsset, this, SourceAsset::WeakPtr(asset)));
-		asset->hash();
+		// TODO: Rehash existing asset if sizes match
+		addAsset(dataPath);
+		// TODO: Return handle to the rehash-process, with checks to prevent responding OK unless hashes are what's asked for
 		return store::StoredAsset::Ptr();
 	}
+
+	auto dataStore = boost::make_shared<RandomAccessFile>(dataPath);
+	auto asset = boost::make_shared<SourceAsset>(_gcd, assetPath.filename().native(), meta.hashStore, dataStore);
 
 	if (!asset->hasRootHash()) {
 		LOG4CPLUS_WARN(log, "Unhashed asset detected, hashing");

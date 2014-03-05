@@ -112,7 +112,7 @@ boost::filesystem::path AssetStore::resolveIds(const BitHordeIds& ids)
 		switch (fs::status(hashLink).type()) {
 			case fs::file_type::regular_file:
 			case fs::file_type::directory_file:
-				return fs::canonical(hashLink);
+				return hashLink;
 			default:
 				unlink(hashLink);
 		}
@@ -202,20 +202,25 @@ void AssetStore::unlinkAndRemove(const BitHordeIds& ids) noexcept
 
 IAsset::Ptr AssetStore::openAsset(const bithorde::BindRead& req)
 {
-	auto assetPath = resolveIds(req.ids());
+	auto linkPath = resolveIds(req.ids());
+	auto assetPath = linkPath.empty() ? fs::path() : fs::canonical(linkPath);
 	if (assetPath.empty())
 		return IAsset::Ptr();
 	else try {
-		return openAsset(assetPath);
+		if (auto res = openAsset(assetPath)) {
+			return res;
+		} else {
+			unlinkAndRemove(linkPath);
+		}
 	} catch (const boost::system::system_error& e) {
 		if (e.code().value() == bsys::errc::no_such_file_or_directory) {
-			LOG4CPLUS_ERROR(storeLog, "Linked asset " << assetPath << "broken. Purging...");
-			unlinkAndRemove(req.ids());
+			LOG4CPLUS_ERROR(storeLog, "Linked asset " << linkPath << "broken. Purging...");
+			unlinkAndRemove(linkPath);
 		} else if (e.code().value() == bsys::errc::file_exists) {
-			LOG4CPLUS_ERROR(storeLog, "Linked asset " << assetPath << "exists with wrong size. Purging...");
-			unlinkAndRemove(req.ids());
+			LOG4CPLUS_ERROR(storeLog, "Linked asset " << linkPath << "exists with wrong size. Purging...");
+			unlinkAndRemove(linkPath);
 		} else {
-			LOG4CPLUS_ERROR(storeLog, "Failed to open " << assetPath << " with unknown error " << e.what());
+			LOG4CPLUS_ERROR(storeLog, "Failed to open " << linkPath << " with unknown error " << e.what());
 		}
 	} catch (const std::ios::failure& e) {
 		LOG4CPLUS_ERROR(storeLog, "Failed to open " << assetPath << " with unknown error " << e.what());
