@@ -51,7 +51,7 @@ echo "Getting testfile..."
 "$BHGET" -u$DAEMON_SOCKET "$MAGNETURL" | verify_equal $TESTFILE & DL1=$!
 wait $DL1 || exit_error "Downloaded file did not match upload source"
 
-echo "Verifying clear after change..."
+echo "Verifying clear after mtime-change..."
 sleep 1; touch "$TESTFILE"
 "$BHGET" -u$DAEMON_SOCKET "$MAGNETURL" &>/dev/null && exit_error "Touching source did not break link"
 
@@ -60,6 +60,17 @@ VERIFICATION=$("$BHUPLOAD" -u$DAEMON_SOCKET -l "$TESTFILE"|grep '^magnet:')
 
 echo "Getting testfile..."
 "$BHGET" -u$DAEMON_SOCKET "$MAGNETURL" | verify_equal $TESTFILE & DL1=$!
+wait $DL1 || exit_error "Re-downloaded file did not match upload source"
+
+echo "Verifying clear after content-change..."
+sleep 1; create_testfile $TESTFILE $(($TESTSIZE * 2))
+"$BHGET" -u$DAEMON_SOCKET "$MAGNETURL" &>/dev/null && exit_error "Modifying source did not break link"
+
+MAGNETURL1=$("$BHUPLOAD" -u$DAEMON_SOCKET -l "$TESTFILE"|grep '^magnet:')
+[ "$MAGNETURL" != "$MAGNETURL1" ] || exit_error "Restored with same magnet-link ($MAGNETURL vs. $MAGNETURL1)".
+
+echo "Getting testfile..."
+"$BHGET" -u$DAEMON_SOCKET "$MAGNETURL1" | verify_equal $TESTFILE & DL1=$!
 wait $DL1 || exit_error "Re-downloaded file did not match upload source"
 
 exit_success

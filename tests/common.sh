@@ -26,6 +26,12 @@ function create_testfile() {
     dd if=/dev/urandom of="$1" bs=1024 count=$2 2>/dev/null
 }
 
+function create_sparsetestfile() {
+    # $1 - filename
+    # $2 - size in KB
+    dd if=/dev/urandom of="$1" bs=1024 seek=$(($2-1)) count=1 2>/dev/null
+}
+
 function verify_equal() {
     # $1 - reference file
     # $2 - testfile, or skip to test stdin
