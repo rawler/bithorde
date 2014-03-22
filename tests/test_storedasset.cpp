@@ -6,6 +6,7 @@
 #include <boost/make_shared.hpp>
 #include <boost/test/unit_test.hpp>
 
+#include <lib/buffer.hpp>
 #include <bithorded/cache/asset.hpp>
 #include <bithorded/lib/grandcentraldispatch.hpp>
 #include <bithorded/store/asset.hpp>
@@ -34,9 +35,20 @@ struct TestData {
 
 BOOST_FIXTURE_TEST_CASE( open_partial_v1_asset, TestData )
 {
-	auto asset = cache::CachedAsset::open(gcd, assets/".bh_meta"/"assets"/"v1_cached_partial");
+	auto temp = fs::unique_path("bhtest-asset-%%%%-%%%%");
+	auto srcDir = assets/".bh_meta"/"assets"/"v1_cached_partial";
+	fs::copy(srcDir, temp);
+	fs::copy(srcDir/"data", temp/"data");
+	fs::copy(srcDir/"meta", temp/"meta");
+	auto asset = cache::CachedAsset::open(gcd, temp);
 	BOOST_CHECK_EQUAL(asset->hasRootHash(), false);
 	BOOST_CHECK_EQUAL(asset->can_read(asset->size()-1024, 1024), 0);
+
+	boost::asio::io_service::work work(ioSvc);
+	asset->write(0, boost::make_shared<bithorde::MemoryBuffer>(asset->size()), boost::bind(&boost::asio::io_service::stop, &ioSvc)); // Yikes I want C++11 lambdas
+	ioSvc.run();
+	BOOST_CHECK_EQUAL(asset->hasRootHash(), true);
+	fs::remove_all(temp);
 }
 
 BOOST_FIXTURE_TEST_CASE( open_fully_cached_v1_asset, TestData )

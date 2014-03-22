@@ -56,14 +56,15 @@ ssize_t _write_held_buffer(const IDataArray::Ptr& storage, uint64_t offset, cons
 // Dummy function used to hold the buffer in RAM until it's processed.
 // Ensure we don't resume reading from client until all data is really processed
 void whenDoneWrapper(const std::function< void() > whenDone, const boost::shared_ptr<bithorde::IBuffer>& dataHolder) {
-	whenDone();
+	if (whenDone)
+		whenDone();
 }
 
 void bithorded::cache::CachedAsset::write(uint64_t offset, const boost::shared_ptr<bithorde::IBuffer>& data, const std::function< void() > whenDone )
 {
 	auto job = boost::bind(&_write_held_buffer, _data, offset, data);
 	boost::function< void() > wrappedDone = boost::bind(&whenDoneWrapper, whenDone, data);
-	auto completion = boost::bind(&StoredAsset::notifyValidRange, shared_from_this(), offset, _1, whenDone);
+	auto completion = boost::bind(&StoredAsset::notifyValidRange, shared_from_this(), offset, _1, wrappedDone);
 	_gcd.submit(job, completion);
 }
 
@@ -73,7 +74,7 @@ CachedAsset::Ptr CachedAsset::open(GrandCentralDispatch& gcd, const boost::files
 	switch (fs::status(path).type()) {
 	case boost::filesystem::directory_file:
 		meta = store::openV1AssetMeta(path/"meta");
-		meta.tail = boost::make_shared<RandomAccessFile>(path/"data");
+		meta.tail = boost::make_shared<RandomAccessFile>(path/"data", RandomAccessFile::READWRITE);
 		break;
 	case boost::filesystem::regular_file:
 		meta = store::openV2AssetMeta(path);
