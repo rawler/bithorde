@@ -271,6 +271,9 @@ void Client::informAssetStatusUpdate(bithorde::Asset::Handle h, const IAsset::We
 	_assets[asset_idx].clearDeadline();
 	bithorde::AssetStatus resp(status);
 	resp.set_handle(h);
+	if (status.size() > (static_cast<uint64_t>(1)<<60)) {
+		LOG4CPLUS_WARN(clientLogger, peerName() << ':' << h << " new state with suspiciously large size" << resp.size() << ", " << status.has_size());
+	}
 
 	LOG4CPLUS_DEBUG(clientLogger, peerName() << ':' << h << " new state " << bithorde::Status_Name(resp.status()) << " (" << resp.ids() << ")");
 

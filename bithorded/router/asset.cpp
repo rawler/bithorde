@@ -137,8 +137,11 @@ void bithorded::router::ForwardedAsset::addUpstream(const bithorded::Client::Ptr
 void bithorded::router::ForwardedAsset::onUpstreamStatus(const string& peername, const bithorde::AssetStatus& status)
 {
 	if (status.status() == bithorde::Status::SUCCESS) {
+		if (status.size() > (static_cast<uint64_t>(1)<<60)) {
+			LOG4CPLUS_WARN(assetLogger, _requestedIds << ':' << peername << ": new state with suspiciously large size" << status.size() << ", " << status.has_size() );
+		}
 		if ( overlaps(_reqParameters->requesters, status.servers().begin(), status.servers().end()) ) {
-			LOG4CPLUS_DEBUG(assetLogger, _requestedIds << "Loop detected " << peername);
+			LOG4CPLUS_DEBUG(assetLogger, _requestedIds << " Loop detected " << peername);
 			dropUpstream(peername);
 		} else {
 			LOG4CPLUS_DEBUG(assetLogger, _requestedIds << " Found upstream " << peername);
@@ -168,8 +171,10 @@ void bithorded::router::ForwardedAsset::updateStatus() {
 			status = bithorde::Status::SUCCESS;
 	}
 	auto trx = this->status.change();
-	trx->set_size(_size);
-	trx->set_availability(1000);
+	if (_size > 0) {
+		trx->set_size(_size);
+	}
+	trx->set_availability( (status == bithorde::Status::SUCCESS) ? 1000 : 0 );
 	trx->set_status(status);
 
 	unordered_set< uint64_t > servers;
