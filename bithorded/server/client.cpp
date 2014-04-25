@@ -117,7 +117,7 @@ void Client::onMessage( const boost::shared_ptr< bithorde::MessageContext< bitho
 		if (path.is_absolute()) {
 			if (auto asset = _server.async_linkAsset(path)) {
 				LOG4CPLUS_INFO(clientLogger, "Linking " << path);
-				assignAsset( msg.handle(), asset, bithorde::RouteTrace(), boost::posix_time::neg_infin);
+				assignAsset( msg.handle(), asset, BitHordeIds(), bithorde::RouteTrace(), boost::posix_time::neg_infin);
 			} else {
 				LOG4CPLUS_ERROR(clientLogger, "Upload did not match any allowed assetStore: " << path);
 				informAssetStatus( msg.handle(), bithorde::ERROR);
@@ -129,7 +129,7 @@ void Client::onMessage( const boost::shared_ptr< bithorde::MessageContext< bitho
 	} else {
 		if (auto asset = _server.prepareUpload( msg.size())) {
 			LOG4CPLUS_INFO(clientLogger, "Ready for upload");
-			assignAsset( msg.handle(), asset, bithorde::RouteTrace(), boost::posix_time::neg_infin);
+			assignAsset( msg.handle(), asset, BitHordeIds(), bithorde::RouteTrace(), boost::posix_time::neg_infin);
 		} else {
 			informAssetStatus( msg.handle(), bithorde::NORESOURCES);
 		}
@@ -170,7 +170,7 @@ void Client::onMessage( const boost::shared_ptr< bithorde::MessageContext< bitho
 					auto now = boost::posix_time::microsec_clock::universal_time();
 					deadline = now + boost::posix_time::milliseconds(msg.timeout());
 				}
-				assignAsset(h, asset, msg.requesters(), deadline);
+				assignAsset(h, asset, msg.ids(), msg.requesters(), deadline);
 			} else {
 				informAssetStatus(h, bithorde::NOTFOUND);
 			}
@@ -267,10 +267,16 @@ void Client::informAssetStatusUpdate(bithorde::Asset::Handle h, const IAsset::We
 	size_t asset_idx = h;
 	if ((asset_idx >= _assets.size()) || (_assets[asset_idx] != asset.lock()))
 		return;
-
 	_assets[asset_idx].clearDeadline();
 	bithorde::AssetStatus resp(status);
 	resp.set_handle(h);
+	if ((resp.status() == bithorde::SUCCESS)
+			&& _assets[asset_idx].assetIds().size()
+			&& !idsOverlap(_assets[asset_idx].assetIds(), status.ids())
+			) {
+		LOG4CPLUS_WARN(clientLogger, peerName() << ':' << h << " new state with mismatching asset ids (" << resp.ids() << ")");
+		resp.set_status(bithorde::NOTFOUND);
+	}
 	if (status.size() > (static_cast<uint64_t>(1)<<60)) {
 		LOG4CPLUS_WARN(clientLogger, peerName() << ':' << h << " new state with suspiciously large size" << resp.size() << ", " << status.has_size());
 	}
@@ -280,7 +286,7 @@ void Client::informAssetStatusUpdate(bithorde::Asset::Handle h, const IAsset::We
 	sendMessage(bithorde::Connection::AssetStatus, resp);
 }
 
-void Client::assignAsset(bithorde::Asset::Handle handle_, const UpstreamRequestBinding::Ptr& a, const bithorde::RouteTrace& requesters, const boost::posix_time::ptime& deadline)
+void Client::assignAsset(bithorde::Asset::Handle handle_, const UpstreamRequestBinding::Ptr& a, const BitHordeIds& assetIds, const bithorde::RouteTrace& requesters, const boost::posix_time::ptime& deadline)
 {
 	size_t handle = handle_;
 	if (handle >= _assets.size()) {
@@ -299,7 +305,7 @@ void Client::assignAsset(bithorde::Asset::Handle handle_, const UpstreamRequestB
 			_assets[i].setClient(self);
 		}
 	}
-	if (_assets[handle].bind(a, requesters, deadline)) {
+	if (_assets[handle].bind(a, assetIds, requesters, deadline)) {
 		auto weak_asset = _assets[handle].weak();
 		// Remember to inform peer about changes in asset-status.
 		(*a)->status.onChange.connect(boost::bind(&Client::informAssetStatusUpdate, this, handle_, weak_asset, _2));

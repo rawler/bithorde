@@ -72,11 +72,11 @@ const string& Store::label() const
 	return _label;
 }
 
-UpstreamRequestBinding::Ptr Store::addAsset(const boost::filesystem::path& file)
+SourceAsset::Ptr Store::addAsset ( const boost::filesystem::path& file )
 {
 	auto target = fs::canonical( file );
 	if (fs::path_is_in(target, _baseDir)) {
-		fs::path assetPath(AssetStore::newAsset());
+		auto assetPath(AssetStore::newAsset());
 		auto relativepath = fs::relative(target, _baseDir).native();
 
 		try {
@@ -92,14 +92,14 @@ UpstreamRequestBinding::Ptr Store::addAsset(const boost::filesystem::path& file)
 
 			asset->status.onChange.connect(boost::bind(&Store::_addAsset, this, SourceAsset::WeakPtr(asset)));
 			asset->hash();
-			return boost::make_shared<UpstreamRequestBinding>(asset);
+			return asset;
 		} catch (const std::ios::failure& e) {
 			LOG4CPLUS_ERROR(log, "Failed to create " << assetPath << " for hashing " << file << ". Purging...");
 			AssetStore::removeAsset(assetPath);
-			return UpstreamRequestBinding::NONE;
+			return SourceAsset::Ptr();
 		}
 	} else {
-		return UpstreamRequestBinding::NONE;
+		return SourceAsset::Ptr();
 	}
 }
 
@@ -138,10 +138,9 @@ IAsset::Ptr Store::openAsset(const boost::filesystem::path& assetPath)
 
 	if ( fs::last_write_time(assetPath) < fs::last_write_time(dataPath) ) {
 		LOG4CPLUS_INFO(log, "Stale asset detected, hashing");
-		// TODO: Rehash existing asset if sizes match
-		addAsset(dataPath);
-		// TODO: Return handle to the rehash-process, with checks to prevent responding OK unless hashes are what's asked for
-		return store::StoredAsset::Ptr();
+		auto asset = addAsset(dataPath);
+		asset->status.change()->set_status(bithorde::Status::NONE);
+		return asset;
 	}
 
 	auto dataStore = boost::make_shared<RandomAccessFile>(dataPath);

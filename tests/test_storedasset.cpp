@@ -61,7 +61,8 @@ BOOST_FIXTURE_TEST_CASE( open_fully_cached_v1_asset, TestData )
 BOOST_FIXTURE_TEST_CASE( open_v1_linked_asset, TestData )
 {
 	source::Store repo(gcd, "test", assets);
-	fs::path test_asset = assets/".bh_meta"/"assets"/"v1_linked";
+	fs::path assets_folder = assets/".bh_meta"/"assets";
+	fs::path test_asset = assets_folder / "v1_linked";
 	fs::path link_target = fs::absolute(fs::read_symlink(test_asset/"data"), test_asset);
 
 	fs::remove(link_target);
@@ -73,15 +74,19 @@ BOOST_FIXTURE_TEST_CASE( open_v1_linked_asset, TestData )
 		RandomAccessFile f(link_target, RandomAccessFile::READWRITE, 130*1024);
 		f.close();
 	}
-	fs::last_write_time(test_asset, std::time(NULL)-10000);
-	// Should fail due to data newer than link
-	BOOST_CHECK_EQUAL( repo.openAsset(test_asset), IAsset::Ptr() );
 
 	fs::last_write_time(test_asset, std::time(NULL)+10000);
-
-	auto asset = repo.openAsset(test_asset); // Should now succeed with newer link than data
+	// Should now succeed with newer link than data
+	auto asset = boost::static_pointer_cast<bithorded::source::SourceAsset>(repo.openAsset(test_asset));
 	BOOST_CHECK_EQUAL(asset->can_read(0, 1024), 1024);
 	BOOST_CHECK_EQUAL(asset->can_read(asset->size()-1024, 1024), 1024);
+	asset.reset();
+
+	fs::last_write_time(test_asset, std::time(NULL)-10000);
+	// Should fail due to data newer than link
+	asset = boost::static_pointer_cast<bithorded::source::SourceAsset>(repo.openAsset(test_asset));
+	BOOST_CHECK_EQUAL( asset->status->status(), bithorde::Status::NONE );
+	fs::remove_all(assets_folder/asset->id());
 }
 
 
@@ -104,7 +109,8 @@ BOOST_FIXTURE_TEST_CASE( open_fully_cached_v2_asset, TestData )
 BOOST_FIXTURE_TEST_CASE( open_v2_linked_asset, TestData )
 {
 	source::Store repo(gcd, "test", assets);
-	fs::path test_asset = assets/".bh_meta"/"assets"/"v2_linked";
+	fs::path assets_folder = assets/".bh_meta"/"assets";
+	fs::path test_asset = assets_folder/"v2_linked";
 	fs::path link_target = fs::absolute(assets/"link-data", test_asset);
 
 	fs::remove(link_target);
@@ -117,13 +123,15 @@ BOOST_FIXTURE_TEST_CASE( open_v2_linked_asset, TestData )
 		RandomAccessFile f(link_target, RandomAccessFile::READWRITE, 130*1024);
 		f.close();
 	}
-	fs::last_write_time(test_asset, std::time(NULL)-10000);
-	// Should fail due to data newer than link
-	BOOST_CHECK_EQUAL( repo.openAsset(test_asset), IAsset::Ptr() );
-
 	fs::last_write_time(test_asset, std::time(NULL)+10000);
-
-	auto asset = repo.openAsset(test_asset); // Should now succeed with newer link than data
+	// Should now succeed with newer link than data
+	auto asset = boost::static_pointer_cast<bithorded::source::SourceAsset>(repo.openAsset(test_asset));
 	BOOST_CHECK_EQUAL(asset->can_read(0, 1024), 1024);
 	BOOST_CHECK_EQUAL(asset->can_read(asset->size()-1024, 1024), 1024);
+
+	fs::last_write_time(test_asset, std::time(NULL)-10000);
+	// Should fail due to data newer than link
+	asset = boost::static_pointer_cast<bithorded::source::SourceAsset>(repo.openAsset(test_asset));
+	BOOST_CHECK_EQUAL( asset->status->status(), bithorde::Status::NONE );
+	fs::remove_all(assets_folder/asset->id());
 }

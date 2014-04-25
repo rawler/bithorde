@@ -64,7 +64,7 @@ private:
 	void informAssetStatus(bithorde::Asset::Handle h, bithorde::Status s);
 	void informAssetStatusUpdate(bithorde::Asset::Handle h, const bithorded::IAsset::WeakPtr& asset, const bithorde::AssetStatus& status);
 	void onReadResponse( const boost::shared_ptr< bithorde::MessageContext< bithorde::Read::Request > >& reqCtx, int64_t offset, const boost::shared_ptr< bithorde::IBuffer >& data, bithorde::Message::Deadline t );
-	void assignAsset(bithorde::Asset::Handle handle_, const UpstreamRequestBinding::Ptr& a, const bithorde::RouteTrace& requesters, const boost::posix_time::ptime& deadline);
+	void assignAsset( bithorde::Asset::Handle handle_, const bithorded::UpstreamRequestBinding::Ptr& a, const BitHordeIds& assetIds, const bithorde::RouteTrace& requesters, const boost::posix_time::ptime& deadline );
 	void clearAssets();
 	void clearAsset(bithorde::Asset::Handle handle);
 	const AssetBinding& getAsset(bithorde::Asset::Handle handle_) const;

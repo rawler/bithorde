@@ -53,7 +53,7 @@ wait $DL1 || exit_error "Downloaded file did not match upload source"
 
 echo "Verifying clear after mtime-change..."
 sleep 1; touch "$TESTFILE"
-"$BHGET" -u$DAEMON_SOCKET "$MAGNETURL" &>/dev/null && exit_error "Touching source did not break link"
+"$BHGET" -u$DAEMON_SOCKET "$MAGNETURL" &>/dev/null || exit_error "Touching source did break link"
 
 VERIFICATION=$("$BHUPLOAD" -u$DAEMON_SOCKET -l "$TESTFILE"|grep '^magnet:')
 [ "$MAGNETURL" == "$VERIFICATION" ] || exit_error "Restored with different magnet-link ($MAGNETURL vs. $VERIFICATION)".

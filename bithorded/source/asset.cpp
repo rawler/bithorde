@@ -40,8 +40,9 @@ using namespace bithorded::store;
 SourceAsset::SourceAsset( GrandCentralDispatch& gcd, const string& id, const store::HashStore::Ptr& hashStore, const IDataArray::Ptr& data ) :
 	StoredAsset(gcd, id, hashStore, data)
 {
-	auto trx = status.change();
-	trx->set_status(bithorde::SUCCESS);
+	if (hasRootHash()) {
+		status.change()->set_status(bithorde::SUCCESS);
+	}
 }
 
 void SourceAsset::inspect(management::InfoList& target) const

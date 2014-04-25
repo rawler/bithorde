@@ -27,6 +27,7 @@ using namespace bithorded;
 AssetBinding::AssetBinding() :
 	_client(NULL),
 	_ptr(),
+	_assetIds(),
 	_requesters(),
 	_deadline(boost::posix_time::neg_infin)
 {}
@@ -34,6 +35,7 @@ AssetBinding::AssetBinding() :
 AssetBinding::AssetBinding(const AssetBinding& other) :
 	_client(other._client),
 	_ptr(other._ptr),
+	_assetIds(other.assetIds()),
 	_requesters(other._requesters),
 	_deadline(other.deadline())
 {
@@ -59,15 +61,16 @@ Client* AssetBinding::client() const
 
 bool AssetBinding::bind(const bithorde::RouteTrace& requesters)
 {
-	return bind(_ptr, requesters, boost::posix_time::neg_infin);
+	return bind(_ptr, BitHordeIds(), requesters, boost::posix_time::neg_infin);
 }
 
-bool AssetBinding::bind(const boost::shared_ptr< UpstreamRequestBinding >& asset, const bithorde::RouteTrace& requesters, const boost::posix_time::ptime& deadline)
+bool AssetBinding::bind( const boost::shared_ptr< UpstreamRequestBinding >& asset, const BitHordeIds& assetIds, const bithorde::RouteTrace& requesters, const boost::posix_time::ptime& deadline )
 {
 	if (_ptr) {
 		if (asset != _ptr)
 			_ptr->unbindDownstream(this);
 	}
+	_assetIds = assetIds;
 	_requesters = requesters;
 	_deadline = deadline;
 	if (_requesters.size() == 0)

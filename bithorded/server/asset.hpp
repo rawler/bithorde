@@ -44,6 +44,7 @@ class UpstreamRequestBinding;
 class AssetBinding {
 	Client* _client; // Client owns us, so should always be valid.
 	boost::shared_ptr<UpstreamRequestBinding> _ptr;
+	BitHordeIds _assetIds;
 	bithorde::RouteTrace _requesters;
 	boost::posix_time::ptime _deadline;
 public:
@@ -54,8 +55,8 @@ public:
 	void setClient(const boost::shared_ptr<Client>& client);
 	Client* client() const;
 
-	bool bind(const bithorde::RouteTrace& requesters);
-	bool bind(const boost::shared_ptr< bithorded::UpstreamRequestBinding >& asset, const bithorde::RouteTrace& requesters, const boost::posix_time::ptime& deadline);
+	bool bind( const bithorde::RouteTrace& requesters );
+	bool bind( const boost::shared_ptr< bithorded::UpstreamRequestBinding >& asset, const BitHordeIds& assetIds, const bithorde::RouteTrace& requesters, const boost::posix_time::ptime& deadline );
 	void reset();
 
 	AssetBinding& operator=(const AssetBinding& other);
@@ -67,6 +68,7 @@ public:
 	const boost::shared_ptr< IAsset >& shared() const;
 	boost::weak_ptr< IAsset > weak() const;
 
+	const BitHordeIds& assetIds() const { return _assetIds; };
 	const bithorde::RouteTrace& requesters() const { return _requesters; }
 
 	const boost::posix_time::ptime& deadline() const { return _deadline; }
