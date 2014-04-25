@@ -6,6 +6,7 @@ ADD_LIBRARY(bithorde
 	allocator.h
 	asset.h asset.cpp
 	bithorde.h
+	buffer.cpp
 	client.h client.cpp
 	cliprogressbar.h cliprogressbar.cpp
 	counter.cpp

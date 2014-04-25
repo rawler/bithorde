@@ -29,6 +29,7 @@ void run(const ptime::ptime& a) {
 
 BOOST_AUTO_TEST_CASE( timers_copyable )
 {
+	auto start = ptime::microsec_clock::universal_time();
 	{
 		std::vector<Timer> timers;
 		for (int i=0; i < 1000; i++) {
@@ -36,14 +37,16 @@ BOOST_AUTO_TEST_CASE( timers_copyable )
 			t.arm(TIMEOUT);
 			timers.push_back(t);
 		}
-		auto now = ptime::microsec_clock::universal_time();
 		for (int i=0; i < 1000; i++) {
 			Timer t(*TSVC, &run);
-			t.arm(now+TIMEOUT);
+			t.arm(start+TIMEOUT);
 			timers.push_back(t);
 		}
 		TIMERS = timers;
 	}
 
+	BOOST_CHECK_EQUAL( TIMERS.size(), 2000 );
 	IO_SVC.run();
+	auto stop = ptime::microsec_clock::universal_time();
+	BOOST_CHECK_GE( (stop - start).total_microseconds(), TIMEOUT.total_microseconds() );
 }

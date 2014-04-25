@@ -55,7 +55,6 @@ class Directory : public http::server::RequestRouter
 {
 public:
 	virtual bool handle(const path& path, const http::server::request& req, http::server::reply& reply) const;
-protected:
 	virtual void inspect(InfoList& target) const = 0;
 };
 

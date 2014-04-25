@@ -17,22 +17,38 @@
 
 #include "asset.hpp"
 
+#include <boost/make_shared.hpp>
+#include <boost/filesystem.hpp>
+#include <vector>
+
+#include <log4cplus/logger.h>
+#include <log4cplus/loggingmacros.h>
+
+#include "../lib/relativepath.hpp"
+
 using namespace std;
+namespace fs = boost::filesystem;
+
+namespace bithorded { namespace source {
+	log4cplus::Logger assetLog = log4cplus::Logger::getInstance("sourceAsset");
+} }
 
 using namespace bithorded;
 using namespace bithorded::source;
+using namespace bithorded::store;
 
-SourceAsset::SourceAsset(GrandCentralDispatch& gcd, const boost::filesystem::path& metaFolder) :
-	StoredAsset(gcd, metaFolder, RandomAccessFile::READ)
+SourceAsset::SourceAsset( GrandCentralDispatch& gcd, const string& id, const store::HashStore::Ptr& hashStore, const IDataArray::Ptr& data ) :
+	StoredAsset(gcd, id, hashStore, data)
 {
-	auto trx = status.change();
-	trx->set_status(bithorde::SUCCESS);
+	if (hasRootHash()) {
+		status.change()->set_status(bithorde::SUCCESS);
+	}
 }
 
 void SourceAsset::inspect(management::InfoList& target) const
 {
 	target.append("type") << "SourceAsset";
-	target.append("path") << _file.path();
+	target.append("path") << _data->describe();
 }
 
 void SourceAsset::apply(const AssetRequestParameters& old_parameters, const AssetRequestParameters& new_parameters)

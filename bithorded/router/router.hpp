@@ -39,7 +39,7 @@ namespace router {
 
 class FriendConnector;
 
-class Router : public AssetSessions, public management::DescriptiveDirectory
+class Router : public AssetSessions, public management::DescriptiveDirectory, public IAssetSource
 {
 	Server& _server;
 	std::map<std::string, Config::Friend> _friends;
@@ -64,7 +64,7 @@ public:
 	void onConnected(const bithorded::Client::Ptr& client);
 	void onDisconnected(const bithorded::Client::Ptr& client);
 
-	UpstreamRequestBinding::Ptr findAsset(const bithorde::BindRead& req);
+	virtual UpstreamRequestBinding::Ptr findAsset(const bithorde::BindRead& req);
 
 	virtual void inspect(management::InfoList& target) const;
     virtual void describe(management::Info& target) const;

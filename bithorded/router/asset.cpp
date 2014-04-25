@@ -23,8 +23,9 @@
 #include <utility>
 
 #include <lib/weak_fn.hpp>
-#include "lib/random.h"
-#include "lib/protocolmessages.hpp"
+#include <lib/buffer.hpp>
+#include <lib/protocolmessages.hpp>
+#include <lib/random.h>
 
 #include <log4cplus/logger.h>
 #include <log4cplus/loggingmacros.h>
@@ -40,17 +41,17 @@ namespace bithorded { namespace router {
 
 void PendingRead::cancel()
 {
-	cb(offset, "");
+	cb(offset, bithorde::NullBuffer::instance);
 }
 
 UpstreamAsset::UpstreamAsset(const bithorde::ReadAsset::ClientPointer& client, const BitHordeIds& requestIds)
 	: ReadAsset(client, requestIds)
 {}
 
-void UpstreamAsset::handleMessage(const bithorde::Read::Response& resp)
+void UpstreamAsset::handleMessage( const boost::shared_ptr< bithorde::MessageContext< bithorde::Read::Response > >& msgCtx )
 {
 	auto self_ref = shared_from_this();
-	bithorde::ReadAsset::handleMessage(resp);
+	bithorde::ReadAsset::handleMessage(msgCtx);
 }
 
 ForwardedAsset::ForwardedAsset(Router& router, const BitHordeIds& ids) :
@@ -136,8 +137,11 @@ void bithorded::router::ForwardedAsset::addUpstream(const bithorded::Client::Ptr
 void bithorded::router::ForwardedAsset::onUpstreamStatus(const string& peername, const bithorde::AssetStatus& status)
 {
 	if (status.status() == bithorde::Status::SUCCESS) {
+		if (status.size() > (static_cast<uint64_t>(1)<<60)) {
+			LOG4CPLUS_WARN(assetLogger, _requestedIds << ':' << peername << ": new state with suspiciously large size" << status.size() << ", " << status.has_size() );
+		}
 		if ( overlaps(_reqParameters->requesters, status.servers().begin(), status.servers().end()) ) {
-			LOG4CPLUS_DEBUG(assetLogger, _requestedIds << "Loop detected " << peername);
+			LOG4CPLUS_DEBUG(assetLogger, _requestedIds << " Loop detected " << peername);
 			dropUpstream(peername);
 		} else {
 			LOG4CPLUS_DEBUG(assetLogger, _requestedIds << " Found upstream " << peername);
@@ -167,8 +171,10 @@ void bithorded::router::ForwardedAsset::updateStatus() {
 			status = bithorde::Status::SUCCESS;
 	}
 	auto trx = this->status.change();
-	trx->set_size(_size);
-	trx->set_availability(1000);
+	if (_size > 0) {
+		trx->set_size(_size);
+	}
+	trx->set_availability( (status == bithorde::Status::SUCCESS) ? 1000 : 0 );
 	trx->set_status(status);
 
 	unordered_set< uint64_t > servers;
@@ -194,10 +200,10 @@ size_t bithorded::router::ForwardedAsset::can_read(uint64_t offset, size_t size)
 	return size;
 }
 
-void bithorded::router::ForwardedAsset::async_read(uint64_t offset, size_t& size, uint32_t timeout, ReadCallback cb)
+void bithorded::router::ForwardedAsset::async_read(uint64_t offset, size_t size, uint32_t timeout, ReadCallback cb)
 {
 	if (_upstream.empty())
-		return cb(-1, string());
+		return cb(-1, bithorde::NullBuffer::instance);
 	auto chosen = _upstream.begin();
 	uint32_t current_best = 1000*60*60*24;
 	for (auto iter = _upstream.begin(); iter != _upstream.end(); iter++) {
@@ -217,7 +223,7 @@ void bithorded::router::ForwardedAsset::async_read(uint64_t offset, size_t& size
 	chosen->second->aSyncRead(offset, size, timeout);
 }
 
-void bithorded::router::ForwardedAsset::onData(uint64_t offset, const std::string& data, int tag) {
+void bithorded::router::ForwardedAsset::onData( uint64_t offset, const boost::shared_ptr<bithorde::IBuffer>& data, int tag ) {
 	for (auto iter=_pendingReads.begin(); iter != _pendingReads.end(); ) {
 		if (iter->offset == offset) {
 			iter->cb(offset, data);
@@ -236,6 +242,7 @@ uint64_t bithorded::router::ForwardedAsset::size()
 void ForwardedAsset::inspect(bithorded::management::InfoList& target) const
 {
 	target.append("type") << "forwarded";
+	inspect_upstreams(target);
 }
 
 void ForwardedAsset::inspect_upstreams(bithorded::management::InfoList& target) const
@@ -246,7 +253,6 @@ void ForwardedAsset::inspect_upstreams(bithorded::management::InfoList& target) 
 		target.append(buf.str()) << bithorde::Status_Name(iter->second->status) << ", responseTime: " << iter->second->readResponseTime;
 	}
 }
-
 
 void ForwardedAsset::dropUpstream(const string& peername)
 {

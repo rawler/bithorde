@@ -21,13 +21,24 @@
 #include <boost/filesystem.hpp>
 #include <fcntl.h>
 #include <ios>
-#include <sys/stat.h>
 #include <sstream>
+#include <sys/stat.h>
 
 using namespace std;
+using namespace bithorded;
 
 namespace bsys = boost::system;
 namespace fs = boost::filesystem;
+
+ssize_t IDataArray::write ( uint64_t offset, const string& buf ) {
+	return write(offset, buf.data(), buf.length());
+}
+
+string bithorded::dataArrayToString ( const IDataArray& dataarray ) {
+	std::vector<byte> buf(dataarray.size());
+	dataarray.read(0, dataarray.size(), buf.data());
+	return string(reinterpret_cast<char*>(buf.data()), buf.size());
+}
 
 RandomAccessFile::RandomAccessFile() :
 	_fd(-1), _path(""), _size(0)
@@ -103,16 +114,10 @@ uint32_t RandomAccessFile::blocks(size_t blockSize) const
 	return (size() + blockSize - 1) / blockSize;
 }
 
-byte* RandomAccessFile::read(uint64_t offset, size_t& size, byte* buf) const
-{
-	ssize_t read = pread(_fd, buf, size, offset);
-	if ( read > 0 ) {
-		size = read;
-		return buf;
-	} else {
-		size = 0;
-		return NULL;
-	}
+ssize_t RandomAccessFile::read ( uint64_t offset, size_t size, byte* buf ) const {
+	BOOST_ASSERT(buf);
+	BOOST_ASSERT(offset+size <= _size);
+	return pread(_fd, buf, size, offset);
 }
 
 ssize_t RandomAccessFile::write(uint64_t offset, const void* src, size_t size)
@@ -123,9 +128,8 @@ ssize_t RandomAccessFile::write(uint64_t offset, const void* src, size_t size)
 	return written;
 }
 
-ssize_t RandomAccessFile::write(uint64_t offset, const string& buf)
-{
-	return write(offset, buf.data(), buf.length());
+string RandomAccessFile::describe() {
+	return _path.string();
 }
 
 const boost::filesystem::path& RandomAccessFile::path() const
@@ -133,4 +137,38 @@ const boost::filesystem::path& RandomAccessFile::path() const
 	return _path;
 }
 
+DataArraySlice::DataArraySlice ( const IDataArray::Ptr& parent, uint64_t offset, uint64_t size ) :
+	_parent(parent),
+	_offset(offset),
+	_size(size)
+{
+	BOOST_ASSERT(offset + size <= _parent->size());
+}
 
+DataArraySlice::DataArraySlice ( const IDataArray::Ptr& parent, uint64_t offset ) :
+	_parent(parent),
+	_offset(offset),
+	_size(parent->size()-offset)
+{
+	BOOST_ASSERT(offset <= _parent->size());
+}
+
+uint64_t DataArraySlice::size() const {
+	return _size;
+}
+
+ssize_t DataArraySlice::read ( uint64_t offset, size_t size, byte* buf ) const {
+	BOOST_ASSERT(offset + size <= _size);
+	return _parent->read(_offset + offset, size, buf);
+}
+
+ssize_t DataArraySlice::write ( uint64_t offset, const void* src, size_t size ) {
+	BOOST_ASSERT(offset + size <= _size);
+	return _parent->write(_offset + offset, src, size);
+}
+
+string DataArraySlice::describe() {
+	ostringstream buf;
+	buf << _parent->describe() << '[' << _offset << ':' << _size << ']';
+	return buf.str();
+}

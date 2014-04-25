@@ -34,9 +34,7 @@ namespace bithorded {
 	}
 }
 
-CacheManager::CacheManager(GrandCentralDispatch& gcd,
-                           bithorded::router::Router& router,
-                           const boost::filesystem::path& baseDir, intmax_t size) :
+CacheManager::CacheManager( GrandCentralDispatch& gcd, IAssetSource& router, const boost::filesystem::path& baseDir, intmax_t size ) :
 	bithorded::store::AssetStore(baseDir),
 	_baseDir(baseDir),
 	_gcd(gcd),
@@ -62,8 +60,7 @@ void CacheManager::inspect(management::InfoList& target) const
 
 IAsset::Ptr CacheManager::openAsset(const boost::filesystem::path& assetPath)
 {
-	auto res = boost::make_shared<CachedAsset>(_gcd, assetPath);
-	return IAsset::Ptr(res);
+	return CachedAsset::open(_gcd, assetPath);
 }
 
 IAsset::Ptr CacheManager::openAsset(const bithorde::BindRead& req)
@@ -75,7 +72,7 @@ IAsset::Ptr CacheManager::openAsset(const bithorde::BindRead& req)
 		return stored;
 	} else {
 		auto upstream = _router.findAsset(req);
-		if (auto upstream_ = boost::dynamic_pointer_cast<router::ForwardedAsset>(upstream->shared())) {
+		if (auto upstream_ = boost::dynamic_pointer_cast<bithorded::IAsset>(upstream->shared())) {
 			return boost::make_shared<CachingAsset>(*this, upstream_, stored);
 		} else {
 			return upstream->shared();
@@ -86,15 +83,15 @@ IAsset::Ptr CacheManager::openAsset(const bithorde::BindRead& req)
 CachedAsset::Ptr CacheManager::prepareUpload(uint64_t size)
 {
 	if ((!_baseDir.empty()) && makeRoom(size)) {
-		fs::path assetFolder(AssetStore::newAssetDir());
+		fs::path assetPath(AssetStore::newAsset());
 
 		try {
-			auto asset = boost::make_shared<CachedAsset>(_gcd, assetFolder,size);
+			auto asset = CachedAsset::create(_gcd, assetPath, size);
 			asset->status.onChange.connect(boost::bind(&CacheManager::linkAsset, this, CachedAsset::WeakPtr(asset)));
 			return asset;
 		} catch (const std::ios::failure& e) {
-			LOG4CPLUS_ERROR(log, "Failed to create " << assetFolder << " for upload. Purging...");
-			AssetStore::removeAsset(assetFolder);
+			LOG4CPLUS_ERROR(log, "Failed to create " << assetPath << " for upload (" << e.what() << "). Purging...");
+			AssetStore::removeAsset(assetPath);
 			return CachedAsset::Ptr();
 		}
 	} else {
@@ -148,9 +145,9 @@ void CacheManager::linkAsset(CachedAsset::WeakPtr asset_)
 	auto asset = asset_.lock();
 	if (asset && asset->status->ids_size()) {
 		auto& ids = asset->status->ids();
-		LOG4CPLUS_DEBUG(log, "Linking " << ids << " to " << asset->folder());
-		const char *data_path = (asset->folder()/"data").c_str();
-		lutimes(data_path, NULL);
+		auto assetPath = (assetsFolder() / asset->id());
+		LOG4CPLUS_DEBUG(log, "Linking " << ids << " to " << assetPath);
+		lutimes(assetPath.c_str(), NULL);
 
 		AssetStore::update_links(ids, asset);
 	}

@@ -44,7 +44,6 @@ create_testfile $TESTFILE $TESTSIZE
 
 echo "Uploading to A..."
 MAGNETURL=$("$BHUPLOAD" -d -u$A_SOCK "$TESTFILE"|grep '^magnet:')
-verify_equal cachea/assets/?????*/data "$TESTFILE" || exit_error "Uploaded file did not match upload source"
 VERIFICATION=$("$BHUPLOAD" -u$A_SOCK "$TESTFILE"|grep '^magnet:')
 [ "$MAGNETURL" == "$VERIFICATION" ] || exit_error "Re-upload with different magnet-link".
 
@@ -53,6 +52,5 @@ echo "Getting (2 in parallel) from B..."
 "$BHGET" -nbhget2 -u$B_SOCK "$MAGNETURL" | verify_equal $TESTFILE & DL2=$!
 wait $DL1 && echo "Download 1 succeeded" || exit_error "Download 1 file did not match upload source"
 wait $DL2 && echo "Download 2 succeeded" || exit_error "Download 2 file did not match upload source"
-verify_equal cacheb/assets/?????*/data "$TESTFILE" || exit_error "Cached file did not match upload source"
 
 exit_success

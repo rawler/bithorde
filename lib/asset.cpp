@@ -5,6 +5,7 @@
 #include <boost/filesystem.hpp>
 #include <iostream>
 
+#include "buffer.hpp"
 #include "client.h"
 
 using namespace std;
@@ -118,23 +119,24 @@ void ReadRequestContext::cancel()
 	if (_asset) {
 		auto asset = _asset;
 		_asset = NULL;
-		asset->dataArrived(offset(), string(), reqid());
+		asset->dataArrived(offset(), NullBuffer::instance, reqid());
 	}
 	_timer.cancel();
 }
 
-void ReadRequestContext::callback(const Read::Response& msg)
+void ReadRequestContext::callback(const boost::shared_ptr< MessageContext<Read::Response> >& msgCtx)
 {
+	const auto& msg = msgCtx->message();
 	if (!_asset) // Cancelled
 		return;
 	auto asset = _asset;
 	_asset = NULL; // Handle circular triggers
 	asset->readResponseTime.post((ptime::microsec_clock::universal_time() - _requested_at).total_milliseconds());
 	if (msg.status() == bithorde::SUCCESS) {
-		asset->dataArrived(msg.offset(), msg.content(), msg.reqid());
+		asset->dataArrived(msg.offset(), boost::make_shared<ReadResponseCtxBuffer>(msgCtx), msg.reqid());
 	} else {
 		cerr << "Error: failed read, " << bithorde::Status_Name(msg.status()) << endl;
-		asset->dataArrived(msg.offset(), string(), msg.reqid());
+		asset->dataArrived(msg.offset(), NullBuffer::instance, msg.reqid());
 	}
 }
 
@@ -146,7 +148,7 @@ void ReadRequestContext::timer_callback(const boost::system::error_code& error)
 			auto asset = _asset;
 			_asset = NULL;
 			asset->readResponseTime.post((ptime::microsec_clock::universal_time() - _requested_at).total_milliseconds());
-			asset->dataArrived(offset(), string(), reqid());
+			asset->dataArrived(offset(), NullBuffer::instance, reqid());
 			asset->clearOffset(offset(), reqid());
 		}
 	}
@@ -187,7 +189,8 @@ void ReadAsset::handleMessage(const bithorde::AssetStatus &msg)
 	Asset::handleMessage(msg);
 }
 
-void ReadAsset::handleMessage(const bithorde::Read::Response &msg) {
+void ReadAsset::handleMessage( const boost::shared_ptr< MessageContext< Read::Response > >& msgCtx ) {
+	const auto& msg = msgCtx->message();
 	auto it = _requestMap.lower_bound(msg.offset());
 	auto end = _requestMap.upper_bound(msg.offset());
 	while (it != end) {
@@ -195,7 +198,7 @@ void ReadAsset::handleMessage(const bithorde::Read::Response &msg) {
 		next++;
 		auto ctx = it->second;
 		_requestMap.erase(it);
-		ctx->callback(msg);
+		ctx->callback(msgCtx);
 		it = next;
 	}
 }
@@ -260,6 +263,7 @@ const fs::path& UploadAsset::link()
 	return _linkPath;
 }
 
-void UploadAsset::handleMessage(const bithorde::Read::Response&) {
+
+void UploadAsset::handleMessage(const boost::shared_ptr< MessageContext< Read::Response > >& msgCtx) {
 	BOOST_ASSERT(false);
 }

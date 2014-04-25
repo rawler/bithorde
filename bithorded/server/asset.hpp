@@ -29,6 +29,10 @@
 #include "../lib/management.hpp"
 #include "../lib/subscribable.hpp"
 
+namespace bithorde {
+class IBuffer;
+}
+
 namespace bithorded
 {
 
@@ -40,6 +44,7 @@ class UpstreamRequestBinding;
 class AssetBinding {
 	Client* _client; // Client owns us, so should always be valid.
 	boost::shared_ptr<UpstreamRequestBinding> _ptr;
+	BitHordeIds _assetIds;
 	bithorde::RouteTrace _requesters;
 	boost::posix_time::ptime _deadline;
 public:
@@ -50,8 +55,8 @@ public:
 	void setClient(const boost::shared_ptr<Client>& client);
 	Client* client() const;
 
-	bool bind(const bithorde::RouteTrace& requesters);
-	bool bind(const boost::shared_ptr< bithorded::UpstreamRequestBinding >& asset, const bithorde::RouteTrace& requesters, const boost::posix_time::ptime& deadline);
+	bool bind( const bithorde::RouteTrace& requesters );
+	bool bind( const boost::shared_ptr< bithorded::UpstreamRequestBinding >& asset, const BitHordeIds& assetIds, const bithorde::RouteTrace& requesters, const boost::posix_time::ptime& deadline );
 	void reset();
 
 	AssetBinding& operator=(const AssetBinding& other);
@@ -63,6 +68,7 @@ public:
 	const boost::shared_ptr< IAsset >& shared() const;
 	boost::weak_ptr< IAsset > weak() const;
 
+	const BitHordeIds& assetIds() const { return _assetIds; };
 	const bithorde::RouteTrace& requesters() const { return _requesters; }
 
 	const boost::posix_time::ptime& deadline() const { return _deadline; }
@@ -108,7 +114,7 @@ class IAsset : public management::DescriptiveDirectory
 {
 	uint64_t _sessionId;
 public:
-	typedef boost::function<void(int64_t offset, const std::string& data)> ReadCallback;
+	typedef boost::function<void(int64_t offset, const boost::shared_ptr<bithorde::IBuffer>& data)> ReadCallback;
 
 	IAsset();
 
@@ -119,7 +125,7 @@ public:
 	// Empty dummy Asset::Ptr, for cases when a null Ptr& is needed.
 	static IAsset::Ptr NONE;
 
-	virtual void async_read(uint64_t offset, size_t& size, uint32_t timeout, ReadCallback cb) = 0;
+	virtual void async_read(uint64_t offset, size_t size, uint32_t timeout, ReadCallback cb) = 0;
 	virtual uint64_t size() = 0;
 
 	/**
@@ -142,9 +148,10 @@ public:
 	virtual void describe(management::Info& target) const;
 };
 
-class IAssetStore
+class IAssetSource
 {
-	virtual boost::shared_ptr<IAsset> findAsset(const BitHordeIds& ids) = 0;
+public:
+	virtual UpstreamRequestBinding::Ptr findAsset(const bithorde::BindRead& req) = 0;
 };
 
 }

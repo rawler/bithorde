@@ -13,11 +13,13 @@
 
 #include <crypto++/hmac.h>
 #include <crypto++/sha.h>
+#include <google/protobuf/descriptor.h>
 
 #include "random.h"
 #include "weak_fn.hpp"
 
 const static int LOTS_OF_MILLISECONDS(2^30);
+const size_t MAX_BYTES_ALLOCATED(512*1024);
 
 using namespace std;
 namespace asio = boost::asio;
@@ -97,6 +99,7 @@ Client::Client(asio::io_service& ioSvc, string myName) :
 	_handleAllocator(1),
 	_rpcIdAllocator(1),
 	_protoVersion(0),
+	_bytesAllocated(0),
 	assetResponseTime(0.98, "ms")
 {
 }
@@ -226,6 +229,27 @@ bool Client::sendMessage(Connection::MessageType type, const google::protobuf::M
 		return false;
 }
 
+void Client::allocateBytes ( size_t bytes ) {
+	Client::WeakPtr self(shared_from_this());
+	_ioSvc.post(boost::bind(boost::weak_fn(&Client::trackAllocation, self), bytes));
+}
+
+void Client::freeBytes ( size_t bytes ) {
+	Client::WeakPtr self(shared_from_this());
+	_ioSvc.post(boost::bind(boost::weak_fn(&Client::trackAllocation, self), -bytes));
+}
+
+void Client::trackAllocation ( ssize_t change ) {
+	_bytesAllocated += change;
+	if (_connection) {
+		_connection->setListening(_bytesAllocated < MAX_BYTES_ALLOCATED);
+	}
+}
+
+size_t Client::bytesAllocated() const {
+	return _bytesAllocated;
+}
+
 void Client::sayHello() {
 	if (_state & SaidHello)
 		throw std::runtime_error("Already sent HandShake");
@@ -241,32 +265,46 @@ void Client::sayHello() {
 	addStateFlag(SaidHello);
 }
 
-void Client::onIncomingMessage(Connection::MessageType type, ::google::protobuf::Message& msg)
+void Client::onIncomingMessage(Connection::MessageType type, const ::google::protobuf::Message& msg)
 {
 	if (_state == Authenticated) {
 		switch (type) {
-		case Connection::MessageType::BindRead: return onMessage((bithorde::BindRead&) msg);
-		case Connection::MessageType::AssetStatus: return onMessage((bithorde::AssetStatus&) msg);
-		case Connection::MessageType::ReadRequest: return onMessage((bithorde::Read::Request&) msg);
-		case Connection::MessageType::ReadResponse: return onMessage((bithorde::Read::Response&) msg);
-		case Connection::MessageType::BindWrite: return onMessage((bithorde::BindWrite&) msg);
-		case Connection::MessageType::DataSegment: return onMessage((bithorde::DataSegment&) msg);
-		case Connection::MessageType::Ping: return onMessage((bithorde::Ping&) msg);
+		case Connection::MessageType::BindRead:
+			return onMessage(boost::make_shared< MessageContext<bithorde::BindRead> >(shared_from_this(), (bithorde::BindRead&) msg));
+		case Connection::MessageType::AssetStatus:
+			return onMessage(boost::make_shared< MessageContext<bithorde::AssetStatus> >(shared_from_this(), (bithorde::AssetStatus&) msg));
+		case Connection::MessageType::ReadRequest:
+			return onMessage(boost::make_shared< MessageContext<bithorde::Read::Request> >(shared_from_this(), (bithorde::Read::Request&) msg));
+		case Connection::MessageType::ReadResponse:
+			return onMessage(boost::make_shared< MessageContext<bithorde::Read::Response> >(shared_from_this(), (bithorde::Read::Response&) msg));
+		case Connection::MessageType::BindWrite:
+			return onMessage(boost::make_shared< MessageContext<bithorde::BindWrite> >(shared_from_this(), (bithorde::BindWrite&) msg));
+		case Connection::MessageType::DataSegment:
+			return onMessage(boost::make_shared< MessageContext<bithorde::DataSegment> >(shared_from_this(), (bithorde::DataSegment&) msg));
+		case Connection::MessageType::Ping:
+			return onMessage(boost::make_shared< MessageContext<bithorde::Ping> >(shared_from_this(), (bithorde::Ping&) msg));
 		default: break;
 		}
 	} else {
 		switch (type) {
-		case Connection::MessageType::HandShake: return onMessage((bithorde::HandShake&) msg);
-		case Connection::MessageType::HandShakeConfirmed: return onMessage((bithorde::HandShakeConfirmed&) msg);
+		case Connection::MessageType::HandShake:
+			return onMessage(boost::make_shared< MessageContext<bithorde::HandShake> >(shared_from_this(), (bithorde::HandShake&) msg));
+		case Connection::MessageType::HandShakeConfirmed:
+			return onMessage(boost::make_shared< MessageContext<bithorde::HandShakeConfirmed> >(shared_from_this(), (bithorde::HandShakeConfirmed&) msg));
 		default: break;
 		}
 	}
-	cerr << "ERROR: BitHorde State Error (" << _state << "," << type << "), Disconnecting" << endl;
+	if (auto msgType = bithorde::Stream::descriptor()->FindFieldByNumber(type)) {
+		cerr << "ERROR: BitHorde State Error (" << _state << "," << msgType->name() << "), Disconnecting" << endl;
+	} else {
+		cerr << "ERROR: BitHorde Unknown Message Error (" << _state << "," << type << "), Disconnecting" << endl;
+	}
 	close();
 }
 
-void Client::onMessage(const bithorde::HandShake &msg)
+void Client::onMessage( const boost::shared_ptr< MessageContext< HandShake > >& msgCtx )
 {
+	const auto& msg = msgCtx->message();
 	BOOST_ASSERT(_state & SaidHello);
 	if (msg.protoversion() >= 2) {
 		_protoVersion = 2;
@@ -339,15 +377,16 @@ void Client::setAuthenticated(const std::string peerName)
 	authenticated(*this, peerName);
 }
 
-void Client::onMessage(bithorde::BindRead & msg) {
+void Client::onMessage( const boost::shared_ptr< MessageContext< BindRead > >& msgCtx ) {
 	cerr << "unsupported: handling BindRead" << endl;
 	bithorde::AssetStatus resp;
-	resp.set_handle(msg.handle());
+	resp.set_handle( msgCtx->message().has_handle());
 	resp.set_status(ERROR);
 	sendMessage(Connection::MessageType::AssetStatus, resp);
 }
 
-void Client::onMessage(const bithorde::AssetStatus & msg) {
+void Client::onMessage( const boost::shared_ptr< MessageContext< AssetStatus > >& msgCtx ) {
+	const auto& msg = msgCtx->message();
 	if (!msg.has_handle())
 		return;
 	Asset::Handle handle = msg.handle();
@@ -357,32 +396,33 @@ void Client::onMessage(const bithorde::AssetStatus & msg) {
 		if (a && a->status != bithorde::Status::INVALID_HANDLE) {
 			if (a->status == bithorde::Status::NONE)
 				assetResponseTime.post((ptime::microsec_clock::universal_time() - a._opened_at).total_milliseconds());
-			a->handleMessage(msg);
-		} else if (msg.status() != bithorde::Status::SUCCESS) {
+			a->handleMessage( msg );
+		} else if ( msg.status() != bithorde::Status::SUCCESS) {
 			_assetMap.erase(handle);
 			_handleAllocator.free(handle);
 		}
-	} else if (msg.ids_size()) {
-		cerr << "WARNING: " << peerName() << ':' << handle << " AssetStatus " << bithorde::Status_Name(msg.status()) << " for unmapped handle" << endl;
+	} else if ( msg.ids_size()) {
+		cerr << "WARNING: " << peerName() << ':' << handle << " AssetStatus " << bithorde::Status_Name( msg.status()) << " for unmapped handle" << endl;
 	}
 }
 
-void Client::onMessage(const bithorde::Read::Request & msg) {
+void Client::onMessage( const boost::shared_ptr< MessageContext< Read::Request > >& msgCtx ) {
 	cerr << "unsupported: handling Read-Requests" << endl;
 	bithorde::Read::Response resp;
-	resp.set_reqid(msg.reqid());
+	resp.set_reqid( msgCtx->message().reqid() );
 	resp.set_status(ERROR);
 	sendMessage(Connection::MessageType::ReadResponse, resp);
 }
 
-void Client::onMessage(const bithorde::Read::Response & msg) {
+void Client::onMessage( const boost::shared_ptr< MessageContext< Read::Response > >& msgCtx ) {
+	const auto& msg = msgCtx->message();
 	if (_requestIdMap.count(msg.reqid())) {
 		Asset::Handle assetHandle = _requestIdMap[msg.reqid()];
-		releaseRPCRequest(msg.reqid());
+		releaseRPCRequest( msg.reqid());
 		if (_assetMap.count(assetHandle)) {
 			Asset* a = _assetMap[assetHandle]->asset();
 			if (a) {
-				a->handleMessage(msg);
+				a->handleMessage( msgCtx );
 			} else {
 				cerr << "WARNING " << peerName() << ": ReadResponse " << msg.reqid() << " for handle being closed " << assetHandle << endl;
 			}
@@ -394,18 +434,19 @@ void Client::onMessage(const bithorde::Read::Response & msg) {
 	}
 }
 
-void Client::onMessage(const bithorde::BindWrite & msg) {
+void Client::onMessage( const boost::shared_ptr< MessageContext< BindWrite > >& msgCtx ) {
 	cerr << "unsupported: handling BindWrite" << endl;
 	bithorde::AssetStatus resp;
-	resp.set_handle(msg.handle());
+	resp.set_handle(msgCtx->message().handle());
 	resp.set_status(ERROR);
 	sendMessage(Connection::MessageType::AssetStatus, resp);
 }
-void Client::onMessage(const bithorde::DataSegment & msg) {
+void Client::onMessage( const boost::shared_ptr< MessageContext< DataSegment > >& msgCtx ) {
 	cerr << "unsupported: handling DataSegment-pushes" << endl;
 	close();
 }
-void Client::onMessage(const bithorde::HandShakeConfirmed & msg) {
+void Client::onMessage( const boost::shared_ptr< MessageContext< HandShakeConfirmed > >& msgCtx ) {
+	const auto& msg = msgCtx->message();
 	CryptoPP::HMAC<CryptoPP::SHA256> digest((const byte*)_key.data(), _key.size());
 	digest.Update((const byte*)_sentChallenge.data(), _sentChallenge.size());
 	auto cipher = (byte)msg.cipher();
@@ -420,10 +461,10 @@ void Client::onMessage(const bithorde::HandShakeConfirmed & msg) {
 		setAuthenticated("");
 	}
 }
-void Client::onMessage(const bithorde::Ping & msg) {
-	if (msg.timeout()) {
+void Client::onMessage( const boost::shared_ptr< MessageContext< Ping > >& msgCtx ) {
+	if (msgCtx->message().timeout()) {
 		bithorde::Ping reply;
-		auto deadline =  boost::chrono::steady_clock::now() + boost::chrono::milliseconds(msg.timeout());
+		auto deadline =  boost::chrono::steady_clock::now() + boost::chrono::milliseconds(msgCtx->message().timeout());
 		sendMessage(Connection::MessageType::Ping, reply, deadline, false);
 	}
 }

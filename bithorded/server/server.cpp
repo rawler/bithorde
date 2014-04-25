@@ -209,7 +209,7 @@ UpstreamRequestBinding::Ptr Server::async_linkAsset(const boost::filesystem::pat
 {
 	for (auto iter=_assetStores.begin(); iter != _assetStores.end(); iter++) {
 		if (auto res = (*iter)->addAsset(filePath))
-			return res;
+			return boost::make_shared<UpstreamRequestBinding>(res);
 	}
 	return UpstreamRequestBinding::NONE;
 }

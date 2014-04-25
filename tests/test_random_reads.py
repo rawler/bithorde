@@ -66,11 +66,11 @@ if __name__ == '__main__':
     for _ in xrange(64):
         size = (1 + rand.randrange(16*1024)) * 4
         offset = rand.randrange((ASSET_SIZE-size)/4)*4
-        client.send(message.Read.Request(reqId=1, handle=1, offset=offset, size=size, timeout=2000))
+        client.send(message.Read.Request(reqId=1, handle=1, offset=offset, size=size, timeout=30000))
         resp = client.expect(message.Read.Response(reqId=1, status=message.SUCCESS))
         assert resp.content == generate(resp.offset, len(resp.content))
 
     for offset in xrange(0, ASSET_SIZE, 8192):
-        client.send(message.Read.Request(reqId=1, handle=1, offset=i, size=8192, timeout=2000))
+        client.send(message.Read.Request(reqId=1, handle=1, offset=i, size=8192, timeout=30000))
         resp = client.expect(message.Read.Response(reqId=1, status=message.SUCCESS))
         assert resp.content == generate(resp.offset, len(resp.content))

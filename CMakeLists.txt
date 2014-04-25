@@ -116,6 +116,7 @@ ENDMACRO(ADD_TEST_SCRIPT)
 
 ADD_TEST_SCRIPT(RoundtripTest ${CMAKE_SOURCE_DIR}/tests/roundtrip/test_roundtrip.sh)
 ADD_TEST_SCRIPT(LinkSourceTest ${CMAKE_SOURCE_DIR}/tests/link_source/test_links.sh)
+ADD_TEST_SCRIPT(LinkLargeSourceTest ${CMAKE_SOURCE_DIR}/tests/link_source/test_largefile.sh)
 ADD_TEST_SCRIPT(Proto_Basic ${CMAKE_SOURCE_DIR}/tests/proto/basic.py)
 ADD_TEST_SCRIPT(Proto_AssetTimeout ${CMAKE_SOURCE_DIR}/tests/proto/asset_timeout.py)
 ADD_TEST_SCRIPT(Proto_AssetReconnect ${CMAKE_SOURCE_DIR}/tests/proto/reconnect_asset.py)

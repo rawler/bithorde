@@ -20,7 +20,7 @@
 
 #include <boost/enable_shared_from_this.hpp>
 
-#include "assetmeta.hpp"
+#include "hashstore.hpp"
 #include "../../lib/hashes.h"
 #include "../lib/randomaccessfile.hpp"
 #include "../server/asset.hpp"
@@ -31,32 +31,27 @@ class GrandCentralDispatch;
 
 namespace store {
 
-typedef HashTree<TigerNode, AssetMeta> Hasher;
+const uint8_t DEFAULT_HASH_LEVELS_SKIPPED = 6;
+
+typedef HashTree<HashStore> Hasher;
 
 class StoredAsset : public IAsset, public boost::enable_shared_from_this<StoredAsset> {
 protected:
 	GrandCentralDispatch& _gcd;
-	const boost::filesystem::path _assetFolder;
-	boost::filesystem::path _metaFolder;
-	RandomAccessFile _file;
-	AssetMeta _metaStore;
+	const std::string _id;
+	IDataArray::Ptr _data;
+	HashStore::Ptr _hashStore;
 	Hasher _hasher;
 public:
 	typedef typename boost::shared_ptr<StoredAsset> Ptr;
 
-	/**
-	 * All writes must be aligned on this BLOCKSIZE, or the data might be trimmed in the ends.
-	 */
-	const static int BLOCKSIZE = Hasher::BLOCKSIZE;
-
-	StoredAsset(GrandCentralDispatch& gcd, const boost::filesystem::path& metaFolder, RandomAccessFile::Mode mode);
-	StoredAsset(GrandCentralDispatch& gcd, const boost::filesystem::path& metaFolder, RandomAccessFile::Mode mode, uint64_t size);
+	StoredAsset(GrandCentralDispatch& gcd, const std::string& id, const HashStore::Ptr hashStore, const IDataArray::Ptr& data);
 
 	/**
 	 * Will read up to /size/ bytes from underlying file, and send to callback.
      * TODO: refactor into passing along single AsyncRead-message.
 	 */
-	virtual void async_read(uint64_t offset, size_t& size, uint32_t timeout, ReadCallback cb);
+	virtual void async_read( uint64_t offset, size_t size, uint32_t timeout, IAsset::ReadCallback cb );
 
 	/**
 	 * Returns the amount readable, starting at /offset/, and up to size.
@@ -64,11 +59,6 @@ public:
 	 * @return the amount of data available, or null if no data can be read
 	 */
 	virtual size_t can_read(uint64_t offset, size_t size);
-
-	/**
-	 * Get the path to the folder containing file data + metadata
-	 */
-	boost::filesystem::path folder();
 
 	/**
 	 * Is the root hash known yet?
@@ -79,6 +69,11 @@ public:
 	 * Notify that given range of the file is available for hashing. Should respect BLOCKSIZE
 	 */
 	void notifyValidRange(uint64_t offset, uint64_t size, std::function< void() > whenDone=0);
+
+	/**
+	 * Unique local ID for this asset
+	 */
+	const std::string& id() const;
 
 	/**
 	 * The size of the asset, in bytes
@@ -93,6 +88,24 @@ public:
 private:
 	void updateHash(uint64_t offset, uint64_t end, std::function< void() > whenDone);
 };
+
+enum FileFormatVersion {
+	V1FORMAT = 0x01,
+	V2CACHE = 0x02,
+	V2LINKED = 0x03,
+};
+
+struct AssetMeta {
+	uint8_t hashLevelsSkipped;
+	uint64_t atoms;
+	HashStore::Ptr hashStore;
+	IDataArray::Ptr tail;
+};
+
+AssetMeta openV1AssetMeta( const boost::filesystem::path& path );
+AssetMeta openV2AssetMeta( const boost::filesystem::path& path );
+
+AssetMeta createAssetMeta( const boost::filesystem::path& path, bithorded::store::FileFormatVersion version, uint64_t dataSize, uint8_t levelsSkipped, uint64_t tailSize );
 
 }}
 

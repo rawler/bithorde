@@ -20,7 +20,6 @@
 
 #include "asset.hpp"
 #include "../lib/management.hpp"
-#include "../router/router.hpp"
 #include "../store/assetstore.hpp"
 
 namespace bithorded { namespace cache {
@@ -29,11 +28,11 @@ class CacheManager : private bithorded::store::AssetStore, public bithorded::man
 {
 	boost::filesystem::path _baseDir;
 	GrandCentralDispatch& _gcd;
-	bithorded::router::Router& _router;
+	bithorded::IAssetSource& _router;
 
 	uintmax_t _maxSize;
 public:
-	CacheManager(GrandCentralDispatch& gcd, bithorded::router::Router& router, const boost::filesystem::path& baseDir, intmax_t size);
+	CacheManager(GrandCentralDispatch& gcd, bithorded::IAssetSource& router, const boost::filesystem::path& baseDir, intmax_t size);
 
 	virtual void describe(management::Info& target) const;
 	virtual void inspect(management::InfoList& target) const;
@@ -59,11 +58,10 @@ public:
 	 * Finds an asset by bithorde HashId. (Only the tiger-hash is actually used)
 	 */
 	UpstreamRequestBinding::Ptr findAsset(const bithorde::BindRead& req);
-protected:
-	/**
-	 * Finds an asset by bithorde HashId. (Only the tiger-hash is actually used)
-	 */
+
 	IAsset::Ptr openAsset(const boost::filesystem::path& assetPath);
+
+protected:
 
 	virtual IAsset::Ptr openAsset(const bithorde::BindRead& req);
 

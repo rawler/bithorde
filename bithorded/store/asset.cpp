@@ -16,14 +16,18 @@
 
 
 #include "asset.hpp"
+#include "hashstore.hpp"
 
 #include "../lib/grandcentraldispatch.hpp"
 #include "../lib/rounding.hpp"
+#include <lib/buffer.hpp>
 
 #include <boost/bind/protect.hpp>
 #include <boost/enable_shared_from_this.hpp>
+#include <boost/filesystem.hpp>
 #include <boost/make_shared.hpp>
 #include <boost/shared_array.hpp>
+#include <stdexcept>
 
 const size_t MAX_CHUNK = 64*1024;
 const size_t PARALLEL_HASH_JOBS = 64;
@@ -32,34 +36,29 @@ using namespace std;
 using namespace bithorded;
 using namespace bithorded::store;
 
-StoredAsset::StoredAsset(GrandCentralDispatch& gcd, const boost::filesystem::path& metaFolder, RandomAccessFile::Mode mode) :
+namespace fs = boost::filesystem;
+
+StoredAsset::StoredAsset( GrandCentralDispatch& gcd, const string& id, const HashStore::Ptr hashStore, const IDataArray::Ptr& data ) :
 	_gcd(gcd),
-	_metaFolder(metaFolder),
-	_file(metaFolder/"data", mode),
-	_metaStore(metaFolder/"meta", _file.blocks(BLOCKSIZE)),
-	_hasher(_metaStore)
+	_id(id),
+	_data(data),
+	_hashStore(hashStore),
+	_hasher(*hashStore, _hashStore->hashLevelsSkipped())
 {
+// TODO: Check data->size() against size of HashStore
 	updateStatus();
 }
 
-StoredAsset::StoredAsset(GrandCentralDispatch& gcd, const boost::filesystem::path& metaFolder, RandomAccessFile::Mode mode, uint64_t size) :
-	_gcd(gcd),
-	_metaFolder(metaFolder),
-	_file(metaFolder/"data", mode, size),
-	_metaStore(metaFolder/"meta", _file.blocks(BLOCKSIZE)),
-	_hasher(_metaStore)
+void StoredAsset::async_read(uint64_t offset, size_t size, uint32_t timeout, bithorded::IAsset::ReadCallback cb)
 {
-	updateStatus();
-}
-
-void StoredAsset::async_read(uint64_t offset, size_t& size, uint32_t timeout, bithorded::IAsset::ReadCallback cb)
-{
-	byte buf[MAX_CHUNK];
-	const byte* data = _file.read(offset, size, buf);
-	if (data)
-		cb(offset, std::string((char*)data, size));
-	else
-		cb(offset, std::string());
+	auto buf = boost::make_shared<bithorde::MemoryBuffer>(size);
+	auto read = _data->read(offset, size, **buf);
+	if (read > 0) {
+		buf->trim(read);
+		cb(offset, buf);
+	} else {
+		cb(offset, bithorde::NullBuffer::instance);
+	}
 }
 
 size_t StoredAsset::can_read(uint64_t offset, size_t size)
@@ -70,16 +69,17 @@ size_t StoredAsset::can_read(uint64_t offset, size_t size)
 		size = MAX_CHUNK;
 	auto stopoffset = offset+size;
 	auto lastbyteoffset = stopoffset-1;
-	uint32_t firstBlock = offset / BLOCKSIZE;
-	uint32_t lastBlock = lastbyteoffset / BLOCKSIZE;
+	auto blockSize = _hashStore->leafBlockSize();
+	uint32_t firstBlock = offset / blockSize;
+	uint32_t lastBlock = lastbyteoffset / blockSize;
 
 	for (auto currentBlock = firstBlock; currentBlock <= lastBlock && _hasher.isBlockSet(currentBlock); currentBlock++) {
-		res += BLOCKSIZE;
+		res += blockSize;
 		if (currentBlock == firstBlock)
-			res -= offset % BLOCKSIZE;
+			res -= offset % blockSize;
 		if (currentBlock == lastBlock) {
-			if (auto overflow = (stopoffset % BLOCKSIZE))
-				res -= BLOCKSIZE - overflow;
+			if (auto overflow = (stopoffset % blockSize))
+				res -= blockSize - overflow;
 		}
 	}
 
@@ -96,27 +96,28 @@ void StoredAsset::notifyValidRange(uint64_t offset, uint64_t size, std::function
 {
 	uint64_t filesize = StoredAsset::size();
 	uint64_t end = offset + size;
-	offset = roundUp(offset, BLOCKSIZE);
+	auto blockSize = _hashStore->leafBlockSize();
+
+	offset = roundUp(offset, blockSize);
 	if (end != filesize)
-		end = roundDown(end, BLOCKSIZE);
+		end = roundDown(end, blockSize);
 
 	updateHash(offset, end, whenDone);
 }
 
-uint64_t StoredAsset::size() {
-	return _file.size();
+const string& StoredAsset::id() const {
+	return _id;
 }
 
-boost::filesystem::path StoredAsset::folder()
-{
-	return _metaFolder;
+uint64_t StoredAsset::size() {
+	return _data->size();
 }
 
 void StoredAsset::updateStatus()
 {
 	auto trx = status.change();
 	// TODO: trx->set_availability(_hasher.getCoveragePercent()*10);
-	trx->set_size(_file.size());
+	trx->set_size(_data->size());
 	auto root = _hasher.getRoot();
 	if (root->state == TigerNode::State::SET) {
 		trx->set_status(bithorde::SUCCESS);
@@ -127,43 +128,51 @@ void StoredAsset::updateStatus()
 	}
 }
 
-boost::shared_array<byte> crunch_piece(RandomAccessFile* file, uint64_t offset, size_t size) {
-	byte BUF[StoredAsset::BLOCKSIZE];
+boost::shared_array<byte> crunch_piece(IDataArray* file, uint64_t offset, size_t size) {
+	byte BUF[size];
 	byte* res = new byte[Hasher::DigestSize];
 
-	size_t got(size);
-	byte* buf = file->read(offset, got, BUF);
-	if (got != size) {
+	auto got = file->read(offset, size, BUF);
+	if (got != static_cast<ssize_t>(size)) {
 		throw ios_base::failure("Unexpected read error");
 	}
 
-	Hasher::computeLeaf(buf, got, res);
+	Hasher::Hasher::rootDigest(BUF, got, res);
 	return boost::shared_array<byte>(res);
 }
 
 struct HashTail : public boost::enable_shared_from_this<HashTail> {
 	uint64_t offset, end;
+	uint32_t blockSize;
 
 	GrandCentralDispatch& gcd;
-	RandomAccessFile& file;
+	IDataArray::Ptr data;
 	Hasher& hasher;
 	boost::shared_ptr<StoredAsset> asset;
 	std::function<void()> whenDone;
 
-	HashTail(uint64_t offset, uint64_t end, GrandCentralDispatch& gcd, RandomAccessFile& file, Hasher& hasher, boost::shared_ptr<StoredAsset> asset, std::function<void()> whenDone=0) :
+	HashTail(uint64_t offset, uint64_t end, uint32_t blockSize, GrandCentralDispatch& gcd, const IDataArray::Ptr& data, Hasher& hasher, boost::shared_ptr<StoredAsset> asset, std::function<void()> whenDone=0) :
 		offset(offset),
 		end(end),
+		blockSize(blockSize),
 		gcd(gcd),
-		file(file),
+		data(data),
 		hasher(hasher),
 		asset(asset),
 		whenDone(whenDone)
 	{}
 
-	~HashTail() {
+	// Function to run asynchronously from main-thread, to force update asset-status,
+	// and possibly call callback when done.
+	static void whenDoneWrapper(const boost::shared_ptr<StoredAsset>& asset, std::function<void()> whenDone) {
 		asset->updateStatus();
-		if (whenDone)
+		if (whenDone) {
 			whenDone();
+		}
+	}
+
+	~HashTail() {
+		gcd.ioService().post(boost::bind(&HashTail::whenDoneWrapper, asset, whenDone));
 	}
 	
 	bool empty() const { return offset >= end; }
@@ -171,14 +180,12 @@ struct HashTail : public boost::enable_shared_from_this<HashTail> {
 	void chewNext() {
 		if (empty())
 			return;
-		size_t blockSize = StoredAsset::BLOCKSIZE;
-		if (offset+blockSize > end)
-			blockSize = end - offset;
+		auto blockSize_ = std::min(static_cast<uint64_t>(blockSize), static_cast<uint64_t>(end - offset));
 		
-		auto job_handler = boost::bind(&crunch_piece, &file, offset, blockSize);
-		auto result_handler = boost::bind(&HashTail::add_piece, shared_from_this(), (uint32_t)(offset/StoredAsset::BLOCKSIZE), _1);
+		auto job_handler = boost::bind(&crunch_piece, data.get(), offset, blockSize_);
+		auto result_handler = boost::bind(&HashTail::add_piece, shared_from_this(), (uint32_t)(offset/blockSize), _1);
 
-		offset += blockSize;
+		offset += blockSize_;
 
 		gcd.submit(job_handler, result_handler);
 	}
@@ -193,10 +200,130 @@ struct HashTail : public boost::enable_shared_from_this<HashTail> {
 
 void StoredAsset::updateHash(uint64_t offset, uint64_t end, std::function< void() > whenDone)
 {
-	boost::shared_ptr<HashTail> tail(boost::make_shared<HashTail>(offset, end, _gcd, _file, _hasher, shared_from_this(), whenDone));
+	boost::shared_ptr<HashTail> tail(boost::make_shared<HashTail>(offset, end, _hashStore->leafBlockSize(), _gcd, _data, _hasher, shared_from_this(), whenDone));
 	
 	for (size_t i=0; (i < PARALLEL_HASH_JOBS) && !tail->empty(); i++ ) {
 		tail->chewNext();
 	}
 }
 
+template <typename T>
+static inline T
+hton_any(const T &input)
+{
+    T output(0);
+    const std::size_t size = sizeof(T);
+    uint8_t *data = reinterpret_cast<uint8_t *>(&output);
+
+    for (std::size_t i = 1; i <= size; i++) {
+        data[i-1] = input >> ((size - i) * 8);
+    }
+
+    return output;
+}
+
+#pragma pack(push, 1)
+struct V1Header {
+	uint8_t format;
+	uint32_t _atoms;
+
+	uint32_t atoms() {
+		return ntohl( _atoms );
+	}
+
+	uint32_t atoms(uint32_t val) {
+		_atoms = htonl(val);
+		return val;
+	}
+};
+
+struct V2Header {
+	uint8_t format;
+	uint64_t _atoms;
+	uint8_t hashLevelsSkipped;
+
+	uint64_t atoms() {
+		return hton_any( _atoms );
+	}
+
+	uint64_t atoms(uint64_t val) {
+		_atoms = hton_any(val);
+		return val;
+	}
+
+	uint64_t storedLeaves() {
+		auto x = atoms();
+		auto res = x >> hashLevelsSkipped;
+		if (x != (res << hashLevelsSkipped)) // Check for overflowing blocks
+			res += 1;
+		return res;
+	}
+};
+#pragma pack(pop)
+
+AssetMeta store::openV1AssetMeta ( const boost::filesystem::path& path ) {
+	auto metaFile = boost::make_shared<RandomAccessFile>( path, RandomAccessFile::READWRITE);
+
+	V1Header hdr;
+	auto read = metaFile->read(0, sizeof(V1Header), (byte*)&hdr);
+	if (read != sizeof(V1Header))
+		throw ios_base::failure("Failed to read header from "+path.string());
+	if (hdr.format != FileFormatVersion::V1FORMAT)
+		throw ios_base::failure("Unknown format of file "+path.string());
+
+	AssetMeta res;
+	res.hashLevelsSkipped = 0;
+	res.hashStore = boost::make_shared<HashStore>(boost::make_shared<DataArraySlice>(metaFile, sizeof(hdr)), res.hashLevelsSkipped);
+	res.atoms = hdr.atoms();
+
+	return res;
+}
+
+AssetMeta store::openV2AssetMeta ( const boost::filesystem::path& path ) {
+	auto file = boost::make_shared<RandomAccessFile>( path, RandomAccessFile::READWRITE);
+
+	V2Header hdr;
+	if (file->read(0, sizeof(hdr), (byte*)&hdr) != sizeof(hdr))
+		throw ios_base::failure("Failed to read header from "+path.string());
+	if ((hdr.format != FileFormatVersion::V2CACHE) && (hdr.format != FileFormatVersion::V2LINKED))
+		throw ios_base::failure("Unknown format of file "+path.string());
+
+	uint64_t metaSize = HashStore::size_needed_for_atoms(hdr.atoms(), hdr.hashLevelsSkipped);
+
+	AssetMeta res;
+	res.hashLevelsSkipped = hdr.hashLevelsSkipped;
+	res.hashStore = boost::make_shared<HashStore>(boost::make_shared<DataArraySlice>(file, sizeof(hdr), metaSize ), res.hashLevelsSkipped);
+	res.tail = boost::make_shared<DataArraySlice>(file, sizeof(hdr) + metaSize);
+	res.atoms = hdr.atoms();
+
+	return res;
+}
+
+AssetMeta store::createAssetMeta ( const boost::filesystem::path& path, FileFormatVersion version, uint64_t dataSize, uint8_t levelsSkipped, uint64_t tailSize ) {
+	uint64_t atoms = HashStore::atoms_needed_for_content(dataSize);
+	uint64_t hashesSize = HashStore::size_needed_for_atoms(atoms, levelsSkipped);
+
+	if ((version != store::V2CACHE) && (version != store::V2LINKED))
+		throw std::invalid_argument("Failed to write header to "+path.native());
+
+	auto file = boost::make_shared<RandomAccessFile>(path, RandomAccessFile::READWRITE, sizeof(V2Header) + hashesSize + tailSize);
+
+	V2Header hdr;
+	hdr.format = version;
+	hdr.atoms(atoms);
+	hdr.hashLevelsSkipped = levelsSkipped;
+	if (file->write(0, &hdr, sizeof(hdr)) != sizeof(hdr))
+		throw ios_base::failure("Failed to write header to "+path.native());
+
+	auto hashSlice = boost::make_shared<DataArraySlice>(file, sizeof(hdr), hashesSize);
+
+	AssetMeta res;
+	res.hashLevelsSkipped = levelsSkipped;
+	res.hashStore = boost::make_shared<HashStore>(hashSlice, res.hashLevelsSkipped);
+	res.tail = boost::make_shared<DataArraySlice>(file, sizeof(hdr)+hashesSize);
+	res.atoms = atoms;
+
+	BOOST_ASSERT(res.tail->size() == tailSize);
+
+	return res;
+}

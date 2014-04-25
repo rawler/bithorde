@@ -24,6 +24,10 @@ namespace bithorde {
 
 class Client;
 class AssetBinding;
+class IBuffer;
+
+template <typename T>
+class MessageContext;
 
 static boost::arg<1> ASSET_ARG_STATUS;
 
@@ -67,7 +71,7 @@ protected:
 	std::unordered_set<uint64_t> _servers;
 
 	virtual void handleMessage(const bithorde::AssetStatus &msg);
-	virtual void handleMessage(const bithorde::Read::Response &msg) = 0;
+	virtual void handleMessage( const boost::shared_ptr< MessageContext< bithorde::Read::Response > >& msg ) = 0;
 };
 
 static boost::arg<1> ASSET_ARG_OFFSET;
@@ -86,7 +90,7 @@ public:
 	virtual ~ReadRequestContext();
 
 	void armTimer(int32_t timeout);
-	void callback(const bithorde::Read::Response& msg);
+	void callback( const boost::shared_ptr< bithorde::MessageContext< bithorde::Read::Response > >& msgCtx );
 	void timer_callback(const boost::system::error_code& error);
 	void cancel();
 };
@@ -108,13 +112,13 @@ public:
 	const BitHordeIds & requestIds() const;
 	const BitHordeIds & confirmedIds() const;
 
-	typedef boost::signals2::signal<void (off_t offset, const std::string& data, int tag)> DataSignal;
+	typedef boost::signals2::signal<void (off_t offset, const boost::shared_ptr<IBuffer>& data, int tag)> DataSignal;
 	DataSignal dataArrived;
 
 	InertialValue readResponseTime;
 protected:
 	virtual void handleMessage(const bithorde::AssetStatus &msg);
-	virtual void handleMessage(const bithorde::Read::Response &msg);
+	virtual void handleMessage( const boost::shared_ptr< bithorde::MessageContext< bithorde::Read::Response > >& msgCtx );
 	void clearOffset(off_t offset, uint32_t reqid);
 
 private:
@@ -135,7 +139,7 @@ public:
 	const boost::filesystem::path& link();
 
 protected:
-	virtual void handleMessage(const bithorde::Read::Response &msg);
+	virtual void handleMessage( const boost::shared_ptr< bithorde::MessageContext< bithorde::Read::Response > >& msgCtx );
 };
 
 }

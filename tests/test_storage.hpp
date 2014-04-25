@@ -6,13 +6,13 @@
 template <typename _NodeType>
 class TestStorage : public std::vector<_NodeType> {
 public:
-	typedef _NodeType NodeType;
-	typedef NodeType* NodePtr;
+	typedef _NodeType Node;
+	typedef Node* NodePtr;
 
-	TestStorage(size_t count) : std::vector<_NodeType>(count) {}
+	TestStorage(size_t count) : std::vector<Node>(count) {}
 
-	NodeType* operator[](size_t offset) {
-		return &std::vector<_NodeType>::operator[](offset);
+	Node* operator[](size_t offset) {
+		return &std::vector<Node>::operator[](offset);
 	}
 };
 

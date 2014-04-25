@@ -38,7 +38,7 @@ public:
 private:
 	void onAuthenticated(bithorde::Client& c, const std::string& peerName);
 	void onStatusUpdate(const bithorde::AssetStatus&);
-	void onDataChunk(uint64_t offset, const std::string& data, int tag);
+	void onDataChunk( uint64_t offset, const boost::shared_ptr< bithorde::IBuffer >& data, int tag );
 
 	void nextAsset();
 	void requestMore();

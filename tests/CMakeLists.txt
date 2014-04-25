@@ -8,10 +8,20 @@ ADD_EXECUTABLE( unittests
 	../lib/timer.cpp test_timer.cpp
 	../lib/connection.cpp test_message_queue.cpp
 	../bithorded/lib/treestore.cpp test_treestore.cpp
-	../bithorded/store/assetmeta.cpp test_assetmeta.cpp
+	../bithorded/store/hashstore.cpp test_hashstore.cpp
+
+	../bithorded/lib/assetsessions.cpp ../bithorded/lib/relativepath.cpp
+	../bithorded/lib/grandcentraldispatch.cpp
+	../bithorded/cache/asset.cpp ../bithorded/cache/manager.cpp
+	../bithorded/source/asset.cpp ../bithorded/source/store.cpp
+	../bithorded/store/asset.cpp ../bithorded/store/assetstore.cpp
+	../bithorded/server/asset.cpp ../bithorded/lib/management.cpp
+	../bithorded/http_server/request.cpp ../bithorded/http_server/reply.cpp
+	test_storedasset.cpp
 )
 
 TARGET_LINK_LIBRARIES( unittests
 	bithorde
 	${Boost_LIBRARIES}
+	${LOG4CPLUS_LIBRARIES}
 )

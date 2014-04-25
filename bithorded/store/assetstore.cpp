@@ -50,6 +50,10 @@ AssetStore::AssetStore(const boost::filesystem::path& baseDir) :
 {
 }
 
+const boost::filesystem::path& AssetStore::assetsFolder() {
+	return _assetsFolder;
+}
+
 void AssetStore::openOrCreate()
 {
 	if (!fs::exists(_assetsFolder))
@@ -58,20 +62,19 @@ void AssetStore::openOrCreate()
 		fs::create_directories(_tigerFolder);
 }
 
-boost::filesystem::path AssetStore::newAssetDir()
+boost::filesystem::path AssetStore::newAsset()
 {
-	fs::path assetFolder;
+	fs::path assetPath;
 	do {
-		assetFolder = _assetsFolder / randomAlphaNumeric(20);
-	} while (fs::exists(assetFolder));
-	fs::create_directory(assetFolder);
-	return assetFolder;
+		assetPath = _assetsFolder / randomAlphaNumeric(20);
+	} while (fs::exists( assetPath ));
+	return assetPath;
 }
 
 void AssetStore::purge_links(const boost::shared_ptr< StoredAsset >& asset, const BitHordeIds& except)
 {
 	fs::directory_iterator end;
-	auto tgt = asset->folder();
+	auto tgt = _assetsFolder / asset->id();
 	boost::system::error_code ec;
 	std::set<fs::path> exceptions;
 	for (auto iter = except.begin(); iter != except.end(); ++iter) {
@@ -97,61 +100,21 @@ void AssetStore::update_links(const BitHordeIds& ids, const boost::shared_ptr<St
 	if (fs::exists(fs::symlink_status(link)))
 		fs::remove(link);
 
-	fs::create_relative_symlink(asset->folder(), link);
+	fs::create_relative_symlink(_assetsFolder / asset->id(), link);
 }
 
-enum LinkStatus{
-	OK,
-	BROKEN,
-	OUTDATED,
-};
-
-LinkStatus validateData(const fs::path& assetDataPath) {
-	struct stat linkStat, dataStat;
-
-	const char* c_path = assetDataPath.c_str();
-	if (lstat(c_path, &linkStat) ||
-	    !(S_ISLNK(linkStat.st_mode) || S_ISREG(linkStat.st_mode)) ||
-	    stat(c_path, &dataStat) ||
-	    !S_ISREG(dataStat.st_mode))
-		return BROKEN;
-	if (linkStat.st_mtime >= dataStat.st_mtime)
-		return OK;
-	else
-		return OUTDATED;
-}
-
-bool checkAssetFolder(const fs::path& referrer, const fs::path& assetFolder) {
-	auto assetDataPath = assetFolder/"data";
-	switch (validateData(assetDataPath)) {
-	case OK:
-		return true;
-	case OUTDATED:
-		LOG4CPLUS_WARN(bithorded::storeLog, "outdated asset detected, " << assetFolder);
-		AssetStore::unlink(referrer);
-		fs::remove(referrer/"meta");
-		return false;
-	case BROKEN:
-		LOG4CPLUS_WARN(bithorded::storeLog, "broken asset detected, " << assetFolder);
-		AssetStore::unlinkAndRemove(referrer);
-		return false;
-	}
-	return false;
-}
 
 boost::filesystem::path AssetStore::resolveIds(const BitHordeIds& ids)
 {
-	if (_tigerFolder.empty())
-		fs::path();
 	auto tigerId = findBithordeId(ids, bithorde::HashType::TREE_TIGER);
 	if (tigerId.size()) {
 		fs::path hashLink = _tigerFolder / base32encode(tigerId);
-		boost::system::error_code e;
-		auto assetFolder = fs::canonical(hashLink, e);
-		if (e || !fs::is_directory(assetFolder)) {
-			unlink(hashLink);
-		} else if (checkAssetFolder(hashLink, assetFolder)) {
-			return assetFolder;
+		switch (fs::status(hashLink).type()) {
+			case fs::file_type::regular_file:
+			case fs::file_type::directory_file:
+				return hashLink;
+			default:
+				unlink(hashLink);
 		}
 	}
 	return fs::path();
@@ -177,24 +140,35 @@ uintmax_t AssetStore::size() const
 uintmax_t AssetStore::assetFullSize(const boost::filesystem::path& path) const
 {
 	uintmax_t res=0;
-	fs::directory_iterator end;
-	for (fs::directory_iterator iter(path); iter != end; iter++) {
-		struct stat res_stat;
-		if (stat(iter->path().c_str(), &res_stat) == 0)
-			res += res_stat.st_blocks * 512;
+	struct stat res_stat;
+	if (stat(path.c_str(), &res_stat) != 0) {
+		LOG4CPLUS_WARN(bithorded::storeLog, "failed stat:ing asset " << path.native());
+		return 0;
+	}
+	if (S_ISREG(res_stat.st_mode)) {
+		res += res_stat.st_blocks * 512;
+	} else if (S_ISDIR(res_stat.st_mode)) {
+		fs::directory_iterator end;
+		for (fs::directory_iterator iter(path); iter != end; iter++) {
+			if (stat(iter->path().c_str(), &res_stat) == 0) {
+				res += res_stat.st_blocks * 512;
+			} else {
+				LOG4CPLUS_WARN(bithorded::storeLog, "failed stat:ing asset-part " << iter->path().native());
+			}
+		}
+	} else {
+		LOG4CPLUS_WARN(bithorded::storeLog, "unknown type for asset " << path.native());
 	}
 	return res;
 }
 
 void AssetStore::removeAsset(const boost::filesystem::path& assetPath) noexcept
 {
-	if (fs::is_directory(assetPath)) {
-		LOG4CPLUS_WARN(bithorded::storeLog, "removing asset " << assetPath.filename());
-		boost::system::error_code err;
-		fs::remove_all(assetPath, err);
-		if (err && (err.value() != boost::system::errc::no_such_file_or_directory)) {
-			LOG4CPLUS_WARN(bithorded::storeLog, "error removing asset " << assetPath << "; " << err);
-		}
+	LOG4CPLUS_INFO(bithorded::storeLog, "removing asset " << assetPath.filename());
+	boost::system::error_code err;
+	fs::remove_all(assetPath, err);
+	if (err && (err.value() != boost::system::errc::no_such_file_or_directory)) {
+		LOG4CPLUS_WARN(bithorded::storeLog, "error removing asset " << assetPath << "; " << err);
 	}
 }
 
@@ -228,20 +202,25 @@ void AssetStore::unlinkAndRemove(const BitHordeIds& ids) noexcept
 
 IAsset::Ptr AssetStore::openAsset(const bithorde::BindRead& req)
 {
-	auto assetPath = resolveIds(req.ids());
+	auto linkPath = resolveIds(req.ids());
+	auto assetPath = linkPath.empty() ? fs::path() : fs::canonical(linkPath);
 	if (assetPath.empty())
 		return IAsset::Ptr();
 	else try {
-		return openAsset(assetPath);
+		if (auto res = openAsset(assetPath)) {
+			return res;
+		} else {
+			unlinkAndRemove(linkPath);
+		}
 	} catch (const boost::system::system_error& e) {
 		if (e.code().value() == bsys::errc::no_such_file_or_directory) {
-			LOG4CPLUS_ERROR(storeLog, "Linked asset " << assetPath << "broken. Purging...");
-			unlinkAndRemove(req.ids());
+			LOG4CPLUS_ERROR(storeLog, "Linked asset " << linkPath << "broken. Purging...");
+			unlinkAndRemove(linkPath);
 		} else if (e.code().value() == bsys::errc::file_exists) {
-			LOG4CPLUS_ERROR(storeLog, "Linked asset " << assetPath << "exists with wrong size. Purging...");
-			unlinkAndRemove(req.ids());
+			LOG4CPLUS_ERROR(storeLog, "Linked asset " << linkPath << "exists with wrong size. Purging...");
+			unlinkAndRemove(linkPath);
 		} else {
-			LOG4CPLUS_ERROR(storeLog, "Failed to open " << assetPath << " with unknown error " << e.what());
+			LOG4CPLUS_ERROR(storeLog, "Failed to open " << linkPath << " with unknown error " << e.what());
 		}
 	} catch (const std::ios::failure& e) {
 		LOG4CPLUS_ERROR(storeLog, "Failed to open " << assetPath << " with unknown error " << e.what());
