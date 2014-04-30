@@ -18,6 +18,13 @@ using namespace std;
 namespace bsys = boost::system;
 namespace fs = boost::filesystem;
 
+// Hack required since fs::copy wasn't defined
+#if BOOST_VERSION >= 105000
+  namespace fs3 = boost::filesystem;
+#else
+  namespace fs3 = boost::filesystem3;
+#endif
+
 using namespace bithorded;
 
 struct TestData {
@@ -37,9 +44,9 @@ BOOST_FIXTURE_TEST_CASE( open_partial_v1_asset, TestData )
 {
 	auto temp = fs::unique_path("bhtest-asset-%%%%-%%%%");
 	auto srcDir = assets/".bh_meta"/"assets"/"v1_cached_partial";
-	fs::copy(srcDir, temp);
-	fs::copy(srcDir/"data", temp/"data");
-	fs::copy(srcDir/"meta", temp/"meta");
+	fs3::copy(srcDir, temp);
+	fs3::copy(srcDir/"data", temp/"data");
+	fs3::copy(srcDir/"meta", temp/"meta");
 	auto asset = cache::CachedAsset::open(gcd, temp);
 	BOOST_CHECK_EQUAL(asset->hasRootHash(), false);
 	BOOST_CHECK_EQUAL(asset->can_read(asset->size()-1024, 1024), 0);
