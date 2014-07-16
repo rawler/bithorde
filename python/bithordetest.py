@@ -59,7 +59,7 @@ class TestConnection:
     def _matches(cls, msg, criteria):
         if isinstance(criteria, type):
             return isinstance(msg, criteria)
-        elif isinstance(criteria, message.message.Message):
+        elif isinstance(criteria, Message):
             if not isinstance(msg, type(criteria)):
                 return False
             for field, value in criteria.ListFields():
