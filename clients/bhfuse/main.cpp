@@ -161,16 +161,17 @@ int BHFuse::fuse_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
 	MagnetURI uri;
 	if (uri.parse(name)) {
 		auto ids = uri.toIdList();
-		if (auto asset = _inode_cache.lookup(ids)) {
-			asset->fuse_reply_lookup(req);
-		} else {
-			Lookup * lookup = new Lookup(this, req, ids);
-			lookup->perform(client);
+		if (ids.size()) {
+			if (auto asset = _inode_cache.lookup(ids)) {
+				asset->fuse_reply_lookup(req);
+			} else {
+				Lookup * lookup = new Lookup(this, req, ids);
+				lookup->perform(client);
+			}
+			return 0;
 		}
-		return 0;
-	} else {
-		return ENOENT;
 	}
+	return ENOENT;
 }
 
 void BHFuse::fuse_forget(fuse_ino_t ino, u_long nlookup) {
