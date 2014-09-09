@@ -21,7 +21,6 @@
 #include <google/protobuf/io/zero_copy_stream_impl.h>
 
 const size_t K = 1024;
-const size_t M = 1024*K;
 const size_t MAX_MSG = 130*K;
 const size_t MAX_ERRORS = 5;
 const size_t SEND_BUF = 1024*K;
