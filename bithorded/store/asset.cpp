@@ -265,9 +265,10 @@ AssetMeta store::openV1AssetMeta ( const boost::filesystem::path& path ) {
 	auto metaFile = boost::make_shared<RandomAccessFile>( path, RandomAccessFile::READWRITE);
 
 	V1Header hdr;
-	auto read = metaFile->read(0, sizeof(V1Header), (byte*)&hdr);
-	if (read != sizeof(V1Header))
-		throw ios_base::failure("Failed to read header from "+path.string());
+        if (metaFile->size() < sizeof(hdr))
+                throw ios_base::failure("File size less than constant header "+path.string());
+	if (metaFile->read(0, sizeof(V1Header), (byte*)&hdr) != sizeof(V1Header))
+		throw ios_base::failure("Failed to read V1 header from "+path.string());
 	if (hdr.format != FileFormatVersion::V1FORMAT)
 		throw ios_base::failure("Unknown format of file "+path.string());
 
@@ -283,8 +284,10 @@ AssetMeta store::openV2AssetMeta ( const boost::filesystem::path& path ) {
 	auto file = boost::make_shared<RandomAccessFile>( path, RandomAccessFile::READWRITE);
 
 	V2Header hdr;
+        if (file->size() < sizeof(hdr))
+                throw ios_base::failure("File size less than constant header "+path.string());
 	if (file->read(0, sizeof(hdr), (byte*)&hdr) != sizeof(hdr))
-		throw ios_base::failure("Failed to read header from "+path.string());
+		throw ios_base::failure("Failed to read V2 header from "+path.string());
 	if ((hdr.format != FileFormatVersion::V2CACHE) && (hdr.format != FileFormatVersion::V2LINKED))
 		throw ios_base::failure("Unknown format of file "+path.string());
 
