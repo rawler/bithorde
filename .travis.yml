@@ -2,6 +2,7 @@ language: cpp
 compiler:
   - gcc
   - clang
-install: sudo apt-get install devscripts equivs && sudo mk-build-deps --install
+install:
+  - sudo apt-get install libboost1.48-all-dev libprotobuf-dev protobuf-compiler liblog4cplus-dev libcrypto++-dev libfuse-dev
 script: cmake . && make all test
 
