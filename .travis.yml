@@ -1,8 +1,9 @@
 language: cpp
-compiler:
-  - gcc
-  - clang
+compiler: gcc
 install:
-  - sudo apt-get install libboost1.48-all-dev libprotobuf-dev protobuf-compiler liblog4cplus-dev libcrypto++-dev libfuse-dev
-script: cmake . && make all test
+  - sudo apt-get install libboost1.48-all-dev libprotobuf-dev protobuf-compiler liblog4cplus-dev libcrypto++-dev libfuse-dev python-crypto python-eventlet python-protobuf
+script:
+  - cmake .
+  - make
+  - ctest -V
 
