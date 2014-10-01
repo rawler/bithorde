@@ -52,7 +52,10 @@ StoredAsset::StoredAsset( GrandCentralDispatch& gcd, const string& id, const Has
 void StoredAsset::async_read(uint64_t offset, size_t size, uint32_t timeout, bithorded::IAsset::ReadCallback cb)
 {
 	auto buf = boost::make_shared<bithorde::MemoryBuffer>(size);
-	auto read = _data->read(offset, size, **buf);
+	auto dataSize = _data->size();
+	BOOST_ASSERT(offset < dataSize);
+	auto clamped_size = std::min(size, static_cast<size_t>(dataSize-offset));
+	auto read = _data->read(offset, clamped_size, **buf);
 	if (read > 0) {
 		buf->trim(read);
 		cb(offset, buf);

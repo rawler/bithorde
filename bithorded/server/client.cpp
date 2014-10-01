@@ -193,9 +193,16 @@ void Client::onMessage( const boost::shared_ptr< bithorde::MessageContext< bitho
 		if (size > MAX_CHUNK)
 			size = MAX_CHUNK;
 
-		// Raw pointer to this should be fine here, since asset has ownership of this. (Through member Ptr client)
-		auto onComplete = boost::bind(&Client::onReadResponse, this, msgCtx, _1, _2, bithorde::Message::in(msg.timeout()));
-		asset->async_read(offset, size, msg.timeout(), onComplete);
+		if (offset < asset->size()) {
+			// Raw pointer to this should be fine here, since asset has ownership of this. (Through member Ptr client)
+			auto onComplete = boost::bind(&Client::onReadResponse, this, msgCtx, _1, _2, bithorde::Message::in(msg.timeout()));
+			asset->async_read(offset, size, msg.timeout(), onComplete);
+		} else {
+			bithorde::Read::Response resp;
+			resp.set_reqid(msg.reqid());
+			resp.set_status(bithorde::ERROR);
+			sendMessage(bithorde::Connection::ReadResponse, resp);
+		}
 	} else {
 		bithorde::Read::Response resp;
 		resp.set_reqid(msg.reqid());
