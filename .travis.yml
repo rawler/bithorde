@@ -2,6 +2,6 @@ language: cpp
 compiler:
   - gcc
   - clang
-install: apt-get install devscripts equivs && mk-build-deps --install
+install: sudo apt-get install devscripts equivs && sudo mk-build-deps --install
 script: cmake . && make all test
 
