@@ -5,8 +5,7 @@ Maintainer: Adam Palmblad <adam.palmblad@gmail.com>
 Build-Depends: debhelper (>= 7), cmake, libboost-all-dev,
                libcrypto++-dev, libfuse-dev, liblog4cplus-dev,
                libprotobuf-dev, pkg-config, protobuf-compiler,
-               python-crypto, python-eventlet, python-protobuf,
-               python-twisted
+               python-crypto, python-eventlet, python-protobuf
 Standards-Version: 3.8.3
 Homepage: http://www.bithorde.org/
 
