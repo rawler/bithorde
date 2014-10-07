@@ -3,11 +3,13 @@ description "BitHorde FUSE proxy"
 start on started bithorde
 stop on stopped bithorde
 
-if [ ! /tmp/bhfuse ]; then
-  mkdir /tmp/bhfuse
-fi
+pre-start script
+  if [ ! -d /tmp/bhfuse ]; then
+    mkdir /tmp/bhfuse
+  fi
+end script
 
-exec /usr/bin/bhfuse /tmp/bhfuse
+exec /usr/bin/bhfuse --mountpoint /tmp/bhfuse
 respawn
 
 post-stop script
