@@ -162,14 +162,35 @@ uintmax_t AssetStore::assetFullSize(const boost::filesystem::path& path) const
 	return res;
 }
 
-void AssetStore::removeAsset(const boost::filesystem::path& assetPath) noexcept
+namespace {
+	boost::filesystem::directory_iterator end_dir_itr;
+}
+
+uintmax_t remove_file_recursive(const fs::path& path) {
+	uintmax_t size_freed = 0;
+	boost::system::error_code err;
+
+	struct stat res_stat;
+	if (stat(path.c_str(), &res_stat) == 0) {
+		size_freed += res_stat.st_blocks * 512;
+		if (S_ISDIR(res_stat.st_mode)) {
+			for (fs::directory_iterator itr(path); itr != end_dir_itr; ++itr)
+				size_freed += remove_file_recursive(itr->path());
+		}
+		fs::remove(path, err);
+		if (err) {
+			LOG4CPLUS_WARN(bithorded::storeLog, "error removing file " << path << "; " << err);
+		}
+	} else {
+		LOG4CPLUS_WARN(bithorded::storeLog, "failed stat:ing file " << path.native());
+	}
+	return size_freed;
+}
+
+uintmax_t AssetStore::removeAsset(const boost::filesystem::path& assetPath) noexcept
 {
 	LOG4CPLUS_INFO(bithorded::storeLog, "removing asset " << assetPath.filename());
-	boost::system::error_code err;
-	fs::remove_all(assetPath, err);
-	if (err && (err.value() != boost::system::errc::no_such_file_or_directory)) {
-		LOG4CPLUS_WARN(bithorded::storeLog, "error removing asset " << assetPath << "; " << err);
-	}
+	return remove_file_recursive(assetPath);
 }
 
 void AssetStore::unlink(const fs::path& linkPath) noexcept
