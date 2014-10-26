@@ -31,7 +31,7 @@ def responder(conn):
         print err
 
 if __name__ == '__main__':
-    import shutil, random
+    import os, random, shutil
     try:
         shutil.rmtree('cache')
     except OSError:
@@ -54,6 +54,8 @@ if __name__ == '__main__':
     server.send(message.AssetStatus(handle=server_asset.handle, ids=server_asset.ids, size=ASSET_SIZE, status=message.SUCCESS))
     client.expect(message.AssetStatus(handle=1, status=message.SUCCESS))
 
+    assert len(os.listdir('cache/assets')) == 0 # Delayed cache-creation works.
+
     resp_thread = greenthread.spawn(responder, server)
 
     for i in xrange(64, 4096, 64):
@@ -74,3 +76,5 @@ if __name__ == '__main__':
         client.send(message.Read.Request(reqId=1, handle=1, offset=i, size=8192, timeout=30000))
         resp = client.expect(message.Read.Response(reqId=1, status=message.SUCCESS))
         assert resp.content == generate(resp.offset, len(resp.content))
+
+    assert len(os.listdir('cache/assets')) == 1
