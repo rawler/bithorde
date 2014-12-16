@@ -43,7 +43,7 @@ StoredAsset::StoredAsset( GrandCentralDispatch& gcd, const string& id, const Has
 	_id(id),
 	_data(data),
 	_hashStore(hashStore),
-	_hasher(*hashStore, _hashStore->hashLevelsSkipped())
+	_hashTree(*hashStore, _hashStore->hashLevelsSkipped())
 {
 // TODO: Check data->size() against size of HashStore
 	updateStatus();
@@ -76,7 +76,7 @@ size_t StoredAsset::can_read(uint64_t offset, size_t size)
 	uint32_t firstBlock = offset / blockSize;
 	uint32_t lastBlock = lastbyteoffset / blockSize;
 
-	for (auto currentBlock = firstBlock; currentBlock <= lastBlock && _hasher.isBlockSet(currentBlock); currentBlock++) {
+	for (auto currentBlock = firstBlock; currentBlock <= lastBlock && _hashTree.isBlockSet(currentBlock); currentBlock++) {
 		res += blockSize;
 		if (currentBlock == firstBlock)
 			res -= offset % blockSize;
@@ -91,7 +91,7 @@ size_t StoredAsset::can_read(uint64_t offset, size_t size)
 
 bool StoredAsset::hasRootHash()
 {
-	auto root = _hasher.getRoot();
+	auto root = _hashTree.getRoot();
 	return (root->state == TigerNode::State::SET);
 }
 
@@ -101,9 +101,13 @@ void StoredAsset::notifyValidRange(uint64_t offset, uint64_t size, std::function
 	uint64_t end = offset + size;
 	auto blockSize = _hashStore->leafBlockSize();
 
+	std::cerr << "Notified of " << offset << '-' << end << std::endl;
+
 	offset = roundUp(offset, blockSize);
 	if (end != filesize)
 		end = roundDown(end, blockSize);
+
+	std::cerr << "Running     " << offset << '-' << end << std::endl;
 
 	updateHash(offset, end, whenDone);
 }
@@ -119,9 +123,9 @@ uint64_t StoredAsset::size() {
 void StoredAsset::updateStatus()
 {
 	auto trx = status.change();
-	// TODO: trx->set_availability(_hasher.getCoveragePercent()*10);
+	// TODO: trx->set_availability(_hashTree.getCoveragePercent()*10);
 	trx->set_size(_data->size());
-	auto root = _hasher.getRoot();
+	auto root = _hashTree.getRoot();
 	if (root->state == TigerNode::State::SET) {
 		trx->set_status(bithorde::SUCCESS);
 		trx->clear_ids();
@@ -177,14 +181,14 @@ struct HashTail : public boost::enable_shared_from_this<HashTail> {
 	~HashTail() {
 		gcd.ioService().post(boost::bind(&HashTail::whenDoneWrapper, asset, whenDone));
 	}
-	
+
 	bool empty() const { return offset >= end; }
 
 	void chewNext() {
 		if (empty())
 			return;
 		auto blockSize_ = std::min(static_cast<uint64_t>(blockSize), static_cast<uint64_t>(end - offset));
-		
+
 		auto job_handler = boost::bind(&crunch_piece, data.get(), offset, blockSize_);
 		auto result_handler = boost::bind(&HashTail::add_piece, shared_from_this(), (uint32_t)(offset/blockSize), _1);
 
@@ -203,8 +207,8 @@ struct HashTail : public boost::enable_shared_from_this<HashTail> {
 
 void StoredAsset::updateHash(uint64_t offset, uint64_t end, std::function< void() > whenDone)
 {
-	boost::shared_ptr<HashTail> tail(boost::make_shared<HashTail>(offset, end, _hashStore->leafBlockSize(), _gcd, _data, _hasher, shared_from_this(), whenDone));
-	
+	boost::shared_ptr<HashTail> tail(boost::make_shared<HashTail>(offset, end, _hashStore->leafBlockSize(), _gcd, _data, _hashTree, shared_from_this(), whenDone));
+
 	for (size_t i=0; (i < PARALLEL_HASH_JOBS) && !tail->empty(); i++ ) {
 		tail->chewNext();
 	}

@@ -41,7 +41,7 @@ protected:
 	const std::string _id;
 	IDataArray::Ptr _data;
 	HashStore::Ptr _hashStore;
-	Hasher _hasher;
+	Hasher _hashTree;
 public:
 	typedef typename boost::shared_ptr<StoredAsset> Ptr;
 
