@@ -27,7 +27,7 @@ if __name__ == '__main__':
     conn.expect(message.AssetStatus(handle=1, status=message.SUCCESS, size=len(ASSET), ids=[TigerId(ASSET_TTH)]))
 
     conn.send(message.Read.Request(reqId=1, handle=1, offset=0, size=len(ASSET), timeout=500))
-    conn.expect(message.Read.Response(reqId=1, status=message.SUCCESS, offset=0, content=ASSET[:65536]))
+    conn.expect(message.Read.Response(reqId=1, status=message.SUCCESS, offset=0, content=ASSET[:128*1024]))
 
     conn.send(message.BindRead(handle=1))
     conn.expect(message.AssetStatus(handle=1, status=message.NOTFOUND))

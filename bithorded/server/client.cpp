@@ -29,7 +29,7 @@
 #include <lib/buffer.hpp>
 
 const size_t MAX_ASSETS = 1024;
-const size_t MAX_CHUNK = 64*1024;
+const size_t MAX_CHUNK = 128*1024;
 
 using namespace std;
 namespace fs = boost::filesystem;
