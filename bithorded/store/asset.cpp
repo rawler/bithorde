@@ -101,13 +101,9 @@ void StoredAsset::notifyValidRange(uint64_t offset, uint64_t size, std::function
 	uint64_t end = offset + size;
 	auto blockSize = _hashStore->leafBlockSize();
 
-	std::cerr << "Notified of " << offset << '-' << end << std::endl;
-
 	offset = roundUp(offset, blockSize);
 	if (end != filesize)
 		end = roundDown(end, blockSize);
-
-	std::cerr << "Running     " << offset << '-' << end << std::endl;
 
 	updateHash(offset, end, whenDone);
 }
