@@ -16,6 +16,7 @@
 #include "assetstore.hpp"
 
 #include <boost/filesystem.hpp>
+#include <boost/algorithm/string.hpp>
 #include <set>
 #include <sys/stat.h>
 #include <time.h>
@@ -60,6 +61,7 @@ void AssetStore::openOrCreate()
 		fs::create_directories(_assetsFolder);
 	if (!fs::exists(_tigerFolder))
 		fs::create_directories(_tigerFolder);
+	loadIndex();
 }
 
 boost::filesystem::path AssetStore::newAsset()
@@ -81,7 +83,7 @@ void AssetStore::purge_links(const boost::shared_ptr< StoredAsset >& asset, cons
 	std::set<fs::path> exceptions;
 	for (auto iter = except.begin(); iter != except.end(); ++iter) {
 		if (iter->type() == bithorde::HashType::TREE_TIGER)
-			exceptions.insert(base32encode(iter->id()));
+			exceptions.insert(iter->id());
 	}
 	for (fs::directory_iterator iter(_tigerFolder); iter != end; ++iter) {
 		if (fs::is_symlink(iter->status())) {
@@ -98,28 +100,27 @@ void AssetStore::update_links(const BitHordeIds& ids, const boost::shared_ptr<St
 		return;
 	purge_links(asset, ids);
 
+	auto assetId = asset->id();
+	auto assetPath = _assetsFolder / assetId;
+	_index.addAsset(assetId, tigerId, assetFullSize(assetPath), fs::last_write_time(assetPath));
+
 	fs::path link = _tigerFolder / tigerId.base32();
 	if (fs::exists(fs::symlink_status(link)))
 		fs::remove(link);
 
-	fs::create_relative_symlink(_assetsFolder / asset->id(), link);
+	fs::create_relative_symlink(_assetsFolder / assetId, link);
 }
 
 
 boost::filesystem::path AssetStore::resolveIds(const BitHordeIds& ids)
 {
 	auto tigerId = findBithordeId(ids, bithorde::HashType::TREE_TIGER);
-	if (!tigerId.empty()) {
-		fs::path hashLink = _tigerFolder / tigerId.base32();
-		switch (fs::status(hashLink).type()) {
-			case fs::file_type::regular_file:
-			case fs::file_type::directory_file:
-				return hashLink;
-			default:
-				unlink(hashLink);
-		}
+	auto assetId = _index.lookupTiger(tigerId);
+	if ( assetId.size() ) {
+		return _assetsFolder / assetId;
+	} else {
+		return fs::path();
 	}
-	return fs::path();
 }
 
 boost::filesystem::directory_iterator AssetStore::assetIterator() const
@@ -129,14 +130,7 @@ boost::filesystem::directory_iterator AssetStore::assetIterator() const
 
 uintmax_t AssetStore::size() const
 {
-	if (_baseFolder.empty())
-		return 0;
-	uintmax_t res(0);
-	fs::directory_iterator end;
-	for (auto iter=assetIterator(); iter != end; iter++) {
-		res += assetFullSize(iter->path());
-	}
-	return res;
+	return _index.totalSize();
 }
 
 uintmax_t AssetStore::assetFullSize(const boost::filesystem::path& path) const
@@ -192,6 +186,7 @@ uintmax_t remove_file_recursive(const fs::path& path) {
 uintmax_t AssetStore::removeAsset(const boost::filesystem::path& assetPath) noexcept
 {
 	LOG4CPLUS_INFO(bithorded::storeLog, "removing asset " << assetPath.filename());
+	_index.removeAsset(assetPath.filename().native());
 	return remove_file_recursive(assetPath);
 }
 
@@ -217,10 +212,53 @@ void AssetStore::unlinkAndRemove(const BitHordeIds& ids) noexcept
 {
 	for (auto iter=ids.begin(); iter != ids.end(); iter++) {
 		if (iter->type() == bithorde::HashType::TREE_TIGER) {
-			fs::path hashLink = _tigerFolder / base32encode(iter->id());
+			fs::path hashLink = _tigerFolder / iter->id();
 			unlinkAndRemove(hashLink);
 		}
 	}
+}
+
+void AssetStore::loadIndex()
+{
+	boost::system::error_code ec;
+	fs::directory_iterator enddir;
+
+	LOG4CPLUS_DEBUG(bithorded::storeLog, "starting scan of " << _tigerFolder);
+
+	// Iterate through tigerFolder, and add any assets found matching
+	for ( auto fi = fs::directory_iterator(_tigerFolder); fi != enddir; fi++ ) {
+		auto tigerLink = fi->path();
+		auto assetPath = read_symlink(tigerLink, ec);
+		if (ec || assetPath.empty()) {
+			continue;
+		}
+		try {
+			assetPath = fs::canonical(assetPath, _tigerFolder);
+		} catch (fs::filesystem_error) {
+			LOG4CPLUS_WARN(bithorded::storeLog, "dangling link in " << tigerLink);
+			unlink(tigerLink);
+		}
+		if (!boost::starts_with(assetPath, _assetsFolder)) {
+			LOG4CPLUS_WARN(bithorded::storeLog, "wild link in " << tigerLink << " pointing to " << assetPath);
+			continue;
+		}
+
+		_index.addAsset(assetPath.filename().native(), BinId::fromBase32(tigerLink.filename().native()), assetFullSize(assetPath), fs::last_write_time(assetPath));
+	}
+
+	LOG4CPLUS_DEBUG(bithorded::storeLog, "starting scan of " << _assetsFolder);
+
+	// Iterate through assetFolder, and remove any assets not found in index
+	for ( auto fi = fs::directory_iterator(_assetsFolder); fi != enddir; fi++ ) {
+		auto assetPath = fi->path();
+		auto tigerId = _index.lookupAsset(assetPath.filename().native());
+		if (tigerId.empty()) {
+			LOG4CPLUS_INFO(bithorded::storeLog, "found " << assetPath << " without referencing tigerId, removing");
+			removeAsset(assetPath);
+		}
+	}
+
+	LOG4CPLUS_DEBUG(bithorded::storeLog, "Scan finished. " << _index.assetCount() << " assets, " << (_index.totalSize()/1048576) << "MB found ");
 }
 
 IAsset::Ptr AssetStore::openAsset(const bithorde::BindRead& req)

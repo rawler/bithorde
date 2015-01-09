@@ -21,6 +21,7 @@
 #include <boost/filesystem/path.hpp>
 #include <boost/filesystem/operations.hpp>
 
+#include "assetindex.hpp"
 #include "../../lib/hashes.h"
 #include "../lib/assetsessions.hpp"
 #include "../server/asset.hpp"
@@ -63,12 +64,15 @@ public:
 	 */
 	uintmax_t assetFullSize(const boost::filesystem::path& path) const;
 
-	static uintmax_t removeAsset(const boost::filesystem::path& assetPath) noexcept;
-	static void unlink(const boost::filesystem::path& linkPath) noexcept;
-	static void unlinkAndRemove(const boost::filesystem::path& linkPath) noexcept;
+	uintmax_t removeAsset(const boost::filesystem::path& assetPath) noexcept;
+	void unlink(const boost::filesystem::path& linkPath) noexcept;
+	void unlinkAndRemove(const boost::filesystem::path& linkPath) noexcept;
 	void unlinkAndRemove(const BitHordeIds& ids) noexcept;
 
 protected:
+    AssetIndex _index;
+    virtual void loadIndex();
+
     virtual IAsset::Ptr openAsset(const bithorde::BindRead& req);
 	virtual IAsset::Ptr openAsset(const boost::filesystem::path& assetPath) = 0;
 };

@@ -43,6 +43,10 @@ private:
 class BinId {
 	std::string _raw;
 public:
+	const static BinId EMPTY;
+
+	BinId() {}
+
 	static BinId fromRaw(const std::string& raw) {
 		BinId res;
 		res._raw = raw;

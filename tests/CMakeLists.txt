@@ -14,7 +14,7 @@ ADD_EXECUTABLE( unittests
 	../bithorded/lib/grandcentraldispatch.cpp
 	../bithorded/cache/asset.cpp ../bithorded/cache/manager.cpp
 	../bithorded/source/asset.cpp ../bithorded/source/store.cpp
-	../bithorded/store/asset.cpp ../bithorded/store/assetstore.cpp
+	../bithorded/store/asset.cpp ../bithorded/store/assetindex.cpp ../bithorded/store/assetstore.cpp
 	../bithorded/server/asset.cpp ../bithorded/lib/management.cpp
 	../bithorded/http_server/request.cpp ../bithorded/http_server/reply.cpp
 	test_storedasset.cpp

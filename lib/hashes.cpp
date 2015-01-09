@@ -78,6 +78,8 @@ std::ostream& operator<<(std::ostream& str, const BitHordeIds& ids)
 	return str;
 }
 
+const BinId BinId::EMPTY;
+
 BinId findBithordeId(const BitHordeIds& ids, bithorde::HashType type) {
 	for (auto iter=ids.begin(); iter != ids.end(); iter++) {
 		if (iter->type() == type)
