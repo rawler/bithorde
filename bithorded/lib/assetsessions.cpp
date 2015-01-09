@@ -22,7 +22,7 @@
 
 bithorded::UpstreamRequestBinding::Ptr bithorded::AssetSessions::findAsset(const bithorde::BindRead& req)
 {
-	std::string tigerId = findBithordeId(req.ids(), bithorde::HashType::TREE_TIGER);
+	auto tigerId = findBithordeId(req.ids(), bithorde::HashType::TREE_TIGER);
 	if (tigerId.empty())
 		return UpstreamRequestBinding::Ptr();
 	if (auto active = _tigerCache[tigerId])
@@ -36,7 +36,7 @@ bithorded::UpstreamRequestBinding::Ptr bithorded::AssetSessions::findAsset(const
 	return res;
 }
 
-void bithorded::AssetSessions::add(const std::string& tigerId, const UpstreamRequestBinding::Ptr& asset)
+void bithorded::AssetSessions::add(const BinId& tigerId, const UpstreamRequestBinding::Ptr& asset)
 {
 	if (asset)
 		_tigerCache.set(tigerId, asset);

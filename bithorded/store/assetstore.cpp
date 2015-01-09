@@ -73,8 +73,10 @@ boost::filesystem::path AssetStore::newAsset()
 
 void AssetStore::purge_links(const boost::shared_ptr< StoredAsset >& asset, const BitHordeIds& except)
 {
+	// TODO: use _index for this
+	auto assetId = asset->id();
 	fs::directory_iterator end;
-	auto tgt = _assetsFolder / asset->id();
+	auto tgt = _assetsFolder / assetId;
 	boost::system::error_code ec;
 	std::set<fs::path> exceptions;
 	for (auto iter = except.begin(); iter != except.end(); ++iter) {
@@ -96,7 +98,7 @@ void AssetStore::update_links(const BitHordeIds& ids, const boost::shared_ptr<St
 		return;
 	purge_links(asset, ids);
 
-	fs::path link = _tigerFolder / base32encode(tigerId);
+	fs::path link = _tigerFolder / tigerId.base32();
 	if (fs::exists(fs::symlink_status(link)))
 		fs::remove(link);
 
@@ -107,8 +109,8 @@ void AssetStore::update_links(const BitHordeIds& ids, const boost::shared_ptr<St
 boost::filesystem::path AssetStore::resolveIds(const BitHordeIds& ids)
 {
 	auto tigerId = findBithordeId(ids, bithorde::HashType::TREE_TIGER);
-	if (tigerId.size()) {
-		fs::path hashLink = _tigerFolder / base32encode(tigerId);
+	if (!tigerId.empty()) {
+		fs::path hashLink = _tigerFolder / tigerId.base32();
 		switch (fs::status(hashLink).type()) {
 			case fs::file_type::regular_file:
 			case fs::file_type::directory_file:

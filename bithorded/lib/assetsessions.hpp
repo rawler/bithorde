@@ -25,12 +25,12 @@ namespace bithorded {
 
 class AssetSessions
 {
-	bithorded::WeakMap<std::string, UpstreamRequestBinding> _tigerCache;
+	bithorded::WeakMap<BinId, UpstreamRequestBinding> _tigerCache;
 public:
 	UpstreamRequestBinding::Ptr findAsset(const bithorde::BindRead& req);
 protected:
 	virtual IAsset::Ptr openAsset(const bithorde::BindRead& req) = 0;
-	void add(const std::string& tigerId, const UpstreamRequestBinding::Ptr& asset);
+	void add(const BinId& tigerId, const UpstreamRequestBinding::Ptr& asset);
 };
 
 }

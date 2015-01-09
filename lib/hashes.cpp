@@ -50,6 +50,20 @@ const int *RFC4648Base32Decoder::GetDefaultDecodingLookupArray()
 	return s_array;
 }
 
+void BinId::writeBase32(std::ostream& str) const {
+	CryptoPP::StringSource(_raw, true,
+		new RFC4648Base32Encoder(
+			new CryptoPP::FileSink(str)
+		)
+	);
+}
+
+std::ostream& operator<<(std::ostream& str, const BinId& id)
+{
+	id.writeBase32(str);
+	return str;
+}
+
 std::ostream& operator<<(std::ostream& str, const BitHordeIds& ids)
 {
 	for (auto iter = ids.begin(); iter != ids.end(); iter++) {
@@ -64,10 +78,10 @@ std::ostream& operator<<(std::ostream& str, const BitHordeIds& ids)
 	return str;
 }
 
-std::string findBithordeId(const BitHordeIds& ids, bithorde::HashType type) {
+BinId findBithordeId(const BitHordeIds& ids, bithorde::HashType type) {
 	for (auto iter=ids.begin(); iter != ids.end(); iter++) {
 		if (iter->type() == type)
-			return iter->id();
+			return BinId::fromRaw(iter->id());
 	}
-	return "";
+	return BinId::fromRaw("");
 }

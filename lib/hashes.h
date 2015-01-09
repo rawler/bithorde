@@ -40,8 +40,49 @@ private:
 	static const int * CRYPTOPP_API GetDefaultDecodingLookupArray();
 };
 
+class BinId {
+	std::string _raw;
+public:
+	static BinId fromRaw(const std::string& raw) {
+		BinId res;
+		res._raw = raw;
+		return res;
+	}
+
+	static BinId fromBase32(const std::string& base32) {
+		BinId res;
+		CryptoPP::StringSource(base32, true,
+			new RFC4648Base32Decoder(
+				new CryptoPP::StringSink(res._raw)));
+		return res;
+	}
+
+	std::string base32() const { return base32encode(_raw); }
+	void writeBase32(std::ostream& str) const;
+	const std::string& raw() const { return _raw; }
+
+	bool empty() const { return _raw.empty(); }
+	bool operator==(const BinId &other) const {
+   		return other._raw == _raw;
+  	}
+};
+
+std::ostream& operator<<(std::ostream& str, const BinId& id);
+
+namespace std
+{
+	template <>
+	struct hash<BinId>
+	{
+	    std::size_t operator()(const BinId& c) const
+	    {
+	        return std::hash<std::string>()(c.raw());
+	    }
+	};
+}
+
 std::ostream& operator<<(std::ostream& str, const BitHordeIds& ids);
 
-std::string findBithordeId(const BitHordeIds& ids, bithorde::HashType type);
+BinId findBithordeId(const BitHordeIds& ids, bithorde::HashType type);
 
 #endif // BITHORDE_HASHES_H
