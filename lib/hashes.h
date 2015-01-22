@@ -67,8 +67,11 @@ public:
 
 	bool empty() const { return _raw.empty(); }
 	bool operator==(const BinId &other) const {
-   		return other._raw == _raw;
-  	}
+		return other._raw == _raw;
+	}
+	bool operator!=(const BinId &other) const {
+		return other._raw != _raw;
+	}
 };
 
 std::ostream& operator<<(std::ostream& str, const BinId& id);
@@ -85,7 +88,14 @@ namespace std
 	};
 }
 
+namespace boost {
+	namespace filesystem {
+		class path;
+	}
+}
+
 std::ostream& operator<<(std::ostream& str, const BitHordeIds& ids);
+boost::filesystem::path operator/(const boost::filesystem::path& lhs, const BinId& rhs);
 
 BinId findBithordeId(const BitHordeIds& ids, bithorde::HashType type);
 

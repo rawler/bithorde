@@ -6,6 +6,8 @@
 #include <crypto++/pch.h>
 #include <crypto++/files.h>
 
+#include <boost/filesystem/path.hpp>
+
 #include "bithorde.pb.h"
 
 static const byte s_vecUpper[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
@@ -76,6 +78,11 @@ std::ostream& operator<<(std::ostream& str, const BitHordeIds& ids)
 		str << ",";
 	}
 	return str;
+}
+
+boost::filesystem::path operator/(const boost::filesystem::path& lhs, const BinId& rhs)
+{
+	return lhs / rhs.base32();
 }
 
 const BinId BinId::EMPTY;
