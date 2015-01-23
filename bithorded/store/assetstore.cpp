@@ -76,16 +76,14 @@ boost::filesystem::path AssetStore::newAsset()
 	return assetPath;
 }
 
-void AssetStore::update_links(const BitHordeIds& ids, const boost::shared_ptr<StoredAsset>& asset)
+void AssetStore::update_asset(const BitHordeIds& ids, const boost::shared_ptr<StoredAsset>& asset)
 {
 	auto tigerId = findBithordeId(ids, bithorde::HashType::TREE_TIGER);
-	if (tigerId.empty())
-		return;
 
 	auto assetId = asset->id();
 
 	auto oldTiger = _index.lookupAsset(assetId);
-	if ((!oldTiger.empty()) && (oldTiger != tigerId)) {
+	if ((!oldTiger.empty()) && (!tigerId.empty()) && (oldTiger != tigerId)) {
 		LOG4CPLUS_WARN(bithorded::storeLog, "asset " << assetId << " were linked by the wrong tthsum " << oldTiger);
 		unlink(_tigerFolder/oldTiger);
 	}
@@ -93,11 +91,12 @@ void AssetStore::update_links(const BitHordeIds& ids, const boost::shared_ptr<St
 	auto assetPath = _assetsFolder / assetId;
 	_index.addAsset(assetId, tigerId, assetFullSize(assetPath), fs::last_write_time(assetPath));
 
-	fs::path link = _tigerFolder / tigerId.base32();
-	if (fs::exists(fs::symlink_status(link)))
-		fs::remove(link);
-
-	fs::create_relative_symlink(_assetsFolder / assetId, link);
+	if (!tigerId.empty()) {
+		fs::path link = _tigerFolder / tigerId.base32();
+		if (fs::exists(fs::symlink_status(link)))
+			fs::remove(link);
+		fs::create_relative_symlink(_assetsFolder / assetId, link);
+	}
 }
 
 boost::filesystem::directory_iterator AssetStore::assetIterator() const
@@ -239,6 +238,7 @@ IAsset::Ptr AssetStore::openAsset(const bithorde::BindRead& req)
 	auto assetPath = _assetsFolder / assetId;
 	try {
 		if (auto res = openAsset(assetPath)) {
+			update_asset(res->status->ids(), static_pointer_cast<StoredAsset>(res));
 			return res;
 		} else {
 			removeAsset(assetPath);

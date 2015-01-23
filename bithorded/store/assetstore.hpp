@@ -44,7 +44,7 @@ public:
 
 	boost::filesystem::path newAsset();
 
-	void update_links(const BitHordeIds& ids, const boost::shared_ptr<StoredAsset>& asset);
+	void update_asset(const BitHordeIds& ids, const boost::shared_ptr<StoredAsset>& asset);
 
 	/**
 	 * Returns iterator allowing iterating over the assets in the store.

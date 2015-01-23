@@ -168,7 +168,11 @@ void bithorded::cache::CachingAsset::upstreamDataArrived( IAsset::ReadCallback c
 	auto cached_ = cached();
 	if (data->size() >= requested_size) {
 		if (cached_) {
-			cached_->write(offset, data, boost::bind(&CachingAsset::releaseIfCached, shared_from_this()));
+			cached_->write(offset, data, [=]() {
+				if (cached_->hasRootHash())
+					disconnect();
+				_manager.updateAsset(cached_);
+			});
 		}
 		cb(offset, data);
 	} else if (cached_ && (cached_->can_read(offset, requested_size) == requested_size)) {
@@ -188,13 +192,6 @@ void bithorded::cache::CachingAsset::upstreamStatusChange(const bithorde::AssetS
 	} else {
 		status = newStatus;
 	}
-}
-
-void CachingAsset::releaseIfCached()
-{
-	auto cached_ = cached();
-	if (cached_ && cached_->hasRootHash())
-		disconnect();
 }
 
 bithorded::cache::CachedAsset::Ptr bithorded::cache::CachingAsset::cached()

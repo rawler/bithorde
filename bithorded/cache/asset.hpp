@@ -72,11 +72,9 @@ public:
 	virtual uint64_t size();
 
 	virtual void apply(const AssetRequestParameters& old_parameters, const AssetRequestParameters& new_parameters);
-	
+
 private:
 	CachedAsset::Ptr cached();
-
-	void releaseIfCached();
 
 	void disconnect();
 	void upstreamDataArrived( bithorded::IAsset::ReadCallback cb, std::size_t requested_size, int64_t offset, const boost::shared_ptr<bithorde::IBuffer>& data );

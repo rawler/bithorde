@@ -119,7 +119,7 @@ uint64_t StoredAsset::size() {
 void StoredAsset::updateStatus()
 {
 	auto trx = status.change();
-	// TODO: trx->set_availability(_hashTree.getCoveragePercent()*10);
+	trx->set_availability(_hashTree.getCoveragePercent()*10);
 	trx->set_size(_data->size());
 	auto root = _hashTree.getRoot();
 	if (root->state == TigerNode::State::SET) {

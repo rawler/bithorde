@@ -18,7 +18,6 @@
 #include "manager.hpp"
 
 #include <boost/filesystem.hpp>
-#include <ctime>
 
 #include <log4cplus/logger.h>
 #include <log4cplus/loggingmacros.h>
@@ -80,6 +79,11 @@ IAsset::Ptr CacheManager::openAsset(const bithorde::BindRead& req)
 	}
 }
 
+void CacheManager::updateAsset(const boost::shared_ptr<store::StoredAsset>& asset)
+{
+	return AssetStore::update_asset(asset->status->ids(), asset);
+}
+
 CachedAsset::Ptr CacheManager::prepareUpload(uint64_t size)
 {
 	if ((!_baseDir.empty()) && makeRoom(size)) {
@@ -103,7 +107,7 @@ CachedAsset::Ptr CacheManager::prepareUpload(uint64_t size, const BitHordeIds& i
 {
 	auto res = prepareUpload(size);
 	if (res)
-		AssetStore::update_links(ids, res);
+		AssetStore::update_asset(ids, res);
 	return res;
 }
 
@@ -130,12 +134,12 @@ bool CacheManager::makeRoom(uint64_t size)
 void CacheManager::linkAsset(CachedAsset::WeakPtr asset_)
 {
 	auto asset = asset_.lock();
-	if (asset && asset->status->ids_size()) {
+	if (asset) {
 		auto& ids = asset->status->ids();
-		auto assetPath = (assetsFolder() / asset->id());
-		LOG4CPLUS_DEBUG(log, "Linking " << ids << " to " << assetPath);
-		lutimes(assetPath.c_str(), NULL);
+		if (ids.size()) {
+			LOG4CPLUS_DEBUG(log, "Linking " << ids << " to " << asset->id());
+		}
 
-		AssetStore::update_links(ids, asset);
+		AssetStore::update_asset(ids, asset);
 	}
 }
