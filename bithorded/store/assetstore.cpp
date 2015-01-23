@@ -104,14 +104,14 @@ boost::filesystem::directory_iterator AssetStore::assetIterator() const
 	return fs::directory_iterator(_assetsFolder);
 }
 
-uintmax_t AssetStore::size() const
+uint64_t AssetStore::size() const
 {
 	return _index.totalSize();
 }
 
-uintmax_t AssetStore::assetFullSize(const boost::filesystem::path& path) const
+uint64_t AssetStore::assetFullSize(const boost::filesystem::path& path) const
 {
-	uintmax_t res=0;
+	uint64_t res=0;
 	struct stat res_stat;
 	if (stat(path.c_str(), &res_stat) != 0) {
 		LOG4CPLUS_WARN(bithorded::storeLog, "failed stat:ing asset " << path.native());
@@ -138,8 +138,8 @@ namespace {
 	boost::filesystem::directory_iterator end_dir_itr;
 }
 
-uintmax_t remove_file_recursive(const fs::path& path) {
-	uintmax_t size_freed = 0;
+uint64_t remove_file_recursive(const fs::path& path) {
+	uint64_t size_freed = 0;
 	boost::system::error_code err;
 
 	struct stat res_stat;
@@ -159,12 +159,12 @@ uintmax_t remove_file_recursive(const fs::path& path) {
 	return size_freed;
 }
 
-uintmax_t AssetStore::removeAsset(const std::string& assetId) noexcept
+uint64_t AssetStore::removeAsset(const std::string& assetId) noexcept
 {
 	return removeAsset(_assetsFolder / assetId);
 }
 
-uintmax_t AssetStore::removeAsset(const boost::filesystem::path& assetPath) noexcept
+uint64_t AssetStore::removeAsset(const boost::filesystem::path& assetPath) noexcept
 {
 	LOG4CPLUS_INFO(bithorded::storeLog, "removing asset " << assetPath.filename());
 	auto tigerId = _index.removeAsset(assetPath.filename().native());

@@ -54,15 +54,15 @@ public:
 	/**
 	 * Calculates used store-size. Can be smaller than the sum of the file-sizes due to sparse allocation
 	 */
-	uintmax_t size() const;
+	uint64_t size() const;
 
 	/**
 	 * Returns the "full" size of the asset, that is the size of the asset and it's metadata
 	 */
-	uintmax_t assetFullSize(const boost::filesystem::path& path) const;
+	uint64_t assetFullSize(const boost::filesystem::path& path) const;
 
-	uintmax_t removeAsset(const std::string& assetId) noexcept;
-	uintmax_t removeAsset(const boost::filesystem::path& assetPath) noexcept;
+	uint64_t removeAsset(const std::string& assetId) noexcept;
+	uint64_t removeAsset(const boost::filesystem::path& assetPath) noexcept;
 protected:
     AssetIndex _index;
     virtual void loadIndex();
