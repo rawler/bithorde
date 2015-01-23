@@ -83,7 +83,10 @@ void AssetStore::update_asset(const BitHordeIds& ids, const boost::shared_ptr<St
 	auto assetId = asset->id();
 
 	auto oldTiger = _index.lookupAsset(assetId);
-	if ((!oldTiger.empty()) && (!tigerId.empty()) && (oldTiger != tigerId)) {
+	if (tigerId.empty()) {
+		// Updates with empty TigerId won't overwrite.
+		tigerId = oldTiger;
+	} else if ((!oldTiger.empty()) && (oldTiger != tigerId)) {
 		LOG4CPLUS_WARN(bithorded::storeLog, "asset " << assetId << " were linked by the wrong tthsum " << oldTiger);
 		unlink(_tigerFolder/oldTiger);
 	}
