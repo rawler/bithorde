@@ -102,11 +102,6 @@ void AssetStore::update_asset(const BitHordeIds& ids, const boost::shared_ptr<St
 	}
 }
 
-boost::filesystem::directory_iterator AssetStore::assetIterator() const
-{
-	return fs::directory_iterator(_assetsFolder);
-}
-
 uint64_t AssetStore::size() const
 {
 	return _index.totalSize();

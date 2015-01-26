@@ -47,11 +47,6 @@ public:
 	void update_asset(const BitHordeIds& ids, const boost::shared_ptr<StoredAsset>& asset);
 
 	/**
-	 * Returns iterator allowing iterating over the assets in the store.
-	 */
-	boost::filesystem::directory_iterator assetIterator() const;
-
-	/**
 	 * Calculates used store-size. Can be smaller than the sum of the file-sizes due to sparse allocation
 	 */
 	uint64_t size() const;
