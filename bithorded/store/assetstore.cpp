@@ -29,6 +29,7 @@
 #include "asset.hpp"
 #include "../../lib/hashes.h"
 #include "../../lib/random.h"
+#include "../lib/management.hpp"
 #include "../lib/relativepath.hpp"
 
 using namespace bithorded;
@@ -49,6 +50,11 @@ AssetStore::AssetStore(const boost::filesystem::path& baseDir) :
 	_assetsFolder(baseDir.empty() ? fs::path() : (baseDir/ASSETS_DIR)),
 	_tigerFolder(baseDir.empty() ? fs::path() : (baseDir/TIGER_DIR))
 {
+}
+
+void AssetStore::inspect(management::InfoList& target) const
+{
+	return _index.inspect(target);
 }
 
 const boost::filesystem::path& AssetStore::assetsFolder() {

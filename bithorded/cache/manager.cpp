@@ -55,6 +55,7 @@ void CacheManager::inspect(management::InfoList& target) const
 	target.append("path") << _baseDir;
 	target.append("capacity") << _maxSize;
 	target.append("size") << store::AssetStore::size();
+	return AssetStore::inspect(target);
 }
 
 IAsset::Ptr CacheManager::openAsset(const boost::filesystem::path& assetPath)

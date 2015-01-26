@@ -25,6 +25,9 @@
 #include "../../lib/hashes.h"
 
 namespace bithorded {
+    namespace management {
+        struct InfoList;
+    }
 
 namespace store {
 
@@ -51,6 +54,8 @@ class AssetIndex {
     std::unordered_map<std::string, std::unique_ptr<AssetIndexEntry>> _assetMap;
     std::unordered_map<BinId, AssetIndexEntry*> _tigerMap;
 public:
+    void inspect(management::InfoList& target) const;
+
     size_t assetCount() const {
         return _assetMap.size();
     }

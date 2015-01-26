@@ -17,8 +17,14 @@
 #include "assetindex.hpp"
 
 #include <chrono>
+#include <iomanip>
+#include <iostream>
+#include <map>
+#include <boost/range/adaptor/map.hpp>
 
 #include "../../lib/hashes.h"
+
+#include "../lib/management.hpp"
 
 using namespace std;
 using namespace bithorded;
@@ -68,4 +74,20 @@ double AssetIndexEntry::addScore(float amount) {
     double seconds_since_epoch = (milliseconds_since_epoch / 1000.0);
     _score += (seconds_since_epoch - _score) * amount;
     return _score;
+}
+
+void AssetIndex::inspect(management::InfoList& target) const
+{
+    std::multimap<double, AssetIndexEntry*> scoreMap;
+    for (auto& asset : _assetMap | boost::adaptors::map_values ) {
+        scoreMap.insert(std::pair<double, AssetIndexEntry*>(asset->score(), asset.get()));
+    }
+    if (scoreMap.empty()) {
+        return;
+    }
+    auto lowest = scoreMap.begin()->first;
+    for (auto& kv : scoreMap) {
+        auto asset = kv.second;
+        target.append("urn:tree:tiger:" + asset->tigerId().base32()) << std::fixed << std::setprecision(1) << (kv.first-lowest) << '\t' << asset->size();
+    }
 }

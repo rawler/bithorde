@@ -65,6 +65,7 @@ void Store::inspect(management::InfoList& target) const
 {
 	target.append("path") << _baseDir;
 	target.append("size") << store::AssetStore::size();
+	return AssetStore::inspect(target);
 }
 
 const string& Store::label() const

@@ -26,7 +26,12 @@
 #include "../lib/assetsessions.hpp"
 #include "../server/asset.hpp"
 
-namespace bithorded { namespace store {
+namespace bithorded {
+	namespace management {
+		struct InfoList;
+	}
+
+	namespace store {
 
 class StoredAsset;
 
@@ -37,6 +42,8 @@ class AssetStore : public AssetSessions
 	boost::filesystem::path _tigerFolder;
 public:
 	AssetStore(const boost::filesystem::path& baseDir);
+
+	virtual void inspect(management::InfoList& target) const;
 
 	const boost::filesystem::path& assetsFolder();
 
