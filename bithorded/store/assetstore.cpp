@@ -67,6 +67,9 @@ void AssetStore::openOrCreate()
 		fs::create_directories(_assetsFolder);
 	if (!fs::exists(_tigerFolder))
 		fs::create_directories(_tigerFolder);
+	_baseFolder = fs::canonical(_baseFolder);
+	_assetsFolder = fs::canonical(_assetsFolder);
+	_tigerFolder = fs::canonical(_tigerFolder);
 	loadIndex();
 }
 
