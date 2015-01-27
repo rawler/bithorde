@@ -209,8 +209,9 @@ void AssetStore::loadIndex()
 			unlink(tigerLink);
 		}
 		if (!boost::starts_with(assetPath, _assetsFolder)) {
-			LOG4CPLUS_WARN(bithorded::storeLog, "wild link in " << tigerLink << " pointing to " << assetPath);
-			continue;
+			std::ostringstream err;
+			err << "wild link in " << tigerLink << " pointing to " << assetPath;
+			throw std::runtime_error(err.str());
 		}
 
 		_index.addAsset(assetPath.filename().native(), BinId::fromBase32(tigerLink.filename().native()), assetFullSize(assetPath), fs::last_write_time(assetPath));
