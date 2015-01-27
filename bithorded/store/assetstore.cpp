@@ -147,7 +147,7 @@ uint64_t remove_file_recursive(const fs::path& path) {
 	boost::system::error_code err;
 
 	struct stat res_stat;
-	if (stat(path.c_str(), &res_stat) == 0) {
+	if (lstat(path.c_str(), &res_stat) == 0) {
 		size_freed += res_stat.st_blocks * 512;
 		if (S_ISDIR(res_stat.st_mode)) {
 			for (fs::directory_iterator itr(path); itr != end_dir_itr; ++itr)
