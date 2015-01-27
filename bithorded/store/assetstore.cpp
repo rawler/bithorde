@@ -191,6 +191,7 @@ void AssetStore::loadIndex()
 {
 	boost::system::error_code ec;
 	fs::directory_iterator enddir;
+	uint64_t size_cleared = 0;
 
 	LOG4CPLUS_DEBUG(bithorded::storeLog, "starting scan of " << _tigerFolder);
 
@@ -223,11 +224,11 @@ void AssetStore::loadIndex()
 		auto tigerId = _index.lookupAsset(assetPath.filename().native());
 		if (tigerId.empty()) {
 			LOG4CPLUS_INFO(bithorded::storeLog, "found " << assetPath << " without referencing tigerId, removing");
-			removeAsset(assetPath);
+			size_cleared += remove_file_recursive(assetPath);
 		}
 	}
 
-	LOG4CPLUS_DEBUG(bithorded::storeLog, "Scan finished. " << _index.assetCount() << " assets, " << (_index.totalSize()/1048576) << "MB found ");
+	LOG4CPLUS_INFO(bithorded::storeLog, "Scan finished. " << _index.assetCount() << " assets, " << (_index.totalSize()/1048576) << "MB found. " << (size_cleared/1048576) << "MB cleared.");
 }
 
 IAsset::Ptr AssetStore::openAsset(const bithorde::BindRead& req)
