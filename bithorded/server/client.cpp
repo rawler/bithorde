@@ -288,7 +288,7 @@ void Client::informAssetStatusUpdate(bithorde::Asset::Handle h, const IAsset::We
 		LOG4CPLUS_WARN(clientLogger, peerName() << ':' << h << " new state with suspiciously large size" << resp.size() << ", " << status.has_size());
 	}
 
-	LOG4CPLUS_DEBUG(clientLogger, peerName() << ':' << h << " new state " << bithorde::Status_Name(resp.status()) << " (" << resp.ids() << ")");
+	LOG4CPLUS_DEBUG(clientLogger, peerName() << ':' << h << " new state " << bithorde::Status_Name(resp.status()) << " (" << resp.ids() << ") availability: " << resp.availability());
 
 	sendMessage(bithorde::Connection::AssetStatus, resp);
 }
