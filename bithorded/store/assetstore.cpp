@@ -101,7 +101,7 @@ void AssetStore::update_asset(const BitHordeIds& ids, const boost::shared_ptr<St
 	}
 
 	auto assetPath = _assetsFolder / assetId;
-	_index.addAsset(assetId, tigerId, assetFullSize(assetPath), fs::last_write_time(assetPath));
+	_index.addAsset(assetId, tigerId, assetDiskUsage(assetPath), fs::last_write_time(assetPath));
 
 	if (!tigerId.empty()) {
 		fs::path link = _tigerFolder / tigerId.base32();
@@ -111,12 +111,12 @@ void AssetStore::update_asset(const BitHordeIds& ids, const boost::shared_ptr<St
 	}
 }
 
-uint64_t AssetStore::size() const
+uint64_t AssetStore::diskUsage() const
 {
-	return _index.totalSize();
+	return _index.totalDiskUsage();
 }
 
-uint64_t AssetStore::assetFullSize(const boost::filesystem::path& path) const
+uint64_t AssetStore::assetDiskUsage(const boost::filesystem::path& path) const
 {
 	uint64_t res=0;
 	struct stat res_stat;
@@ -217,7 +217,7 @@ void AssetStore::loadIndex()
 			throw std::runtime_error(err.str());
 		}
 
-		_index.addAsset(assetPath.filename().native(), BinId::fromBase32(tigerLink.filename().native()), assetFullSize(assetPath), fs::last_write_time(assetPath));
+		_index.addAsset(assetPath.filename().native(), BinId::fromBase32(tigerLink.filename().native()), assetDiskUsage(assetPath), fs::last_write_time(assetPath));
 	}
 
 	LOG4CPLUS_DEBUG(bithorded::storeLog, "starting scan of " << _assetsFolder);
@@ -232,7 +232,7 @@ void AssetStore::loadIndex()
 		}
 	}
 
-	LOG4CPLUS_INFO(bithorded::storeLog, "Scan finished. " << _index.assetCount() << " assets, " << (_index.totalSize()/1048576) << "MB found. " << (size_cleared/1048576) << "MB cleared.");
+	LOG4CPLUS_INFO(bithorded::storeLog, "Scan finished. " << _index.assetCount() << " assets, using " << (_index.totalDiskUsage()/1048576) << "MB. " << (size_cleared/1048576) << "MB cleared.");
 }
 
 IAsset::Ptr AssetStore::openAsset(const bithorde::BindRead& req)

@@ -34,17 +34,17 @@ namespace store {
 class AssetIndexEntry {
     std::string _assetId;
     BinId _tigerId;
-    uint64_t _size;
+    uint64_t _diskUsage;
     double _score;
 public:
-    AssetIndexEntry(const std::string& assetId, const BinId& tigerId, uint64_t size, double score);
+    AssetIndexEntry(const std::string& assetId, const BinId& tigerId, uint64_t diskUsage, double score);
 
     const std::string& assetId() const;
     const BinId& tigerId() const;
     AssetIndexEntry& tigerId(const BinId& newTigerId);
 
-    uint64_t size() const;
-    AssetIndexEntry& size(uint64_t newSize);
+    uint64_t diskUsage() const;
+    AssetIndexEntry& diskUsage(uint64_t newSize);
 
     double score() const;
     double addScore(float amount);
@@ -65,7 +65,7 @@ public:
 
     double updateAsset(const std::string& assetId, uint64_t size);
 
-    uint64_t totalSize() const;
+    uint64_t totalDiskUsage() const;
 
     /** Returns assetId for asset */
     std::string lookupTiger( const BinId& tigerId ) const;

@@ -46,15 +46,15 @@ CacheManager::CacheManager( GrandCentralDispatch& gcd, IAssetSource& router, con
 
 void CacheManager::describe(management::Info& target) const
 {
-	auto size = store::AssetStore::size();
-	target << "capacity: " << (_maxSize/(1024*1024)) << "MB, size: " << (size/(1024*1024)) << "MB (" << (int)((size*100)/_maxSize) << "%)";
+	auto diskUsage = store::AssetStore::diskUsage();
+	target << "capacity: " << (_maxSize/(1024*1024)) << "MB, used: " << (diskUsage/(1024*1024)) << "MB (" << (int)((diskUsage*100)/_maxSize) << "%)";
 }
 
 void CacheManager::inspect(management::InfoList& target) const
 {
 	target.append("path") << _baseDir;
 	target.append("capacity") << _maxSize;
-	target.append("size") << store::AssetStore::size();
+	target.append("used") << store::AssetStore::diskUsage();
 	return AssetStore::inspect(target);
 }
 
@@ -119,7 +119,7 @@ UpstreamRequestBinding::Ptr CacheManager::findAsset(const bithorde::BindRead& re
 
 bool CacheManager::makeRoom(uint64_t size)
 {
-	int64_t needed = (store::AssetStore::size()+size) - _maxSize;
+	int64_t needed = (store::AssetStore::diskUsage()+size) - _maxSize;
 	int64_t freed = 0;
 	while (needed > freed) {
 		auto looser = _index.pickLooser();

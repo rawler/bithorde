@@ -33,11 +33,11 @@ using namespace bithorded::store;
 AssetIndexEntry::AssetIndexEntry(
 	const std::string& assetId,
 	const BinId& tigerId,
-	uint64_t size,
+	uint64_t diskUsage,
 	double score) :
 	_assetId(assetId),
 	_tigerId(tigerId),
-	_size(size),
+	_diskUsage(diskUsage),
 	_score(score)
 {}
 
@@ -54,12 +54,12 @@ AssetIndexEntry& AssetIndexEntry::tigerId(const BinId& newTigerId) {
 	return *this;
 }
 
-uint64_t AssetIndexEntry::size() const {
-    return _size;
+uint64_t AssetIndexEntry::diskUsage() const {
+    return _diskUsage;
 }
 
-AssetIndexEntry& AssetIndexEntry::size(uint64_t newSize) {
-	_size = newSize;
+AssetIndexEntry& AssetIndexEntry::diskUsage(uint64_t newSize) {
+	_diskUsage = newSize;
 	return *this;
 }
 
@@ -90,7 +90,7 @@ void AssetIndex::inspect(management::InfoList& target) const
     auto lowest = scoreMap.begin()->first;
     for (auto& kv : scoreMap) {
         auto asset = kv.second;
-        target.append("urn:tree:tiger:" + asset->tigerId().base32()) << std::fixed << std::setprecision(1) << (kv.first-lowest) << '\t' << asset->size();
+        target.append("urn:tree:tiger:" + asset->tigerId().base32()) << std::fixed << std::setprecision(1) << (kv.first-lowest) << '\t' << asset->diskUsage();
     }
 }
 
@@ -98,8 +98,8 @@ size_t AssetIndex::assetCount() const {
     return _assetMap.size();
 }
 
-void AssetIndex::addAsset(const std::string& assetId, const BinId& tigerId, uint64_t size, double score) {
-    auto ptr = new AssetIndexEntry(assetId, tigerId, size, score);
+void AssetIndex::addAsset(const std::string& assetId, const BinId& tigerId, uint64_t diskUsage, double score) {
+    auto ptr = new AssetIndexEntry(assetId, tigerId, diskUsage, score);
     auto& slot = _assetMap[assetId];
     if (slot) {
         _tigerMap.erase(slot->tigerId());
@@ -122,16 +122,16 @@ BinId AssetIndex::removeAsset(const std::string& assetId) {
     return tigerId;
 }
 
-double AssetIndex::updateAsset(const std::string& assetId, uint64_t size) {
+double AssetIndex::updateAsset(const std::string& assetId, uint64_t diskUsage) {
     auto iter = _assetMap.find(assetId);
     if ( iter != _assetMap.end() ) {
         auto& assetPtr = iter->second;
-        auto oldSize = assetPtr->size();
-        if (size == 0) {
-            size = oldSize;
+        auto oldSize = assetPtr->diskUsage();
+        if (diskUsage == 0) {
+            diskUsage = oldSize;
         }
-        auto diff = oldSize - size;
-        auto addition = static_cast<float>(diff) / size;
+        auto diff = oldSize - diskUsage;
+        auto addition = static_cast<float>(diff) / diskUsage;
         addition = std::max(addition, 0.01f);
         addition = std::min(addition, 0.5f);
         return assetPtr->addScore(addition);
@@ -140,10 +140,10 @@ double AssetIndex::updateAsset(const std::string& assetId, uint64_t size) {
     }
 }
 
-uint64_t AssetIndex::totalSize() const {
+uint64_t AssetIndex::totalDiskUsage() const {
     uint64_t result = 0;
     for (auto& kv : _assetMap) {
-        result += kv.second->size();
+        result += kv.second->diskUsage();
     }
     return result;
 }

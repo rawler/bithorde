@@ -54,14 +54,14 @@ public:
 	void update_asset(const BitHordeIds& ids, const boost::shared_ptr<StoredAsset>& asset);
 
 	/**
-	 * Calculates used store-size. Can be smaller than the sum of the file-sizes due to sparse allocation
+	 * Calculates store disk usage. Can be smaller than the sum of the file-sizes due to sparse allocation
 	 */
-	uint64_t size() const;
+	uint64_t diskUsage() const;
 
 	/**
-	 * Returns the "full" size of the asset, that is the size of the asset and it's metadata
+	 * Returns the "full" disk usage of the asset, that is the size of the asset and it's metadata
 	 */
-	uint64_t assetFullSize(const boost::filesystem::path& path) const;
+	uint64_t assetDiskUsage(const boost::filesystem::path& path) const;
 
 	uint64_t removeAsset(const std::string& assetId) noexcept;
 	uint64_t removeAsset(const boost::filesystem::path& assetPath) noexcept;
