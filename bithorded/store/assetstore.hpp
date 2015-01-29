@@ -59,9 +59,14 @@ public:
 	uint64_t diskUsage() const;
 
 	/**
-	 * Returns the "full" disk usage of the asset, that is the size of the asset and it's metadata
+	 * Returns the "full" disk usage of the asset, that is the used size of the asset and it's metadata
 	 */
 	uint64_t assetDiskUsage(const boost::filesystem::path& path) const;
+
+	/**
+	 * Returns the "full" disk allocation for the asset, that is the size of the asset and it's metadata
+	 */
+	uint64_t assetDiskAllocated(const boost::filesystem::path& path) const;
 
 	uint64_t removeAsset(const std::string& assetId) noexcept;
 	uint64_t removeAsset(const boost::filesystem::path& assetPath) noexcept;

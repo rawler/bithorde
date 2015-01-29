@@ -19,7 +19,9 @@
 #include <chrono>
 #include <iomanip>
 #include <iostream>
+#include <limits>
 #include <map>
+#include <numeric>
 #include <boost/range/adaptor/map.hpp>
 
 #include "../../lib/hashes.h"
@@ -34,10 +36,12 @@ AssetIndexEntry::AssetIndexEntry(
 	const std::string& assetId,
 	const BinId& tigerId,
 	uint64_t diskUsage,
+    uint64_t diskAllocation,
 	double score) :
 	_assetId(assetId),
 	_tigerId(tigerId),
 	_diskUsage(diskUsage),
+    _diskAllocation(diskAllocation),
 	_score(score)
 {}
 
@@ -61,6 +65,19 @@ uint64_t AssetIndexEntry::diskUsage() const {
 AssetIndexEntry& AssetIndexEntry::diskUsage(uint64_t newSize) {
 	_diskUsage = newSize;
 	return *this;
+}
+
+uint64_t AssetIndexEntry::diskAllocation() const {
+    return _diskAllocation;
+}
+
+uint AssetIndexEntry::fillPercent() const {
+    uint res;
+    if (_diskAllocation)
+        res = (_diskUsage * 100) / _diskAllocation;
+    else
+        res = std::numeric_limits<uint>::max();
+    return std::min(res, static_cast<uint>(100));
 }
 
 double AssetIndexEntry::score() const {
@@ -90,7 +107,7 @@ void AssetIndex::inspect(management::InfoList& target) const
     auto lowest = scoreMap.begin()->first;
     for (auto& kv : scoreMap) {
         auto asset = kv.second;
-        target.append("urn:tree:tiger:" + asset->tigerId().base32()) << std::fixed << std::setprecision(1) << (kv.first-lowest) << '\t' << asset->diskUsage();
+        target.append("urn:tree:tiger:" + asset->tigerId().base32()) << std::fixed << std::setprecision(1) << (kv.first-lowest) << '\t' << asset->diskUsage() << '\t' << asset->fillPercent() << '%';
     }
 }
 
@@ -98,8 +115,8 @@ size_t AssetIndex::assetCount() const {
     return _assetMap.size();
 }
 
-void AssetIndex::addAsset(const std::string& assetId, const BinId& tigerId, uint64_t diskUsage, double score) {
-    auto ptr = new AssetIndexEntry(assetId, tigerId, diskUsage, score);
+void AssetIndex::addAsset(const std::string& assetId, const BinId& tigerId, uint64_t diskUsage, uint64_t diskAllocation, double score) {
+    auto ptr = new AssetIndexEntry(assetId, tigerId, diskUsage, diskAllocation, score);
     auto& slot = _assetMap[assetId];
     if (slot) {
         _tigerMap.erase(slot->tigerId());
@@ -144,6 +161,14 @@ uint64_t AssetIndex::totalDiskUsage() const {
     uint64_t result = 0;
     for (auto& kv : _assetMap) {
         result += kv.second->diskUsage();
+    }
+    return result;
+}
+
+uint64_t AssetIndex::totalDiskAllocation() const {
+    uint64_t result = 0;
+    for (auto& kv : _assetMap) {
+        result += kv.second->diskAllocation();
     }
     return result;
 }

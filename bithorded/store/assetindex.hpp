@@ -35,9 +35,10 @@ class AssetIndexEntry {
     std::string _assetId;
     BinId _tigerId;
     uint64_t _diskUsage;
+    uint64_t _diskAllocation;
     double _score;
 public:
-    AssetIndexEntry(const std::string& assetId, const BinId& tigerId, uint64_t diskUsage, double score);
+    AssetIndexEntry(const std::string& assetId, const BinId& tigerId, uint64_t diskUsage, uint64_t diskAllocation, double score);
 
     const std::string& assetId() const;
     const BinId& tigerId() const;
@@ -45,6 +46,9 @@ public:
 
     uint64_t diskUsage() const;
     AssetIndexEntry& diskUsage(uint64_t newSize);
+    uint64_t diskAllocation() const;
+
+    uint fillPercent() const;
 
     double score() const;
     double addScore(float amount);
@@ -58,14 +62,15 @@ public:
 
     size_t assetCount() const;
 
-    void addAsset(const std::string& assetId, const BinId& tigerId, uint64_t size, double score);
+    void addAsset(const std::string& assetId, const BinId& tigerId, uint64_t diskUsage, uint64_t diskAllocation, double score);
 
     /** Returns the tigerId the asset had, if any. */
     BinId removeAsset(const std::string& assetId);
 
-    double updateAsset(const std::string& assetId, uint64_t size);
+    double updateAsset(const std::string& assetId, uint64_t diskUsage);
 
     uint64_t totalDiskUsage() const;
+    uint64_t totalDiskAllocation() const;
 
     /** Returns assetId for asset */
     std::string lookupTiger( const BinId& tigerId ) const;

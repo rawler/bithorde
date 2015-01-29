@@ -47,7 +47,8 @@ CacheManager::CacheManager( GrandCentralDispatch& gcd, IAssetSource& router, con
 void CacheManager::describe(management::Info& target) const
 {
 	auto diskUsage = store::AssetStore::diskUsage();
-	target << "capacity: " << (_maxSize/(1024*1024)) << "MB, used: " << (diskUsage/(1024*1024)) << "MB (" << (int)((diskUsage*100)/_maxSize) << "%)";
+	auto diskAllocation = _index.totalDiskAllocation();
+	target << "capacity: " << (_maxSize/(1024*1024)) << "MB, used: " << (diskUsage/(1024*1024)) << "MB (" << (int)((diskUsage*100)/_maxSize) << "\%), allocated: " << (diskAllocation/(1024*1024)) << "MB";
 }
 
 void CacheManager::inspect(management::InfoList& target) const

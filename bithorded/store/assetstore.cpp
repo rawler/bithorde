@@ -81,7 +81,7 @@ boost::filesystem::path AssetStore::newAsset()
 		assetId = randomAlphaNumeric(20);
 		assetPath = _assetsFolder / assetId;
 	} while (fs::exists( assetPath ));
-	_index.addAsset(assetId, BinId::EMPTY, 0, time(NULL));
+	_index.addAsset(assetId, BinId::EMPTY, 0, 0, time(NULL));
 	return assetPath;
 }
 
@@ -101,7 +101,7 @@ void AssetStore::update_asset(const BitHordeIds& ids, const boost::shared_ptr<St
 	}
 
 	auto assetPath = _assetsFolder / assetId;
-	_index.addAsset(assetId, tigerId, assetDiskUsage(assetPath), fs::last_write_time(assetPath));
+	_index.addAsset(assetId, tigerId, assetDiskUsage(assetPath), assetDiskAllocated(assetPath), fs::last_write_time(assetPath));
 
 	if (!tigerId.empty()) {
 		fs::path link = _tigerFolder / tigerId.base32();
@@ -114,6 +114,21 @@ void AssetStore::update_asset(const BitHordeIds& ids, const boost::shared_ptr<St
 uint64_t AssetStore::diskUsage() const
 {
 	return _index.totalDiskUsage();
+}
+
+uint64_t AssetStore::assetDiskAllocated(const boost::filesystem::path& path) const
+{
+	uint64_t res=0;
+    if(fs::is_directory(path)) {
+	    fs::recursive_directory_iterator end;
+	    for(fs::recursive_directory_iterator it(path); it != end; ++it) {
+	        if(!fs::is_directory(*it))
+	            res+=fs::file_size(*it);
+	    }
+	} else {
+		res = fs::file_size(path);
+	}
+	return res;
 }
 
 uint64_t AssetStore::assetDiskUsage(const boost::filesystem::path& path) const
@@ -217,7 +232,7 @@ void AssetStore::loadIndex()
 			throw std::runtime_error(err.str());
 		}
 
-		_index.addAsset(assetPath.filename().native(), BinId::fromBase32(tigerLink.filename().native()), assetDiskUsage(assetPath), fs::last_write_time(assetPath));
+		_index.addAsset(assetPath.filename().native(), BinId::fromBase32(tigerLink.filename().native()), assetDiskUsage(assetPath), assetDiskAllocated(assetPath), fs::last_write_time(assetPath));
 	}
 
 	LOG4CPLUS_DEBUG(bithorded::storeLog, "starting scan of " << _assetsFolder);
