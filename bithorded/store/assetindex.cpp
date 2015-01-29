@@ -76,6 +76,8 @@ double AssetIndexEntry::addScore(float amount) {
     return _score;
 }
 
+/***** AssetIndex *****/
+
 void AssetIndex::inspect(management::InfoList& target) const
 {
     std::multimap<double, AssetIndexEntry*> scoreMap;
@@ -90,4 +92,92 @@ void AssetIndex::inspect(management::InfoList& target) const
         auto asset = kv.second;
         target.append("urn:tree:tiger:" + asset->tigerId().base32()) << std::fixed << std::setprecision(1) << (kv.first-lowest) << '\t' << asset->size();
     }
+}
+
+size_t AssetIndex::assetCount() const {
+    return _assetMap.size();
+}
+
+void AssetIndex::addAsset(const std::string& assetId, const BinId& tigerId, uint64_t size, double score) {
+    auto ptr = new AssetIndexEntry(assetId, tigerId, size, score);
+    auto& slot = _assetMap[assetId];
+    if (slot) {
+        _tigerMap.erase(slot->tigerId());
+    }
+    slot = std::unique_ptr<AssetIndexEntry>(ptr);
+    if (!tigerId.empty()) {
+        _tigerMap[tigerId] = ptr;
+    }
+}
+
+/** Returns the tigerId the asset had, if any. */
+BinId AssetIndex::removeAsset(const std::string& assetId) {
+    BinId tigerId;
+    auto iter = _assetMap.find(assetId);
+    if ( iter != _assetMap.end() ) {
+        tigerId = iter->second->tigerId();
+        _tigerMap.erase(tigerId);
+        _assetMap.erase(iter);
+    }
+    return tigerId;
+}
+
+double AssetIndex::updateAsset(const std::string& assetId, uint64_t size) {
+    auto iter = _assetMap.find(assetId);
+    if ( iter != _assetMap.end() ) {
+        auto& assetPtr = iter->second;
+        auto oldSize = assetPtr->size();
+        if (size == 0) {
+            size = oldSize;
+        }
+        auto diff = oldSize - size;
+        auto addition = static_cast<float>(diff) / size;
+        addition = std::max(addition, 0.01f);
+        addition = std::min(addition, 0.5f);
+        return assetPtr->addScore(addition);
+    } else {
+        return 0.0f;
+    }
+}
+
+uint64_t AssetIndex::totalSize() const {
+    uint64_t result = 0;
+    for (auto& kv : _assetMap) {
+        result += kv.second->size();
+    }
+    return result;
+}
+
+/** Returns assetId for asset */
+std::string AssetIndex::lookupTiger( const BinId& tigerId ) const {
+    auto res = _tigerMap.find(tigerId);
+    if ( res != _tigerMap.end() ) {
+        return res->second->assetId();
+    } else {
+        return std::string();
+    }
+}
+
+/** Returns tigerId for asset */
+const BinId& AssetIndex::lookupAsset( const std::string& assetId ) const {
+    auto res = _assetMap.find(assetId);
+    if ( res != _assetMap.end() ) {
+        return res->second->tigerId();
+    } else {
+        return BinId::EMPTY;
+    }
+}
+
+/** Returns the assetId for the asset in index with lowest score*/
+std::string AssetIndex::pickLooser() const {
+    std::string resultId;
+    double resultScore = std::numeric_limits<float>::max();
+    for (auto& kv : _assetMap) {
+        const auto& entry = kv.second;
+        if (entry->score() < resultScore) {
+            resultScore = entry->score();
+            resultId = entry->assetId();
+        }
+    }
+    return resultId;
 }
