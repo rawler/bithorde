@@ -225,6 +225,7 @@ void AssetStore::loadIndex()
 		} catch (fs::filesystem_error) {
 			LOG4CPLUS_WARN(bithorded::storeLog, "dangling link in " << tigerLink);
 			unlink(tigerLink);
+			continue;
 		}
 		if (!boost::starts_with(assetPath, _assetsFolder)) {
 			std::ostringstream err;
@@ -232,7 +233,17 @@ void AssetStore::loadIndex()
 			throw std::runtime_error(err.str());
 		}
 
-		_index.addAsset(assetPath.filename().native(), BinId::fromBase32(tigerLink.filename().native()), assetDiskUsage(assetPath), assetDiskAllocated(assetPath), fs::last_write_time(assetPath));
+		auto assetUsed = assetDiskUsage(assetPath);
+		auto assetAllocated = assetDiskAllocated(assetPath);
+		auto fillPercent = (assetUsed * 100) / assetAllocated;
+
+		if (fillPercent >= 3) {
+			_index.addAsset(assetPath.filename().native(), BinId::fromBase32(tigerLink.filename().native()), assetUsed, assetAllocated, fs::last_write_time(assetPath));
+		} else {
+			LOG4CPLUS_DEBUG(bithorded::storeLog, "removing almost empty asset: urn:tree:tiger:" << tigerLink.filename());
+			unlink(tigerLink);
+			size_cleared += remove_file_recursive(assetPath);
+		}
 	}
 
 	LOG4CPLUS_DEBUG(bithorded::storeLog, "starting scan of " << _assetsFolder);
