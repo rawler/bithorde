@@ -67,30 +67,13 @@ void AssetStore::openOrCreate()
 boost::filesystem::path AssetStore::newAsset()
 {
 	fs::path assetPath;
+	std::string assetId;
 	do {
-		assetPath = _assetsFolder / randomAlphaNumeric(20);
+		assetId = randomAlphaNumeric(20);
+		assetPath = _assetsFolder / assetId;
 	} while (fs::exists( assetPath ));
+	_index.addAsset(assetId, BinId::EMPTY, 0, time(NULL));
 	return assetPath;
-}
-
-void AssetStore::purge_links(const boost::shared_ptr< StoredAsset >& asset, const BitHordeIds& except)
-{
-	// TODO: use _index for this
-	auto assetId = asset->id();
-	fs::directory_iterator end;
-	auto tgt = _assetsFolder / assetId;
-	boost::system::error_code ec;
-	std::set<fs::path> exceptions;
-	for (auto iter = except.begin(); iter != except.end(); ++iter) {
-		if (iter->type() == bithorde::HashType::TREE_TIGER)
-			exceptions.insert(iter->id());
-	}
-	for (fs::directory_iterator iter(_tigerFolder); iter != end; ++iter) {
-		if (fs::is_symlink(iter->status())) {
-			if ((fs::absolute(fs::read_symlink(_tigerFolder/iter->path(), ec), _tigerFolder) == tgt) && !exceptions.count(iter->path()))
-				unlink(_tigerFolder / iter->path());
-		}
-	}
 }
 
 void AssetStore::update_links(const BitHordeIds& ids, const boost::shared_ptr<StoredAsset>& asset)
@@ -98,9 +81,15 @@ void AssetStore::update_links(const BitHordeIds& ids, const boost::shared_ptr<St
 	auto tigerId = findBithordeId(ids, bithorde::HashType::TREE_TIGER);
 	if (tigerId.empty())
 		return;
-	purge_links(asset, ids);
 
 	auto assetId = asset->id();
+
+	auto oldTiger = _index.lookupAsset(assetId);
+	if ((!oldTiger.empty()) && (oldTiger != tigerId)) {
+		LOG4CPLUS_WARN(bithorded::storeLog, "asset " << assetId << " were linked by the wrong tthsum " << oldTiger);
+		unlink(_tigerFolder/oldTiger);
+	}
+
 	auto assetPath = _assetsFolder / assetId;
 	_index.addAsset(assetId, tigerId, assetFullSize(assetPath), fs::last_write_time(assetPath));
 
@@ -109,18 +98,6 @@ void AssetStore::update_links(const BitHordeIds& ids, const boost::shared_ptr<St
 		fs::remove(link);
 
 	fs::create_relative_symlink(_assetsFolder / assetId, link);
-}
-
-
-boost::filesystem::path AssetStore::resolveIds(const BitHordeIds& ids)
-{
-	auto tigerId = findBithordeId(ids, bithorde::HashType::TREE_TIGER);
-	auto assetId = _index.lookupTiger(tigerId);
-	if ( assetId.size() ) {
-		return _assetsFolder / assetId;
-	} else {
-		return fs::path();
-	}
 }
 
 boost::filesystem::directory_iterator AssetStore::assetIterator() const
@@ -183,10 +160,18 @@ uintmax_t remove_file_recursive(const fs::path& path) {
 	return size_freed;
 }
 
+uintmax_t AssetStore::removeAsset(const std::string& assetId) noexcept
+{
+	return removeAsset(_assetsFolder / assetId);
+}
+
 uintmax_t AssetStore::removeAsset(const boost::filesystem::path& assetPath) noexcept
 {
 	LOG4CPLUS_INFO(bithorded::storeLog, "removing asset " << assetPath.filename());
-	_index.removeAsset(assetPath.filename().native());
+	auto tigerId = _index.removeAsset(assetPath.filename().native());
+	if (!tigerId.empty()) {
+		unlink(_tigerFolder / tigerId);
+	}
 	return remove_file_recursive(assetPath);
 }
 
@@ -196,25 +181,6 @@ void AssetStore::unlink(const fs::path& linkPath) noexcept
 	fs::remove(linkPath, err);
 	if (err && (err.value() != boost::system::errc::no_such_file_or_directory)) {
 		LOG4CPLUS_WARN(bithorded::storeLog, "error removing asset-link " << linkPath << "; " << err);
-	}
-}
-
-void AssetStore::unlinkAndRemove(const boost::filesystem::path& linkPath) noexcept
-{
-	boost::system::error_code e;
-	auto asset = fs::canonical(linkPath, e);
-	unlink(linkPath);
-	if (!e)
-		removeAsset(asset);
-}
-
-void AssetStore::unlinkAndRemove(const BitHordeIds& ids) noexcept
-{
-	for (auto iter=ids.begin(); iter != ids.end(); iter++) {
-		if (iter->type() == bithorde::HashType::TREE_TIGER) {
-			fs::path hashLink = _tigerFolder / iter->id();
-			unlinkAndRemove(hashLink);
-		}
 	}
 }
 
@@ -263,25 +229,29 @@ void AssetStore::loadIndex()
 
 IAsset::Ptr AssetStore::openAsset(const bithorde::BindRead& req)
 {
-	auto linkPath = resolveIds(req.ids());
-	auto assetPath = linkPath.empty() ? fs::path() : fs::canonical(linkPath);
-	if (assetPath.empty())
+	auto tigerId = findBithordeId(req.ids(), bithorde::HashType::TREE_TIGER);
+	if (tigerId.empty())
 		return IAsset::Ptr();
-	else try {
+	auto assetId = _index.lookupTiger(tigerId);
+	if (assetId.empty())
+		return IAsset::Ptr();
+
+	auto assetPath = _assetsFolder / assetId;
+	try {
 		if (auto res = openAsset(assetPath)) {
 			return res;
 		} else {
-			unlinkAndRemove(linkPath);
+			removeAsset(assetPath);
 		}
 	} catch (const boost::system::system_error& e) {
 		if (e.code().value() == bsys::errc::no_such_file_or_directory) {
-			LOG4CPLUS_ERROR(storeLog, "Linked asset " << linkPath << "broken. Purging...");
-			unlinkAndRemove(linkPath);
+			LOG4CPLUS_ERROR(storeLog, "Linked asset " << assetPath << "broken. Purging...");
+			removeAsset(assetPath);
 		} else if (e.code().value() == bsys::errc::file_exists) {
-			LOG4CPLUS_ERROR(storeLog, "Linked asset " << linkPath << "exists with wrong size. Purging...");
-			unlinkAndRemove(linkPath);
+			LOG4CPLUS_ERROR(storeLog, "Linked asset " << assetPath << "exists with wrong size. Purging...");
+			removeAsset(assetPath);
 		} else {
-			LOG4CPLUS_ERROR(storeLog, "Failed to open " << linkPath << " with unknown error " << e.what());
+			LOG4CPLUS_ERROR(storeLog, "Failed to open " << assetPath << " with unknown error " << e.what());
 		}
 	} catch (const std::ios::failure& e) {
 		LOG4CPLUS_ERROR(storeLog, "Failed to open " << assetPath << " with unknown error " << e.what());

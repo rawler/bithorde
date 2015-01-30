@@ -114,30 +114,17 @@ UpstreamRequestBinding::Ptr CacheManager::findAsset(const bithorde::BindRead& re
 
 bool CacheManager::makeRoom(uint64_t size)
 {
-	while ((store::AssetStore::size()+size) > _maxSize) {
-		auto looser = pickLooser();
-		if (looser.empty())
+	int64_t needed = (store::AssetStore::size()+size) - _maxSize;
+	int64_t freed = 0;
+	while (needed > freed) {
+		auto looser = _index.pickLooser();
+		if (looser.empty()) {
 			return false;
-		else
-			AssetStore::removeAsset(looser);
-	}
-	return true;
-}
-
-fs::path CacheManager::pickLooser() {
-	// TODO: update mtime on access (support both FIFO and LRU?)
-	fs::path looser;
-	std::time_t oldest=-1;
-	fs::directory_iterator end;
-	for (auto iter=AssetStore::assetIterator(); iter != end; iter++) {
-		auto age = fs::last_write_time(iter->path());
-		if ((oldest == -1) || (age < oldest)) {
-			oldest = age;
-			looser = iter->path();
+		} else {
+			freed += AssetStore::removeAsset(looser);
 		}
 	}
-
-	return looser;
+	return true;
 }
 
 void CacheManager::linkAsset(CachedAsset::WeakPtr asset_)
@@ -152,4 +139,3 @@ void CacheManager::linkAsset(CachedAsset::WeakPtr asset_)
 		AssetStore::update_links(ids, asset);
 	}
 }
-

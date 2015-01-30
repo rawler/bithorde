@@ -3,6 +3,8 @@
 
 #include <ostream>
 
+#include <boost/filesystem/path.hpp>
+
 #include <crypto++/basecode.h>
 
 #include "bithorde.pb.h"
@@ -86,12 +88,6 @@ namespace std
 	        return std::hash<std::string>()(c.raw());
 	    }
 	};
-}
-
-namespace boost {
-	namespace filesystem {
-		class path;
-	}
 }
 
 std::ostream& operator<<(std::ostream& str, const BitHordeIds& ids);

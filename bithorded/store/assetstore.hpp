@@ -44,10 +44,7 @@ public:
 
 	boost::filesystem::path newAsset();
 
-	void purge_links(const boost::shared_ptr<StoredAsset>& asset, const BitHordeIds& except);
 	void update_links(const BitHordeIds& ids, const boost::shared_ptr<StoredAsset>& asset);
-
-	boost::filesystem::path resolveIds(const BitHordeIds& ids);
 
 	/**
 	 * Returns iterator allowing iterating over the assets in the store.
@@ -64,17 +61,17 @@ public:
 	 */
 	uintmax_t assetFullSize(const boost::filesystem::path& path) const;
 
+	uintmax_t removeAsset(const std::string& assetId) noexcept;
 	uintmax_t removeAsset(const boost::filesystem::path& assetPath) noexcept;
-	void unlink(const boost::filesystem::path& linkPath) noexcept;
-	void unlinkAndRemove(const boost::filesystem::path& linkPath) noexcept;
-	void unlinkAndRemove(const BitHordeIds& ids) noexcept;
-
 protected:
     AssetIndex _index;
     virtual void loadIndex();
 
     virtual IAsset::Ptr openAsset(const bithorde::BindRead& req);
 	virtual IAsset::Ptr openAsset(const boost::filesystem::path& assetPath) = 0;
+
+private:
+	void unlink(const boost::filesystem::path& linkPath) noexcept;
 };
 } }
 

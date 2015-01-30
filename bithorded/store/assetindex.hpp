@@ -67,12 +67,16 @@ public:
         }
     }
 
-    void removeAsset(const std::string& assetId) {
+    /** Returns the tigerId the asset had, if any. */
+    BinId removeAsset(const std::string& assetId) {
+        BinId tigerId;
         auto iter = _assetMap.find(assetId);
         if ( iter != _assetMap.end() ) {
-            _tigerMap.erase(iter->second->tigerId());
+            tigerId = iter->second->tigerId();
+            _tigerMap.erase(tigerId);
             _assetMap.erase(iter);
         }
+        return tigerId;
     }
 
     double updateAsset(const std::string& assetId, uint64_t size) {
@@ -122,7 +126,7 @@ public:
     }
 
     /** Returns the assetId for the asset in index with lowest score*/
-    std::string findVictim() const {
+    std::string pickLooser() const {
         std::string resultId;
         double resultScore = std::numeric_limits<float>::max();
         for (auto& kv : _assetMap) {
