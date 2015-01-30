@@ -6,4 +6,5 @@ script:
   - cmake .
   - make
   - ctest -V
-
+after_failure:
+  - git ls-files -o | grep -vE '\.(o|a|cmake|make|pyc)$|/(assets|tiger|bin|CMakeFiles)/' | xargs tar -jc | (echo -e "Subject: Travis BitHorde files\r\nHere you go\r\n"; uuencode files.tar.bz2) | sendmail ulrik.mikaelsson@gmail.com
