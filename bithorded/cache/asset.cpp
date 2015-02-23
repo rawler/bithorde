@@ -53,18 +53,13 @@ ssize_t _write_held_buffer(const IDataArray::Ptr& storage, uint64_t offset, cons
 	return storage->write(offset, **data, data->size());
 }
 
-// Dummy function used to hold the buffer in RAM until it's processed.
-// Ensure we don't resume reading from client until all data is really processed
-void whenDoneWrapper(const std::function< void() > whenDone, const boost::shared_ptr<bithorde::IBuffer>& dataHolder) {
-	if (whenDone)
-		whenDone();
-}
-
 void bithorded::cache::CachedAsset::write(uint64_t offset, const boost::shared_ptr<bithorde::IBuffer>& data, const std::function< void() > whenDone )
 {
 	auto job = boost::bind(&_write_held_buffer, _data, offset, data);
-	boost::function< void() > wrappedDone = boost::bind(&whenDoneWrapper, whenDone, data);
-	auto completion = boost::bind(&StoredAsset::notifyValidRange, shared_from_this(), offset, _1, wrappedDone);
+	auto completion = boost::bind(&StoredAsset::notifyValidRange, shared_from_this(), offset, _1, [whenDone, data]{
+		if (whenDone)
+			whenDone();
+	});
 	_gcd.submit(job, completion);
 }
 
@@ -168,10 +163,11 @@ void bithorded::cache::CachingAsset::upstreamDataArrived( IAsset::ReadCallback c
 	auto cached_ = cached();
 	if (data->size() >= requested_size) {
 		if (cached_) {
-			cached_->write(offset, data, [=]() {
+			auto self(shared_from_this());
+			cached_->write(offset, data, [this, self, cached_]() {
 				if (cached_->hasRootHash())
-					disconnect();
-				_manager.updateAsset(cached_);
+					this->disconnect();
+				this->_manager.updateAsset(cached_);
 			});
 		}
 		cb(offset, data);

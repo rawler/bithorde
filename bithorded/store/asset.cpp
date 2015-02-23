@@ -165,17 +165,15 @@ struct HashTail : public boost::enable_shared_from_this<HashTail> {
 		whenDone(whenDone)
 	{}
 
-	// Function to run asynchronously from main-thread, to force update asset-status,
-	// and possibly call callback when done.
-	static void whenDoneWrapper(const boost::shared_ptr<StoredAsset>& asset, std::function<void()> whenDone) {
-		asset->updateStatus();
-		if (whenDone) {
-			whenDone();
-		}
-	}
-
 	~HashTail() {
-		gcd.ioService().post(boost::bind(&HashTail::whenDoneWrapper, asset, whenDone));
+		auto asset(this->asset);
+		auto whenDone(this->whenDone);
+		gcd.ioService().post([asset, whenDone]{
+			asset->updateStatus();
+			if (whenDone) {
+				whenDone();
+			}
+		});
 	}
 
 	bool empty() const { return offset >= end; }
