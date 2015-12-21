@@ -558,8 +558,7 @@ bool Client::informBound(const AssetBinding& asset, int timeout_ms)
 	msg.set_timeout(timeout_ms);
 	msg.mutable_requesters()->MergeFrom(asset.requesters());
 
-	ReadAsset * readAsset = asset.readAsset();
-	if (readAsset) {
+	if (auto readAsset = asset.readAsset()) {
 		msg.mutable_ids()->CopyFrom(readAsset->requestIds());
 		return sendMessage(Connection::MessageType::BindRead, msg, Message::in(timeout_ms), false);
 	} else {

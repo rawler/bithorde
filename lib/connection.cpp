@@ -24,7 +24,7 @@ const size_t K = 1024;
 const size_t MAX_MSG = 130*K;
 const size_t MAX_ERRORS = 5;
 const size_t SEND_BUF = 1024*K;
-const size_t SEND_BUF_EMERGENCY = SEND_BUF + 64*K;
+const size_t SEND_BUF_EMERGENCY = SEND_BUF + 256*K;
 const size_t SEND_BUF_LOW_WATER_MARK = SEND_BUF/4;
 const size_t SEND_CHUNK_MS = 50;
 
@@ -49,7 +49,7 @@ public:
 		: Connection(ioSvc, stats), _socket(new Socket(ioSvc))
 	{
 		std::ostringstream buf;
-		buf << addr; 
+		buf << addr;
 		setLogTag(buf.str());
 
 		_socket->connect(addr);
@@ -59,7 +59,7 @@ public:
 		: Connection(ioSvc, stats)
 	{
 		std::ostringstream buf;
-		buf << socket->remote_endpoint(); 
+		buf << socket->remote_endpoint();
 		setLogTag(buf.str());
 
 		_socket = socket;
@@ -359,8 +359,13 @@ void Connection::setLogTag(const std::string& tag)
 bool Connection::sendMessage(Connection::MessageType type, const google::protobuf::Message& msg, const Message::Deadline& expires, bool prioritized)
 {
 	size_t bufLimit = prioritized ? SEND_BUF_EMERGENCY : SEND_BUF;
-	if (_sndQueue.size() > bufLimit)
+	if (_sndQueue.size() > bufLimit) {
+		if (prioritized) {
+			cerr << _logTag << ": Prioritized overflow. Closing." << endl;
+			close();
+		}
 		return false;
+	}
 
 	boost::shared_ptr<Message> buf(new Message(expires));
 	// Encode
