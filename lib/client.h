@@ -19,7 +19,7 @@ namespace bithorde {
 
 const boost::posix_time::millisec DEFAULT_ASSET_TIMEOUT(1500);
 const boost::posix_time::millisec UPLOAD_ASSET_TIMEOUT(15000);
-const boost::posix_time::millisec CLOSE_TIMEOUT(300);
+const boost::posix_time::millisec CLOSE_TIMEOUT(DEFAULT_ASSET_TIMEOUT);
 const int MAX_ASSETS(1024);
 
 class Client;

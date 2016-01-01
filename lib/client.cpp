@@ -86,8 +86,13 @@ void AssetBinding::onTimeout()
 		msg.set_status(bithorde::Status::TIMEOUT);
 		_asset->handleMessage(msg);
 	} else if (_client) {
-		_client->informBound(*this, LOTS_OF_MILLISECONDS);
-		setTimer(CLOSE_TIMEOUT);
+		if (_client->informBound(*this, LOTS_OF_MILLISECONDS)) {
+			setTimer(CLOSE_TIMEOUT);
+		} else {
+			cerr << "Warning: informBound failed in AssetBinding::onTimeout." << endl;
+		}
+	} else {
+		cerr << "Warning: onTimeout() for stale AssetBinding" << endl;
 	}
 }
 
