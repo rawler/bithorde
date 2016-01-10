@@ -4,7 +4,7 @@ from bithordetest import message, BithordeD, TestConnection
 
 if __name__ == '__main__':
     bithorded = BithordeD(config={
-        'friend.evilservant.addr': ''
+        'friend.evilservant.addr': '',
     })
     conn = TestConnection(bithorded, name='tester')
     server = TestConnection(bithorded, name='evilservant')
@@ -22,8 +22,10 @@ if __name__ == '__main__':
     # Close upstream server
     server.close()
     bithorded.wait_for("Disconnected: evilservant")
-    conn.expect(message.Read.Response(reqId=1, status=message.NOTFOUND, offset=0, content=''))
-    conn.expect(message.AssetStatus(handle=1, status=message.NOTFOUND))
+    conn.expect([
+        message.Read.Response(reqId=1, status=message.NOTFOUND, offset=0),
+        message.AssetStatus(handle=1, status=message.NOTFOUND),
+    ])
 
     # Reconnect upstream server
     server = TestConnection(bithorded, name='evilservant')

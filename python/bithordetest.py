@@ -55,8 +55,21 @@ class TestConnection:
     def push(self, str):
         self._socket.send(str)
 
+    @staticmethod
+    def _crit_str(crit):
+        if isinstance(crit, type):
+            return str(crit)
+        elif isinstance(crit, Message):
+            return "%s(%s)" % (type(crit), crit)
+
     @classmethod
     def _matches(cls, msg, criteria):
+        if hasattr(criteria, '__iter__'):
+            for crit in criteria:
+                if cls._matches(msg, crit):
+                    return crit
+            return None
+
         if isinstance(criteria, type):
             return isinstance(msg, criteria)
         elif isinstance(criteria, Message):
@@ -65,18 +78,34 @@ class TestConnection:
             for field, value in criteria.ListFields():
                 if getattr(msg, field.name) != value:
                     return False
-            return True
+            return criteria
         else:
             assert False, "Criteria %s not supported" % criteria
 
-    def expect(self, criteria):
+    def _check_next(self, criteria):
         next = self.next()
-        assert self._matches(next, criteria), "Next message %s did not match expected %s" % (next, criteria)
-        return next
+        crit = self._matches(next, criteria)
+        assert crit, "Next message %s did not match expected %s" % (next, criteria)
+        return next, crit
+
+    def expect(self, criteria):
+        if hasattr(criteria, '__iter__'):
+            criteria = list(criteria)
+            res = list()
+            while criteria:
+                next, crit = self._check_next(criteria)
+                print "  -> Matched ", self._crit_str(crit)
+                res.append(next)
+                criteria.remove(crit)
+            return res
+        else:
+            next, crit = self._check_next(criteria)
+            return next
 
     def auth(self, name="bhtest"):
         self.send(message.HandShake(name=name, protoversion=2))
         self.expect(message.HandShake)
+
 
 class BithordeD(Process):
     def __init__(self, label='bithorded', bithorded=os.environ.get('BITHORDED', 'bithorded'), config={}):
@@ -87,7 +116,7 @@ class BithordeD(Process):
             server_cfg.setdefault('inspectPort', 0)
             server_cfg.setdefault('unixSocket', "bhtest-sock-%d-%d" % suffix)
             cache_cfg = config.setdefault('cache', {})
-            if not cache_cfg.get('dir'):
+            if not 'dir' in cache_cfg:
                 d = 'bhtest-cache-%d-%d' % suffix
                 os.mkdir(d)
                 cache_cfg['dir'] = d
