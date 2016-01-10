@@ -2,7 +2,6 @@
 #include <vector>
 #include <crypto++/tiger.h>
 #include <boost/filesystem.hpp>
-#include <boost/make_shared.hpp>
 #include <boost/test/unit_test.hpp>
 
 #include <bithorded/lib/treestore.hpp>
@@ -49,15 +48,15 @@ public:
 
 BOOST_AUTO_TEST_CASE( hashstore_exceptions )
 {
-	BOOST_CHECK_THROW( new HashStore(boost::make_shared<TestArray>(0)), ios_base::failure );
-	BOOST_CHECK_THROW( new HashStore(boost::make_shared<TestArray>(1)), ios_base::failure );
+	BOOST_CHECK_THROW( new HashStore(std::make_shared<TestArray>(0)), ios_base::failure );
+	BOOST_CHECK_THROW( new HashStore(std::make_shared<TestArray>(1)), ios_base::failure );
 }
 
 BOOST_AUTO_TEST_CASE( assetmeta_random_sequence )
 {
 	const uint LEAVES = 7;
 
-	auto array = boost::make_shared<TestArray>(treesize(LEAVES)*sizeof(TigerBaseNode));
+	auto array = std::make_shared<TestArray>(treesize(LEAVES)*sizeof(TigerBaseNode));
 	{
 		HashStore store(array);
 		TigerTree tree(store, 0);
@@ -101,7 +100,7 @@ BOOST_AUTO_TEST_CASE( wild_index_jump )
 {
 	const uint LEAVES = 16*1024;
 
-	auto array = boost::make_shared<TestArray>(treesize(LEAVES)*sizeof(TigerBaseNode));
+	auto array = std::make_shared<TestArray>(treesize(LEAVES)*sizeof(TigerBaseNode));
 	HashStore store(array);
 
 	auto first = store[0];

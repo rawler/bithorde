@@ -17,7 +17,6 @@
 
 #include "asset.hpp"
 
-#include <boost/make_shared.hpp>
 #include <boost/filesystem.hpp>
 #include <vector>
 

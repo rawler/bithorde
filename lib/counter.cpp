@@ -1,5 +1,5 @@
 /*
-    Copyright 2013 <copyright holder> <email>
+    Copyright 2015 Ulrik Mikaelsson <ulrik.mikaelsson@gmail.com>
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 
 #include "counter.h"
 
-#include <boost/bind.hpp>
+#include <functional>
 
 TypedValue::TypedValue(const std::string& unit)
 	: _value(0), unit(unit)
@@ -65,7 +65,7 @@ uint64_t InertialValue::post(uint64_t amount)
 }
 
 LazyCounter::LazyCounter(TimerService& ts, const std::string& unit, const boost::posix_time::time_duration& granularity, float falloff)
-	: Counter(unit), _timer(ts, boost::bind(&LazyCounter::tick, this), granularity), _value(falloff, unit)
+	: Counter(unit), _timer(ts, std::bind(&LazyCounter::tick, this), granularity), _value(falloff, unit)
 {
 }
 

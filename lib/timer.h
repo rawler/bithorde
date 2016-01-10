@@ -19,18 +19,17 @@
 #define TIMER_H
 
 #include <boost/asio/deadline_timer.hpp>
-#include <boost/function.hpp>
-#include <boost/enable_shared_from_this.hpp>
+#include <functional>
 #include <map>
 
 class Timer;
 
-class TimerService : public boost::enable_shared_from_this<TimerService> {
+class TimerService : public std::enable_shared_from_this<TimerService> {
 friend class Timer;
 	std::multimap<boost::posix_time::ptime, Timer*> _timers;
 	boost::asio::deadline_timer _timer;
 public:
-	typedef boost::shared_ptr<TimerService> Ptr;
+	typedef std::shared_ptr<TimerService> Ptr;
 	TimerService(boost::asio::io_service& ioSvc);
 protected:
 	void arm(boost::posix_time::ptime deadline, Timer* t);
@@ -44,7 +43,7 @@ class Timer : private boost::noncopyable
 {
 friend class TimerService;
 public:
-	typedef boost::function<void (const boost::posix_time::ptime& now)> Target;
+	typedef std::function<void (const boost::posix_time::ptime& now)> Target;
 private:
 	TimerService* _ts;
 	Target _target;

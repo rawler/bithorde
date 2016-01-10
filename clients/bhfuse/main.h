@@ -39,14 +39,14 @@ public:
 
 public:
 	void onConnected(bithorde::Client&, std::string remoteName);
-	FUSEAsset * registerAsset(boost::shared_ptr< bithorde::ReadAsset > asset);
+	FUSEAsset * registerAsset(std::shared_ptr< bithorde::ReadAsset > asset);
 	void reconnect();
 
 	TimerService& timerSvc();
 private:
 	bool unrefInode(fuse_ino_t ino, int count);
 
-	boost::shared_ptr<TimerService> _timerSvc;
+	std::shared_ptr<TimerService> _timerSvc;
 
 	INodeCache _inode_cache;
 

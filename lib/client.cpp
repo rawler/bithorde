@@ -5,10 +5,11 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/asio/placeholders.hpp>
 #include <boost/assert.hpp>
-#include <boost/bind.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/lexical_cast.hpp>
+#include <functional>
 #include <iostream>
+#include <memory>
 #include <string.h>
 
 #include <crypto++/hmac.h>
@@ -42,7 +43,7 @@ AssetBinding::AssetBinding(Client* client, Asset* asset, Asset::Handle handle) :
 	_client(client),
 	_asset(asset),
 	_handle(handle),
-	_statusTimer(*client->_timerSvc, boost::bind(&AssetBinding::onTimeout, this))
+	_statusTimer(*client->_timerSvc, std::bind(&AssetBinding::onTimeout, this))
 {
 	_opened_at = boost::posix_time::microsec_clock::universal_time();
 }
@@ -236,12 +237,12 @@ bool Client::sendMessage(Connection::MessageType type, const google::protobuf::M
 
 void Client::allocateBytes ( size_t bytes ) {
 	Client::WeakPtr self(shared_from_this());
-	_ioSvc.post(boost::bind(boost::weak_fn(&Client::trackAllocation, self), bytes));
+	_ioSvc.post(std::bind(boost::weak_fn(&Client::trackAllocation, self), bytes));
 }
 
 void Client::freeBytes ( size_t bytes ) {
 	Client::WeakPtr self(shared_from_this());
-	_ioSvc.post(boost::bind(boost::weak_fn(&Client::trackAllocation, self), -bytes));
+	_ioSvc.post(std::bind(boost::weak_fn(&Client::trackAllocation, self), -bytes));
 }
 
 void Client::trackAllocation ( ssize_t change ) {
@@ -275,27 +276,27 @@ void Client::onIncomingMessage(Connection::MessageType type, const ::google::pro
 	if (_state == Authenticated) {
 		switch (type) {
 		case Connection::MessageType::BindRead:
-			return onMessage(boost::make_shared< MessageContext<bithorde::BindRead> >(shared_from_this(), (bithorde::BindRead&) msg));
+			return onMessage(std::make_shared< MessageContext<bithorde::BindRead> >(shared_from_this(), (bithorde::BindRead&) msg));
 		case Connection::MessageType::AssetStatus:
-			return onMessage(boost::make_shared< MessageContext<bithorde::AssetStatus> >(shared_from_this(), (bithorde::AssetStatus&) msg));
+			return onMessage(std::make_shared< MessageContext<bithorde::AssetStatus> >(shared_from_this(), (bithorde::AssetStatus&) msg));
 		case Connection::MessageType::ReadRequest:
-			return onMessage(boost::make_shared< MessageContext<bithorde::Read::Request> >(shared_from_this(), (bithorde::Read::Request&) msg));
+			return onMessage(std::make_shared< MessageContext<bithorde::Read::Request> >(shared_from_this(), (bithorde::Read::Request&) msg));
 		case Connection::MessageType::ReadResponse:
-			return onMessage(boost::make_shared< MessageContext<bithorde::Read::Response> >(shared_from_this(), (bithorde::Read::Response&) msg));
+			return onMessage(std::make_shared< MessageContext<bithorde::Read::Response> >(shared_from_this(), (bithorde::Read::Response&) msg));
 		case Connection::MessageType::BindWrite:
-			return onMessage(boost::make_shared< MessageContext<bithorde::BindWrite> >(shared_from_this(), (bithorde::BindWrite&) msg));
+			return onMessage(std::make_shared< MessageContext<bithorde::BindWrite> >(shared_from_this(), (bithorde::BindWrite&) msg));
 		case Connection::MessageType::DataSegment:
-			return onMessage(boost::make_shared< MessageContext<bithorde::DataSegment> >(shared_from_this(), (bithorde::DataSegment&) msg));
+			return onMessage(std::make_shared< MessageContext<bithorde::DataSegment> >(shared_from_this(), (bithorde::DataSegment&) msg));
 		case Connection::MessageType::Ping:
-			return onMessage(boost::make_shared< MessageContext<bithorde::Ping> >(shared_from_this(), (bithorde::Ping&) msg));
+			return onMessage(std::make_shared< MessageContext<bithorde::Ping> >(shared_from_this(), (bithorde::Ping&) msg));
 		default: break;
 		}
 	} else {
 		switch (type) {
 		case Connection::MessageType::HandShake:
-			return onMessage(boost::make_shared< MessageContext<bithorde::HandShake> >(shared_from_this(), (bithorde::HandShake&) msg));
+			return onMessage(std::make_shared< MessageContext<bithorde::HandShake> >(shared_from_this(), (bithorde::HandShake&) msg));
 		case Connection::MessageType::HandShakeConfirmed:
-			return onMessage(boost::make_shared< MessageContext<bithorde::HandShakeConfirmed> >(shared_from_this(), (bithorde::HandShakeConfirmed&) msg));
+			return onMessage(std::make_shared< MessageContext<bithorde::HandShakeConfirmed> >(shared_from_this(), (bithorde::HandShakeConfirmed&) msg));
 		default: break;
 		}
 	}
@@ -307,7 +308,7 @@ void Client::onIncomingMessage(Connection::MessageType type, const ::google::pro
 	close();
 }
 
-void Client::onMessage( const boost::shared_ptr< MessageContext< HandShake > >& msgCtx )
+void Client::onMessage( const std::shared_ptr< MessageContext< HandShake > >& msgCtx )
 {
 	const auto& msg = msgCtx->message();
 	BOOST_ASSERT(_state & SaidHello);
@@ -382,7 +383,7 @@ void Client::setAuthenticated(const std::string peerName)
 	authenticated(*this, peerName);
 }
 
-void Client::onMessage( const boost::shared_ptr< MessageContext< BindRead > >& msgCtx ) {
+void Client::onMessage( const std::shared_ptr< MessageContext< BindRead > >& msgCtx ) {
 	cerr << "unsupported: handling BindRead" << endl;
 	bithorde::AssetStatus resp;
 	resp.set_handle( msgCtx->message().has_handle());
@@ -390,7 +391,7 @@ void Client::onMessage( const boost::shared_ptr< MessageContext< BindRead > >& m
 	sendMessage(Connection::MessageType::AssetStatus, resp);
 }
 
-void Client::onMessage( const boost::shared_ptr< MessageContext< AssetStatus > >& msgCtx ) {
+void Client::onMessage( const std::shared_ptr< MessageContext< AssetStatus > >& msgCtx ) {
 	const auto& msg = msgCtx->message();
 	if (!msg.has_handle())
 		return;
@@ -411,7 +412,7 @@ void Client::onMessage( const boost::shared_ptr< MessageContext< AssetStatus > >
 	}
 }
 
-void Client::onMessage( const boost::shared_ptr< MessageContext< Read::Request > >& msgCtx ) {
+void Client::onMessage( const std::shared_ptr< MessageContext< Read::Request > >& msgCtx ) {
 	cerr << "unsupported: handling Read-Requests" << endl;
 	bithorde::Read::Response resp;
 	resp.set_reqid( msgCtx->message().reqid() );
@@ -419,7 +420,7 @@ void Client::onMessage( const boost::shared_ptr< MessageContext< Read::Request >
 	sendMessage(Connection::MessageType::ReadResponse, resp);
 }
 
-void Client::onMessage( const boost::shared_ptr< MessageContext< Read::Response > >& msgCtx ) {
+void Client::onMessage( const std::shared_ptr< MessageContext< Read::Response > >& msgCtx ) {
 	const auto& msg = msgCtx->message();
 	if (_requestIdMap.count(msg.reqid())) {
 		Asset::Handle assetHandle = _requestIdMap[msg.reqid()];
@@ -439,18 +440,18 @@ void Client::onMessage( const boost::shared_ptr< MessageContext< Read::Response 
 	}
 }
 
-void Client::onMessage( const boost::shared_ptr< MessageContext< BindWrite > >& msgCtx ) {
+void Client::onMessage( const std::shared_ptr< MessageContext< BindWrite > >& msgCtx ) {
 	cerr << "unsupported: handling BindWrite" << endl;
 	bithorde::AssetStatus resp;
 	resp.set_handle(msgCtx->message().handle());
 	resp.set_status(ERROR);
 	sendMessage(Connection::MessageType::AssetStatus, resp);
 }
-void Client::onMessage( const boost::shared_ptr< MessageContext< DataSegment > >& msgCtx ) {
+void Client::onMessage( const std::shared_ptr< MessageContext< DataSegment > >& msgCtx ) {
 	cerr << "unsupported: handling DataSegment-pushes" << endl;
 	close();
 }
-void Client::onMessage( const boost::shared_ptr< MessageContext< HandShakeConfirmed > >& msgCtx ) {
+void Client::onMessage( const std::shared_ptr< MessageContext< HandShakeConfirmed > >& msgCtx ) {
 	const auto& msg = msgCtx->message();
 	CryptoPP::HMAC<CryptoPP::SHA256> digest((const byte*)_key.data(), _key.size());
 	digest.Update((const byte*)_sentChallenge.data(), _sentChallenge.size());
@@ -466,7 +467,7 @@ void Client::onMessage( const boost::shared_ptr< MessageContext< HandShakeConfir
 		setAuthenticated("");
 	}
 }
-void Client::onMessage( const boost::shared_ptr< MessageContext< Ping > >& msgCtx ) {
+void Client::onMessage( const std::shared_ptr< MessageContext< Ping > >& msgCtx ) {
 	if (msgCtx->message().timeout()) {
 		bithorde::Ping reply;
 		auto deadline =  boost::chrono::steady_clock::now() + boost::chrono::milliseconds(msgCtx->message().timeout());
@@ -502,7 +503,7 @@ bool Client::bind(ReadAsset& asset, int timeout_ms, const RouteTrace& requesters
 		BOOST_ASSERT(asset._handle > 0);
 		BOOST_ASSERT(_assetMap.count(asset._handle) == 0);
 		auto& bind = _assetMap[asset._handle];
-		bind = boost::make_shared<AssetBinding>(this, &asset, asset._handle);
+		bind = std::make_shared<AssetBinding>(this, &asset, asset._handle);
 		bind->setTimer(boost::posix_time::millisec(timeout_ms));
 	}
 	 _assetMap[asset._handle]->requesters().CopyFrom(requesters);
@@ -522,7 +523,7 @@ bool Client::bind(UploadAsset & asset, int timeout_ms)
 		timeout_ms = UPLOAD_ASSET_TIMEOUT.total_milliseconds();
 	asset._handle = handle;
 	auto& bind = _assetMap[asset._handle];
-	bind = boost::make_shared<AssetBinding>(this, &asset, asset._handle);
+	bind = std::make_shared<AssetBinding>(this, &asset, asset._handle);
 	bind->setTimer(boost::posix_time::milliseconds(timeout_ms));
 	bithorde::BindWrite msg;
 	msg.set_handle(asset._handle);

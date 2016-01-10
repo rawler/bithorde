@@ -111,12 +111,23 @@ BHFuse::BHFuse(asio::io_service& ioSvc, string bithorded, const BHFuseOptions& o
 	ioSvc(ioSvc),
 	bithorded(bithorded),
 	opts(opts),
-	_timerSvc(boost::make_shared<TimerService>(ioSvc)),
+	_timerSvc(std::make_shared<TimerService>(ioSvc)),
 	_ino_allocator(2)
 {
 	client = Client::create(ioSvc, "bhfuse");
-	client->authenticated.connect(boost::bind(&BHFuse::onConnected, this, _1, _2));
-	client->disconnected.connect(boost::bind(&BHFuse::reconnect, this));
+
+	client->authenticated.connect([=](bithorde::Client& c, std::string remoteName) {
+		if (remoteName.empty()) {
+			(cerr << "Failed authentication" << endl).flush();
+			this->ioSvc.stop();
+		} else {
+			(cerr << "Connected to " << remoteName << endl).flush();
+		}
+	});
+
+	client->disconnected.connect([=]() {
+		reconnect();
+	});
 
 	client->connect(bithorded);
 }
@@ -138,12 +149,6 @@ void BHFuse::reconnect()
 }
 
 void BHFuse::onConnected(bithorde::Client&, std::string remoteName) {
-	if (remoteName.empty()) {
-		(cerr << "Failed authentication" << endl).flush();
-		ioSvc.stop();
-	} else {
-		(cerr << "Connected to " << remoteName << endl).flush();
-	}
 }
 
 void BHFuse::fuse_init(fuse_conn_info* conn)
@@ -224,7 +229,7 @@ int BHFuse::fuse_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, fu
 	}
 }
 
-FUSEAsset * BHFuse::registerAsset(boost::shared_ptr< ReadAsset > asset)
+FUSEAsset * BHFuse::registerAsset(std::shared_ptr< ReadAsset > asset)
 {
 	fuse_ino_t ino = _ino_allocator.allocate();
 	FUSEAsset::Ptr a = FUSEAsset::create(this, ino, asset);

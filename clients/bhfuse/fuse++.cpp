@@ -5,7 +5,6 @@
 #include <iostream>
 
 #include <boost/assert.hpp>
-#include <boost/bind.hpp>
 
 #include <fuse_lowlevel.h>
 #include <fuse_opt.h>
@@ -123,20 +122,18 @@ BoostAsioFilesystem::~BoostAsioFilesystem() {
 		fuse_session_destroy(_fuse_session);
 }
 
-void BoostAsioFilesystem::dispatch_waiting(const boost::system::error_code& error, size_t count) {
-	if (error) {
-		cerr << "ERROR reading from fuse: " << error.message() << endl;
-	} else {
-		fuse_session_process(_fuse_session, (const char*)_receive_buf.ptr, count, _fuse_chan);
-		readNext();
-	}
-}
-
 void BoostAsioFilesystem::readNext()
 {
 	_channel.async_read_some(
 		asio::buffer(_receive_buf.ptr, _receive_buf.capacity),
-		boost::bind(&BoostAsioFilesystem::dispatch_waiting, this, asio::placeholders::error(), asio::placeholders::bytes_transferred())
+		[=](const boost::system::error_code& ec, size_t count) {
+            if (ec) {
+                cerr << "ERROR reading from fuse: " << ec.message() << endl;
+            } else {
+                fuse_session_process(_fuse_session, (const char*)_receive_buf.ptr, count, _fuse_chan);
+                readNext();
+            }
+        }
 	);
 }
 

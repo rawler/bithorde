@@ -20,7 +20,6 @@
 
 #include <boost/asio/io_service.hpp>
 #include <boost/filesystem/path.hpp>
-#include <boost/function.hpp>
 #include <map>
 
 #include "asset.hpp"

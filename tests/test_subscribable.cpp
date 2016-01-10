@@ -1,5 +1,4 @@
 #include <boost/test/unit_test.hpp>
-#include <boost/bind.hpp>
 
 #include "bithorded/lib/subscribable.hpp"
 
@@ -26,7 +25,7 @@ BOOST_AUTO_TEST_CASE( subscribable )
 	somestruct res;
 	res.a = 4;
 
-	s.onChange.connect(boost::bind(&react, &res, _1, _2));
+	s.onChange.connect(std::bind(&react, &res, std::placeholders::_1, std::placeholders::_2));
 
 	{
 		auto guard = s.change();

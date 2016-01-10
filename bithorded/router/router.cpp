@@ -20,7 +20,6 @@
 #include <boost/asio/placeholders.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/lexical_cast.hpp>
-#include <boost/make_shared.hpp>
 #include <unordered_set>
 
 #include <log4cplus/logger.h>
@@ -40,10 +39,10 @@ namespace bithorded { namespace router {
 	log4cplus::Logger routerLog = log4cplus::Logger::getInstance("router");
 } }
 
-class bithorded::router::FriendConnector : public boost::enable_shared_from_this<bithorded::router::FriendConnector> {
+class bithorded::router::FriendConnector : public std::enable_shared_from_this<bithorded::router::FriendConnector> {
 	Server& _server;
 	Config::Friend _f;
-	boost::shared_ptr<boost::asio::ip::tcp::socket> _socket;
+	std::shared_ptr<boost::asio::ip::tcp::socket> _socket;
 	boost::asio::ip::tcp::resolver _resolver;
 	boost::asio::deadline_timer _timer;
 	boost::asio::ip::tcp::resolver::query _q;
@@ -52,7 +51,7 @@ public:
 	FriendConnector(Server& server, const bithorded::Config::Friend& cfg) :
 		_server(server),
 		_f(cfg),
-		_socket(boost::make_shared<boost::asio::ip::tcp::socket>(server.ioService())),
+		_socket(std::make_shared<boost::asio::ip::tcp::socket>(server.ioService())),
 		_resolver(server.ioService()),
 		_timer(server.ioService()),
 		_q(cfg.addr, boost::lexical_cast<string>(cfg.port)),
@@ -60,8 +59,8 @@ public:
 	{
 	}
 
-	static boost::shared_ptr<FriendConnector> create(Server& server, const bithorded::Config::Friend& cfg) {
-		auto res = boost::make_shared<FriendConnector>(server, cfg);
+	static std::shared_ptr<FriendConnector> create(Server& server, const bithorded::Config::Friend& cfg) {
+		auto res = std::make_shared<FriendConnector>(server, cfg);
 		res->start();
 		return res;
 	}
@@ -72,21 +71,27 @@ public:
 
 private:
 	void scheduleRestart(ptime::time_duration delay=RECONNECT_INTERVAL) {
+		auto self = shared_from_this();
 		_timer.expires_from_now(delay);
-		_timer.async_wait(boost::bind(&FriendConnector::start, shared_from_this()));
+		_timer.async_wait([=](const boost::system::error_code& error){
+			if ( !error ) {
+				self->start();
+			}
+		});
 	}
 
 	void start() {
-		if (!_cancelled)
-			_resolver.async_resolve(_q, boost::bind(&FriendConnector::hostResolved, shared_from_this(), asio::placeholders::error, asio::placeholders::iterator));
-	}
-
-	void hostResolved(const boost::system::error_code& error, boost::asio::ip::tcp::resolver::iterator iterator)
-	{
-		if (error) {
-			scheduleRestart();
-		} else if (!_cancelled) {
-			_socket->async_connect(iterator->endpoint(), boost::bind(&FriendConnector::connectionDone, shared_from_this(), asio::placeholders::error));
+		auto self = shared_from_this();
+		if (!_cancelled) {
+			_resolver.async_resolve(_q, [=](const boost::system::error_code& error, boost::asio::ip::tcp::resolver::iterator iterator) {
+				if (error) {
+					scheduleRestart();
+				} else if (!_cancelled) {
+					_socket->async_connect(iterator->endpoint(), [=](const boost::system::error_code& error) {
+						self->connectionDone(error);
+					});
+				}
+			});
 		}
 	}
 
@@ -185,7 +190,7 @@ bithorded::IAsset::Ptr bithorded::router::Router::openAsset(const bithorde::Bind
 	if (_isBlacklisted(now, req.requesters()))
 		throw bithorded::BindError(bithorde::WOULD_LOOP);
 
-	auto asset = boost::make_shared<ForwardedAsset, Router&, const BitHordeIds&>(*this, req.ids());
+	auto asset = std::make_shared<ForwardedAsset, Router&, const BitHordeIds&>(*this, req.ids());
 	_openAssets.insert(asset);
 
 	ptime::ptime deadline;

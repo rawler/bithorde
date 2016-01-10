@@ -39,8 +39,21 @@ int BHUpload::main(const std::vector<std::string>& args) {
 	}
 
 	_client = Client::create(_ioSvc, optMyName);
-	_client->authenticated.connect(boost::bind(&BHUpload::onAuthenticated, this, _1, _2));
-	_client->disconnected.connect(boost::bind(&BHUpload::onDisconnected, this));
+
+	_client->authenticated.connect([=](bithorde::Client& c, std::string peerName) {
+		if (peerName.empty()) {
+			cerr << "Failed authentication" << endl;
+			_ioSvc.stop();
+		}
+		if (optDebug)
+			cerr << "DEBUG: Connected to " << peerName << endl;
+		nextAsset();
+	});
+
+	_client->disconnected.connect([=]() {
+		onDisconnected();
+	});
+
 	_client->connect(optConnectUrl);
 
 	_ioSvc.run();
@@ -74,8 +87,7 @@ void BHUpload::nextAsset() {
 		delete _currentAsset;
 		_currentAsset = NULL;
 	}
-	if (_currentFile.is_open())
-		_currentFile.close();
+	BOOST_ASSERT(!_currentFile.is_open());
 
 	if (_files.empty()) {
 		_ioSvc.stop();
@@ -87,7 +99,9 @@ void BHUpload::nextAsset() {
 			_currentAsset = new UploadAsset(_client, p);
 		else
 			_currentAsset = new UploadAsset(_client, fs::file_size(p));
-		_currentAsset->statusUpdate.connect(boost::bind(&BHUpload::onStatusUpdate, this, _1));
+		_currentAsset->statusUpdate.connect([=](const bithorde::AssetStatus& status) {
+			onStatusUpdate(status);
+		});
 		_client->bind(*_currentAsset, optBindTimeoutMs);
 
 		_currentOffset = 0;
@@ -97,17 +111,17 @@ void BHUpload::nextAsset() {
 
 void BHUpload::onStatusUpdate(const bithorde::AssetStatus& status)
 {
+	if (optDebug)
+		cerr << "DEBUG: Status Update: " << bithorde::Status_Name(status.status()) << ", " << status.ids_size() << endl;
 	switch (status.status()) {
 	case bithorde::SUCCESS:
-		if (optDebug)
-			cerr << "DEBUG: Accepted bind ..." << endl;
 		if (status.ids_size()) {
 			cout << MagnetURI(status) << endl;
 			nextAsset();
-		} else if (!optLink) {
+		} else if ( (!optLink) && _currentFile.is_open() ) {
 			if (optDebug)
 				cerr << "DEBUG: Uploading ..." << endl;
-			_writeConnection = _client->writable.connect(boost::bind(&BHUpload::onWritable, this));
+			_writeConnection = _client->writable.connect(std::bind(&BHUpload::onWritable, this));
 			onWritable();
 		}
 		break;
@@ -134,6 +148,7 @@ ssize_t BHUpload::readNext()
 
 bool BHUpload::tryWrite() {
 	if (!_readBuf.size && !readNext()) {
+		_currentFile.close();
 		if (optDebug)
 			cerr << "DEBUG: Done, awaiting asset-ids..." << endl;
 		// File reading done. Don't try to write before next is ready for upload.
@@ -151,16 +166,6 @@ bool BHUpload::tryWrite() {
 	} else {
 		return false;
 	}
-}
-
-void BHUpload::onAuthenticated(Client& c, const string& peerName) {
-	if (peerName.empty()) {
-		cerr << "Failed authentication" << endl;
-		_ioSvc.stop();
-	}
-	if (optDebug)
-		cerr << "DEBUG: Connected to " << peerName << endl;
-	nextAsset();
 }
 
 int main(int argc, char *argv[]) {

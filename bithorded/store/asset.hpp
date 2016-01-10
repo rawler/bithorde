@@ -18,8 +18,6 @@
 #ifndef BITHORDED_STORE_ASSET_HPP
 #define BITHORDED_STORE_ASSET_HPP
 
-#include <boost/enable_shared_from_this.hpp>
-
 #include "hashstore.hpp"
 #include "../../lib/hashes.h"
 #include "../lib/randomaccessfile.hpp"
@@ -35,7 +33,7 @@ const uint8_t DEFAULT_HASH_LEVELS_SKIPPED = 6;
 
 typedef HashTree<HashStore> Hasher;
 
-class StoredAsset : public IAsset, public boost::enable_shared_from_this<StoredAsset> {
+class StoredAsset : public IAsset, public std::enable_shared_from_this<StoredAsset> {
 protected:
 	GrandCentralDispatch& _gcd;
 	const std::string _id;
@@ -43,7 +41,7 @@ protected:
 	HashStore::Ptr _hashStore;
 	Hasher _hashTree;
 public:
-	typedef typename boost::shared_ptr<StoredAsset> Ptr;
+	typedef typename std::shared_ptr<StoredAsset> Ptr;
 
 	StoredAsset(GrandCentralDispatch& gcd, const std::string& id, const HashStore::Ptr hashStore, const IDataArray::Ptr& data);
 

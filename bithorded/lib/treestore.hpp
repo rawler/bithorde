@@ -25,7 +25,6 @@
 #include <ostream>
 
 #include <boost/assert.hpp>
-#include <boost/shared_ptr.hpp>
 
 inline uint32_t parentlayersize(uint32_t nodes) {
 	if (nodes > 1)
@@ -83,13 +82,13 @@ const NodeIdx TREE_ROOT_NODE(0,1);
 
 std::ostream& operator<<(std::ostream& str,const NodeIdx& idx);
 
-template <typename Node, typename BackingStore> 
+template <typename Node, typename BackingStore>
 class TreeStore
 {
 public:
 	typedef typename BackingStore::NodePtr NodePtr;
 
-	TreeStore(BackingStore& backingStore) 
+	TreeStore(BackingStore& backingStore)
 		: _storage(backingStore), _leaves(calc_leaves(backingStore.size()))
 	{
 		BOOST_ASSERT(backingStore.size() >= treesize(_leaves));

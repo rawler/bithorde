@@ -86,7 +86,17 @@ int BHGet::main(const std::vector<std::string>& args) {
 	}
 
 	_client = Client::create(_ioSvc, optMyName);
-	_client->authenticated.connect(boost::bind(&BHGet::onAuthenticated, this, _1, _2));
+	_client->authenticated.connect([=](bithorde::Client& c, const std::string& peerName) {
+		if (peerName.empty()) {
+			cerr << "Failed authentication" << endl;
+			_ioSvc.stop();
+		}
+		if (optDebug)
+			cerr << "DEBUG: Connected to " << peerName << endl;
+		cerr.flush();
+		nextAsset();
+	});
+
 	_client->connect(optConnectUrl);
 
 	_ioSvc.run();
@@ -122,13 +132,6 @@ bool BHGet::queueAsset(const std::string& _uri) {
 }
 
 void BHGet::nextAsset() {
-	if (_asset) {
-		_asset->statusUpdate.disconnect(boost::bind(&BHGet::onStatusUpdate, this, _1));
-		_asset->dataArrived.disconnect(boost::bind(&BHGet::onDataChunk, this, _1, _2, _3));
-		_asset->close();
-		_asset.reset();
-	}
-
 	BitHordeIds ids;
 	while ((!ids.size()) && (!_assets.empty())) {
 		MagnetURI nextUri = _assets.front();
@@ -140,9 +143,19 @@ void BHGet::nextAsset() {
 		return;
 	}
 
-	_asset.reset(new ReadAsset(_client, ids));
-	_asset->statusUpdate.connect(boost::bind(&BHGet::onStatusUpdate, this, _1));
-	_asset->dataArrived.connect(boost::bind(&BHGet::onDataChunk, this, _1, _2, _3));
+	auto asset = new ReadAsset(_client, ids);
+	_asset.reset(asset);
+	_asset->statusUpdate.connect([=](const bithorde::AssetStatus& status) {
+		if (this->_asset.get() == asset) {
+			this->onStatusUpdate(status);
+		}
+	});
+	_asset->dataArrived.connect([=](uint64_t offset, const std::shared_ptr<bithorde::IBuffer>& data, int tag) {
+		if (this->_asset.get() == asset) {
+			this->onDataChunk(offset, data, tag);
+		}
+	});
+
 	_client->bind(*_asset);
 
 	_outQueue = new OutQueue();
@@ -185,7 +198,7 @@ void BHGet::requestMore()
 	}
 }
 
-void BHGet::onDataChunk(uint64_t offset, const boost::shared_ptr<bithorde::IBuffer>& data, int tag)
+void BHGet::onDataChunk(uint64_t offset, const std::shared_ptr<bithorde::IBuffer>& data, int tag)
 {
 	if ((data->size() < BLOCK_SIZE) && ((offset+data->size()) < _asset->size())) {
 		cerr << "WARNING: got unexpectedly small data-block at offset " << offset << ", " << data->size() << " vs. " << BLOCK_SIZE << endl;
@@ -205,17 +218,6 @@ void BHGet::onDataChunk(uint64_t offset, const boost::shared_ptr<bithorde::IBuff
 	} else {
 		nextAsset();
 	}
-}
-
-void BHGet::onAuthenticated(Client& c, const string& peerName) {
-	if (peerName.empty()) {
-		cerr << "Failed authentication" << endl;
-		_ioSvc.stop();
-	}
-	if (optDebug)
-		cerr << "DEBUG: Connected to " << peerName << endl;
-	cerr.flush();
-	nextAsset();
 }
 
 int main(int argc, char *argv[]) {

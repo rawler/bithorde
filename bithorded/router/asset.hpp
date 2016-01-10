@@ -38,24 +38,27 @@ struct PendingRead {
 	void cancel();
 };
 
-class UpstreamAsset : public bithorde::ReadAsset, public boost::enable_shared_from_this<UpstreamAsset> {
+class ForwardedAsset;
+
+class UpstreamBinding : public bithorde::ReadAsset {
+    boost::signals2::scoped_connection _statusConnection;
+    boost::signals2::scoped_connection _dataConnection;
 public:
-	typedef boost::shared_ptr<UpstreamAsset> Ptr;
-	explicit UpstreamAsset(const ClientPointer& client, const BitHordeIds& requestIds);
-	virtual void handleMessage ( const boost::shared_ptr< bithorde::MessageContext< bithorde::Read::Response > >& msgCtx );
+    UpstreamBinding(std::shared_ptr<ForwardedAsset>, std::string, bithorded::Client::Ptr, BitHordeIds);
 };
 
-class ForwardedAsset : public bithorded::IAsset, public boost::noncopyable, public boost::enable_shared_from_this<ForwardedAsset>
+class ForwardedAsset : public bithorded::IAsset, public boost::noncopyable, public std::enable_shared_from_this<ForwardedAsset>
 {
+    friend class UpstreamBinding;
 	Router& _router;
 	BitHordeIds _requestedIds;
 	const AssetRequestParameters* _reqParameters;
 	int64_t _size;
-	std::map<std::string, UpstreamAsset::Ptr> _upstream;
+	std::map<std::string, UpstreamBinding> _upstream;
 	std::list<PendingRead> _pendingReads;
 public:
-	typedef boost::shared_ptr<ForwardedAsset> Ptr;
-	typedef boost::weak_ptr<ForwardedAsset> WeakPtr;
+	typedef std::shared_ptr<ForwardedAsset> Ptr;
+	typedef std::weak_ptr<ForwardedAsset> WeakPtr;
 	typedef std::unordered_set<uint64_t> Requesters;
 
 	ForwardedAsset(Router& router, const BitHordeIds& ids);
@@ -76,7 +79,7 @@ public:
 private:
 	void addUpstream(const bithorded::Client::Ptr& f, int32_t timeout, const bithorde::RouteTrace requesters);
 	void dropUpstream(const std::string& peername);
-	void onData(uint64_t offset, const boost::shared_ptr<bithorde::IBuffer>& data, int tag);
+	void onData(uint64_t offset, const std::shared_ptr<bithorde::IBuffer>& data, int tag);
 	void onUpstreamStatus(const std::string& peername, const bithorde::AssetStatus& status);
 	bithorde::RouteTrace requestTrace(const std::unordered_set< uint64_t >& requesters) const;
 	void updateStatus();

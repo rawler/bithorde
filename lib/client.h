@@ -1,13 +1,12 @@
 #ifndef BITHORDE_CLIENT_H
 #define BITHORDE_CLIENT_H
 
+#include <functional>
 #include <map>
 #include <string>
 
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/local/stream_protocol.hpp>
-#include <boost/bind.hpp>
-#include <boost/make_shared.hpp>
 #include <boost/signals2.hpp>
 
 #include "allocator.h"
@@ -62,7 +61,7 @@ class MessageContext;
 
 struct CipherConfig;
 class Client
-	: boost::noncopyable, public boost::enable_shared_from_this<Client>
+	: public std::enable_shared_from_this<Client>
 {
 public:
 	enum State {
@@ -79,7 +78,7 @@ private:
 	friend class ReadAsset;
 	friend class ReadRequestContext;
 
-	typedef boost::shared_ptr<AssetBinding> AssetPtr;
+	typedef std::shared_ptr<AssetBinding> AssetPtr;
 	typedef std::map<Asset::Handle, AssetPtr> AssetMap;
 
 	boost::asio::io_service& _ioSvc;
@@ -100,8 +99,8 @@ private:
 	uint8_t _protoVersion;
 	size_t _bytesAllocated;
 public:
-	typedef boost::shared_ptr<Client> Pointer;
-	typedef boost::weak_ptr<Client> WeakPtr;
+	typedef std::shared_ptr<Client> Pointer;
+	typedef std::weak_ptr<Client> WeakPtr;
 
 	static Pointer create(boost::asio::io_service& ioSvc, std::string myName) {
 		return Pointer(new Client(ioSvc, myName));
@@ -160,15 +159,15 @@ protected:
 	virtual void onDisconnected();
 	void onIncomingMessage( bithorde::Connection::MessageType type, const google::protobuf::Message& msg );
 
-	virtual void onMessage(const boost::shared_ptr< MessageContext<bithorde::HandShake> >& msgCtx);
-	virtual void onMessage(const boost::shared_ptr< MessageContext<bithorde::BindRead> >& msgCtx);
-	virtual void onMessage(const boost::shared_ptr< MessageContext<bithorde::AssetStatus> >& msgCtx);
-	virtual void onMessage(const boost::shared_ptr< MessageContext<bithorde::Read::Request> >& msgCtx);
-	virtual void onMessage(const boost::shared_ptr< MessageContext<bithorde::Read::Response> >& msgCtx);
-	virtual void onMessage(const boost::shared_ptr< MessageContext<bithorde::BindWrite > >& msgCtx );
-	virtual void onMessage(const boost::shared_ptr< MessageContext<bithorde::DataSegment> >& msgCtx);
-	virtual void onMessage(const boost::shared_ptr< MessageContext<bithorde::HandShakeConfirmed> >& msgCtx);
-	virtual void onMessage(const boost::shared_ptr< MessageContext<bithorde::Ping> >& msgCtx);
+	virtual void onMessage(const std::shared_ptr< MessageContext<bithorde::HandShake> >& msgCtx);
+	virtual void onMessage(const std::shared_ptr< MessageContext<bithorde::BindRead> >& msgCtx);
+	virtual void onMessage(const std::shared_ptr< MessageContext<bithorde::AssetStatus> >& msgCtx);
+	virtual void onMessage(const std::shared_ptr< MessageContext<bithorde::Read::Request> >& msgCtx);
+	virtual void onMessage(const std::shared_ptr< MessageContext<bithorde::Read::Response> >& msgCtx);
+	virtual void onMessage(const std::shared_ptr< MessageContext<bithorde::BindWrite > >& msgCtx );
+	virtual void onMessage(const std::shared_ptr< MessageContext<bithorde::DataSegment> >& msgCtx);
+	virtual void onMessage(const std::shared_ptr< MessageContext<bithorde::HandShakeConfirmed> >& msgCtx);
+	virtual void onMessage(const std::shared_ptr< MessageContext<bithorde::Ping> >& msgCtx);
 
 	virtual void addStateFlag(State s);
 	virtual void setAuthenticated(const std::string peerName);
@@ -190,7 +189,7 @@ class MessageContext {
 	const Client::Pointer _client;
 	const T _msg;
 public:
-	typedef boost::shared_ptr< MessageContext<T> > Ptr;
+	typedef std::shared_ptr< MessageContext<T> > Ptr;
 
 	MessageContext(const Client::Pointer& client, const T& msg) :
 		_client ( client ), _msg(msg)
@@ -206,7 +205,7 @@ public:
 		return _msg;
 	}
 
-	const boost::shared_ptr<Client>& client() const {
+	const std::shared_ptr<Client>& client() const {
 		return _client;
 	}
 

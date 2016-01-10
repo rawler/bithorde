@@ -16,8 +16,6 @@
 
 #include "client.hpp"
 
-#include <boost/assert.hpp>
-#include <boost/pointer_cast.hpp>
 #include <iostream>
 
 #include <log4cplus/logger.h>
@@ -47,7 +45,7 @@ Client::Client( Server& server) :
 }
 
 Client::Ptr Client::shared_from_this() {
-	return boost::static_pointer_cast<Client>(bithorde::Client::shared_from_this());
+	return std::static_pointer_cast<Client>(bithorde::Client::shared_from_this());
 }
 
 size_t Client::serverAssets() const
@@ -93,7 +91,7 @@ void Client::inspect(management::InfoList& tgt) const
 	}
 }
 
-void Client::onMessage( const boost::shared_ptr< bithorde::MessageContext< bithorde::HandShake > >& msgCtx )
+void Client::onMessage( const std::shared_ptr< bithorde::MessageContext< bithorde::HandShake > >& msgCtx )
 {
 	const auto& msg = msgCtx->message();
 	if (!(state() & SaidHello)) {
@@ -105,7 +103,7 @@ void Client::onMessage( const boost::shared_ptr< bithorde::MessageContext< bitho
 	bithorde::Client::onMessage( msgCtx );
 }
 
-void Client::onMessage( const boost::shared_ptr< bithorde::MessageContext< bithorde::BindWrite > >& msgCtx )
+void Client::onMessage( const std::shared_ptr< bithorde::MessageContext< bithorde::BindWrite > >& msgCtx )
 {
 	const auto& msg = msgCtx->message();
 	auto h = msg.handle();
@@ -128,7 +126,7 @@ void Client::onMessage( const boost::shared_ptr< bithorde::MessageContext< bitho
 		}
 	} else {
 		if (auto asset = _server.prepareUpload( msg.size())) {
-			LOG4CPLUS_INFO(clientLogger, "Ready for upload");
+			LOG4CPLUS_INFO(clientLogger, "Ready for upload of size " << msg.size());
 			assignAsset( msg.handle(), asset, BitHordeIds(), bithorde::RouteTrace(), boost::posix_time::neg_infin);
 		} else {
 			informAssetStatus( msg.handle(), bithorde::NORESOURCES);
@@ -136,7 +134,7 @@ void Client::onMessage( const boost::shared_ptr< bithorde::MessageContext< bitho
 	}
 }
 
-void Client::onMessage( const boost::shared_ptr< bithorde::MessageContext< bithorde::BindRead > >& msgCtx )
+void Client::onMessage( const std::shared_ptr< bithorde::MessageContext< bithorde::BindRead > >& msgCtx )
 {
 	const auto& msg = msgCtx->message();
 	auto h = msg.handle();
@@ -150,7 +148,7 @@ void Client::onMessage( const boost::shared_ptr< bithorde::MessageContext< bitho
 		auto& asset = _assets[h];
 		if (idsOverlap(asset->status->ids(), msg.ids())) {
 			if (asset.bind(msg.requesters())) {
-				informAssetStatusUpdate(h, asset.weak(), *(asset->status));
+				informAssetStatusUpdate(h, asset.shared(), *(asset->status));
 			} else {
 				informAssetStatus(h, bithorde::WOULD_LOOP);
 			}
@@ -183,7 +181,7 @@ void Client::onMessage( const boost::shared_ptr< bithorde::MessageContext< bitho
 	}
 }
 
-void Client::onMessage( const boost::shared_ptr< bithorde::MessageContext< bithorde::Read::Request > >& msgCtx )
+void Client::onMessage( const std::shared_ptr< bithorde::MessageContext< bithorde::Read::Request > >& msgCtx )
 {
 	const auto& msg = msgCtx->message();
 	const AssetBinding& asset = getAsset(msg.handle());
@@ -195,8 +193,9 @@ void Client::onMessage( const boost::shared_ptr< bithorde::MessageContext< bitho
 
 		if (offset < asset->size()) {
 			// Raw pointer to this should be fine here, since asset has ownership of this. (Through member Ptr client)
-			auto onComplete = boost::bind(&Client::onReadResponse, this, msgCtx, _1, _2, bithorde::Message::in(msg.timeout()));
-			asset->async_read(offset, size, msg.timeout(), onComplete);
+			auto deadline = bithorde::Message::in(msg.timeout());
+			asset->async_read(offset, size, msg.timeout(),
+				std::bind(&Client::onReadResponse, this, msgCtx, std::placeholders::_1, std::placeholders::_2, deadline));
 		} else {
 			bithorde::Read::Response resp;
 			resp.set_reqid(msg.reqid());
@@ -211,14 +210,15 @@ void Client::onMessage( const boost::shared_ptr< bithorde::MessageContext< bitho
 	}
 }
 
-void Client::onMessage( const boost::shared_ptr< bithorde::MessageContext< bithorde::DataSegment > >& msgCtx )
+void Client::onMessage( const std::shared_ptr< bithorde::MessageContext< bithorde::DataSegment > >& msgCtx )
 {
 	const auto& msg = msgCtx->message();
 	const AssetBinding& asset_ = getAsset(msg.handle());
+
 	if (asset_) {
 		bithorded::cache::CachedAsset::Ptr asset = dynamic_pointer_cast<bithorded::cache::CachedAsset>(asset_.shared());
 		if (asset) {
-			asset->write(msg.offset(), boost::make_shared<bithorde::DataSegmentCtxBuffer>(msgCtx));
+			asset->write(msg.offset(), std::make_shared<bithorde::DataSegmentCtxBuffer>(msgCtx));
 		} else {
 			LOG4CPLUS_ERROR(clientLogger, peerName() << ':' << msg.handle() << " is not an upload-asset");
 		}
@@ -238,7 +238,7 @@ void Client::setAuthenticated(const string peerName_)
 	}
 }
 
-void Client::onReadResponse(const boost::shared_ptr< bithorde::MessageContext<bithorde::Read::Request> >& reqCtx, int64_t offset, const boost::shared_ptr<bithorde::IBuffer>& data, bithorde::Message::Deadline t) {
+void Client::onReadResponse(const std::shared_ptr< bithorde::MessageContext<bithorde::Read::Request> >& reqCtx, int64_t offset, const std::shared_ptr<bithorde::IBuffer>& data, bithorde::Message::Deadline t) {
 	bithorde::Read::Response resp;
 	resp.set_reqid( reqCtx->message().reqid());
 	auto size = data->size();
@@ -267,12 +267,12 @@ void Client::informAssetStatus(bithorde::Asset::Handle h, bithorde::Status s)
 	sendMessage(bithorde::Connection::AssetStatus, resp, bithorde::Message::NEVER, true);
 }
 
-void Client::informAssetStatusUpdate(bithorde::Asset::Handle h, const IAsset::WeakPtr& asset, const bithorde::AssetStatus& status)
+void Client::informAssetStatusUpdate(bithorde::Asset::Handle h, const IAsset::Ptr& asset, const bithorde::AssetStatus& status)
 {
 	if (status.status() == bithorde::NONE)
 		return;
 	size_t asset_idx = h;
-	if ((asset_idx >= _assets.size()) || (_assets[asset_idx] != asset.lock()))
+	if ((asset_idx >= _assets.size()) || (_assets[asset_idx] != asset))
 		return;
 	_assets[asset_idx].clearDeadline();
 	bithorde::AssetStatus resp(status);
@@ -290,7 +290,7 @@ void Client::informAssetStatusUpdate(bithorde::Asset::Handle h, const IAsset::We
 
 	LOG4CPLUS_DEBUG(clientLogger, peerName() << ':' << h << " new state " << bithorde::Status_Name(resp.status()) << " (" << resp.ids() << ") availability: " << resp.availability());
 
-	sendMessage(bithorde::Connection::AssetStatus, resp);
+	sendMessage(bithorde::Connection::AssetStatus, resp, bithorde::Message::NEVER, true);
 }
 
 void Client::assignAsset(bithorde::Asset::Handle handle_, const UpstreamRequestBinding::Ptr& a, const BitHordeIds& assetIds, const bithorde::RouteTrace& requesters, const boost::posix_time::ptime& deadline)
@@ -312,16 +312,10 @@ void Client::assignAsset(bithorde::Asset::Handle handle_, const UpstreamRequestB
 			_assets[i].setClient(self);
 		}
 	}
-	if (_assets[handle].bind(a, assetIds, requesters, deadline)) {
-		auto weak_asset = _assets[handle].weak();
-		// Remember to inform peer about changes in asset-status.
-		(*a)->status.onChange.connect(boost::bind(&Client::informAssetStatusUpdate, this, handle_, weak_asset, _2));
 
-		if ((*a)->status->status() != bithorde::Status::NONE) {
-			// We already have a valid status for the asset, so inform about it
-			informAssetStatusUpdate(handle_, weak_asset, *((*a)->status));
-		}
-	} else {
+	auto statusUpdate = std::bind (&Client::informAssetStatusUpdate, this,
+		handle_, std::placeholders::_1, std::placeholders::_2);
+	if (!_assets[handle].bind(a, assetIds, requesters, deadline, statusUpdate)) {
 		informAssetStatus(handle_, bithorde::Status::WOULD_LOOP);
 	}
 }
@@ -343,9 +337,8 @@ void Client::clearAsset(bithorde::Asset::Handle handle_)
 {
 	size_t handle = handle_;
 	if (handle < _assets.size()) {
-		if (auto& a=_assets[handle]) {
-			a->status.onChange.disconnect(boost::bind(&Client::informAssetStatusUpdate, this, handle_, _assets[handle].weak(), _2));
-			_assets[handle].reset();
+		if ( auto& a = _assets[handle] ) {
+			a.reset();
 			LOG4CPLUS_DEBUG(clientLogger, peerName() << ':' << handle_ << " released");
 		}
 	}

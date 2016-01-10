@@ -16,7 +16,7 @@ class INode {
 	// Counts references held to this INode. TODO: break out of INode alltogether.
 	int _refCount;
 public:
-	typedef boost::shared_ptr<INode> Ptr;
+	typedef std::shared_ptr<INode> Ptr;
 
 	BHFuse * fs;
 
@@ -50,14 +50,14 @@ struct BHReadOperation {
 	BHReadOperation(fuse_req_t req, off_t off, size_t size);
 };
 
-class FUSEAsset : public INode, public boost::enable_shared_from_this<FUSEAsset> {
-	FUSEAsset(BHFuse* fs, ino_t ino, boost::shared_ptr< bithorde::ReadAsset > asset);
+class FUSEAsset : public INode, public std::enable_shared_from_this<FUSEAsset> {
+	FUSEAsset(BHFuse* fs, ino_t ino, std::shared_ptr< bithorde::ReadAsset > asset);
 public:
-	typedef boost::shared_ptr<FUSEAsset> Ptr;
+	typedef std::shared_ptr<FUSEAsset> Ptr;
 
-	static Ptr create(BHFuse* fs, ino_t ino, boost::shared_ptr< bithorde::ReadAsset > asset);
+	static Ptr create(BHFuse* fs, ino_t ino, std::shared_ptr< bithorde::ReadAsset > asset);
 
-	boost::shared_ptr<bithorde::ReadAsset> asset;
+	std::shared_ptr<bithorde::ReadAsset> asset;
 
 	void fuse_dispatch_open(fuse_req_t req, fuse_file_info * fi);
 	void fuse_dispatch_close( fuse_req_t req, fuse_file_info*);
@@ -67,7 +67,7 @@ public:
 protected:
 	virtual void fill_stat_t(struct stat & s);
 private:
-	void onDataArrived( uint64_t offset, const boost::shared_ptr<bithorde::IBuffer>& data, int tag );
+	void onDataArrived( uint64_t offset, const std::shared_ptr<bithorde::IBuffer>& data, int tag );
 	void onStatusChanged(const bithorde::AssetStatus& s);
 	void queueRead(const BHReadOperation& read);
 	void tryRebind();

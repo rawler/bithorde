@@ -1,6 +1,5 @@
 
 #include <boost/filesystem.hpp>
-#include <boost/make_shared.hpp>
 #include <boost/program_options.hpp>
 #include <iostream>
 

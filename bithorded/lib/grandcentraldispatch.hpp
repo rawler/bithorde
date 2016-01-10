@@ -19,8 +19,6 @@
 #define BITHORDED_GRANDCENTRALDISPATCH_HPP
 
 #include <boost/asio/io_service.hpp>
-#include <boost/bind.hpp>
-#include <boost/bind/protect.hpp>
 #include <boost/thread.hpp>
 
 namespace bithorded {
@@ -44,15 +42,13 @@ public:
 
 	template<typename Job, typename CompletionHandler>
 	void submit(Job job, CompletionHandler handler) {
-		typedef boost::_bi::protected_bind_t<Job> ProtectedJob;
-		typedef boost::_bi::protected_bind_t<CompletionHandler> ProtectedCompletionHandler;
-		_jobService.post(boost::bind(&GrandCentralDispatch::run_job<ProtectedJob, ProtectedCompletionHandler>, this, boost::protect(job), boost::protect(handler)));
+		_jobService.post([=](){ run_job(job, handler); });
 	}
 
 	template<typename Job, typename CompletionHandler>
 	void run_job(Job job, CompletionHandler handler) {
 		auto res = job();
-		_controller.post(boost::bind(handler, res));
+		_controller.post([=](){ handler(res); });
 	}
 };
 

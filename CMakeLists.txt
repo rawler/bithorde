@@ -47,7 +47,13 @@ IF(CMAKE_BUILD_TOOL MATCHES "make")
 ENDIF(CMAKE_BUILD_TOOL MATCHES "make")
 
 # Build C++0x
-ADD_DEFINITIONS(-std=c++0x)
+ADD_DEFINITIONS(-std=c++11)
+
+if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+  if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS "3.5")
+    message(FATAL_ERROR "Clang < 3.5 has bugs with C++11-lambdas")
+  endif()
+endif()
 
 # Build with support for large files
 ADD_DEFINITIONS(-D_FILE_OFFSET_BITS=64)

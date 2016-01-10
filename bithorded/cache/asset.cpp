@@ -49,17 +49,18 @@ void bithorded::cache::CachedAsset::inspect(bithorded::management::InfoList& tar
 void CachedAsset::apply(const bithorded::AssetRequestParameters& old_parameters, const bithorded::AssetRequestParameters& new_parameters)
 {}
 
-ssize_t _write_held_buffer(const IDataArray::Ptr& storage, uint64_t offset, const boost::shared_ptr<bithorde::IBuffer>& data) {
-	return storage->write(offset, **data, data->size());
-}
-
-void bithorded::cache::CachedAsset::write(uint64_t offset, const boost::shared_ptr<bithorde::IBuffer>& data, const std::function< void() > whenDone )
+void bithorded::cache::CachedAsset::write(uint64_t offset, const bithorde::IBuffer::Ptr& data, const std::function< void() > whenDone )
 {
-	auto job = boost::bind(&_write_held_buffer, _data, offset, data);
-	auto completion = boost::bind(&StoredAsset::notifyValidRange, shared_from_this(), offset, _1, [whenDone, data]{
-		if (whenDone)
-			whenDone();
-	});
+	auto self = shared_from_this();
+	auto job = [=]() mutable {
+		return _data->write(offset, **data, data->size());
+	};
+	auto completion = [=](uint64_t size) {
+		self->notifyValidRange(offset, size, [=]{
+			if (whenDone)
+				whenDone();
+		});
+	};
 	_gcd.submit(job, completion);
 }
 
@@ -69,7 +70,7 @@ CachedAsset::Ptr CachedAsset::open(GrandCentralDispatch& gcd, const boost::files
 	switch (fs::status(path).type()) {
 	case boost::filesystem::directory_file:
 		meta = store::openV1AssetMeta(path/"meta");
-		meta.tail = boost::make_shared<RandomAccessFile>(path/"data", RandomAccessFile::READWRITE);
+		meta.tail = std::make_shared<RandomAccessFile>(path/"data", RandomAccessFile::READWRITE);
 		break;
 	case boost::filesystem::regular_file:
 		meta = store::openV2AssetMeta(path);
@@ -81,13 +82,13 @@ CachedAsset::Ptr CachedAsset::open(GrandCentralDispatch& gcd, const boost::files
 		return CachedAsset::Ptr();
 	}
 
-	return boost::make_shared<CachedAsset>(gcd, path.filename().native(), meta.hashStore, meta.tail);
+	return std::make_shared<CachedAsset>(gcd, path.filename().native(), meta.hashStore, meta.tail);
 }
 
 CachedAsset::Ptr CachedAsset::create( GrandCentralDispatch& gcd, const boost::filesystem::path& path, uint64_t size ) {
 	auto meta = store::createAssetMeta(path, store::V2CACHE, size, store::DEFAULT_HASH_LEVELS_SKIPPED, size);
 
-	auto ptr = boost::make_shared<CachedAsset>(gcd, path.filename().native(), meta.hashStore, meta.tail);
+	auto ptr = std::make_shared<CachedAsset>(gcd, path.filename().native(), meta.hashStore, meta.tail);
 	ptr->status.change()->set_status(bithorde::SUCCESS);
 	return ptr;
 }
@@ -95,7 +96,7 @@ CachedAsset::Ptr CachedAsset::create( GrandCentralDispatch& gcd, const boost::fi
 bithorded::cache::CachingAsset::CachingAsset( CacheManager& mgr, const IAsset::Ptr& upstream, const CachedAsset::Ptr& cached ) :
 	_manager(mgr),
 	_upstream(upstream),
-	_upstreamTracker(_upstream->status.onChange.connect(boost::bind(&CachingAsset::upstreamStatusChange, this, _2))),
+	_upstreamTracker(_upstream->status.onChange.connect([=](const bithorde::AssetStatus&, const bithorde::AssetStatus& newStatus) { upstreamStatusChange(newStatus); })),
 	_cached(cached),
 	_delayedCreation(false)
 {
@@ -120,7 +121,9 @@ void bithorded::cache::CachingAsset::async_read(uint64_t offset, size_t size, ui
 	if (cached_ && (cached_->can_read(offset, size) == size)) {
 		cached_->async_read(offset, size, timeout, cb);
 	} else if (_upstream) {
-		_upstream->async_read(offset, size, timeout, boost::bind(&CachingAsset::upstreamDataArrived, shared_from_this(), cb, size, _1, _2));
+		_upstream->async_read(offset, size, timeout,
+			std::bind(&CachingAsset::upstreamDataArrived, shared_from_this(), cb, size, std::placeholders::_1, std::placeholders::_2)
+		);
 	} else {
 		cb(-1, bithorde::NullBuffer::instance);
 	}
@@ -158,16 +161,16 @@ void bithorded::cache::CachingAsset::disconnect()
 	_upstream.reset();
 }
 
-void bithorded::cache::CachingAsset::upstreamDataArrived( IAsset::ReadCallback cb, std::size_t requested_size, int64_t offset, const boost::shared_ptr< bithorde::IBuffer >& data )
+void bithorded::cache::CachingAsset::upstreamDataArrived( IAsset::ReadCallback cb, std::size_t requested_size, int64_t offset, const std::shared_ptr< bithorde::IBuffer >& data )
 {
 	auto cached_ = cached();
 	if (data->size() >= requested_size) {
 		if (cached_) {
-			auto self(shared_from_this());
-			cached_->write(offset, data, [this, self, cached_]() {
+			auto self = shared_from_this();
+			cached_->write(offset, data, [=]() {
 				if (cached_->hasRootHash())
-					this->disconnect();
-				this->_manager.updateAsset(cached_);
+					self->disconnect();
+				self->_manager.updateAsset(cached_);
 			});
 		}
 		cb(offset, data);

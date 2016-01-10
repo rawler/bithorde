@@ -18,8 +18,6 @@
 #ifndef BITHORDED_CLIENT_H
 #define BITHORDED_CLIENT_H
 
-#include <boost/smart_ptr/enable_shared_from_this.hpp>
-
 #include "../lib/management.hpp"
 #include "lib/allocator.h"
 #include "lib/client.h"
@@ -33,8 +31,8 @@ class Client : public bithorde::Client, public management::DescriptiveDirectory
 	Server& _server;
 	std::vector< AssetBinding > _assets;
 public:
-	typedef boost::shared_ptr<Client> Ptr;
-	typedef boost::weak_ptr<Client> WeakPtr;
+	typedef std::shared_ptr<Client> Ptr;
+	typedef std::weak_ptr<Client> WeakPtr;
 	static Ptr create(Server& server) {
 		return Ptr(new Client(server));
 	}
@@ -53,17 +51,17 @@ protected:
 
 	virtual void onDisconnected();
 
-	virtual void onMessage(const boost::shared_ptr<bithorde::MessageContext<bithorde::HandShake> >& msgCtx);
-	virtual void onMessage(const boost::shared_ptr<bithorde::MessageContext<bithorde::BindWrite> >& msgCtx);
-	virtual void onMessage(const boost::shared_ptr<bithorde::MessageContext<bithorde::BindRead> >& msgCtx);
-	virtual void onMessage(const boost::shared_ptr<bithorde::MessageContext<bithorde::Read::Request> >& msgCtx);
-	virtual void onMessage(const boost::shared_ptr<bithorde::MessageContext<bithorde::DataSegment> >& msgCtx);
+	virtual void onMessage(const std::shared_ptr<bithorde::MessageContext<bithorde::HandShake> >& msgCtx);
+	virtual void onMessage(const std::shared_ptr<bithorde::MessageContext<bithorde::BindWrite> >& msgCtx);
+	virtual void onMessage(const std::shared_ptr<bithorde::MessageContext<bithorde::BindRead> >& msgCtx);
+	virtual void onMessage(const std::shared_ptr<bithorde::MessageContext<bithorde::Read::Request> >& msgCtx);
+	virtual void onMessage(const std::shared_ptr<bithorde::MessageContext<bithorde::DataSegment> >& msgCtx);
 
 	virtual void setAuthenticated(const std::string peerName);
 private:
 	void informAssetStatus(bithorde::Asset::Handle h, bithorde::Status s);
-	void informAssetStatusUpdate(bithorde::Asset::Handle h, const bithorded::IAsset::WeakPtr& asset, const bithorde::AssetStatus& status);
-	void onReadResponse( const boost::shared_ptr< bithorde::MessageContext< bithorde::Read::Request > >& reqCtx, int64_t offset, const boost::shared_ptr< bithorde::IBuffer >& data, bithorde::Message::Deadline t );
+	void informAssetStatusUpdate(bithorde::Asset::Handle h, const bithorded::IAsset::Ptr& asset, const bithorde::AssetStatus& status);
+	void onReadResponse( const std::shared_ptr< bithorde::MessageContext< bithorde::Read::Request > >& reqCtx, int64_t offset, const std::shared_ptr< bithorde::IBuffer >& data, bithorde::Message::Deadline t );
 	void assignAsset( bithorde::Asset::Handle handle_, const bithorded::UpstreamRequestBinding::Ptr& a, const BitHordeIds& assetIds, const bithorde::RouteTrace& requesters, const boost::posix_time::ptime& deadline );
 	void clearAssets();
 	void clearAsset(bithorde::Asset::Handle handle);

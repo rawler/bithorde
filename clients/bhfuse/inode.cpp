@@ -75,12 +75,12 @@ BHReadOperation::BHReadOperation(fuse_req_t req, off_t off, size_t size) :
 	retries(0)
 {}
 
-FUSEAsset::FUSEAsset(BHFuse* fs, ino_t ino, boost::shared_ptr< ReadAsset > asset) :
+FUSEAsset::FUSEAsset(BHFuse* fs, ino_t ino, std::shared_ptr< ReadAsset > asset) :
 	INode(fs, ino),
 	asset(asset),
 	_openCount(0),
-	_holdOpenTimer(fs->timerSvc(), boost::bind(&FUSEAsset::closeOne, this)),
-	_rebindTimer(fs->timerSvc(), boost::bind(&FUSEAsset::tryRebind, this)),
+	_holdOpenTimer(fs->timerSvc(), std::bind(&FUSEAsset::closeOne, this)),
+	_rebindTimer(fs->timerSvc(), std::bind(&FUSEAsset::tryRebind, this)),
 	_connected(true),
 	_retries(0)
 {
@@ -93,7 +93,7 @@ FUSEAsset::FUSEAsset(BHFuse* fs, ino_t ino, boost::shared_ptr< ReadAsset > asset
 	_dataConnection = asset->dataArrived.connect(ReadAsset::DataSignal::slot_type(&FUSEAsset::onDataArrived, this, ASSET_ARG_OFFSET, ASSET_ARG_DATA, ASSET_ARG_TAG));
 }
 
-FUSEAsset::Ptr FUSEAsset::create(BHFuse* fs, ino_t ino, boost::shared_ptr< ReadAsset > asset)
+FUSEAsset::Ptr FUSEAsset::create(BHFuse* fs, ino_t ino, std::shared_ptr< ReadAsset > asset)
 {
 	FUSEAsset *a = new FUSEAsset(fs, ino, asset);
 	Ptr p(a);
@@ -193,7 +193,7 @@ void FUSEAsset::tryRebind()
 	}
 }
 
-void FUSEAsset::onDataArrived( uint64_t offset, const boost::shared_ptr< IBuffer >& data, int tag ) {
+void FUSEAsset::onDataArrived( uint64_t offset, const std::shared_ptr< IBuffer >& data, int tag ) {
 	if (_readOperations.count(tag)) {
 		BHReadOperation &op = _readOperations[tag];
 		if (_connected) {

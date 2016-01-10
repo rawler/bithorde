@@ -18,7 +18,6 @@
 #include "assetsessions.hpp"
 
 #include "../../lib/hashes.h"
-#include <boost/make_shared.hpp>
 
 bithorded::UpstreamRequestBinding::Ptr bithorded::AssetSessions::findAsset(const bithorde::BindRead& req)
 {
@@ -30,7 +29,7 @@ bithorded::UpstreamRequestBinding::Ptr bithorded::AssetSessions::findAsset(const
 
 	UpstreamRequestBinding::Ptr res;
 	if (auto asset = openAsset(req)) {
-		res = boost::make_shared<UpstreamRequestBinding>(asset);
+		res = std::make_shared<UpstreamRequestBinding>(asset);
 		add(tigerId, res);
 	}
 	return res;

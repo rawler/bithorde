@@ -110,8 +110,11 @@ ReadRequestContext::~ReadRequestContext() {
 
 void ReadRequestContext::armTimer(int32_t timeout)
 {
+	auto self = shared_from_this();
 	_timer.expires_from_now(boost::posix_time::millisec(timeout));
-	_timer.async_wait(boost::bind(&ReadRequestContext::timer_callback, shared_from_this(), boost::asio::placeholders::error));
+	_timer.async_wait([=](const boost::system::error_code& ec){
+		self->timer_callback(ec);
+	});
 }
 
 void ReadRequestContext::cancel()
@@ -124,7 +127,7 @@ void ReadRequestContext::cancel()
 	_timer.cancel();
 }
 
-void ReadRequestContext::callback(const boost::shared_ptr< MessageContext<Read::Response> >& msgCtx)
+void ReadRequestContext::callback(const std::shared_ptr< MessageContext<Read::Response> >& msgCtx)
 {
 	const auto& msg = msgCtx->message();
 	if (!_asset) // Cancelled
@@ -133,7 +136,7 @@ void ReadRequestContext::callback(const boost::shared_ptr< MessageContext<Read::
 	_asset = NULL; // Handle circular triggers
 	asset->readResponseTime.post((ptime::microsec_clock::universal_time() - _requested_at).total_milliseconds());
 	if (msg.status() == bithorde::SUCCESS) {
-		asset->dataArrived(msg.offset(), boost::make_shared<ReadResponseCtxBuffer>(msgCtx), msg.reqid());
+		asset->dataArrived(msg.offset(), std::make_shared<ReadResponseCtxBuffer>(msgCtx), msg.reqid());
 	} else {
 		cerr << "Error: failed read, " << bithorde::Status_Name(msg.status()) << endl;
 		asset->dataArrived(msg.offset(), NullBuffer::instance, msg.reqid());
@@ -162,9 +165,14 @@ ReadAsset::ReadAsset(const bithorde::ReadAsset::ClientPointer& client, const Bit
 
 ReadAsset::~ReadAsset()
 {
+	cancelRequests();
+}
+
+void ReadAsset::cancelRequests() {
 	for (auto iter = _requestMap.begin(); iter != _requestMap.end(); iter++) {
 		iter->second->cancel();
 	}
+	_requestMap.clear();
 }
 
 const BitHordeIds& ReadAsset::requestIds() const
@@ -189,7 +197,7 @@ void ReadAsset::handleMessage(const bithorde::AssetStatus &msg)
 	Asset::handleMessage(msg);
 }
 
-void ReadAsset::handleMessage( const boost::shared_ptr< MessageContext< Read::Response > >& msgCtx ) {
+void ReadAsset::handleMessage( const std::shared_ptr< MessageContext< Read::Response > >& msgCtx ) {
 	const auto& msg = msgCtx->message();
 	auto it = _requestMap.lower_bound(msg.offset());
 	auto end = _requestMap.upper_bound(msg.offset());
@@ -226,10 +234,10 @@ int ReadAsset::aSyncRead(ReadAsset::off_t offset, ssize_t size, int32_t timeout)
 	int64_t maxSize = _size - offset;
 	if (size > maxSize)
 		size = maxSize;
-	auto req = boost::make_shared<ReadRequestContext>(this, offset, size, _timeout);
+	auto req = std::make_shared<ReadRequestContext>(this, offset, size, _timeout);
 	if (_client->sendMessage(Connection::ReadRequest, *req)) {
 		req->armTimer(timeout);
-		_requestMap.insert(RequestMap::value_type(offset, req));
+		_requestMap.emplace(offset, req);
 	} else {
 		req->cancel();
 	}
@@ -264,6 +272,6 @@ const fs::path& UploadAsset::link()
 }
 
 
-void UploadAsset::handleMessage(const boost::shared_ptr< MessageContext< Read::Response > >& msgCtx) {
+void UploadAsset::handleMessage(const std::shared_ptr< MessageContext< Read::Response > >& msgCtx) {
 	BOOST_ASSERT(false);
 }

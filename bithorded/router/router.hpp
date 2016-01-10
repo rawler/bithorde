@@ -19,9 +19,8 @@
 #define BITHORDED_ROUTER_ROUTER_HPP
 
 #include <boost/asio/io_service.hpp>
-#include <boost/function.hpp>
-#include <boost/shared_ptr.hpp>
 #include <map>
+#include <memory>
 #include <unordered_set>
 #include <vector>
 
@@ -43,7 +42,7 @@ class Router : public AssetSessions, public management::DescriptiveDirectory, pu
 {
 	Server& _server;
 	std::map<std::string, Config::Friend> _friends;
-	std::map<std::string, boost::shared_ptr<FriendConnector> > _connectors;
+	std::map<std::string, std::shared_ptr<FriendConnector> > _connectors;
 	std::map<std::string, Client::Ptr > _connectedFriends;
 
 	std::unordered_set<uint64_t> _blacklist;

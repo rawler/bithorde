@@ -4,7 +4,7 @@
 #include "weak_fn.hpp"
 
 #include <boost/asio.hpp>
-#include <boost/bind.hpp>
+#include <functional>
 #include <iostream>
 
 #define CRYPTOPP_ENABLE_NAMESPACE_WEAK 1
@@ -41,9 +41,9 @@ class ConnectionImpl : public Connection {
 	typedef typename Protocol::socket Socket;
 	typedef typename Protocol::endpoint EndPoint;
 
-	boost::shared_ptr<Socket> _socket;
+	std::shared_ptr<Socket> _socket;
 
-	boost::shared_ptr<CryptoPP::SymmetricCipher> _encryptor, _decryptor;
+	std::shared_ptr<CryptoPP::SymmetricCipher> _encryptor, _decryptor;
 public:
 	ConnectionImpl(boost::asio::io_service& ioSvc, const ConnectionStats::Ptr& stats, const EndPoint& addr)
 		: Connection(ioSvc, stats), _socket(new Socket(ioSvc))
@@ -55,7 +55,7 @@ public:
 		_socket->connect(addr);
 	}
 
-	ConnectionImpl(boost::asio::io_service& ioSvc, const ConnectionStats::Ptr& stats, boost::shared_ptr<Socket>& socket)
+	ConnectionImpl(boost::asio::io_service& ioSvc, const ConnectionStats::Ptr& stats, const std::shared_ptr<Socket>& socket)
 		: Connection(ioSvc, stats)
 	{
 		std::ostringstream buf;
@@ -124,9 +124,11 @@ public:
 			_sendWaiting += buf.size();
 		}
 		if (_sendWaiting) {
+			auto self = shared_from_this();
 			boost::asio::async_write(*_socket, buffers,
-				boost::bind(&ConnectionImpl<Protocol>::onWritten, shared_from_this(),
-							asio::placeholders::error, asio::placeholders::bytes_transferred, queued)
+				[=](const boost::system::error_code& ec, std::size_t bytes_transferred) {
+					self->onWritten(ec, bytes_transferred, queued);
+				}
 			);
 		}
 		BOOST_ASSERT(_sendWaiting || _sndQueue.empty());
@@ -134,11 +136,12 @@ public:
 
 	void tryRead() {
 		if (_listening && !_readWindow) {
+			auto self = shared_from_this();
 			_readWindow = _rcvBuf.allocate(MAX_MSG);
 			_socket->async_read_some(asio::buffer(_readWindow, MAX_MSG),
-				boost::bind(&ConnectionImpl<Protocol>::onRead, shared_from_this(),
-					asio::placeholders::error, asio::placeholders::bytes_transferred
-				)
+				[=](const boost::system::error_code& ec, std::size_t bytes_transferred) {
+					self->onRead(ec, bytes_transferred);
+				}
 			);
 		}
 	}
@@ -237,7 +240,7 @@ Connection::Pointer Connection::create(asio::io_service& ioSvc, const Connection
 	return c;
 }
 
-Connection::Pointer Connection::create(asio::io_service& ioSvc, const ConnectionStats::Ptr& stats, boost::shared_ptr< asio::ip::tcp::socket >& socket)
+Connection::Pointer Connection::create(asio::io_service& ioSvc, const ConnectionStats::Ptr& stats, const std::shared_ptr< asio::ip::tcp::socket >& socket)
 {
 	Pointer c(new ConnectionImpl<asio::ip::tcp>(ioSvc, stats, socket));
 	c->tryRead();
@@ -250,7 +253,7 @@ Connection::Pointer Connection::create(asio::io_service& ioSvc, const Connection
 	return c;
 }
 
-Connection::Pointer Connection::create(asio::io_service& ioSvc, const ConnectionStats::Ptr& stats, boost::shared_ptr< asio::local::stream_protocol::socket >& socket)
+Connection::Pointer Connection::create(asio::io_service& ioSvc, const ConnectionStats::Ptr& stats, const std::shared_ptr< asio::local::stream_protocol::socket >& socket)
 {
 	Pointer c(new ConnectionImpl<asio::local::stream_protocol>(ioSvc, stats, socket));
 	c->tryRead();
@@ -367,7 +370,7 @@ bool Connection::sendMessage(Connection::MessageType type, const google::protobu
 		return false;
 	}
 
-	boost::shared_ptr<Message> buf(new Message(expires));
+	std::shared_ptr<Message> buf(new Message(expires));
 	// Encode
 	{
 		::google::protobuf::io::StringOutputStream of(&buf->buf);

@@ -22,7 +22,6 @@
 #include <sstream>
 
 #include <boost/filesystem.hpp>
-#include <boost/smart_ptr/make_shared.hpp>
 #include <netinet/in.h>
 
 using namespace std;
@@ -61,7 +60,7 @@ HashStore::NodePtr HashStore::operator[](const size_t offset)
 	if (auto node = _nodeMap[offset]) {
 		return node;
 	} else {
-		auto res = boost::make_shared<TigerNode>(*this, offset);
+		auto res = std::make_shared<TigerNode>(*this, offset);
 		_nodeMap.set(offset, res);
 		return res;
 	}

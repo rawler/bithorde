@@ -26,7 +26,6 @@
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/local/stream_protocol.hpp>
 #include <boost/filesystem/path.hpp>
-#include <boost/smart_ptr/scoped_ptr.hpp>
 
 #include "../cache/manager.hpp"
 #include "../http_server/server.hpp"
@@ -76,18 +75,14 @@ public:
 	UpstreamRequestBinding::Ptr async_findAsset(const bithorde::BindRead& req);
 	UpstreamRequestBinding::Ptr prepareUpload(uint64_t size);
 
-	void hookup(boost::shared_ptr< boost::asio::ip::tcp::socket >& socket, const Config::Client& client);
+	void hookup( const std::shared_ptr< boost::asio::ip::tcp::socket >& socket, const Config::Client& client);
 
 	virtual void inspect(management::InfoList& target) const;
 private:
 	void clientConnected(const bithorded::Client::Ptr& client);
-	void clientAuthenticated(const bithorded::Client::WeakPtr& client);
-	void clientDisconnected(bithorded::Client::Ptr& client);
 
 	void waitForTCPConnection();
 	void waitForLocalConnection();
-	void onTCPConnected(boost::shared_ptr< boost::asio::ip::tcp::socket >& socket, const boost::system::error_code& ec);
-	void onLocalConnected(boost::shared_ptr< boost::asio::local::stream_protocol::socket >& socket, const boost::system::error_code& ec);
 };
 
 }

@@ -18,9 +18,7 @@
 #ifndef BITHORDED_ASSET_HPP
 #define BITHORDED_ASSET_HPP
 
-#include <boost/shared_ptr.hpp>
-#include <boost/function.hpp>
-#include <boost/signals2/signal.hpp>
+#include <boost/signals2/connection.hpp>
 #include <unordered_set>
 
 #include <lib/hashes.h>
@@ -43,20 +41,24 @@ class UpstreamRequestBinding;
 
 class AssetBinding {
 	Client* _client; // Client owns us, so should always be valid.
-	boost::shared_ptr<UpstreamRequestBinding> _ptr;
+	std::shared_ptr<UpstreamRequestBinding> _ptr;
 	BitHordeIds _assetIds;
 	bithorde::RouteTrace _requesters;
 	boost::posix_time::ptime _deadline;
+	boost::signals2::connection _statusConnection;
 public:
+	typedef std::function<void (const std::shared_ptr< IAsset >&, const bithorde::AssetStatus&)> StatusFunc;
+
 	AssetBinding();
 	AssetBinding(const AssetBinding& other);
 	virtual ~AssetBinding();
 
-	void setClient(const boost::shared_ptr<Client>& client);
+	void setClient(const std::shared_ptr<Client>& client);
 	Client* client() const;
 
 	bool bind( const bithorde::RouteTrace& requesters );
-	bool bind( const boost::shared_ptr< bithorded::UpstreamRequestBinding >& asset, const BitHordeIds& assetIds, const bithorde::RouteTrace& requesters, const boost::posix_time::ptime& deadline );
+	bool bind( const std::shared_ptr< bithorded::UpstreamRequestBinding >& asset, const BitHordeIds& assetIds, const bithorde::RouteTrace& requesters, const boost::posix_time::ptime& deadline );
+	bool bind( const std::shared_ptr< bithorded::UpstreamRequestBinding >& asset, const BitHordeIds& assetIds, const bithorde::RouteTrace& requesters, const boost::posix_time::ptime& deadline, StatusFunc statusUpdate );
 	void reset();
 
 	AssetBinding& operator=(const AssetBinding& other);
@@ -65,8 +67,8 @@ public:
 	IAsset* get() const;
 	explicit operator bool() const;
 
-	const boost::shared_ptr< IAsset >& shared() const;
-	boost::weak_ptr< IAsset > weak() const;
+	const std::shared_ptr< IAsset >& shared() const;
+	std::weak_ptr< IAsset > weak() const;
 
 	const BitHordeIds& assetIds() const { return _assetIds; };
 	const bithorde::RouteTrace& requesters() const { return _requesters; }
@@ -75,33 +77,33 @@ public:
 	void clearDeadline();
 };
 
-bool operator==(const bithorded::AssetBinding& a, const boost::shared_ptr< bithorded::IAsset >& b);
-bool operator!=(const bithorded::AssetBinding& a, const boost::shared_ptr< bithorded::IAsset >& b);
+bool operator==(const bithorded::AssetBinding& a, const std::shared_ptr< bithorded::IAsset >& b);
+bool operator!=(const bithorded::AssetBinding& a, const std::shared_ptr< bithorded::IAsset >& b);
 
 struct AssetRequestParameters {
 	std::unordered_set<uint64_t> requesters;
 	std::unordered_set<Client*> requesterClients;
 	boost::posix_time::ptime deadline;
 
-	bool isRequester(const boost::shared_ptr<Client>& client) const;
+	bool isRequester(const std::shared_ptr<Client>& client) const;
 	bool operator!=(const AssetRequestParameters& other) const;
 };
 
 class UpstreamRequestBinding : boost::noncopyable {
-	boost::shared_ptr<IAsset> _ptr;
+	std::shared_ptr<IAsset> _ptr;
 	AssetRequestParameters _parameters;
 	std::unordered_set<const AssetBinding*> _downstreams;
 public:
-	typedef boost::shared_ptr<UpstreamRequestBinding> Ptr;
+	typedef std::shared_ptr<UpstreamRequestBinding> Ptr;
 	static UpstreamRequestBinding::Ptr NONE;
 
-	UpstreamRequestBinding(boost::shared_ptr<IAsset> asset);
+	UpstreamRequestBinding(std::shared_ptr<IAsset> asset);
 
 	virtual bool bindDownstream(const AssetBinding* binding);
 	virtual void unbindDownstream(const bithorded::AssetBinding* binding);
 
-	const boost::shared_ptr< IAsset >& shared();
-	boost::weak_ptr<IAsset> weaken();
+	const std::shared_ptr< IAsset >& shared();
+	std::weak_ptr<IAsset> weaken();
 
 	IAsset* get() const;
 	IAsset* operator->() const;
@@ -114,14 +116,14 @@ class IAsset : public management::DescriptiveDirectory
 {
 	uint64_t _sessionId;
 public:
-	typedef boost::function<void(int64_t offset, const boost::shared_ptr<bithorde::IBuffer>& data)> ReadCallback;
+	typedef boost::function<void(int64_t offset, const std::shared_ptr<bithorde::IBuffer>& data)> ReadCallback;
 
 	IAsset();
 
 	Subscribable<bithorde::AssetStatus> status;
 
-	typedef boost::shared_ptr<IAsset> Ptr;
-	typedef boost::weak_ptr<IAsset> WeakPtr;
+	typedef std::shared_ptr<IAsset> Ptr;
+	typedef std::weak_ptr<IAsset> WeakPtr;
 	// Empty dummy Asset::Ptr, for cases when a null Ptr& is needed.
 	static IAsset::Ptr NONE;
 

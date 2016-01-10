@@ -19,8 +19,6 @@
 #define BITHORDED_RANDOMACCESSFILE_H
 
 #include <boost/filesystem/path.hpp>
-#include <boost/noncopyable.hpp>
-#include <boost/shared_ptr.hpp>
 
 #include "lib/types.h"
 
@@ -28,7 +26,7 @@ namespace bithorded {
 
 class IDataArray {
 public:
-	typedef boost::shared_ptr<IDataArray> Ptr;
+	typedef std::shared_ptr<IDataArray> Ptr;
 
 	virtual uint64_t size() const = 0;
 
@@ -60,7 +58,7 @@ public:
 
 std::string dataArrayToString(const IDataArray& dataarray);
 
-class RandomAccessFile : boost::noncopyable, public IDataArray {
+class RandomAccessFile : public IDataArray {
 	int _fd;
 	boost::filesystem::path _path;
 	uint64_t _size;
@@ -72,7 +70,8 @@ public:
 	};
 
 	RandomAccessFile();
-	RandomAccessFile(const boost::filesystem::path& path, RandomAccessFile::Mode mode = READ, uint64_t size = 0);
+	RandomAccessFile( const boost::filesystem::path& path, RandomAccessFile::Mode mode = READ, uint64_t size = 0 );
+	RandomAccessFile( const RandomAccessFile& ) = delete;
 	~RandomAccessFile();
 
 	/**

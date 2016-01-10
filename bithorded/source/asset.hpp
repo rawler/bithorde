@@ -20,7 +20,6 @@
 
 #include <ios>
 #include <boost/filesystem/path.hpp>
-#include <boost/shared_ptr.hpp>
 
 #include "../server/asset.hpp"
 #include "../store/asset.hpp"
@@ -33,8 +32,8 @@ namespace bithorded {
 class SourceAsset : public store::StoredAsset
 {
 public:
-	typedef boost::shared_ptr<SourceAsset> Ptr;
-	typedef boost::weak_ptr<SourceAsset> WeakPtr;
+	typedef std::shared_ptr<SourceAsset> Ptr;
+	typedef std::weak_ptr<SourceAsset> WeakPtr;
 
 	/**
 	 * The /metaFolder/ is a special control-folder for a single-asset. It has file

@@ -22,21 +22,20 @@
 #include <set>
 #include <boost/thread/pthread/mutex.hpp>
 #include <boost/thread/locks.hpp>
-#include <boost/weak_ptr.hpp>
 
 namespace bithorded {
 
 template <typename KeyType, typename LinkType, typename MutexType=boost::mutex>
 class WeakMap
 {
-	typedef boost::weak_ptr<LinkType> WeakPtr;
+	typedef std::weak_ptr<LinkType> WeakPtr;
 	std::unordered_map<KeyType, WeakPtr> _map;
 	uint32_t _scrubThreshold; // Will automatically perform a complete scrubbing after this amount of changes
 	uint32_t _dirtiness; // The amount of changes made since last scrubbing
 	MutexType _m;
 	typedef boost::lock_guard<MutexType> lock_guard;
 public:
-	typedef boost::shared_ptr<LinkType> Link;
+	typedef std::shared_ptr<LinkType> Link;
 	WeakMap(int scrubThreshold=10000/sizeof(KeyType)) :
 		_scrubThreshold(scrubThreshold),
 		_dirtiness(0)
@@ -134,14 +133,14 @@ private:
 template <typename LinkType, typename MutexType=boost::mutex>
 class WeakSet
 {
-	typedef boost::weak_ptr<LinkType> WeakPtr;
-	std::set<WeakPtr> _set;
+	typedef std::weak_ptr<LinkType> WeakPtr;
+	std::set< WeakPtr, std::owner_less<WeakPtr> > _set;
 	uint32_t _scrubThreshold; // Will automatically perform a complete scrubbing after this amount of changes
 	uint32_t _dirtiness; // The amount of changes made since last scrubbing
 	MutexType _m;
 	typedef boost::lock_guard<MutexType> lock_guard;
 public:
-	typedef boost::shared_ptr<LinkType> Link;
+	typedef std::shared_ptr<LinkType> Link;
 	WeakSet(int scrubThreshold=2000) :
 		_scrubThreshold(scrubThreshold),
 		_dirtiness(0)

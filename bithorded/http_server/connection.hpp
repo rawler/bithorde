@@ -13,9 +13,7 @@
 
 #include <boost/asio.hpp>
 #include <boost/array.hpp>
-#include <boost/noncopyable.hpp>
 #include <boost/shared_ptr.hpp>
-#include <boost/enable_shared_from_this.hpp>
 #include "reply.hpp"
 #include "request.hpp"
 #include "request_handler.hpp"
@@ -28,12 +26,12 @@ class connection_manager;
 
 /// Represents a single connection from a client.
 class connection
-: public boost::enable_shared_from_this<connection>,
-	private boost::noncopyable
+: public std::enable_shared_from_this<connection>
 {
 	public:
 	/// Construct a connection with the given io_service.
 	explicit connection(boost::asio::io_service& io_service, connection_manager& manager, request_handler& handler);
+	connection( const connection& ) = delete;
 
 	/// Get the socket associated with the connection.
 	boost::asio::ip::tcp::socket& socket();
@@ -74,7 +72,7 @@ class connection
 	reply reply_;
 };
 
-typedef boost::shared_ptr<connection> connection_ptr;
+typedef std::shared_ptr<connection> connection_ptr;
 
 } // namespace server
 } // namespace http

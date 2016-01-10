@@ -21,7 +21,6 @@
 #include <boost/filesystem/path.hpp>
 #include <boost/interprocess/sync/null_mutex.hpp>
 #include <boost/iostreams/device/mapped_file.hpp>
-#include <boost/noncopyable.hpp>
 
 #include <crypto++/tiger.h>
 
@@ -36,12 +35,13 @@ typedef HashNode<CryptoPP::Tiger> TigerBaseNode;
 
 class HashStore;
 
-class TigerNode : public TigerBaseNode, private boost::noncopyable {
+class TigerNode : public TigerBaseNode{
 	HashStore& _metaFile;
 	size_t _offset;
 	TigerBaseNode _unmodified;
 public:
 	TigerNode(HashStore& metaFile, size_t offset);
+	TigerNode( const TigerNode& ) = delete;
 	virtual ~TigerNode();
 };
 
@@ -51,8 +51,8 @@ class HashStore {
 	uint8_t _hashLevelsSkipped;
 public:
 	typedef TigerBaseNode Node;
-	typedef typename boost::shared_ptr<TigerNode> NodePtr;
-	typedef boost::shared_ptr<HashStore> Ptr;
+	typedef typename std::shared_ptr<TigerNode> NodePtr;
+	typedef std::shared_ptr<HashStore> Ptr;
 	explicit HashStore(const IDataArray::Ptr& storage, uint8_t hashLevelsSkipped=0);
 
 	NodePtr operator[](const std::size_t offset);

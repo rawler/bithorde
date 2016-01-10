@@ -18,8 +18,6 @@
 #ifndef SUBSCRIBABLE_HPP
 #define SUBSCRIBABLE_HPP
 
-#include <boost/noncopyable.hpp>
-#include <boost/shared_ptr.hpp>
 #include <boost/signals2/signal.hpp>
 
 template <typename T>
@@ -30,9 +28,6 @@ class ChangeGuard{
 public:
 	ChangeGuard(T* data, const boost::signals2::signal<void (const T&, const T&)>& signal)
 		: _data(data), _dataCopy(*data), _signal(signal)
-	{}
-	ChangeGuard(const ChangeGuard& other)
-		: _data(other._data), _dataCopy(other._dataCopy), _signal(other._signal)
 	{}
 	virtual ~ChangeGuard() {
 		if (_dataCopy != *_data)
@@ -56,11 +51,14 @@ public:
 };
 
 template <typename T>
-class Subscribable : boost::noncopyable
+class Subscribable
 {
 	T _value;
 public:
 	boost::signals2::signal<void (const T&, const T&)> onChange;
+
+	Subscribable() {}
+	Subscribable( const Subscribable<T>& ) = delete;
 
 	virtual ChangeGuard< T > change() {
 		return ChangeGuard<T>(&_value, onChange);

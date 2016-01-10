@@ -74,12 +74,6 @@ public:
 	 ***********************************************************************************/
 	bool debug;
 private:
-	/************************************************************************************
-		* Read one instruction on Fuse Socket, and dispatch to handler.
-		* Might block on read, you may want to check with a Selector first.
-		***********************************************************************************/
-	void dispatch_waiting(const boost::system::error_code& err, size_t count);
-
 	void readNext();
 private:
 	boost::asio::posix::stream_descriptor _channel;

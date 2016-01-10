@@ -24,11 +24,11 @@ struct request;
 
 /// The common handler for all incoming requests.
 class request_handler
-  : private boost::noncopyable
 {
 public:
 	/// Construct with a directory containing files to be served.
 	explicit request_handler(const RequestRouter& root);
+	request_handler( const request_handler& ) = delete;
 
 	/// Handle a request and produce a reply.
 	void handle_request(const request& req, reply& rep);

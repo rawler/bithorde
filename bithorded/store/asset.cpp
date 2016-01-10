@@ -22,10 +22,7 @@
 #include "../lib/rounding.hpp"
 #include <lib/buffer.hpp>
 
-#include <boost/bind/protect.hpp>
-#include <boost/enable_shared_from_this.hpp>
 #include <boost/filesystem.hpp>
-#include <boost/make_shared.hpp>
 #include <boost/shared_array.hpp>
 #include <stdexcept>
 
@@ -51,7 +48,7 @@ StoredAsset::StoredAsset( GrandCentralDispatch& gcd, const string& id, const Has
 
 void StoredAsset::async_read(uint64_t offset, size_t size, uint32_t timeout, bithorded::IAsset::ReadCallback cb)
 {
-	auto buf = boost::make_shared<bithorde::MemoryBuffer>(size);
+	auto buf = std::make_shared<bithorde::MemoryBuffer>(size);
 	auto dataSize = _data->size();
 	BOOST_ASSERT(offset < dataSize);
 	auto clamped_size = std::min(size, static_cast<size_t>(dataSize-offset));
@@ -144,17 +141,17 @@ boost::shared_array<byte> crunch_piece(IDataArray* file, uint64_t offset, size_t
 	return boost::shared_array<byte>(res);
 }
 
-struct HashTail : public boost::enable_shared_from_this<HashTail> {
+struct HashTail : public std::enable_shared_from_this<HashTail> {
 	uint64_t offset, end;
 	uint32_t blockSize;
 
 	GrandCentralDispatch& gcd;
 	IDataArray::Ptr data;
 	Hasher& hasher;
-	boost::shared_ptr<StoredAsset> asset;
+	std::shared_ptr<StoredAsset> asset;
 	std::function<void()> whenDone;
 
-	HashTail(uint64_t offset, uint64_t end, uint32_t blockSize, GrandCentralDispatch& gcd, const IDataArray::Ptr& data, Hasher& hasher, boost::shared_ptr<StoredAsset> asset, std::function<void()> whenDone=0) :
+	HashTail(uint64_t offset, uint64_t end, uint32_t blockSize, GrandCentralDispatch& gcd, const IDataArray::Ptr& data, Hasher& hasher, std::shared_ptr<StoredAsset> asset, std::function<void()> whenDone=0) :
 		offset(offset),
 		end(end),
 		blockSize(blockSize),
@@ -166,8 +163,8 @@ struct HashTail : public boost::enable_shared_from_this<HashTail> {
 	{}
 
 	~HashTail() {
-		auto asset(this->asset);
-		auto whenDone(this->whenDone);
+		auto& asset(this->asset);
+		auto& whenDone(this->whenDone);
 		gcd.ioService().post([asset, whenDone]{
 			asset->updateStatus();
 			if (whenDone) {
@@ -183,8 +180,8 @@ struct HashTail : public boost::enable_shared_from_this<HashTail> {
 			return;
 		auto blockSize_ = std::min(static_cast<uint64_t>(blockSize), static_cast<uint64_t>(end - offset));
 
-		auto job_handler = boost::bind(&crunch_piece, data.get(), offset, blockSize_);
-		auto result_handler = boost::bind(&HashTail::add_piece, shared_from_this(), (uint32_t)(offset/blockSize), _1);
+		auto job_handler = std::bind(&crunch_piece, data.get(), offset, blockSize_);
+		auto result_handler = std::bind(&HashTail::add_piece, shared_from_this(), (uint32_t)(offset/blockSize), std::placeholders::_1);
 
 		offset += blockSize_;
 
@@ -201,7 +198,7 @@ struct HashTail : public boost::enable_shared_from_this<HashTail> {
 
 void StoredAsset::updateHash(uint64_t offset, uint64_t end, std::function< void() > whenDone)
 {
-	boost::shared_ptr<HashTail> tail(boost::make_shared<HashTail>(offset, end, _hashStore->leafBlockSize(), _gcd, _data, _hashTree, shared_from_this(), whenDone));
+	std::shared_ptr<HashTail> tail(std::make_shared<HashTail>(offset, end, _hashStore->leafBlockSize(), _gcd, _data, _hashTree, shared_from_this(), whenDone));
 
 	for (size_t i=0; (i < PARALLEL_HASH_JOBS) && !tail->empty(); i++ ) {
 		tail->chewNext();
@@ -263,7 +260,7 @@ struct V2Header {
 #pragma pack(pop)
 
 AssetMeta store::openV1AssetMeta ( const boost::filesystem::path& path ) {
-	auto metaFile = boost::make_shared<RandomAccessFile>( path, RandomAccessFile::READWRITE);
+	auto metaFile = std::make_shared<RandomAccessFile>( path, RandomAccessFile::READWRITE);
 
 	V1Header hdr;
         if (metaFile->size() < sizeof(hdr))
@@ -275,14 +272,14 @@ AssetMeta store::openV1AssetMeta ( const boost::filesystem::path& path ) {
 
 	AssetMeta res;
 	res.hashLevelsSkipped = 0;
-	res.hashStore = boost::make_shared<HashStore>(boost::make_shared<DataArraySlice>(metaFile, sizeof(hdr)), res.hashLevelsSkipped);
+	res.hashStore = std::make_shared<HashStore>(std::make_shared<DataArraySlice>(metaFile, sizeof(hdr)), res.hashLevelsSkipped);
 	res.atoms = hdr.atoms();
 
 	return res;
 }
 
 AssetMeta store::openV2AssetMeta ( const boost::filesystem::path& path ) {
-	auto file = boost::make_shared<RandomAccessFile>( path, RandomAccessFile::READWRITE);
+	auto file = std::make_shared<RandomAccessFile>( path, RandomAccessFile::READWRITE);
 
 	V2Header hdr;
         if (file->size() < sizeof(hdr))
@@ -296,8 +293,8 @@ AssetMeta store::openV2AssetMeta ( const boost::filesystem::path& path ) {
 
 	AssetMeta res;
 	res.hashLevelsSkipped = hdr.hashLevelsSkipped;
-	res.hashStore = boost::make_shared<HashStore>(boost::make_shared<DataArraySlice>(file, sizeof(hdr), metaSize ), res.hashLevelsSkipped);
-	res.tail = boost::make_shared<DataArraySlice>(file, sizeof(hdr) + metaSize);
+	res.hashStore = std::make_shared<HashStore>(std::make_shared<DataArraySlice>(file, sizeof(hdr), metaSize ), res.hashLevelsSkipped);
+	res.tail = std::make_shared<DataArraySlice>(file, sizeof(hdr) + metaSize);
 	res.atoms = hdr.atoms();
 
 	return res;
@@ -310,7 +307,7 @@ AssetMeta store::createAssetMeta ( const boost::filesystem::path& path, FileForm
 	if ((version != store::V2CACHE) && (version != store::V2LINKED))
 		throw std::invalid_argument("Failed to write header to "+path.native());
 
-	auto file = boost::make_shared<RandomAccessFile>(path, RandomAccessFile::READWRITE, sizeof(V2Header) + hashesSize + tailSize);
+	auto file = std::make_shared<RandomAccessFile>(path, RandomAccessFile::READWRITE, sizeof(V2Header) + hashesSize + tailSize);
 
 	V2Header hdr;
 	hdr.format = version;
@@ -319,12 +316,12 @@ AssetMeta store::createAssetMeta ( const boost::filesystem::path& path, FileForm
 	if (file->write(0, &hdr, sizeof(hdr)) != sizeof(hdr))
 		throw ios_base::failure("Failed to write header to "+path.native());
 
-	auto hashSlice = boost::make_shared<DataArraySlice>(file, sizeof(hdr), hashesSize);
+	auto hashSlice = std::make_shared<DataArraySlice>(file, sizeof(hdr), hashesSize);
 
 	AssetMeta res;
 	res.hashLevelsSkipped = levelsSkipped;
-	res.hashStore = boost::make_shared<HashStore>(hashSlice, res.hashLevelsSkipped);
-	res.tail = boost::make_shared<DataArraySlice>(file, sizeof(hdr)+hashesSize);
+	res.hashStore = std::make_shared<HashStore>(hashSlice, res.hashLevelsSkipped);
+	res.tail = std::make_shared<DataArraySlice>(file, sizeof(hdr)+hashesSize);
 	res.atoms = atoms;
 
 	BOOST_ASSERT(res.tail->size() == tailSize);

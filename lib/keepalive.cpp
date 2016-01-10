@@ -24,7 +24,7 @@ const static boost::posix_time::seconds MAX_PING_RESPONSE_TIME(15);
 using namespace std;
 
 bithorde::Keepalive::Keepalive(Client& client) :
-	_client(client), _timer(*client.timerService(), boost::bind(&Keepalive::run, this)), _stale(false)
+	_client(client), _timer(*client.timerService(), std::bind(&Keepalive::run, this)), _stale(false)
 {
 	reset();
 }

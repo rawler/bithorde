@@ -32,8 +32,8 @@ class CacheManager;
 class CachedAsset : public store::StoredAsset
 {
 public:
-	typedef boost::shared_ptr<CachedAsset> Ptr;
-	typedef boost::weak_ptr<CachedAsset> WeakPtr;
+	typedef std::shared_ptr<CachedAsset> Ptr;
+	typedef std::weak_ptr<CachedAsset> WeakPtr;
 
 	CachedAsset( bithorded::GrandCentralDispatch& gcd, const std::string& id, const store::HashStore::Ptr& hashStore, const bithorded::IDataArray::Ptr& data );
 
@@ -47,13 +47,13 @@ public:
 	 *        a callback to /whenDone/
 	 *  whenDone - called when written content is completely processed
 	 */
-	void write(uint64_t offset, const boost::shared_ptr<bithorde::IBuffer>& data, const std::function< void() > whenDone = 0);
+	void write(uint64_t offset, const std::shared_ptr<bithorde::IBuffer>& data, const std::function< void() > whenDone = 0);
 
 	static Ptr open( bithorded::GrandCentralDispatch& gcd, const boost::filesystem::path& path );
 	static Ptr create( bithorded::GrandCentralDispatch& gcd, const boost::filesystem::path& path, uint64_t size );
 };
 
-class CachingAsset : boost::noncopyable, public IAsset, public boost::enable_shared_from_this<CachingAsset> {
+class CachingAsset : boost::noncopyable, public IAsset, public std::enable_shared_from_this<CachingAsset> {
 	CacheManager& _manager;
 	bithorded::IAsset::Ptr _upstream;
 	boost::signals2::scoped_connection _upstreamTracker;
@@ -77,7 +77,7 @@ private:
 	CachedAsset::Ptr cached();
 
 	void disconnect();
-	void upstreamDataArrived( bithorded::IAsset::ReadCallback cb, std::size_t requested_size, int64_t offset, const boost::shared_ptr<bithorde::IBuffer>& data );
+	void upstreamDataArrived( bithorded::IAsset::ReadCallback cb, std::size_t requested_size, int64_t offset, const std::shared_ptr<bithorde::IBuffer>& data );
 	void upstreamStatusChange(const bithorde::AssetStatus& newStatus);
 };
 	}

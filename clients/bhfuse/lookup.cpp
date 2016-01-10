@@ -3,7 +3,6 @@
 #include "lookup.h"
 
 #include <errno.h>
-#include <boost/make_shared.hpp>
 
 using namespace std;
 
@@ -13,10 +12,10 @@ Lookup::Lookup(BHFuse* fs, fuse_req_t req, const BitHordeIds& ids) :
 	fs(fs),
 	req(req)
 {
-	asset = boost::make_shared<ReadAsset>(fs->client, ids);
+	asset = std::make_shared<ReadAsset>(fs->client, ids);
 }
 
-Lookup::Lookup( BHFuse* fs, boost::shared_ptr< FUSEAsset >& asset, fuse_req_t req) :
+Lookup::Lookup( BHFuse* fs, std::shared_ptr< FUSEAsset >& asset, fuse_req_t req) :
 	fs(fs),
 	req(req),
 	fuseAsset(asset),

@@ -18,9 +18,8 @@
 #ifndef BITHORDE_BUFFER_H
 #define BITHORDE_BUFFER_H
 
-#include <boost/noncopyable.hpp>
-#include <boost/shared_ptr.hpp>
 #include <boost/shared_array.hpp>
+#include <memory>
 
 #include "types.h"
 
@@ -28,7 +27,7 @@ namespace bithorde {
 
 class IBuffer {
 public:
-	typedef boost::shared_ptr<IBuffer> Ptr;
+	typedef std::shared_ptr<IBuffer> Ptr;
 
 	virtual byte * operator*() const = 0;
 	virtual size_t size() const = 0;
@@ -59,18 +58,18 @@ class Read_Response;
 // Possible Optimization: create specialized class inheriting MessageContext<bithorde::Read_Response> and IBuffer,
 // and instantiate directly from client
 class ReadResponseCtxBuffer : public IBuffer {
-	boost::shared_ptr< MessageContext<bithorde::Read_Response> > _msgCtx;
+	std::shared_ptr< MessageContext<bithorde::Read_Response> > _msgCtx;
 public:
-	ReadResponseCtxBuffer(const boost::shared_ptr< MessageContext<Read_Response> > msgCtx);
+	ReadResponseCtxBuffer(const std::shared_ptr< MessageContext<Read_Response> > msgCtx);
 	virtual byte* operator*() const;
 	virtual size_t size() const;
 };
 
 class DataSegment;
 class DataSegmentCtxBuffer : public IBuffer {
-	boost::shared_ptr< MessageContext<bithorde::DataSegment> > _msgCtx;
+	std::shared_ptr< MessageContext<bithorde::DataSegment> > _msgCtx;
 public:
-	DataSegmentCtxBuffer(const boost::shared_ptr< MessageContext<DataSegment> > msgCtx);
+	DataSegmentCtxBuffer(const std::shared_ptr< MessageContext<DataSegment> > msgCtx);
 	virtual byte* operator*() const;
 	virtual size_t size() const;
 };

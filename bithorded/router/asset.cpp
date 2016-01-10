@@ -18,8 +18,6 @@
 #include "asset.hpp"
 #include "router.hpp"
 
-#include <boost/foreach.hpp>
-#include <boost/smart_ptr/make_shared.hpp>
 #include <utility>
 
 #include <lib/weak_fn.hpp>
@@ -44,14 +42,17 @@ void PendingRead::cancel()
 	cb(offset, bithorde::NullBuffer::instance);
 }
 
-UpstreamAsset::UpstreamAsset(const bithorde::ReadAsset::ClientPointer& client, const BitHordeIds& requestIds)
-	: ReadAsset(client, requestIds)
-{}
-
-void UpstreamAsset::handleMessage( const boost::shared_ptr< bithorde::MessageContext< bithorde::Read::Response > >& msgCtx )
+UpstreamBinding::UpstreamBinding(std::shared_ptr<ForwardedAsset> parent, std::string peerName, bithorded::Client::Ptr f, BitHordeIds ids) :
+	ReadAsset(f, ids)
 {
-	auto self_ref = shared_from_this();
-	bithorde::ReadAsset::handleMessage(msgCtx);
+	auto parent_ = std::weak_ptr<ForwardedAsset>(parent);
+
+	_statusConnection = statusUpdate.connect([=](const bithorde::AssetStatus& status){
+		if (auto p = parent_.lock()) { p->onUpstreamStatus(peerName, status); }
+	});
+	_dataConnection = dataArrived.connect([=](uint64_t offset, const std::shared_ptr<bithorde::IBuffer>& data, int tag) {
+		if (auto p = parent_.lock()) { p->onData(offset, data, tag); }
+	});
 }
 
 ForwardedAsset::ForwardedAsset(Router& router, const BitHordeIds& ids) :
@@ -98,11 +99,11 @@ void bithorded::router::ForwardedAsset::apply(const bithorded::AssetRequestParam
 			continue;
 
 		auto peername = f->peerName();
-		if (_upstream.count(peername)) {
+		auto upstream = _upstream.find(peername);
+		if ( upstream != _upstream.end() ) {
 			if (current.requesters.size()) { // Some downstreams are still interested
-				auto& upstream = _upstream[peername];
-				auto client = upstream->client();
-				client->bind(*upstream, requesters_);
+				auto client = upstream->second.client();
+				client->bind(upstream->second, requesters_);
 			} else {
 				dropUpstream(peername);
 			}
@@ -125,13 +126,12 @@ void ForwardedAsset::addUpstream(const bithorded::Client::Ptr& f)
 void bithorded::router::ForwardedAsset::addUpstream(const bithorded::Client::Ptr& f, int32_t timeout, const bithorde::RouteTrace requesters) {
 	const auto& peername = f->peerName();
 	BOOST_ASSERT( _router.connectedFriends().count(peername) );
-	auto upstream = make_shared<UpstreamAsset>(f, _requestedIds);
-	auto self = boost::weak_ptr<ForwardedAsset>(shared_from_this());
-	upstream->statusUpdate.connect(boost::bind(boost::weak_fn(&ForwardedAsset::onUpstreamStatus, self), peername, bithorde::ASSET_ARG_STATUS));
-	upstream->dataArrived.connect(boost::bind(boost::weak_fn(&ForwardedAsset::onData, self),
-		bithorde::ASSET_ARG_OFFSET, bithorde::ASSET_ARG_DATA, bithorde::ASSET_ARG_TAG));
-	if (f->bind(*upstream, timeout, requesters))
-		_upstream[peername] = upstream;
+
+	auto inserted = _upstream.emplace(std::piecewise_construct, std::make_tuple(peername), std::make_tuple	(shared_from_this(), peername, f, _requestedIds));
+	BOOST_ASSERT( inserted.second );
+
+	if ( !f->bind(inserted.first->second, timeout, requesters) )
+		_upstream.erase(peername);
 }
 
 void bithorded::router::ForwardedAsset::onUpstreamStatus(const string& peername, const bithorde::AssetStatus& status)
@@ -157,7 +157,7 @@ void bithorded::router::ForwardedAsset::onUpstreamStatus(const string& peername,
 			}
 		}
 	} else {
-		LOG4CPLUS_DEBUG(assetLogger, _requestedIds << "Failed upstream " << peername);
+		LOG4CPLUS_DEBUG(assetLogger, _requestedIds << " Failed upstream " << peername);
 		dropUpstream(peername);
 	}
 	updateStatus();
@@ -167,7 +167,7 @@ void bithorded::router::ForwardedAsset::updateStatus() {
 	bithorde::Status status = _upstream.empty() ? bithorde::Status::NOTFOUND : bithorde::Status::NONE;
 	for (auto iter=_upstream.begin(); iter!=_upstream.end(); iter++) {
 		auto& asset = iter->second;
-		if (asset->status == bithorde::Status::SUCCESS)
+		if (asset.status == bithorde::Status::SUCCESS)
 			status = bithorde::Status::SUCCESS;
 	}
 	auto trx = this->status.change();
@@ -180,14 +180,14 @@ void bithorded::router::ForwardedAsset::updateStatus() {
 	unordered_set< uint64_t > servers;
 	servers.insert(sessionId());
 	for (auto iter = _upstream.begin(); iter != _upstream.end(); iter++) {
-		const auto& upstreamServers = iter->second->servers();
+		const auto& upstreamServers = iter->second.servers();
 		servers.insert(upstreamServers.begin(), upstreamServers.end());
 	}
 	setRepeatedField(trx->mutable_servers(), servers);
 
 	unordered_set< bithorde::Identifier > requestIds;
 	for (auto iter = _upstream.begin(); iter != _upstream.end(); iter++) {
-		const auto& upstreamRequestIds = iter->second->requestIds();
+		const auto& upstreamRequestIds = iter->second.requestIds();
 		for (auto iter1 = upstreamRequestIds.begin(); iter1 != upstreamRequestIds.end(); iter1++) {
 			requestIds.insert(*iter1);
 		}
@@ -208,10 +208,10 @@ void bithorded::router::ForwardedAsset::async_read(uint64_t offset, size_t size,
 	uint32_t current_best = 1000*60*60*24;
 	for (auto iter = _upstream.begin(); iter != _upstream.end(); iter++) {
 		auto& a = iter->second;
-		if (a->status != bithorde::SUCCESS)
+		if (a.status != bithorde::SUCCESS)
 			continue;
-		if (current_best > a->readResponseTime.value()) {
-			current_best = a->readResponseTime.value();
+		if (current_best > a.readResponseTime.value()) {
+			current_best = a.readResponseTime.value();
 			chosen = iter;
 		}
 	}
@@ -220,10 +220,10 @@ void bithorded::router::ForwardedAsset::async_read(uint64_t offset, size_t size,
 	read.size = size;
 	read.cb = cb;
 	_pendingReads.push_back(read);
-	chosen->second->aSyncRead(offset, size, timeout);
+	chosen->second.aSyncRead(offset, size, timeout);
 }
 
-void bithorded::router::ForwardedAsset::onData( uint64_t offset, const boost::shared_ptr<bithorde::IBuffer>& data, int tag ) {
+void bithorded::router::ForwardedAsset::onData( uint64_t offset, const std::shared_ptr<bithorde::IBuffer>& data, int tag ) {
 	for (auto iter=_pendingReads.begin(); iter != _pendingReads.end(); ) {
 		if (iter->offset == offset) {
 			iter->cb(offset, data);
@@ -250,7 +250,7 @@ void ForwardedAsset::inspect_upstreams(bithorded::management::InfoList& target) 
 	for (auto iter = _upstream.begin(); iter != _upstream.end(); iter++) {
 		ostringstream buf;
 		buf << "upstream_" << iter->first;
-		target.append(buf.str()) << bithorde::Status_Name(iter->second->status) << ", responseTime: " << iter->second->readResponseTime;
+		target.append(buf.str()) << bithorde::Status_Name(iter->second.status) << ", responseTime: " << iter->second.readResponseTime;
 	}
 }
 
@@ -258,9 +258,7 @@ void ForwardedAsset::dropUpstream(const string& peername)
 {
 	auto upstream = _upstream.find(peername);
 	if (upstream != _upstream.end()) {
-		upstream->second->statusUpdate.disconnect(boost::bind(&ForwardedAsset::onUpstreamStatus, this, peername, bithorde::ASSET_ARG_STATUS));
-		upstream->second->dataArrived.disconnect(boost::bind(&ForwardedAsset::onData, this,
-			bithorde::ASSET_ARG_OFFSET, bithorde::ASSET_ARG_DATA, bithorde::ASSET_ARG_TAG));
+		upstream->second.cancelRequests();
 		_upstream.erase(upstream);
 	}
 }

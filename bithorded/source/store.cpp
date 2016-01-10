@@ -18,7 +18,6 @@
 
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/filesystem.hpp>
-#include <boost/make_shared.hpp>
 #include <string>
 
 #include <log4cplus/logger.h>
@@ -81,17 +80,17 @@ SourceAsset::Ptr Store::addAsset ( const boost::filesystem::path& file )
 		auto relativepath = fs::relative(target, _baseDir).native();
 
 		try {
-			auto asset_data = boost::make_shared<RandomAccessFile>(target);
+			auto asset_data = std::make_shared<RandomAccessFile>(target);
 
 			auto meta = store::createAssetMeta(assetPath, store::V2LINKED, asset_data->size(), store::DEFAULT_HASH_LEVELS_SKIPPED, relativepath.size());
 			meta.tail->write(0, relativepath);
 
-			auto asset = boost::make_shared<SourceAsset>(_gcd, assetPath.filename().native(), meta.hashStore, asset_data);
+			auto asset = std::make_shared<SourceAsset>(_gcd, assetPath.filename().native(), meta.hashStore, asset_data);
 			{
 				asset->status.change()->set_status(bithorde::SUCCESS);
 			}
 
-			asset->status.onChange.connect(boost::bind(&Store::_addAsset, this, SourceAsset::WeakPtr(asset)));
+			asset->status.onChange.connect(std::bind(&Store::_addAsset, this, SourceAsset::WeakPtr(asset)));
 			asset->hash();
 			return asset;
 		} catch (const std::ios::failure& e) {
@@ -144,12 +143,12 @@ IAsset::Ptr Store::openAsset(const boost::filesystem::path& assetPath)
 		return asset;
 	}
 
-	auto dataStore = boost::make_shared<RandomAccessFile>(dataPath);
-	auto asset = boost::make_shared<SourceAsset>(_gcd, assetPath.filename().native(), meta.hashStore, dataStore);
+	auto dataStore = std::make_shared<RandomAccessFile>(dataPath);
+	auto asset = std::make_shared<SourceAsset>(_gcd, assetPath.filename().native(), meta.hashStore, dataStore);
 
 	if (!asset->hasRootHash()) {
 		LOG4CPLUS_WARN(log, "Unhashed asset detected, hashing");
-		asset->status.onChange.connect(boost::bind(&Store::_addAsset, this, SourceAsset::WeakPtr(asset)));
+		asset->status.onChange.connect(std::bind(&Store::_addAsset, this, SourceAsset::WeakPtr(asset)));
 		asset->hash();
 		return store::StoredAsset::Ptr();
 	}

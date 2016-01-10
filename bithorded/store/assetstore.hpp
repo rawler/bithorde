@@ -51,7 +51,7 @@ public:
 
 	boost::filesystem::path newAsset();
 
-	void update_asset(const BitHordeIds& ids, const boost::shared_ptr<StoredAsset>& asset);
+	void update_asset(const BitHordeIds& ids, const std::shared_ptr<StoredAsset>& asset);
 
 	/**
 	 * Calculates store disk usage. Can be smaller than the sum of the file-sizes due to sparse allocation

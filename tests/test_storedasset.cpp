@@ -3,7 +3,6 @@
 #include <ctime>
 #include <crypto++/tiger.h>
 #include <boost/filesystem.hpp>
-#include <boost/make_shared.hpp>
 #include <boost/test/unit_test.hpp>
 
 #include <log4cplus/configurator.h>
@@ -59,7 +58,7 @@ BOOST_FIXTURE_TEST_CASE( open_partial_v1_asset, TestData )
 	BOOST_CHECK_EQUAL(asset->can_read(asset->size()-1024, 1024), 0);
 
 	boost::asio::io_service::work work(ioSvc);
-	asset->write(0, boost::make_shared<bithorde::MemoryBuffer>(asset->size()), boost::bind(&boost::asio::io_service::stop, &ioSvc)); // Yikes I want C++11 lambdas
+	asset->write(0, std::make_shared<bithorde::MemoryBuffer>(asset->size()), std::bind(&boost::asio::io_service::stop, &ioSvc)); // Yikes I want C++11 lambdas
 	ioSvc.run();
 	BOOST_CHECK_EQUAL(asset->hasRootHash(), true);
 	fs::remove_all(temp);
@@ -91,14 +90,14 @@ BOOST_FIXTURE_TEST_CASE( open_v1_linked_asset, TestData )
 
 	fs::last_write_time(test_asset, std::time(NULL)+10000);
 	// Should now succeed with newer link than data
-	auto asset = boost::static_pointer_cast<bithorded::source::SourceAsset>(repo.openAsset(test_asset));
+	auto asset = std::static_pointer_cast<bithorded::source::SourceAsset>(repo.openAsset(test_asset));
 	BOOST_CHECK_EQUAL(asset->can_read(0, 1024), 1024);
 	BOOST_CHECK_EQUAL(asset->can_read(asset->size()-1024, 1024), 1024);
 	asset.reset();
 
 	fs::last_write_time(test_asset, std::time(NULL)-10000);
 	// Should fail due to data newer than link
-	asset = boost::static_pointer_cast<bithorded::source::SourceAsset>(repo.openAsset(test_asset));
+	asset = std::static_pointer_cast<bithorded::source::SourceAsset>(repo.openAsset(test_asset));
 	BOOST_CHECK_EQUAL( asset->status->status(), bithorde::Status::NONE );
 	fs::remove_all(assets_folder/asset->id());
 }
@@ -139,13 +138,13 @@ BOOST_FIXTURE_TEST_CASE( open_v2_linked_asset, TestData )
 	}
 	fs::last_write_time(test_asset, std::time(NULL)+10000);
 	// Should now succeed with newer link than data
-	auto asset = boost::static_pointer_cast<bithorded::source::SourceAsset>(repo.openAsset(test_asset));
+	auto asset = std::static_pointer_cast<bithorded::source::SourceAsset>(repo.openAsset(test_asset));
 	BOOST_CHECK_EQUAL(asset->can_read(0, 1024), 1024);
 	BOOST_CHECK_EQUAL(asset->can_read(asset->size()-1024, 1024), 1024);
 
 	fs::last_write_time(test_asset, std::time(NULL)-10000);
 	// Should fail due to data newer than link
-	asset = boost::static_pointer_cast<bithorded::source::SourceAsset>(repo.openAsset(test_asset));
+	asset = std::static_pointer_cast<bithorded::source::SourceAsset>(repo.openAsset(test_asset));
 	BOOST_CHECK_EQUAL( asset->status->status(), bithorde::Status::NONE );
 	fs::remove_all(assets_folder/asset->id());
 }

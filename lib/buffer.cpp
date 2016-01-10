@@ -32,7 +32,7 @@ size_t NullBuffer::size() const {
 	return 0;
 }
 
-const NullBuffer::Ptr NullBuffer::instance(boost::make_shared<NullBuffer>());
+const NullBuffer::Ptr NullBuffer::instance(std::make_shared<NullBuffer>());
 
 MemoryBuffer::MemoryBuffer ( size_t size )
 	: _buf(new byte[size]), _size(size)
@@ -52,7 +52,7 @@ size_t MemoryBuffer::size() const {
 	return _size;
 }
 
-ReadResponseCtxBuffer::ReadResponseCtxBuffer ( const boost::shared_ptr< MessageContext< Read_Response > > msgCtx )
+ReadResponseCtxBuffer::ReadResponseCtxBuffer ( const std::shared_ptr< MessageContext< Read_Response > > msgCtx )
 	: _msgCtx(msgCtx)
 {
 }
@@ -65,7 +65,7 @@ size_t ReadResponseCtxBuffer::size() const {
 	return _msgCtx->message().content().size();
 }
 
-DataSegmentCtxBuffer::DataSegmentCtxBuffer ( const boost::shared_ptr< MessageContext< DataSegment > > msgCtx )
+DataSegmentCtxBuffer::DataSegmentCtxBuffer ( const std::shared_ptr< MessageContext< DataSegment > > msgCtx )
 	: _msgCtx(msgCtx)
 {
 }

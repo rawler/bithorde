@@ -68,20 +68,20 @@ IAsset::Ptr CacheManager::openAsset(const bithorde::BindRead& req)
 {
 	if (_baseDir.empty())
 		return IAsset::Ptr();
-	auto stored = boost::dynamic_pointer_cast<CachedAsset>(bithorded::store::AssetStore::openAsset(req));
+	auto stored = std::dynamic_pointer_cast<CachedAsset>(bithorded::store::AssetStore::openAsset(req));
 	if (stored && (stored->status->status() == bithorde::Status::SUCCESS)) {
 		return stored;
 	} else {
 		auto upstream = _router.findAsset(req);
-		if (auto upstream_ = boost::dynamic_pointer_cast<bithorded::IAsset>(upstream->shared())) {
-			return boost::make_shared<CachingAsset>(*this, upstream_, stored);
+		if (auto upstream_ = std::dynamic_pointer_cast<bithorded::IAsset>(upstream->shared())) {
+			return std::make_shared<CachingAsset>(*this, upstream_, stored);
 		} else {
 			return upstream->shared();
 		}
 	}
 }
 
-void CacheManager::updateAsset(const boost::shared_ptr<store::StoredAsset>& asset)
+void CacheManager::updateAsset(const std::shared_ptr<store::StoredAsset>& asset)
 {
 	return AssetStore::update_asset(asset->status->ids(), asset);
 }
@@ -93,7 +93,8 @@ CachedAsset::Ptr CacheManager::prepareUpload(uint64_t size)
 
 		try {
 			auto asset = CachedAsset::create(_gcd, assetPath, size);
-			asset->status.onChange.connect(boost::bind(&CacheManager::linkAsset, this, CachedAsset::WeakPtr(asset)));
+			auto weakAsset = CachedAsset::WeakPtr(asset);
+			asset->status.onChange.connect([=](const bithorde::AssetStatus&, const bithorde::AssetStatus&){ linkAsset(weakAsset); });
 			return asset;
 		} catch (const std::ios::failure& e) {
 			LOG4CPLUS_ERROR(log, "Failed to create " << assetPath << " for upload (" << e.what() << "). Purging...");

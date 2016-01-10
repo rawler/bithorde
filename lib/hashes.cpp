@@ -6,8 +6,6 @@
 #include <crypto++/pch.h>
 #include <crypto++/files.h>
 
-#include <boost/filesystem/path.hpp>
-
 #include "bithorde.pb.h"
 
 static const byte s_vecUpper[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";

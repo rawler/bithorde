@@ -18,7 +18,6 @@
 #include "asset.hpp"
 
 #include <lib/random.h>
-#include <boost/make_shared.hpp>
 
 using namespace bithorded;
 
@@ -49,7 +48,7 @@ AssetBinding::~AssetBinding()
 	reset();
 }
 
-void AssetBinding::setClient(const boost::shared_ptr< Client >& client)
+void AssetBinding::setClient(const std::shared_ptr< Client >& client)
 {
 	_client = client.get();
 }
@@ -64,7 +63,7 @@ bool AssetBinding::bind(const bithorde::RouteTrace& requesters)
 	return bind(_ptr, BitHordeIds(), requesters, boost::posix_time::neg_infin);
 }
 
-bool AssetBinding::bind( const boost::shared_ptr< UpstreamRequestBinding >& asset, const BitHordeIds& assetIds, const bithorde::RouteTrace& requesters, const boost::posix_time::ptime& deadline )
+bool AssetBinding::bind( const std::shared_ptr< UpstreamRequestBinding >& asset, const BitHordeIds& assetIds, const bithorde::RouteTrace& requesters, const boost::posix_time::ptime& deadline )
 {
 	if (_ptr) {
 		if (asset != _ptr)
@@ -85,8 +84,31 @@ bool AssetBinding::bind( const boost::shared_ptr< UpstreamRequestBinding >& asse
 	}
 }
 
+bool AssetBinding::bind( const std::shared_ptr< UpstreamRequestBinding >& asset, const BitHordeIds& assetIds, const bithorde::RouteTrace& requesters, const boost::posix_time::ptime& deadline, StatusFunc statusUpdate )
+{
+	auto res = bind(asset, assetIds, requesters, deadline);
+
+	if (res) {
+		auto& status = _ptr->shared()->status;
+
+		// Remember to inform peer about changes in asset-status.
+		auto weak_self = weak();
+		_statusConnection = status.onChange.connect([=](const bithorde::AssetStatus&, const bithorde::AssetStatus& current) {
+			statusUpdate(weak_self.lock(), current);
+		});
+
+		if ( status->status() != bithorde::Status::NONE ) {
+			// We already have a valid status for the asset, so inform about it
+			statusUpdate(shared(), *status);
+		}
+	}
+
+	return res;
+}
+
 void AssetBinding::reset()
 {
+	_statusConnection.disconnect();
 	if (_ptr) {
 		_ptr->unbindDownstream(this);
 	}
@@ -131,7 +153,7 @@ AssetBinding::operator bool() const
 	return _ptr.get() && _ptr->get();
 }
 
-const boost::shared_ptr< IAsset >& AssetBinding::shared() const
+const std::shared_ptr< IAsset >& AssetBinding::shared() const
 {
 	if (_ptr) {
 		return _ptr->shared();
@@ -140,21 +162,21 @@ const boost::shared_ptr< IAsset >& AssetBinding::shared() const
 	}
 }
 
-boost::weak_ptr< IAsset > AssetBinding::weak() const
+std::weak_ptr< IAsset > AssetBinding::weak() const
 {
 	if (_ptr) {
 		return _ptr->weaken();
 	} else {
-		return boost::weak_ptr< IAsset >();
+		return std::weak_ptr< IAsset >();
 	}
 }
 
-bool bithorded::operator==(const AssetBinding& a, const boost::shared_ptr< IAsset >& b)
+bool bithorded::operator==(const AssetBinding& a, const std::shared_ptr< IAsset >& b)
 {
 	return a.get() == b.get();
 }
 
-bool bithorded::operator!=(const AssetBinding& a, const boost::shared_ptr< IAsset >& b)
+bool bithorded::operator!=(const AssetBinding& a, const std::shared_ptr< IAsset >& b)
 {
 	return a.get() != b.get();
 }
@@ -168,7 +190,7 @@ void AssetBinding::clearDeadline()
 }
 
 /**** AssetRequestParameters *****/
-bool AssetRequestParameters::isRequester(const boost::shared_ptr< Client >& client) const
+bool AssetRequestParameters::isRequester(const std::shared_ptr< Client >& client) const
 {
 	return requesterClients.count(client.get());
 }
@@ -181,7 +203,7 @@ bool AssetRequestParameters::operator!=(const AssetRequestParameters& other) con
 /**** UpstreamRequestBinding *****/
 UpstreamRequestBinding::Ptr UpstreamRequestBinding::NONE;
 
-UpstreamRequestBinding::UpstreamRequestBinding(boost::shared_ptr< IAsset > asset) :
+UpstreamRequestBinding::UpstreamRequestBinding(std::shared_ptr< IAsset > asset) :
 	_ptr(asset), _parameters(), _downstreams()
 {}
 
@@ -221,14 +243,14 @@ IAsset* UpstreamRequestBinding::operator->() const
 	return _ptr.operator->();
 }
 
-const boost::shared_ptr< IAsset >& UpstreamRequestBinding::shared()
+const std::shared_ptr< IAsset >& UpstreamRequestBinding::shared()
 {
 	return _ptr;
 }
 
-boost::weak_ptr< IAsset > UpstreamRequestBinding::weaken()
+std::weak_ptr< IAsset > UpstreamRequestBinding::weaken()
 {
-	return boost::weak_ptr<IAsset>(_ptr);
+	return std::weak_ptr<IAsset>(_ptr);
 }
 
 void UpstreamRequestBinding::rebuild()

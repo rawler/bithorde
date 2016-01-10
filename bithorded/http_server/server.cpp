@@ -9,7 +9,6 @@
 //
 
 #include "server.hpp"
-#include <boost/bind.hpp>
 #include <boost/lexical_cast.hpp>
 
 namespace http {
@@ -41,14 +40,13 @@ uint16_t server::port()
 
 void server::start_accept()
 {
-	new_connection_.reset(new connection(io_service_,
-			connection_manager_, request_handler_));
-	acceptor_.async_accept(new_connection_->socket(),
-		boost::bind(&server::handle_accept, this,
-			boost::asio::placeholders::error));
+	new_connection_.reset(new connection(io_service_, connection_manager_, request_handler_));
+	acceptor_.async_accept(new_connection_->socket(), [=](const boost::system::error_code& ec) {
+		handle_accept(ec);
+	});
 }
 
-void server::handle_accept(const boost::system::error_code& e)
+void server::handle_accept(const boost::system::error_code& ec)
 {
 	// Check whether the server was stopped by a signal before this completion
 	// handler had a chance to run.
@@ -56,7 +54,7 @@ void server::handle_accept(const boost::system::error_code& e)
 		return;
 	}
 
-	if (!e) {
+	if (!ec) {
 		connection_manager_.start(new_connection_);
 	}
 

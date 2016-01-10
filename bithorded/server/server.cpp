@@ -16,9 +16,7 @@
 
 #include "server.hpp"
 
-#include <boost/asio/placeholders.hpp>
 #include <boost/filesystem.hpp>
-#include <boost/make_shared.hpp>
 #include <iostream>
 #include <system_error>
 
@@ -116,22 +114,19 @@ Server::Server(asio::io_service& ioSvc, Config& cfg) :
 
 void Server::waitForTCPConnection()
 {
-	boost::shared_ptr<asio::ip::tcp::socket> sock = boost::make_shared<asio::ip::tcp::socket>(ioService());
-	_tcpListener.async_accept(*sock, boost::bind(&Server::onTCPConnected, this, sock, asio::placeholders::error));
+	std::shared_ptr<asio::ip::tcp::socket> sock = std::make_shared<asio::ip::tcp::socket>(ioService());
+	_tcpListener.async_accept(*sock, [=](const boost::system::error_code& error) {
+		if (!error) {
+			hookup(sock, null_client);
+			waitForTCPConnection();
+		}
+	});
 }
 
-void Server::onTCPConnected(boost::shared_ptr< asio::ip::tcp::socket >& socket, const boost::system::error_code& ec)
-{
-	if (!ec) {
-		hookup(socket, null_client);
-		waitForTCPConnection();
-	}
-}
-
-void Server::hookup ( boost::shared_ptr< asio::ip::tcp::socket >& socket, const Config::Client& client)
+void Server::hookup ( const std::shared_ptr< asio::ip::tcp::socket >& socket, const Config::Client& client)
 {
 	bithorded::Client::Ptr c = bithorded::Client::create(*this);
-	auto conn = bithorde::Connection::create(ioService(), boost::make_shared<bithorde::ConnectionStats>(_timerSvc), socket);
+	auto conn = bithorde::Connection::create(ioService(), std::make_shared<bithorde::ConnectionStats>(_timerSvc), socket);
 	c->setSecurity(client.key, (bithorde::CipherType)client.cipher);
 	if (client.name.empty())
 		c->hookup(conn);
@@ -142,18 +137,15 @@ void Server::hookup ( boost::shared_ptr< asio::ip::tcp::socket >& socket, const 
 
 void Server::waitForLocalConnection()
 {
-	boost::shared_ptr<asio::local::stream_protocol::socket> sock = boost::make_shared<asio::local::stream_protocol::socket>(ioService());
-	_localListener.async_accept(*sock, boost::bind(&Server::onLocalConnected, this, sock, asio::placeholders::error));
-}
-
-void Server::onLocalConnected(boost::shared_ptr< boost::asio::local::stream_protocol::socket >& socket, const boost::system::error_code& ec)
-{
-	if (!ec) {
-		bithorded::Client::Ptr c = bithorded::Client::create(*this);
-		c->hookup(bithorde::Connection::create(ioService(), boost::make_shared<bithorde::ConnectionStats>(_timerSvc), socket));
-		clientConnected(c);
-		waitForLocalConnection();
-	}
+	std::shared_ptr<asio::local::stream_protocol::socket> sock = std::make_shared<asio::local::stream_protocol::socket>(ioService());
+	_localListener.async_accept(*sock, [=](const boost::system::error_code& error) {
+		if (!error) {
+			bithorded::Client::Ptr c = bithorded::Client::create(*this);
+			c->hookup(bithorde::Connection::create(ioService(), std::make_shared<bithorde::ConnectionStats>(_timerSvc), sock));
+			clientConnected(c);
+			waitForLocalConnection();
+		}
+	});
 }
 
 void Server::inspect(management::InfoList& target) const
@@ -170,26 +162,18 @@ void Server::inspect(management::InfoList& target) const
 
 void Server::clientConnected(const bithorded::Client::Ptr& client)
 {
-	// When storing a client-copy in the bound reference, we make sure the Client isn't
-	// destroyed until the disconnected signal calls clientDisconnected, which releases
-	// the reference
-	client->disconnected.connect(boost::bind(&Server::clientDisconnected, this, client));
-	client->authenticated.connect(boost::bind(&Server::clientAuthenticated, this, Client::WeakPtr(client)));
-}
+	Client::WeakPtr weak(client);
+	client->authenticated.connect([=](bithorde::Client&, const std::string& peerName){
+		if (Client::Ptr client = weak.lock()) {
+			_connections.set(peerName, client);
+			_router.onConnected(client);
+		}
+	});
 
-void Server::clientAuthenticated(const bithorded::Client::WeakPtr& client_) {
-	if (Client::Ptr client = client_.lock()) {
-		_connections.set(client->peerName(), client);
-		_router.onConnected(client);
-	}
-}
-
-void Server::clientDisconnected(bithorded::Client::Ptr& client)
-{
-	LOG4CPLUS_INFO(serverLog, "Disconnected: " << client->peerName());
-	_router.onDisconnected(client);
-	// Will destroy the client, unless others are holding references.
-	client.reset();
+	client->disconnected.connect([=]{
+		LOG4CPLUS_INFO(serverLog, "Disconnected: " << client->peerName());
+		_router.onDisconnected(client);
+	});
 }
 
 const bithorded::Config::Client& Server::getClientConfig(const string& name)
@@ -209,7 +193,7 @@ UpstreamRequestBinding::Ptr Server::async_linkAsset(const boost::filesystem::pat
 {
 	for (auto iter=_assetStores.begin(); iter != _assetStores.end(); iter++) {
 		if (auto res = (*iter)->addAsset(filePath))
-			return boost::make_shared<UpstreamRequestBinding>(res);
+			return std::make_shared<UpstreamRequestBinding>(res);
 	}
 	return UpstreamRequestBinding::NONE;
 }

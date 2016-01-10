@@ -85,7 +85,7 @@ boost::filesystem::path AssetStore::newAsset()
 	return assetPath;
 }
 
-void AssetStore::update_asset(const BitHordeIds& ids, const boost::shared_ptr<StoredAsset>& asset)
+void AssetStore::update_asset(const BitHordeIds& ids, const std::shared_ptr<StoredAsset>& asset)
 {
 	auto tigerId = findBithordeId(ids, bithorde::HashType::TREE_TIGER);
 

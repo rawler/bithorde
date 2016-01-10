@@ -17,9 +17,6 @@
 
 #include "timer.h"
 
-#include <boost/asio/placeholders.hpp>
-#include <boost/bind.hpp>
-
 TimerService::TimerService(boost::asio::io_service& ioSvc)
 	: _timer(ioSvc)
 {
@@ -46,8 +43,11 @@ void TimerService::enable()
 	if (_timers.size() > 0) {
 		const auto& target_time = _timers.begin()->first;
 		if (target_time != _timer.expires_at()) {
+			auto self = shared_from_this();
 			_timer.expires_at(target_time);
-			_timer.async_wait(boost::bind(&TimerService::invoke, shared_from_this(), boost::asio::placeholders::error));
+			_timer.async_wait([=](const boost::system::error_code& ec) {
+				self->invoke(ec);
+			});
 		}
 	}
 }

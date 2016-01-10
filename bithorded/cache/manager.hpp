@@ -61,7 +61,7 @@ public:
 
 	IAsset::Ptr openAsset(const boost::filesystem::path& assetPath);
 
-	void updateAsset(const boost::shared_ptr<bithorded::store::StoredAsset>& asset);
+	void updateAsset(const std::shared_ptr<bithorded::store::StoredAsset>& asset);
 protected:
 
 	virtual IAsset::Ptr openAsset(const bithorde::BindRead& req);

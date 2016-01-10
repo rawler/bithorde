@@ -13,7 +13,6 @@
 
 #include <boost/asio.hpp>
 #include <string>
-#include <boost/noncopyable.hpp>
 #include "connection.hpp"
 #include "connection_manager.hpp"
 #include "request_handler.hpp"
@@ -24,13 +23,13 @@ namespace server {
 
 /// The top-level class of the HTTP server.
 class server
-  : private boost::noncopyable
 {
 public:
   /// Construct the server to listen on the specified TCP address and port, and
   /// serve up files from the given directory.
   explicit server(boost::asio::io_service& ioSvc, const std::string& address, const uint16_t& port,
       const RequestRouter& root);
+  server( const server& ) = delete;
 
   uint16_t port();
 private:

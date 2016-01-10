@@ -15,13 +15,13 @@ BOOST_AUTO_TEST_CASE( message_queue )
 
 	auto now = boost::chrono::steady_clock::now();
 	for (auto i = 0; i < 32; i++ ) {
-		boost::shared_ptr<bithorde::Message> msg(new bithorde::Message(now));
+		std::shared_ptr<bithorde::Message> msg(new bithorde::Message(now));
 		msg->buf.insert(0, 1024, 'X');
 		mq.enqueue(msg);
 	}
 	auto later = now + boost::chrono::seconds(15);
 	for (auto i = 0; i < 32; i++ ) {
-		boost::shared_ptr<bithorde::Message> msg(new bithorde::Message(later));
+		std::shared_ptr<bithorde::Message> msg(new bithorde::Message(later));
 		msg->buf.insert(0, 1024, 'X');
 		mq.enqueue(msg);
 	}

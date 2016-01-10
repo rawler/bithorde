@@ -7,7 +7,7 @@
 #include <boost/asio/local/stream_protocol.hpp>
 #include <boost/chrono/system_clocks.hpp>
 #include <boost/signals2.hpp>
-#include <boost/smart_ptr/enable_shared_from_this.hpp>
+#include <memory>
 #include <list>
 
 #include "bithorde.pb.h"
@@ -30,9 +30,10 @@ struct Message {
 	boost::chrono::steady_clock::time_point expires;
 };
 
-class MessageQueue : boost::noncopyable {
+class MessageQueue {
 public:
-	typedef boost::shared_ptr<const Message> MessagePtr;
+	MessageQueue( const MessageQueue& ) = delete;
+	typedef std::shared_ptr<const Message> MessagePtr;
 	typedef std::vector< MessagePtr > MessageList;
 private:
 	std::list< MessagePtr > _queue;
@@ -56,7 +57,7 @@ public:
 class ConnectionStats {
 	TimerService::Ptr _ts;
 public:
-	typedef boost::shared_ptr<ConnectionStats> Ptr;
+	typedef std::shared_ptr<ConnectionStats> Ptr;
 
 	LazyCounter incomingMessagesCurrent, incomingBitrateCurrent;
 	LazyCounter outgoingMessagesCurrent, outgoingBitrateCurrent;
@@ -67,10 +68,10 @@ public:
 };
 
 class Connection
-	: public boost::enable_shared_from_this<Connection>
+	: public std::enable_shared_from_this<Connection>
 {
 public:
-	typedef boost::shared_ptr<Connection> Pointer;
+	typedef std::shared_ptr<Connection> Pointer;
 
 	enum MessageType {
 		HandShake = 1,
@@ -85,9 +86,9 @@ public:
 	};
 
 	static Pointer create(boost::asio::io_service& ioSvc, const bithorde::ConnectionStats::Ptr& stats, const boost::asio::ip::tcp::endpoint& addr);
-	static Pointer create(boost::asio::io_service& ioSvc, const bithorde::ConnectionStats::Ptr& stats, boost::shared_ptr< boost::asio::ip::tcp::socket >& socket);
+	static Pointer create(boost::asio::io_service& ioSvc, const bithorde::ConnectionStats::Ptr& stats, const std::shared_ptr< boost::asio::ip::tcp::socket >& socket);
 	static Pointer create(boost::asio::io_service& ioSvc, const bithorde::ConnectionStats::Ptr& stats, const boost::asio::local::stream_protocol::endpoint& addr);
-	static Pointer create(boost::asio::io_service& ioSvc, const bithorde::ConnectionStats::Ptr& stats, boost::shared_ptr< boost::asio::local::stream_protocol::socket >& socket);
+	static Pointer create(boost::asio::io_service& ioSvc, const bithorde::ConnectionStats::Ptr& stats, const std::shared_ptr< boost::asio::local::stream_protocol::socket >& socket);
 
 	virtual void setEncryption(bithorde::CipherType t, const std::string& key, const std::string& iv) = 0;
 	virtual void setDecryption(bithorde::CipherType t, const std::string& key, const std::string& iv) = 0;
@@ -108,15 +109,15 @@ public:
 
 	virtual void close() = 0;
 
+	void onRead(const boost::system::error_code& err, size_t count);
+	void onWritten(const boost::system::error_code& err, std::size_t written, const MessageQueue::MessageList& queued);
+
 protected:
 	Connection(boost::asio::io_service& ioSvc, const bithorde::ConnectionStats::Ptr& stats);
 
 	virtual void trySend() = 0;
 	virtual void tryRead() = 0;
 	virtual void decrypt(byte* buf, size_t size) = 0;
-
-	void onRead(const boost::system::error_code& err, size_t count);
-	void onWritten(const boost::system::error_code& err, std::size_t written, const MessageQueue::MessageList& queued);
 
 protected:
 	boost::asio::io_service& _ioSvc;

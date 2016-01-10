@@ -12,7 +12,6 @@
 #define HTTP_CONNECTION_MANAGER_HPP
 
 #include <set>
-#include <boost/noncopyable.hpp>
 #include "connection.hpp"
 
 namespace http {
@@ -21,9 +20,11 @@ namespace server {
 /// Manages open connections so that they may be cleanly stopped when the server
 /// needs to shut down.
 class connection_manager
-  : private boost::noncopyable
 {
 public:
+	connection_manager();
+	connection_manager( const connection_manager& ) = delete;
+
 	/// Add the specified connection to the manager and start it.
 	void start(connection_ptr c);
 

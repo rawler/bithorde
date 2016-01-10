@@ -4,7 +4,6 @@
 // Copyright (2012) Vladimír Třebický <vladimir.trebicky@gmail.com>
 
 #include <boost/config.hpp>
-#include <boost/weak_ptr.hpp>
 
 namespace boost {
 
@@ -45,7 +44,7 @@ public:
 
     weak_fn_storage(
             R (T::*mem_fn)(Args...),
-            const boost::weak_ptr<T>& ptr,
+            const std::weak_ptr<T>& ptr,
             Policy policy)
         : mem_fn_(mem_fn)
         , ptr_(ptr)
@@ -54,7 +53,7 @@ public:
 
     R operator()(Args... args)
     {
-        if (boost::shared_ptr<T> ptr = ptr_.lock()) {
+        if (std::shared_ptr<T> ptr = ptr_.lock()) {
             return ((*ptr).*mem_fn_)(args...);
         } else {
             return policy_();
@@ -63,13 +62,13 @@ public:
 
 private:
     R (T::*mem_fn_)(Args...);
-    boost::weak_ptr<T> ptr_;
+    std::weak_ptr<T> ptr_;
     Policy policy_;
 };
 
 } // namespace detail
 
-/** Returns a callback that can be used eg. in boost::bind. When called, it
+/** Returns a callback that can be used eg. in std::bind. When called, it
  * tries to lock weak_ptr to get a shared_ptr. If successful, it calls
  * given member function with given arguments. If not successful, it calls given
  * policy functor. Built-in policies are:
@@ -94,19 +93,19 @@ private:
  *
  * int main()
  * {
- *     boost::shared_ptr<Foo> sp(new Foo());
- *     boost::weak_ptr<Foo> wp(sp);
+ *     std::shared_ptr<Foo> sp(new Foo());
+ *     std::weak_ptr<Foo> wp(sp);
  *
- *     boost::bind(boost::weak_fn(&Foo::bar, wp), _1)(1);
+ *     std::bind(boost::weak_fn(&Foo::bar, wp), _1)(1);
  *     sp.reset();
- *     boost::bind(boost::weak_fn(&Foo::bar, wp), 1)();
- *     boost::bind(boost::weak_fn(&Foo::bar, wp, do_something()), 1)();
+ *     std::bind(boost::weak_fn(&Foo::bar, wp), 1)();
+ *     std::bind(boost::weak_fn(&Foo::bar, wp, do_something()), 1)();
  * }
  */
 template <typename T, typename R, typename Policy, typename... Args>
 detail::weak_fn_storage<T, R, Policy, Args...> weak_fn(
         R (T::*mem_fn)(Args...),
-        const boost::weak_ptr<T>& ptr,
+        const std::weak_ptr<T>& ptr,
         Policy policy)
 {
     return detail::weak_fn_storage<T, R, Policy, Args...>
@@ -116,7 +115,7 @@ detail::weak_fn_storage<T, R, Policy, Args...> weak_fn(
 template <typename T, typename R, typename... Args>
 detail::weak_fn_storage<T, R, default_invalid_policy, Args...> weak_fn(
         R (T::*mem_fn)(Args...),
-        const boost::weak_ptr<T>& ptr)
+        const std::weak_ptr<T>& ptr)
 {
     return detail::weak_fn_storage<T, R, default_invalid_policy, Args...>
         (mem_fn, ptr, default_invalid_policy());
@@ -147,7 +146,7 @@ class weak_fn_storage##N {\
 public:\
     typedef R result_type;\
     weak_fn_storage##N(R (T::*mem_fn)(BOOST_PP_ENUM_PARAMS(N, Arg)),\
-            const boost::weak_ptr<T>& ptr,\
+            const std::weak_ptr<T>& ptr,\
             Policy policy)\
         : mem_fn_(mem_fn)\
         , ptr_(ptr)\
@@ -155,7 +154,7 @@ public:\
     {}\
     R operator()(BOOST_PP_ENUM_BINARY_PARAMS(N, Arg, arg))\
     {\
-        if (boost::shared_ptr<T> ptr = ptr_.lock()) {\
+        if (std::shared_ptr<T> ptr = ptr_.lock()) {\
             return ((*ptr).*mem_fn_) (BOOST_PP_ENUM_PARAMS(N, arg));\
         } else {\
             return policy_();\
@@ -163,7 +162,7 @@ public:\
     }\
 private:\
     R (T::*mem_fn_)(BOOST_PP_ENUM_PARAMS(N, Arg));\
-    boost::weak_ptr<T> ptr_;\
+    std::weak_ptr<T> ptr_;\
     Policy policy_;\
 };\
 } /* namespace detail */\
@@ -175,7 +174,7 @@ BOOST_PP_COMMA_IF(N) \
 BOOST_PP_ENUM_PARAMS(N, Arg)>\
 weak_fn(\
         R (T::*mem_fn)(BOOST_PP_ENUM_PARAMS(N, Arg)),\
-        const boost::weak_ptr<T>& ptr,\
+        const std::weak_ptr<T>& ptr,\
         Policy policy)\
 {\
     return detail::weak_fn_storage##N<T, R, Policy \
@@ -191,7 +190,7 @@ BOOST_PP_COMMA_IF(N) \
 BOOST_PP_ENUM_PARAMS(N, Arg)>\
 weak_fn(\
         R (T::*mem_fn)(BOOST_PP_ENUM_PARAMS(N, Arg)),\
-        const boost::weak_ptr<T>& ptr)\
+        const std::weak_ptr<T>& ptr)\
 {\
     return detail::weak_fn_storage##N<T, R, default_invalid_policy \
             BOOST_PP_COMMA_IF(N) \

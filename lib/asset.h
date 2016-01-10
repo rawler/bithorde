@@ -8,12 +8,8 @@
 #include <unordered_set>
 
 #include <boost/asio/deadline_timer.hpp>
-#include <boost/bind/placeholders.hpp>
-#include <boost/bind/arg.hpp>
 #include <boost/filesystem/path.hpp>
 #include <boost/signals2.hpp>
-#include <boost/shared_ptr.hpp>
-#include <boost/smart_ptr/enable_shared_from_this.hpp>
 
 #include "bithorde.pb.h"
 #include "counter.h"
@@ -41,7 +37,7 @@ class Asset
 	friend class AssetBinding;
 	friend class Client;
 public:
-	typedef boost::shared_ptr<Client> ClientPointer;
+	typedef std::shared_ptr<Client> ClientPointer;
 	typedef int Handle;
 
 	explicit Asset(const ClientPointer& client);
@@ -71,7 +67,7 @@ protected:
 	std::unordered_set<uint64_t> _servers;
 
 	virtual void handleMessage(const bithorde::AssetStatus &msg);
-	virtual void handleMessage( const boost::shared_ptr< MessageContext< bithorde::Read::Response > >& msg ) = 0;
+	virtual void handleMessage( const std::shared_ptr< MessageContext< bithorde::Read::Response > >& msg ) = 0;
 };
 
 static boost::arg<1> ASSET_ARG_OFFSET;
@@ -79,18 +75,18 @@ static boost::arg<2> ASSET_ARG_DATA;
 static boost::arg<3> ASSET_ARG_TAG;
 
 class ReadAsset;
-class ReadRequestContext : boost::noncopyable, public bithorde::Read_Request, public boost::enable_shared_from_this<ReadRequestContext> {
+class ReadRequestContext : boost::noncopyable, public bithorde::Read_Request, public std::enable_shared_from_this<ReadRequestContext> {
 	ReadAsset* _asset;
 	Asset::ClientPointer _client;
 	boost::asio::deadline_timer _timer;
 	boost::posix_time::ptime _requested_at;
 public:
-	typedef boost::shared_ptr<ReadRequestContext> Ptr;
+	typedef std::shared_ptr<ReadRequestContext> Ptr;
 	ReadRequestContext(bithorde::ReadAsset* asset, uint64_t offset, std::size_t size, int32_t timeout);
 	virtual ~ReadRequestContext();
 
 	void armTimer(int32_t timeout);
-	void callback( const boost::shared_ptr< bithorde::MessageContext< bithorde::Read::Response > >& msgCtx );
+	void callback( const std::shared_ptr< bithorde::MessageContext< bithorde::Read::Response > >& msgCtx );
 	void timer_callback(const boost::system::error_code& error);
 	void cancel();
 };
@@ -99,26 +95,27 @@ class ReadAsset : public Asset, boost::noncopyable
 {
 	friend class ReadRequestContext;
 public:
-	typedef boost::shared_ptr<Client> ClientPointer;
-	typedef boost::shared_ptr<ReadAsset> Ptr;
+	typedef std::shared_ptr<Client> ClientPointer;
+	typedef std::shared_ptr<ReadAsset> Ptr;
 	typedef uint64_t off_t;
 
 	typedef std::pair<bithorde::HashType, std::string> Identifier;
 
 	explicit ReadAsset(const bithorde::ReadAsset::ClientPointer& client, const BitHordeIds& requestIds);
 	virtual ~ReadAsset();
+	void cancelRequests();
 
 	int aSyncRead(off_t offset, ssize_t size, int32_t timeout=10000);
 	const BitHordeIds & requestIds() const;
 	const BitHordeIds & confirmedIds() const;
 
-	typedef boost::signals2::signal<void (off_t offset, const boost::shared_ptr<IBuffer>& data, int tag)> DataSignal;
+	typedef boost::signals2::signal<void (off_t offset, const std::shared_ptr<IBuffer>& data, int tag)> DataSignal;
 	DataSignal dataArrived;
 
 	InertialValue readResponseTime;
 protected:
 	virtual void handleMessage(const bithorde::AssetStatus &msg);
-	virtual void handleMessage( const boost::shared_ptr< bithorde::MessageContext< bithorde::Read::Response > >& msgCtx );
+	virtual void handleMessage( const std::shared_ptr< bithorde::MessageContext< bithorde::Read::Response > >& msgCtx );
 	void clearOffset(off_t offset, uint32_t reqid);
 
 private:
@@ -139,7 +136,7 @@ public:
 	const boost::filesystem::path& link();
 
 protected:
-	virtual void handleMessage( const boost::shared_ptr< bithorde::MessageContext< bithorde::Read::Response > >& msgCtx );
+	virtual void handleMessage( const std::shared_ptr< bithorde::MessageContext< bithorde::Read::Response > >& msgCtx );
 };
 
 }

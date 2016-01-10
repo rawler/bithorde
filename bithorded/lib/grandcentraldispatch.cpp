@@ -17,13 +17,15 @@
 
 #include "grandcentraldispatch.hpp"
 
+#include <functional>
+
 using namespace bithorded;
 
 GrandCentralDispatch::GrandCentralDispatch(boost::asio::io_service& controller, int parallel)
 	: _controller(controller), _work(_jobService)
 {
 	for (int i = 0; i < parallel; ++i)
-		_workers.create_thread(boost::bind(&boost::asio::io_service::run, &_jobService));
+		_workers.create_thread([=]{_jobService.run();});
 }
 
 GrandCentralDispatch::~GrandCentralDispatch() {
