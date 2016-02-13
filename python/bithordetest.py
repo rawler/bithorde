@@ -109,15 +109,19 @@ class TestConnection:
 
 class BithordeD(Process):
     def __init__(self, label='bithorded', bithorded=os.environ.get('BITHORDED', 'bithorded'), config={}):
+        self._cleanup = list()
         if hasattr(config, 'setdefault'):
             suffix = (time(), os.getpid())
             server_cfg = config.setdefault('server', {})
             server_cfg.setdefault('tcpPort', 0)
             server_cfg.setdefault('inspectPort', 0)
             server_cfg.setdefault('unixSocket', "bhtest-sock-%d-%d" % suffix)
+            self._cleanup.append(lambda: os.unlink(server_cfg['unixSocket']))
             cache_cfg = config.setdefault('cache', {})
             if not 'dir' in cache_cfg:
+                from shutil import rmtree
                 d = 'bhtest-cache-%d-%d' % suffix
+                self._cleanup.append(lambda: rmtree(d, ignore_errors=True))
                 os.mkdir(d)
                 cache_cfg['dir'] = d
 
@@ -126,9 +130,15 @@ class BithordeD(Process):
         self.started = False
         self.queue = eventlet.Queue()
         Process.__init__(self, 'stdbuf', ['-o0', '-e0', bithorded, '-c', '/dev/stdin'])
+
+    def cleanup(self):
+        for op in self._cleanup:
+            op()
+
     def run(self):
         Process.run(self)
         atexit.register(self.kill)
+        atexit.register(self.cleanup)
         def gen_config(value, key=[]):
             if hasattr(value, 'iteritems'):
                 return "\n".join(gen_config(value, key+[ikey]) for ikey, value in value.iteritems())
