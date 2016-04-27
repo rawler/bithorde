@@ -4,7 +4,10 @@ from time import time
 from bithorde import decodeMessage, encoder, MSG_REV_MAP, message
 
 import eventlet
-from eventlet.processes import Process
+try:
+    from eventlet.green.subprocess import Process
+except ImportError:
+    from eventlet.processes import Process
 from google.protobuf.message import Message
 
 class TestConnection:
