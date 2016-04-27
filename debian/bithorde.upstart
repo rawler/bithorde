@@ -1,6 +1,10 @@
 
 start on (filesystem and net-device-up IFACE!=lo)
 
+setuid nobody
+console log
+
 exec /usr/bin/bithorded -c/etc/bithorde.conf
 respawn
+respawn limit 5 60
 

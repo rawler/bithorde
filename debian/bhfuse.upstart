@@ -4,12 +4,14 @@ start on started bithorde
 stop on stopped bithorde
 
 pre-start script
-  if [ ! -d /tmp/bhfuse ]; then
-    mkdir /tmp/bhfuse
+  if [ -d /tmp/bhfuse ]; then
+    exit 0
+  else
+    install -d -onobody -gnogroup -m755 /tmp/bhfuse
   fi
 end script
 
-exec /usr/bin/bhfuse --mountpoint /tmp/bhfuse
+exec /usr/bin/bhfuse --timeout=500 /tmp/bhfuse
 respawn
 
 post-stop script

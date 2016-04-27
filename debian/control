@@ -1,7 +1,7 @@
 Source: bithorde
 Section: net
 Priority: extra
-Maintainer: Adam Palmblad <adam.palmblad@gmail.com>
+Maintainer: Ulrik Mikaelsson <ulrik.mikaelsson@gmail.com>
 Build-Depends: debhelper (>= 7), cmake, libboost-all-dev,
                libcrypto++-dev, libfuse-dev, liblog4cplus-dev,
                libprotobuf-dev, pkg-config, protobuf-compiler,
