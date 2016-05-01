@@ -94,13 +94,12 @@ void BHUpload::nextAsset() {
 		_ioSvc.stop();
 	} else {
 		fs::path& p = _files.front();
-		if (optLink) {
+		_currentFile.open(p.c_str(), ifstream::in | ifstream::binary);
+		_currentFile.exceptions(ios_base::badbit);
+		if (optLink)
 			_currentAsset = new UploadAsset(_client, p);
-		} else {
-			_currentFile.open(p.c_str(), ifstream::in | ifstream::binary);
-			_currentFile.exceptions(ios_base::badbit);
+		else
 			_currentAsset = new UploadAsset(_client, fs::file_size(p));
-		}
 		_currentAsset->statusUpdate.connect([=](const bithorde::AssetStatus& status) {
 			onStatusUpdate(status);
 		});
