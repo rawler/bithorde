@@ -1,24 +1,26 @@
-import atexit, base64, os, shutil, socket, sys, types
+
+import atexit
+import base64
+import os
+import socket
 from time import time
 
 from bithorde import decodeMessage, encoder, MSG_REV_MAP, message
 
-import eventlet
-try:
-    from eventlet.green.subprocess import Process
-except ImportError:
-    from eventlet.processes import Process
+from subprocess import Popen, PIPE, STDOUT
 from google.protobuf.message import Message
+
 
 class TestConnection:
     def __init__(self, tgt, name=None):
-        if isinstance(tgt, eventlet.greenio.GreenSocket):
+        if isinstance(tgt, socket.socket):
             self._socket = tgt
         elif isinstance(tgt, BithordeD):
             server_cfg = tgt.config['server']
-            self._connect(server_cfg.get('unixSocket') or ('localhost', server_cfg.get('tcpPort')))
+            self._connect(server_cfg.get('unixSocket') or (
+                'localhost', server_cfg.get('tcpPort')))
         else:
-            _connect(tgt)
+            self._connect(tgt)
         self.buf = ""
         if name:
             self.auth(name)
@@ -28,13 +30,15 @@ class TestConnection:
             family = socket.AF_INET
         else:
             family = socket.AF_UNIX
-        self._socket = eventlet.connect(tgt, family)
+        self._socket = socket.socket(family, socket.SOCK_STREAM)
+        self._socket.connect(tgt)
 
     def send(self, msg):
         enc = encoder.MessageEncoder(MSG_REV_MAP[type(msg)], False, False)
         enc(self.push, msg)
 
     def close(self):
+        self._socket.shutdown(socket.SHUT_RDWR)
         self._socket.close()
 
     def __iter__(self):
@@ -50,7 +54,7 @@ class TestConnection:
                 self.buf += self.fetch()
 
     def fetch(self):
-        new = self._socket.recv(128*1024)
+        new = self._socket.recv(128 * 1024)
         if not new:
             raise StopIteration
         return new
@@ -88,7 +92,8 @@ class TestConnection:
     def _check_next(self, criteria):
         next = self.next()
         crit = self._matches(next, criteria)
-        assert crit, "Next message %s did not match expected %s" % (next, criteria)
+        assert crit, "Next message %s did not match expected %s" % (
+            next, criteria)
         return next, crit
 
     def expect(self, criteria):
@@ -110,8 +115,9 @@ class TestConnection:
         self.expect(message.HandShake)
 
 
-class BithordeD(Process):
+class BithordeD(Popen):
     def __init__(self, label='bithorded', bithorded=os.environ.get('BITHORDED', 'bithorded'), config={}):
+        Popen.__init__(self, ['stdbuf', '-o0', '-e0', bithorded, '-c', '/dev/stdin'], stdout=PIPE, stderr=STDOUT, stdin=PIPE)
         self._cleanup = list()
         if hasattr(config, 'setdefault'):
             suffix = (time(), os.getpid())
@@ -121,7 +127,7 @@ class BithordeD(Process):
             server_cfg.setdefault('unixSocket', "bhtest-sock-%d-%d" % suffix)
             self._cleanup.append(lambda: os.unlink(server_cfg['unixSocket']))
             cache_cfg = config.setdefault('cache', {})
-            if not 'dir' in cache_cfg:
+            if 'dir' not in cache_cfg:
                 from shutil import rmtree
                 d = 'bhtest-cache-%d-%d' % suffix
                 self._cleanup.append(lambda: rmtree(d, ignore_errors=True))
@@ -131,62 +137,64 @@ class BithordeD(Process):
         self.config = config
         self.label = label
         self.started = False
-        self.queue = eventlet.Queue()
-        Process.__init__(self, 'stdbuf', ['-o0', '-e0', bithorded, '-c', '/dev/stdin'])
+
+        self.run()
 
     def cleanup(self):
+        self.kill()
         for op in self._cleanup:
             op()
 
     def run(self):
-        Process.run(self)
-        atexit.register(self.kill)
         atexit.register(self.cleanup)
+
         def gen_config(value, key=[]):
             if hasattr(value, 'iteritems'):
-                return "\n".join(gen_config(value, key+[ikey]) for ikey, value in value.iteritems())
+                return "\n".join(gen_config(value, key + [ikey]) for ikey, value in value.iteritems())
             elif key:
                 return "%s=%s" % ('.'.join(key), value)
             else:
                 return value
-        self.write(gen_config(self.config))
-        self.close_stdin()
-        for line in self.child_stdout_stderr:
+        self.stdin.write(gen_config(self.config))
+        self.stdin.close()
+        while True:
+            line = self.stdout.readline()
             if self.label:
                 print "%s: %s" % (self.label, line.rstrip())
             if line.find('Server started') >= 0:
                 self.started = True
                 break
         assert self.started
-        eventlet.spawn(self._run)
+
     def is_alive(self):
-        return self.popen4.poll() == -1
-    def _run(self):
-        for line in self.child_stdout_stderr:
-            if self.label:
-                print "%s: %s" % (self.label, line.rstrip())
-            self.queue.put(line)
+        return self.poll() is None
+
     def wait_for(self, crit):
         while True:
-            line = self.queue.get()
+            line = self.stdout.readline()
             if line.find(crit) >= 0:
                 return True
         assert False, "%s: did not find expected '%s'" % (self.label, crit)
 
+
 class TestFolder(object):
     def __init__(self, path="test-cache"):
+        from shutil import rmtree
         self.path = path
         if self.path:
-            shutil.rmtree(path, ignore_errors=True)
+            rmtree(path, ignore_errors=True)
+
     def __str__(self):
         return self.path
+
 
 class Cache(TestFolder):
     pass
 
+
 def TigerId(base32):
-    padding = (((len(base32)+7)/8)*8 - len(base32))
-    base32 = base32 + '='*padding # Pad up to even multiple of 8
+    padding = (((len(base32) + 7) / 8) * 8 - len(base32))
+    base32 = base32 + '=' * padding  # Pad up to even multiple of 8
     return message.Identifier(type=message.TREE_TIGER, id=base64.b32decode(base32))
 
 if __name__ == '__main__':
@@ -197,9 +205,10 @@ if __name__ == '__main__':
         server.tcpPort=0
         server.unixSocket=%s
         cache.dir=/tmp
-    '''%TEST_SOCKET)
+    ''' % TEST_SOCKET)
 
     conn = TestConnection(TEST_SOCKET, name='test-python')
-    conn.send(message.BindRead(handle=1, ids=[message.Identifier(type=message.TREE_TIGER, id='NON-EXISTANT')]))
+    conn.send(message.BindRead(
+        handle=1, ids=[message.Identifier(type=message.TREE_TIGER, id='NON-EXISTANT')]))
     for msg in conn:
         print msg
