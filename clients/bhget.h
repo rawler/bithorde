@@ -22,7 +22,6 @@ class BHGet {
 	// Internal items
 	std::list<MagnetURI> _assets;
 	bithorde::Client::Pointer _client;
-	boost::asio::io_service _ioSvc;
 	std::unique_ptr<bithorde::ReadAsset> _asset;
 	uint64_t _currentOffset;
 	OutQueue * _outQueue;
