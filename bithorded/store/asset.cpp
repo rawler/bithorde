@@ -130,15 +130,14 @@ void StoredAsset::updateStatus()
 
 boost::shared_array<byte> crunch_piece(IDataArray* file, uint64_t offset, size_t size) {
 	byte BUF[size];
-	byte* res = new byte[Hasher::DigestSize];
-
 	auto got = file->read(offset, size, BUF);
 	if (got != static_cast<ssize_t>(size)) {
 		throw ios_base::failure("Unexpected read error");
 	}
 
-	Hasher::Hasher::rootDigest(BUF, got, res);
-	return boost::shared_array<byte>(res);
+	auto res = boost::shared_array<byte>(new byte[Hasher::DigestSize]);
+	Hasher::Hasher::rootDigest(BUF, got, res.get());
+	return res;
 }
 
 struct HashTail : public std::enable_shared_from_this<HashTail> {
