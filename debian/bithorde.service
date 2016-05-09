@@ -1,0 +1,8 @@
+[Unit]
+Description=BitHorde daemon
+
+[Service]
+ExecStart=/usr/bin/bithorded -c/etc/bithorde.conf
+
+[Install]
+WantedBy=multi-user.target

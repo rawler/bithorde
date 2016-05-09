@@ -2,10 +2,18 @@ Source: bithorde
 Section: net
 Priority: extra
 Maintainer: Ulrik Mikaelsson <ulrik.mikaelsson@gmail.com>
-Build-Depends: debhelper (>= 7), cmake, libboost-all-dev,
-               libcrypto++-dev, libfuse-dev, liblog4cplus-dev,
-               libprotobuf-dev, pkg-config, protobuf-compiler,
-               python-crypto, python-protobuf
+Build-Depends: debhelper (>= 7),
+               cmake,
+               dh-systemd,
+               libboost-all-dev,
+               libcrypto++-dev,
+               libfuse-dev,
+               liblog4cplus-dev,
+               libprotobuf-dev,
+               pkg-config,
+               protobuf-compiler,
+               python-crypto,
+               python-protobuf
 Standards-Version: 3.8.3
 Homepage: http://www.bithorde.org/
 
@@ -14,5 +22,5 @@ Architecture: any
 Depends: debconf, python-protobuf, ${shlibs:Depends}, ${misc:Depends}
 Description: A fast and light caching-graph content distribution system.
  A fast and light content distribution system, aimed for high-performance de-centralized
- content distribution. Key design goals is; caching graph, low footprint, direct access 
+ content distribution. Key design goals is; caching graph, low footprint, direct access
  and id-by-content. WARNING: BitHorde is still experimental. Beware of Gremlins

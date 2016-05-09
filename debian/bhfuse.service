@@ -1,0 +1,11 @@
+[Unit]
+Description=BHFuse daemon
+
+[Service]
+ExecStartPre=/bin/bash -c '(mount | grep -c /tmp/bhfuse) && /bin/umount -lf /tmp/bhfuse; test -d /tmp/bhfuse || install -d -onobody -gnogroup -m755 /tmp/bhfuse'
+ExecStart=/usr/bin/bhfuse --timeout=500 /tmp/bhfuse
+ExecStartPost=/bin/bash -c '(mount | grep -c /tmp/bhfuse) && /bin/umount -lf /tmp/bhfuse; true'
+
+[Install]
+WantedBy=multi-user.target
+Wants=bithorde.service
