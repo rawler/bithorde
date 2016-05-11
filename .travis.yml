@@ -1,7 +1,19 @@
+sudo: false
 language: cpp
-compiler: gcc
+compiler:
+  - gcc
+  - clang
 install:
-  - sudo apt-get install libboost1.48-all-dev libprotobuf-dev protobuf-compiler liblog4cplus-dev libcrypto++-dev libfuse-dev python-crypto python-eventlet python-protobuf
+  - if [ "$CXX" = "g++" ]; then export CXX="g++-4.8" CC="gcc-4.8"; fi
+  - sudo apt-get install libboost-all-dev libprotobuf-dev protobuf-compiler liblog4cplus-dev libcrypto++-dev libfuse-dev python-crypto python-eventlet python-protobuf
+addons:
+  apt:
+    sources:
+    - ubuntu-toolchain-r-test
+    packages:
+    - gcc-4.8
+    - g++-4.8
+    - clang
 script:
   - cmake .
   - make
