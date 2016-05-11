@@ -9,20 +9,20 @@ install:
 addons:
   apt:
     sources:
-    - ubuntu-toolchain-r-test
+      - ubuntu-toolchain-r-test
     packages:
-    - clang-3.6
-    - gcc-4.8
-    - g++-4.8
-    - libboost1.55-all-dev
-    - libcrypto++-dev
-    - libfuse-dev
-    - liblog4cplus-dev
-    - libprotobuf-dev
-    - protobuf-compiler
-    - python-crypto
-    - python-eventlet
-    - python-protobuf
+      - clang-3.6
+      - gcc-4.8
+      - g++-4.8
+      - libboost1.55-all-dev
+      - libcrypto++-dev
+      - libfuse-dev
+      - liblog4cplus-dev
+      - libprotobuf-dev
+      - protobuf-compiler
+      - python-crypto
+      - python-eventlet
+      - python-protobuf
 script:
   - cmake .
   - make
