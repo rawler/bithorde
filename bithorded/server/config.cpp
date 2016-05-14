@@ -131,6 +131,15 @@ void read_client(const OptionGroup& options, bithorded::Config::Client& c) {
 	}
 }
 
+std::string head(const std::string& str, char delim) {
+	auto index = str.find_first_of(delim);
+	if (index == std::string::npos) {
+		return str;
+	} else {
+		return str.substr(0, index);
+	}
+}
+
 bithorded::Config::Config(int argc, char* argv[])
 {
 	auto hardwareCores = sysconf( _SC_NPROCESSORS_ONLN );
@@ -144,7 +153,7 @@ bithorded::Config::Config(int argc, char* argv[])
 
 	po::options_description server_options("Server Options");
 	server_options.add_options()
-		("server.name", po::value<string>(&nodeName)->default_value(asio::ip::host_name()),
+		("server.name", po::value<string>(&nodeName)->default_value(head(asio::ip::host_name(),'.')),
 			"Name of this node, defaults to hostname")
 		("server.tcpPort", po::value<uint16_t>(&tcpPort)->default_value(1337),
 			"TCP port to listen on for incoming connections")
