@@ -4,12 +4,13 @@ import base64
 import os
 import socket
 from time import time
+from cStringIO import StringIO
+from threading import Condition, Thread
 
 from bithorde import decodeMessage, encoder, MSG_REV_MAP, message
 
 from subprocess import Popen, PIPE, STDOUT
 from google.protobuf.message import Message
-
 
 class TestConnection:
     def __init__(self, tgt, name=None):
@@ -115,9 +116,54 @@ class TestConnection:
         self.expect(message.HandShake)
 
 
+class LineBuffer(object):
+    def __init__(self, label, f=None):
+        self.buf = list()
+        self.cv = Condition()
+        self.label = label
+        if f:
+            t = Thread(target=self.feed, args=(f,))
+            t.daemon = True
+            t.start()
+
+    def feed(self, f):
+        line = f.readline()
+        while line:
+            if self.label:
+                print "%s: %s" % (self.label, line.rstrip())
+            with self.cv:
+                self.buf.append(line)
+                self.cv.notify()
+            line = f.readline()
+
+        cv = self.cv
+        with cv:
+            self.cv = None
+            cv.notify()
+
+    def readlines(self):
+        i = 0
+        while True:
+            line = None
+
+            cv = self.cv
+            if not cv:
+                return
+            with cv:
+                while i >= len(self.buf):
+                    cv.wait()
+                    if not self.cv:
+                        return
+                line = self.buf[i]
+                i += 1
+
+            yield line
+    __iter__ = readlines
+
+
 class BithordeD(Popen):
     def __init__(self, label='bithorded', bithorded=os.environ.get('BITHORDED', 'bithorded'), config={}):
-        Popen.__init__(self, ['stdbuf', '-o0', '-e0', bithorded, '-c', '/dev/stdin'], stdout=PIPE, stderr=STDOUT, stdin=PIPE)
+        Popen.__init__(self, ['stdbuf', '-o0', '-e0', bithorded, '-c', '/dev/stdin'], stderr=STDOUT, stdout=PIPE, stdin=PIPE)
         self._cleanup = list()
         if hasattr(config, 'setdefault'):
             suffix = (time(), os.getpid())
@@ -134,18 +180,19 @@ class BithordeD(Popen):
                 os.mkdir(d)
                 cache_cfg['dir'] = d
 
+        self.buffer = LineBuffer(label, self.stdout)
         self.config = config
         self.label = label
         self.started = False
 
-        self.run()
+        self._run()
 
     def cleanup(self):
         self.kill()
         for op in self._cleanup:
             op()
 
-    def run(self):
+    def _run(self):
         atexit.register(self.cleanup)
 
         def gen_config(value, key=[]):
@@ -157,10 +204,7 @@ class BithordeD(Popen):
                 return value
         self.stdin.write(gen_config(self.config))
         self.stdin.close()
-        while True:
-            line = self.stdout.readline()
-            if self.label:
-                print "%s: %s" % (self.label, line.rstrip())
+        for line in self.buffer:
             if line.find('Server started') >= 0:
                 self.started = True
                 break
@@ -170,8 +214,7 @@ class BithordeD(Popen):
         return self.poll() is None
 
     def wait_for(self, crit):
-        while True:
-            line = self.stdout.readline()
+        for line in self.buffer:
             if line.find(crit) >= 0:
                 return True
         assert False, "%s: did not find expected '%s'" % (self.label, crit)
