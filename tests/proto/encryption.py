@@ -34,10 +34,11 @@ class Counter:
         idx = len(self._block) - 1
         while idx >= 0:
             current = self._block[idx] + 1
-            self._block[idx] = current
-            if current == 0:
+            if current == 256:
+                self._block[idx] = 0
                 idx -= 1
             else:
+                self._block[idx] = current
                 break
         return res
 
