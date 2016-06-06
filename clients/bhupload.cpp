@@ -163,7 +163,8 @@ bool BHUpload::tryWrite() {
 			cerr << "DEBUG: Wrote " << _readBuf.size << " from " << _currentOffset << endl;
 		_currentOffset += _readBuf.size;
 		// TODO: Update progressbar
-		_readBuf.pop(_readBuf.size);
+		_readBuf.consume(_readBuf.size);
+		_readBuf.pop();
 		return true;
 	} else {
 		return false;

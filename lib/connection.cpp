@@ -109,6 +109,9 @@ public:
 			default:
 				throw std::runtime_error("Unsupported Cipher " + bithorde::CipherType_Name(t));
 		}
+
+		// Decrypt data already in buffer
+		decrypt(_rcvBuf.ptr+_rcvBuf.consumed, _rcvBuf.size-_rcvBuf.consumed);
 	}
 
 	void trySend() {
@@ -274,10 +277,8 @@ void Connection::onRead(const boost::system::error_code& err, size_t count)
 
 	google::protobuf::io::CodedInputStream stream((::google::protobuf::uint8*)_rcvBuf.ptr, _rcvBuf.size);
 	bool res = true;
-	size_t remains;
 	size_t msgs_processed(0);
 	while (res) {
-		remains = stream.BytesUntilLimit();
 		uint32_t tag = stream.ReadTag();
 		if (tag == 0)
 			break;
@@ -315,7 +316,7 @@ void Connection::onRead(const boost::system::error_code& err, size_t count)
 		_keepAlive->reset();
 	}
 	_readWindow = NULL;
-	_rcvBuf.pop(_rcvBuf.size-remains);
+	_rcvBuf.pop();
 
 	tryRead();
 	return;
@@ -330,12 +331,14 @@ bool Connection::dequeue(MessageType type, ::google::protobuf::io::CodedInputStr
 	if (!stream.ReadVarint32(&length)) return false;
 
 	uint32_t bytesLeft = stream.BytesUntilLimit();
-	if (length > bytesLeft) return false;
+	int32_t leftInBuffer = bytesLeft-length;
+	if (leftInBuffer < 0) return false;
 
 	_stats->incomingMessages += 1;
 	_stats->incomingMessagesCurrent += 1;
 	::google::protobuf::io::CodedInputStream::Limit limit = stream.PushLimit(length);
 	if ((res = msg.MergePartialFromCodedStream(&stream))) {
+		_rcvBuf.consume(_rcvBuf.left() - leftInBuffer);
 		_dispatch(type, msg);
 	}
 	stream.PopLimit(limit);

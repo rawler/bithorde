@@ -4,13 +4,12 @@
 #include <stdlib.h>
 #include <string.h>
 
-Buffer::Buffer()
-{
-	ptr = 0;
-	size = capacity = 0;
-}
+Buffer::Buffer() :
+	ptr(0), size(0), capacity(0), consumed(0)
+{}
 
-Buffer::Buffer(byte* ptr, size_t len)
+Buffer::Buffer(byte* ptr, size_t len) :
+	size(0), consumed(0)
 {
 	this->ptr = ptr;
 	this->capacity = len;
@@ -48,12 +47,21 @@ void Buffer::charge(size_t amount)
 	size += amount;
 }
 
-void Buffer::pop(size_t amount)
+void Buffer::consume(size_t amount)
 {
-	if (amount == size) {
-		size = 0;
-		return;
+	consumed += amount;
+}
+
+void Buffer::pop()
+{
+	size -= consumed;
+	if (size != 0) {
+		memmove(ptr, ptr+consumed, size);
 	}
-	memmove(ptr, ptr+amount, size-amount);
-	size -= amount;
+	consumed = 0;
+}
+
+size_t Buffer::left()
+{
+	return size - consumed;
 }

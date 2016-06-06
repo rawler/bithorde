@@ -6,9 +6,10 @@
 
 typedef unsigned char byte;
 
+// TODO: Refactor to try to hide pointers
 struct Buffer {
 	byte* ptr;
-	size_t size, capacity;
+	size_t size, capacity, consumed;
 	Buffer();
 	Buffer(byte* ptr, size_t len);
 	~Buffer();
@@ -26,9 +27,20 @@ struct Buffer {
 	void charge(size_t amount);
 
 	/**
-	 * Consume /amount/ bytes at the beginning of the buffer
+	 * Mark bytes at the beginning of buffer as "consumed"
+	 * Still valid and present until pop() though
 	 */
-	void pop(size_t amount);
+	void consume(size_t amount);
+
+	/**
+	 * Expunge consumed bytes
+	 */
+	void pop();
+
+	/**
+	 * Number of bytes not consumed in buffer
+	 */
+    size_t left();
 };
 
 namespace bithorde {
