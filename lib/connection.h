@@ -7,6 +7,7 @@
 #include <boost/asio/local/stream_protocol.hpp>
 #include <boost/chrono/system_clocks.hpp>
 #include <boost/signals2.hpp>
+#include <functional>
 #include <memory>
 #include <list>
 
@@ -71,8 +72,6 @@ class Connection
 	: public std::enable_shared_from_this<Connection>
 {
 public:
-	typedef std::shared_ptr<Connection> Pointer;
-
 	enum MessageType {
 		HandShake = 1,
 		BindRead = 2,
@@ -85,6 +84,9 @@ public:
 		Ping = 10,
 	};
 
+	typedef std::shared_ptr<Connection> Pointer;
+	typedef std::function<void(MessageType, const ::google::protobuf::Message&)> Callback;
+
 	static Pointer create(boost::asio::io_service& ioSvc, const bithorde::ConnectionStats::Ptr& stats, const boost::asio::ip::tcp::endpoint& addr);
 	static Pointer create(boost::asio::io_service& ioSvc, const bithorde::ConnectionStats::Ptr& stats, const std::shared_ptr< boost::asio::ip::tcp::socket >& socket);
 	static Pointer create(boost::asio::io_service& ioSvc, const bithorde::ConnectionStats::Ptr& stats, const boost::asio::local::stream_protocol::endpoint& addr);
@@ -92,12 +94,11 @@ public:
 
 	virtual void setEncryption(bithorde::CipherType t, const std::string& key, const std::string& iv) = 0;
 	virtual void setDecryption(bithorde::CipherType t, const std::string& key, const std::string& iv) = 0;
+	void setCallback(const Callback& cb);
 	void setKeepalive(Keepalive* keepalive);
 
 	typedef boost::signals2::signal<void ()> VoidSignal;
-	typedef boost::signals2::signal<void (MessageType, const ::google::protobuf::Message&)> MessageSignal;
 	VoidSignal disconnected;
-	MessageSignal message;
 	VoidSignal writable;
 
 	ConnectionStats::Ptr stats();
@@ -121,6 +122,7 @@ protected:
 
 protected:
 	boost::asio::io_service& _ioSvc;
+	Callback _dispatch;
 	ConnectionStats::Ptr _stats;
 	std::unique_ptr<Keepalive> _keepAlive;
 	std::string _logTag;

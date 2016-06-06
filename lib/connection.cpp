@@ -336,13 +336,16 @@ bool Connection::dequeue(MessageType type, ::google::protobuf::io::CodedInputStr
 	_stats->incomingMessagesCurrent += 1;
 	::google::protobuf::io::CodedInputStream::Limit limit = stream.PushLimit(length);
 	if ((res = msg.MergePartialFromCodedStream(&stream))) {
-		message(type, msg);
+		_dispatch(type, msg);
 	}
 	stream.PopLimit(limit);
 
 	return res;
 }
 
+void Connection::setCallback(const Connection::Callback& cb) {
+	_dispatch = cb;
+}
 
 void Connection::setKeepalive(Keepalive* value)
 {

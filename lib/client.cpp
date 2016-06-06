@@ -146,7 +146,7 @@ void Client::hookup(Connection::Pointer newConn)
 	_rpcIdAllocator.reset();
 	_connection = newConn;
 
-	_messageConnection = _connection->message.connect(Connection::MessageSignal::slot_type(&Client::onIncomingMessage, this, _1, _2));
+	_connection->setCallback(std::bind(&Client::onIncomingMessage, this, std::placeholders::_1, std::placeholders::_2));
 	_writableConnection = _connection->writable.connect(writable);
 	_disconnectedConnection = _connection->disconnected.connect(Connection::VoidSignal::slot_type(&Client::onDisconnected, this));
 }
