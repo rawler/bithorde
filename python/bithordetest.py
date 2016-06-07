@@ -133,13 +133,12 @@ class LineBuffer(object):
                 print "%s: %s" % (self.label, line.rstrip())
             with self.cv:
                 self.buf.append(line)
-                self.cv.notify()
+                self.cv.notifyAll()
             line = f.readline()
 
-        cv = self.cv
-        with cv:
-            self.cv = None
-            cv.notify()
+        with self.cv:
+            cv, self.cv = self.cv, None
+            cv.notifyAll()
 
     def readlines(self):
         i = 0
@@ -147,7 +146,7 @@ class LineBuffer(object):
             line = None
 
             cv = self.cv
-            if not cv:
+            if cv is None:
                 return
             with cv:
                 while i >= len(self.buf):
