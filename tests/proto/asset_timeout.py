@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
 from bithordetest import message, BithordeD, TestConnection
 
