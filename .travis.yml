@@ -50,8 +50,6 @@ addons:
     - python-eventlet
     - python-protobuf
 script:
-- mkdir $HOME/bin
-- ln -sf /usr/bin/python2* $HOME/bin
 - cmake .
 - make
 - ctest -V

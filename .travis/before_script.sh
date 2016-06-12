@@ -18,4 +18,6 @@ ssh -T git@github.com
 ssh -T rawler@git.launchpad.net
 echo -e "\n"
 
-
+# Make sure system-installed Python is used
+mkdir $HOME/bin
+ln -sf /usr/bin/python2* $HOME/bin
