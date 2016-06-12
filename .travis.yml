@@ -2,30 +2,61 @@ sudo: required
 dist: trusty
 language: cpp
 compiler:
-  - gcc
-  - clang
+- gcc
+- clang
+env:
+  global:
+  - secure: MGpSvN7f1IW2umoCAddz4mZZB13jVy5805UaLB8YmfnwHOgPJ/YN8t94Le7aPxAKLyyuEpIWVJJOR8R5nCX3NjJZXxItlvq9v2GhhsxITzuEd3yn9hQBEjEgZOWxvwNCrvm+K9EE12iaU4olhPyKe5jqOqelrH5Md4C3EhvqPOo=
+  - secure: Miu52/Rpsfv7za4gtbLR2hFsa9pOGFYbrtQAcXwl12UZuuBfanxpnbQJRwc+RhYvkDU3q0J1cy8VTsKYw+vpm1XILO7KqytCvX8q1pLTx1lw369/RqlG/tnn+BqQun3P4oeiIrU4KBslbtjeHD9dq6R86r9zkcgFUWkxJw2HCYc=
+  - secure: mxqobQ/kSovVDYs8VsRfeQZfM2TRm0PpiUbb5/axGh2oFQn/hd2tbcL4OR0YVRmn3p28rXdJ/lFUqQPCp8sMCQybDGjUWqsYb7pTROGXGhxTe6ENfTyY6uRd/Mx6llml2RkF2MPwDGzFOXuDHQFSpNxMyZ0A8QOKaDAW0rQUbIY=
+  - secure: YWRNI8ZFzN1Iz5IKFTqp5bBtSWhFGEsRuj8wqeYFWrlHPFcgxVohZ2mYvt7UOEGQMGWd58R77DuIHR4/uF2ykPmeSLItnZQBTPpkMxh5y8Qirt0d13zpeO3jZTl3kHMSi1WkWMLx9a+rDp4pedVpsjcm6VAQv0jst6QHEa+yGec=
+  - secure: HxkongLJ7AW/IoQuqHkkz/sjmedvy7CS452pgBwk7hiR+0opxIp2kOcs4LGEQidCoCIZyoLye4JJSZ5OSX1iDzqtQJsfmIELhKV8OztxknWZ1GpjLPuPbsjzhajLMOAcDKrSN2W/wcKSI2iGdnoMZBhLFVKGoEhQQ8f8Y0uDWB0=
+  - secure: A6yJa6tEFKI9DAN9Y6n/24uCr7ztpOq7gtiEkv0gjt080SWDoHT83CXJ96RAktCLQY7EsXlPv6tTD7IpgNqOyZR5sF3Ots3uUG39zdLhqhKEEQV5dHP3l2PZkxfLg9FEUy9Mrk/0A2k3CKbRpPgzzrcREMsRVZ4fiz7lq92Z+Pg=
+  - secure: WoMo3QQl/lOTsiaDq8YS/EoF6BRo7kUHad9sSOCmd+aWRVxB0R/mY08fg5TLdpw/KyJzeK6T16Ap8RZG9YxVZro5Cebb+v3vmaNyyFs9dt66XfhXMRjzqaLMMyRoFVmmJCBfDwjjN1F30wqxulP/u9GIWpIpbOFGecsGSYzAZWA=
+  - secure: jRfdPhhCgA2ou3M1Kh4XGmuk0+FsvRttmYMMYwCof+bizvRudCmjVDnApA3XyE7bUeoD8q2zWNhpxx/2h9VV0gehn1IwiT3ppE9ZTv815PvYsS5oaU/ZROnoPQk0yrbyLOKmX8U4s31t7j8UKEeJlCqKpUCU+IytsVzb7E4+06s=
+  - secure: Tghm4dYwI4ihPtSlTR6e8csInnRxmi6P+zuTUe4ZbxbuL8KuhUimWtypb1tVexYFirymHAgFtyXwqRVmbu/QRGK3JJkJUivRei7YigSmIJXXsLVIA5nzLGH6x0+m0OShy/mTuyFHO/d13/vuqQvm+tRck89rfVZ7wpVGqk4dRgU=
+  - secure: kkPdN3OzbJ6t41eyCM8cNV/87WbXXuS07vOrGPERYp+ELtntHdof16YqG/0JQOZSqb1neOX1c/W2iNr8oQXLOVDBhjEIdGUFcEbk/ofhZG6F6ikoJLp0NU6yLVl18t3wPmO/pjFrmUujaM7YBy6hNU+c44yDiAtEntdjabeilyU=
+  - secure: JxDMh2ezzgP68Wm1HKCXrKC20k0967HG9sO6fnPycHTAjgiWm2Q5WUyEG4WfJGRJqQ8nB3N/wkoJzvd7HXo//bXwjUhy4+twMC+Rh/wEbu2IWlDj6xL6gJno0DnontMboZGYjbiwp2NOO/BfjmvX4cMciNWb4+hpIJEHE8NQahg=
+  - secure: XY72FZw8SD8tScp1+yh+/3dtqZuea+qqSt87uNvJ+uL3fh1lTE+eS+qBJddnvrsiOqVxOn4HS7tPcxSeaTia3l+92t+Hm8Oh3v8mapBTB9qExSyXxCgx9NX+yfDemfN6IG5TNqXxAzM2jquWMWjnINlPJYgnAcR+LQ64m6f9WxA=
+  - secure: rONseVdZylk2HV9lGgJm/VSkIzEi752SfpPnf+5ndERwV+kfRED2NRXjrDdzqwU7guRD/l+Jk1FSfVGrMSBI77p0I2m+Ql2trIChr1qzSSedOuNUzlOJBmN7+R+Zw+rYcO99xBGYn6oSIxMWn1sQBix2vHnyVVumo2RrV/1ni/Q=
+  - secure: ti9uqdOKrXthIzKkZp167RQtsU5dN+8QceLaHvlHZ1NrRs6LndB9ubgtFnB1yZjhs7h2h9Ul7ixLviAJaYAUiKXhL/tNbbpFil6janSQ8l8Z2VFs3XmrGdjZvGeYeuFQY4Lk54YFqhS5NgOnIAVMj58aZeX/CbmwaIU+cJw4MSY=
+  - secure: r6usik/EkFl2pQGi5fmUd1UJBQix18jTcML6ZRf0uN0mvl9EwaV2do5WZahLM30f3dCrPA/wC29hgL8BMvXaDOKaC5/Yy1MQSi2uwJjBc2U+r9Ysqgk3dNeRXjzJhXTdr0jf1fOyNEbCHoE6xT9krcMKJ7lLKKz3Tiii4gw09mk=
+  - secure: bYGAKXgBUyDWzkvVjzPyzikQbZnWiVDQOp4xaIbZG/y+UDvU3ImihIXkIj98nXqJUCccDhGPxLkT3zXwCHp4R+h9J7glUY5AnpP9KPeloaZtttxTjtUibrG6rWk4FJPGyjfpYHKeI+N0wxZB7OSisrTZlmx9E4s278THM7TiCdw=
+  - secure: klMt8AettDCCCvMTWa/2X9XFEehfUq+Lz/cUEwDxnbYMpa+Gk+I9ldUvpzpsFjzkXbbXzxSXeXAmYAKK3w+TjUmFUBHBPtirR7ecrmTDRIu0unGLj+FjDzmXTXLH4D8e6fP4iEXGVdVZcVxbLb+AlGI+czJFf2kvQFd4e+qa5ik=
+  - secure: VGuGUH8ReIwIe6vOcpA8pd9ZD1KC8zxSmfIfDcJrVjH0dNeuhLKDO1nssihBp0u5ydaebMPITNBe4+vDFn610wyDX5wMXIXB1XgK8PoTs7Yl4hYDD6kJpnzwUCtyDeaxABhCJgkecGamASVsntNywytQHkb7t89pLOH7AlsuIF8=
+  - secure: rOUT+Z5gwaSTxmzwFwlM0EVZ9KnQIXhBaYWQSjPGZzEldak5u9xaOZHWlWKzqDeNUpS+65NLceeZ+YgzdTrmFrnjWgRG+DQPkZdEfewRCjT8GBXRN/qQR+YzBSVQqyMq0CrU+/ADSpVuzILk3imv2cafmnCaXfKAZ2Lq191U4+g=
+  - secure: b/nF6ES77y0Q6a2HfTrEwkeEp7wGt3lsECq9xFbEElX/qRdS6FweloXPMSr1gFw8Hg3Cr6Z0PjObuYhpH+MbPzJK2M/+Rz0PKS20EVq9lmNCuwoqCYUmTJNxVwkdK0SQHa1cQENRW0iO0tj9xzzf2naQVFaeUfdzQg0UcN1aMy8=
+  - secure: v5xwQRMM2fH0rECgkSxPqujILKEQaR+lg0oK+2VBVpxSfTuk3sRGAv/pUiHdEiPKAhvm/TNj9X0VglH1dVl9gmBLNHcLE9t/ng6p4RP9/4m1UevN3wRoPEhUeStAAcJh6GXtxM/oC2IKOxil0HkwEt2wIJNxDQS/TfaWSiy10I4=
+  - secure: o2jtCrBCK5/sv5EZoQaZl6bRNO5xi21lXqmqcVd3e/jdbLH9Z1he91h/SXLAw6awJcPlYFNDJOGYiyfe0tN5GAZV0ffKeKgLVEwpEkAe3bbXsDVI5PSUr6JC2GI+XfxQVGW1DyC2+w7WIiRxCFAWYwGPM2lS5fd6wdX6p52KqbM=
+  - secure: Kub72/NfR8BcmtI/QDxpt2EbcA1vVEG3qiUAHEnXRcfRD2HaKdAtghyN1lk6mMQ47dqGL7KdLPWhseFLZzBouPZXv+9bSVrz+/P2DXjkz9bAW5TGf3fEVTx7ZjaU4hn/jmtTUwTn0/RgV8lnFeWftDD1gFgmMjoeBfdJGn0h+cM=
+before_script: .travis/before_script.sh
 install:
-  - if [ "$CXX" = "g++" ]; then export CXX="g++-4.8" CC="gcc-4.8"; fi
+- if [ "$CXX" = "g++" ]; then export CXX="g++-4.8" CC="gcc-4.8"; fi
 addons:
   apt:
     sources:
-      - ubuntu-toolchain-r-test
+    - ubuntu-toolchain-r-test
     packages:
-      - clang-3.6
-      - gcc-4.8
-      - g++-4.8
-      - libboost1.55-all-dev
-      - libcrypto++-dev
-      - libfuse-dev
-      - liblog4cplus-dev
-      - libprotobuf-dev
-      - protobuf-compiler
-      - python-crypto
-      - python-eventlet
-      - python-protobuf
+    - clang-3.6
+    - gcc-4.8
+    - g++-4.8
+    - libboost1.55-all-dev
+    - libcrypto++-dev
+    - libfuse-dev
+    - liblog4cplus-dev
+    - libprotobuf-dev
+    - protobuf-compiler
+    - python-crypto
+    - python-eventlet
+    - python-protobuf
 script:
-  - mkdir $HOME/bin
-  - ln -sf /usr/bin/python2* $HOME/bin # Use system-provided python
-  - cmake .
-  - make
-  - ctest -V
+- mkdir $HOME/bin
+- ln -sf /usr/bin/python2* $HOME/bin
+- cmake .
+- make
+- ctest -V
+deploy:
+  provider: script
+  script: .travis/publish.sh
+  on:
+    branch: staging

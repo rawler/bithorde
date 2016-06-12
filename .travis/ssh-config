@@ -1,0 +1,13 @@
+Host github.com
+	IdentityFile            ~/.ssh/id_rsa
+	StrictHostKeyChecking   no
+	PasswordAuthentication  no
+	CheckHostIP             no
+	BatchMode               yes
+
+Host git.launchpad.net
+	IdentityFile            ~/.ssh/id_rsa
+	StrictHostKeyChecking   no
+	PasswordAuthentication  no
+	CheckHostIP             no
+	BatchMode               yes
