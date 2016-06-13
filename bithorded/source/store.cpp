@@ -57,12 +57,12 @@ Store::Store( GrandCentralDispatch& gcd, const string& label, const boost::files
 
 void Store::describe(management::Info& target) const
 {
-	target << _baseDir << ": " << (store::AssetStore::diskUsage()/(1024*1024)) << "MB";
+	target << _baseDir.string() << ": " << (store::AssetStore::diskUsage()/(1024*1024)) << "MB";
 }
 
 void Store::inspect(management::InfoList& target) const
 {
-	target.append("path") << _baseDir;
+	target.append("path") << _baseDir.string();
 	target.append("diskUsage") << store::AssetStore::diskUsage();
 	return AssetStore::inspect(target);
 }

@@ -17,8 +17,10 @@
 
 #include "management.hpp"
 
-#include <sstream>
+#include <iomanip>
 #include <iostream>
+#include <sstream>
+#include <string>
 
 using namespace std;
 
@@ -59,6 +61,23 @@ ostream& Info::render_html(ostream& output) const
 	return output;
 }
 
+std::string json_escape(const std::string& s) {
+    std::stringstream ss;
+    for (size_t i = 0; i < s.length(); ++i) {
+        if (unsigned(s[i]) < '\x20' || s[i] == '\\' || s[i] == '"') {
+            ss << "\\u" << std::setfill('0') << std::setw(4) << std::hex << unsigned(s[i]);
+        } else {
+            ss << s[i];
+        }
+    }
+    return ss.str();
+}
+
+ostream& Info::render_json(ostream& output) const {
+	output << '"' << json_escape(name) << "\":\"" << json_escape(str()) << '"';
+	return output;
+}
+
 Info& InfoList::append(const string& name, const http::server::RequestRouter* child, const Leaf* renderer)
 {
 	push_back(Info(child, name));
@@ -77,27 +96,57 @@ Info& InfoList::append(const string& name, const Leaf& leaf)
 	return append(name, NULL, &leaf);
 }
 
+ostream& InfoList::render_html(ostream& output) const {
+	output << "<html><head><title>Bithorde Management</title></head><body>"
+		<< "<table><tr><th>Name</th><th>Value</th></tr>";
+
+	for (auto iter=begin(); iter != end(); iter++) {
+		iter->render_html(output);
+	}
+
+	output << "</table></body></html>";
+	return output;
+}
+
+ostream& InfoList::render_json(ostream& output) const {
+	output << "{";
+	for (auto iter=begin(); iter != end(); iter++) {
+		if (iter != begin()) {
+			output << ',';
+		}
+		iter->render_json(output);
+	}
+	output << "}";
+
+	return output;
+}
+
+ostream& InfoList::render_text(ostream& output) const {
+	for (auto iter=begin(); iter != end(); iter++) {
+		iter->render_text(output);
+	}
+
+	return output;
+}
+
 bool Directory::handle(const http::server::RequestRouter::path& path, const http::server::request& req, http::server::reply& reply) const
 {
 	InfoList table;
 	inspect(table);
 	if (path.empty()) {
 		std::ostringstream buf;
-		bool html = req.accepts("text/html");
-		if (html) {
-			buf << "<html><head><title>Bithorde Management</title></head><body>"
-				<< "<table><tr><th>Name</th><th>Value</th></tr>";
+		std::string type;
+
+		if (type = "application/json", req.accepts(type)) {
+			table.render_json(buf);
+		} else if (type = "text/html", req.accepts(type)) {
+			table.render_html(buf);
+		} else {
+			type = "text/plain";
+			table.render_text(buf);
 		}
-		for (auto iter=table.begin(); iter != table.end(); iter++) {
-			if (html)
-				iter->render_html(buf);
-			else
-				iter->render_text(buf);
-		}
-		if (html) {
-			buf << "</table></body></html>";
-		}
-		reply.fill(buf.str(), html ? "text/html" : "text/plain");
+
+		reply.fill(buf.str(), type);
 		return true;
 	} else {
 		auto node = path.begin();
