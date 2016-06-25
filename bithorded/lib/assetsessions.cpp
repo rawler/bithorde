@@ -1,5 +1,5 @@
 /*
-    Copyright 2013 <copyright holder> <email>
+    Copyright 2016 Ulrik Mikaelsson <ulrik.mikaelsson@gmail.com>
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
