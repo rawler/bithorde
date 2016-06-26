@@ -71,8 +71,8 @@ public:
 	std::string name() { return _cfg.nodeName; }
 	const Config::Client& getClientConfig(const std::string& name);
 
-	UpstreamRequestBinding::Ptr async_linkAsset(const boost::filesystem::path& filePath);
-	UpstreamRequestBinding::Ptr async_findAsset(const bithorde::BindRead& req);
+	UpstreamRequestBinding::Ptr asyncLinkAsset(const boost::filesystem::path& filePath);
+	UpstreamRequestBinding::Ptr asyncFindAsset(const bithorde::BindRead& req);
 	UpstreamRequestBinding::Ptr prepareUpload(uint64_t size);
 
 	void hookup( const std::shared_ptr< boost::asio::ip::tcp::socket >& socket, const Config::Client& client);

@@ -41,7 +41,7 @@ inline uint32_t treesize(uint32_t leafs) {
 		return leafs;
 }
 
-uint32_t calc_leaves(uint32_t treesize);
+uint32_t calcLeaves(uint32_t treesize);
 
 struct NodeIdx {
 	uint32_t nodeIdx;
@@ -89,7 +89,7 @@ public:
 	typedef typename BackingStore::NodePtr NodePtr;
 
 	TreeStore(BackingStore& backingStore)
-		: _storage(backingStore), _leaves(calc_leaves(backingStore.size()))
+		: _storage(backingStore), _leaves(calcLeaves(backingStore.size()))
 	{
 		BOOST_ASSERT(backingStore.size() >= treesize(_leaves));
 	}

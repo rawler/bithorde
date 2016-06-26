@@ -240,7 +240,7 @@ bithorded::Config::Config(int argc, char* argv[])
 	}
 }
 
-void bithorded::Config::print_usage(ostream& stream)
+void bithorded::Config::printUsage(ostream& stream)
 {
 	stream << cli_options << endl;
 }

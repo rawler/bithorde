@@ -44,7 +44,7 @@ public:
 	virtual ~Asset();
 
 	const ClientPointer& client();
-	boost::asio::io_service& io_service();
+	boost::asio::io_service& ioSvc();
 	bool isBound();
 	Handle handle();
 	std::string label();

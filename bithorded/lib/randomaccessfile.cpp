@@ -91,14 +91,14 @@ void RandomAccessFile::open(const boost::filesystem::path& path, RandomAccessFil
 
 void RandomAccessFile::close()
 {
-	if (is_open()) {
+	if (isOpen()) {
 		::close(_fd);
 		_fd = -1;
 		_path = "";
 	}
 }
 
-bool RandomAccessFile::is_open() const
+bool RandomAccessFile::isOpen() const
 {
 	return _fd != -1;
 }

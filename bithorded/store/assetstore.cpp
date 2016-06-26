@@ -85,7 +85,7 @@ boost::filesystem::path AssetStore::newAsset()
 	return assetPath;
 }
 
-void AssetStore::update_asset(const BitHordeIds& ids, const std::shared_ptr<StoredAsset>& asset)
+void AssetStore::updateAsset(const BitHordeIds& ids, const std::shared_ptr<StoredAsset>& asset)
 {
 	auto tigerId = findBithordeId(ids, bithorde::HashType::TREE_TIGER);
 
@@ -273,7 +273,7 @@ IAsset::Ptr AssetStore::openAsset(const bithorde::BindRead& req)
 	auto assetPath = _assetsFolder / assetId;
 	try {
 		if (auto res = openAsset(assetPath)) {
-			update_asset(res->status->ids(), static_pointer_cast<StoredAsset>(res));
+			updateAsset(res->status->ids(), static_pointer_cast<StoredAsset>(res));
 			return res;
 		} else {
 			removeAsset(assetPath);

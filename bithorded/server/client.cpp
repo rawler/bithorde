@@ -39,7 +39,7 @@ namespace bithorded {
 }
 
 Client::Client( Server& server) :
-	bithorde::Client(server.ioService(), server.name()),
+	bithorde::Client(server.ioSvc(), server.name()),
 	_server(server)
 {
 }
@@ -113,7 +113,7 @@ void Client::onMessage( const std::shared_ptr< bithorde::MessageContext< bithord
 	if ( msg.has_linkpath()) {
 		fs::path path( msg.linkpath());
 		if (path.is_absolute()) {
-			if (auto asset = _server.async_linkAsset(path)) {
+			if (auto asset = _server.asyncLinkAsset(path)) {
 				LOG4CPLUS_INFO(clientLogger, "Linking " << path);
 				assignAsset( msg.handle(), asset, BitHordeIds(), bithorde::RouteTrace(), boost::posix_time::neg_infin);
 			} else {
@@ -161,7 +161,7 @@ void Client::onMessage( const std::shared_ptr< bithorde::MessageContext< bithord
 	if (msg.ids_size() > 0) {
 		// Trying to open
 		try {
-			auto asset = _server.async_findAsset(msg);
+			auto asset = _server.asyncFindAsset(msg);
 			if (asset) {
 				boost::posix_time::ptime deadline(boost::posix_time::neg_infin);
 				if (msg.has_timeout()) {
@@ -194,7 +194,7 @@ void Client::onMessage( const std::shared_ptr< bithorde::MessageContext< bithord
 		if (offset < asset->size()) {
 			// Raw pointer to this should be fine here, since asset has ownership of this. (Through member Ptr client)
 			auto deadline = bithorde::Message::in(msg.timeout());
-			asset->async_read(offset, size, msg.timeout(),
+			asset->asyncRead(offset, size, msg.timeout(),
 				std::bind(&Client::onReadResponse, this, msgCtx, std::placeholders::_1, std::placeholders::_2, deadline));
 		} else {
 			bithorde::Read::Response resp;

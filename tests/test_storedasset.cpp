@@ -55,7 +55,7 @@ BOOST_FIXTURE_TEST_CASE( open_partial_v1_asset, TestData )
 	fs3::copy(srcDir/"meta", temp/"meta");
 	auto asset = cache::CachedAsset::open(gcd, temp);
 	BOOST_CHECK_EQUAL(asset->hasRootHash(), false);
-	BOOST_CHECK_EQUAL(asset->can_read(asset->size()-1024, 1024), 0);
+	BOOST_CHECK_EQUAL(asset->canRead(asset->size()-1024, 1024), 0);
 
 	boost::asio::io_service::work work(ioSvc);
 	asset->write(0, std::make_shared<bithorde::MemoryBuffer>(asset->size()), std::bind(&boost::asio::io_service::stop, &ioSvc)); // Yikes I want C++11 lambdas
@@ -68,7 +68,7 @@ BOOST_FIXTURE_TEST_CASE( open_fully_cached_v1_asset, TestData )
 {
 	auto asset = cache::CachedAsset::open(gcd, assets/".bh_meta"/"assets"/"v1_cached");
 	BOOST_CHECK_EQUAL(asset->hasRootHash(), true);
-	BOOST_CHECK_EQUAL(asset->can_read(asset->size()-1024, 1024), 1024);
+	BOOST_CHECK_EQUAL(asset->canRead(asset->size()-1024, 1024), 1024);
 }
 
 BOOST_FIXTURE_TEST_CASE( open_v1_linked_asset, TestData )
@@ -91,8 +91,8 @@ BOOST_FIXTURE_TEST_CASE( open_v1_linked_asset, TestData )
 	fs::last_write_time(test_asset, std::time(NULL)+10000);
 	// Should now succeed with newer link than data
 	auto asset = std::static_pointer_cast<bithorded::source::SourceAsset>(repo.openAsset(test_asset));
-	BOOST_CHECK_EQUAL(asset->can_read(0, 1024), 1024);
-	BOOST_CHECK_EQUAL(asset->can_read(asset->size()-1024, 1024), 1024);
+	BOOST_CHECK_EQUAL(asset->canRead(0, 1024), 1024);
+	BOOST_CHECK_EQUAL(asset->canRead(asset->size()-1024, 1024), 1024);
 	asset.reset();
 
 	fs::last_write_time(test_asset, std::time(NULL)-10000);
@@ -109,14 +109,14 @@ BOOST_FIXTURE_TEST_CASE( open_partial_v2_asset, TestData )
 {
 	auto asset = cache::CachedAsset::open(gcd, assets/".bh_meta"/"assets"/"v2_cached_partial");
 	BOOST_CHECK_EQUAL(asset->hasRootHash(), false);
-	BOOST_CHECK_EQUAL(asset->can_read(asset->size()-1024, 1024), 0);
+	BOOST_CHECK_EQUAL(asset->canRead(asset->size()-1024, 1024), 0);
 }
 
 BOOST_FIXTURE_TEST_CASE( open_fully_cached_v2_asset, TestData )
 {
 	auto asset = cache::CachedAsset::open(gcd, assets/".bh_meta"/"assets"/"v2_cached");
 	BOOST_CHECK_EQUAL(asset->hasRootHash(), true);
-	BOOST_CHECK_EQUAL(asset->can_read(asset->size()-1024, 1024), 1024);
+	BOOST_CHECK_EQUAL(asset->canRead(asset->size()-1024, 1024), 1024);
 }
 
 BOOST_FIXTURE_TEST_CASE( open_v2_linked_asset, TestData )
@@ -139,8 +139,8 @@ BOOST_FIXTURE_TEST_CASE( open_v2_linked_asset, TestData )
 	fs::last_write_time(test_asset, std::time(NULL)+10000);
 	// Should now succeed with newer link than data
 	auto asset = std::static_pointer_cast<bithorded::source::SourceAsset>(repo.openAsset(test_asset));
-	BOOST_CHECK_EQUAL(asset->can_read(0, 1024), 1024);
-	BOOST_CHECK_EQUAL(asset->can_read(asset->size()-1024, 1024), 1024);
+	BOOST_CHECK_EQUAL(asset->canRead(0, 1024), 1024);
+	BOOST_CHECK_EQUAL(asset->canRead(asset->size()-1024, 1024), 1024);
 
 	fs::last_write_time(test_asset, std::time(NULL)-10000);
 	// Should fail due to data newer than link

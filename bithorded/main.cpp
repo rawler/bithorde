@@ -45,7 +45,7 @@ int main(int argc, char* argv[]) {
 		return bithorde::exit_version();
 	} catch (ArgumentError& e) {
 		cerr << e.what() << endl;
-		Config::print_usage(cerr);
+		Config::printUsage(cerr);
 		return -1;
 	}
 }

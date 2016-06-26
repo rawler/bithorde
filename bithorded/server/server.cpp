@@ -105,7 +105,7 @@ Server::Server(asio::io_service& ioSvc, Config& cfg) :
 	}
 
 	if (_cfg.inspectPort) {
-		_httpInterface.reset(new http::server::server(ioService(), "127.0.0.1", _cfg.inspectPort, *this));
+		_httpInterface.reset(new http::server::server(this->ioSvc(), "127.0.0.1", _cfg.inspectPort, *this));
 		LOG4CPLUS_INFO(serverLog, "Inspection interface listening on port " << _cfg.inspectPort);
 	}
 
@@ -114,7 +114,7 @@ Server::Server(asio::io_service& ioSvc, Config& cfg) :
 
 void Server::waitForTCPConnection()
 {
-	std::shared_ptr<asio::ip::tcp::socket> sock = std::make_shared<asio::ip::tcp::socket>(ioService());
+	std::shared_ptr<asio::ip::tcp::socket> sock = std::make_shared<asio::ip::tcp::socket>(ioSvc());
 	_tcpListener.async_accept(*sock, [=](const boost::system::error_code& error) {
 		if (!error) {
 			hookup(sock, null_client);
@@ -126,7 +126,7 @@ void Server::waitForTCPConnection()
 void Server::hookup ( const std::shared_ptr< asio::ip::tcp::socket >& socket, const Config::Client& client)
 {
 	bithorded::Client::Ptr c = bithorded::Client::create(*this);
-	auto conn = bithorde::Connection::create(ioService(), std::make_shared<bithorde::ConnectionStats>(_timerSvc), socket);
+	auto conn = bithorde::Connection::create(ioSvc(), std::make_shared<bithorde::ConnectionStats>(_timerSvc), socket);
 	c->setSecurity(client.key, (bithorde::CipherType)client.cipher);
 	if (client.name.empty())
 		c->hookup(conn);
@@ -137,11 +137,11 @@ void Server::hookup ( const std::shared_ptr< asio::ip::tcp::socket >& socket, co
 
 void Server::waitForLocalConnection()
 {
-	std::shared_ptr<asio::local::stream_protocol::socket> sock = std::make_shared<asio::local::stream_protocol::socket>(ioService());
+	std::shared_ptr<asio::local::stream_protocol::socket> sock = std::make_shared<asio::local::stream_protocol::socket>(ioSvc());
 	_localListener.async_accept(*sock, [=](const boost::system::error_code& error) {
 		if (!error) {
 			bithorded::Client::Ptr c = bithorded::Client::create(*this);
-			c->hookup(bithorde::Connection::create(ioService(), std::make_shared<bithorde::ConnectionStats>(_timerSvc), sock));
+			c->hookup(bithorde::Connection::create(ioSvc(), std::make_shared<bithorde::ConnectionStats>(_timerSvc), sock));
 			clientConnected(c);
 			waitForLocalConnection();
 		}
@@ -189,7 +189,7 @@ const bithorded::Config::Client& Server::getClientConfig(const string& name)
 	return null_client;
 }
 
-UpstreamRequestBinding::Ptr Server::async_linkAsset(const boost::filesystem::path& filePath)
+UpstreamRequestBinding::Ptr Server::asyncLinkAsset(const boost::filesystem::path& filePath)
 {
 	for (auto iter=_assetStores.begin(); iter != _assetStores.end(); iter++) {
 		if (auto res = (*iter)->addAsset(filePath))
@@ -198,7 +198,7 @@ UpstreamRequestBinding::Ptr Server::async_linkAsset(const boost::filesystem::pat
 	return UpstreamRequestBinding::NONE;
 }
 
-UpstreamRequestBinding::Ptr Server::async_findAsset(const bithorde::BindRead& req)
+UpstreamRequestBinding::Ptr Server::asyncFindAsset(const bithorde::BindRead& req)
 {
 	for (auto iter=_assetStores.begin(); iter != _assetStores.end(); iter++) {
 		if (auto asset = (*iter)->findAsset(req))

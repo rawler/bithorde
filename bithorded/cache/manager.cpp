@@ -83,7 +83,7 @@ IAsset::Ptr CacheManager::openAsset(const bithorde::BindRead& req)
 
 void CacheManager::updateAsset(const std::shared_ptr<store::StoredAsset>& asset)
 {
-	return AssetStore::update_asset(asset->status->ids(), asset);
+	return AssetStore::updateAsset(asset->status->ids(), asset);
 }
 
 CachedAsset::Ptr CacheManager::prepareUpload(uint64_t size)
@@ -110,7 +110,7 @@ CachedAsset::Ptr CacheManager::prepareUpload(uint64_t size, const BitHordeIds& i
 {
 	auto res = prepareUpload(size);
 	if (res)
-		AssetStore::update_asset(ids, res);
+		AssetStore::updateAsset(ids, res);
 	return res;
 }
 
@@ -143,6 +143,6 @@ void CacheManager::linkAsset(CachedAsset::WeakPtr asset_)
 			LOG4CPLUS_DEBUG(log, "Linking " << ids << " to " << asset->id());
 		}
 
-		AssetStore::update_asset(ids, asset);
+		AssetStore::updateAsset(ids, asset);
 	}
 }

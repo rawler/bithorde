@@ -38,15 +38,16 @@ public:
 	GrandCentralDispatch(boost::asio::io_service& controller, int parallel);
 	virtual ~GrandCentralDispatch();
 
-	boost::asio::io_service& ioService() const { return _controller; }
+	boost::asio::io_service& ioSvc() const { return _controller; }
 
 	template<typename Job, typename CompletionHandler>
 	void submit(Job job, CompletionHandler handler) {
-		_jobService.post([=](){ run_job(job, handler); });
+		_jobService.post([=](){ runJob(job, handler); });
 	}
 
+private:
 	template<typename Job, typename CompletionHandler>
-	void run_job(Job job, CompletionHandler handler) {
+	void runJob(Job job, CompletionHandler handler) {
 		auto res = job();
 		_controller.post([=](){ handler(res); });
 	}

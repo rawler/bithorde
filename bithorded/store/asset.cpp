@@ -46,7 +46,7 @@ StoredAsset::StoredAsset( GrandCentralDispatch& gcd, const string& id, const Has
 	updateStatus();
 }
 
-void StoredAsset::async_read(uint64_t offset, size_t size, uint32_t timeout, bithorded::IAsset::ReadCallback cb)
+void StoredAsset::asyncRead(uint64_t offset, size_t size, uint32_t timeout, bithorded::IAsset::ReadCallback cb)
 {
 	auto buf = std::make_shared<bithorde::MemoryBuffer>(size);
 	auto dataSize = _data->size();
@@ -61,7 +61,7 @@ void StoredAsset::async_read(uint64_t offset, size_t size, uint32_t timeout, bit
 	}
 }
 
-size_t StoredAsset::can_read(uint64_t offset, size_t size)
+size_t StoredAsset::canRead(uint64_t offset, size_t size)
 {
 	BOOST_ASSERT(size > 0);
 	size_t res = 0;
@@ -164,7 +164,7 @@ struct HashTail : public std::enable_shared_from_this<HashTail> {
 	~HashTail() {
 		auto& asset(this->asset);
 		auto& whenDone(this->whenDone);
-		gcd.ioService().post([asset, whenDone]{
+		gcd.ioSvc().post([asset, whenDone]{
 			asset->updateStatus();
 			if (whenDone) {
 				whenDone();
@@ -288,7 +288,7 @@ AssetMeta store::openV2AssetMeta ( const boost::filesystem::path& path ) {
 	if ((hdr.format != FileFormatVersion::V2CACHE) && (hdr.format != FileFormatVersion::V2LINKED))
 		throw ios_base::failure("Unknown format of file "+path.string());
 
-	uint64_t metaSize = HashStore::size_needed_for_atoms(hdr.atoms(), hdr.hashLevelsSkipped);
+	uint64_t metaSize = HashStore::sizeNeededForAtoms(hdr.atoms(), hdr.hashLevelsSkipped);
 
 	AssetMeta res;
 	res.hashLevelsSkipped = hdr.hashLevelsSkipped;
@@ -300,8 +300,8 @@ AssetMeta store::openV2AssetMeta ( const boost::filesystem::path& path ) {
 }
 
 AssetMeta store::createAssetMeta ( const boost::filesystem::path& path, FileFormatVersion version, uint64_t dataSize, uint8_t levelsSkipped, uint64_t tailSize ) {
-	uint64_t atoms = HashStore::atoms_needed_for_content(dataSize);
-	uint64_t hashesSize = HashStore::size_needed_for_atoms(atoms, levelsSkipped);
+	uint64_t atoms = HashStore::atomsNeededForContent(dataSize);
+	uint64_t hashesSize = HashStore::sizeNeededForAtoms(atoms, levelsSkipped);
 
 	if ((version != store::V2CACHE) && (version != store::V2LINKED))
 		throw std::invalid_argument("Failed to write header to "+path.native());

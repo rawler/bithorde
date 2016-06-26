@@ -42,7 +42,7 @@ const Asset::ClientPointer& Asset::client()
 	return _client;
 }
 
-boost::asio::io_service& Asset::io_service()
+boost::asio::io_service& Asset::ioSvc()
 {
 	return _ioSvc;
 }
@@ -94,7 +94,7 @@ void Asset::handleMessage(const bithorde::AssetStatus & msg)
 ReadRequestContext::ReadRequestContext(ReadAsset* asset, uint64_t offset, size_t size, int32_t timeout) :
 	_asset(asset),
 	_client(asset->client()),
-	_timer(asset->io_service()),
+	_timer(asset->ioSvc()),
 	_requested_at(ptime::microsec_clock::universal_time())
 {
 	set_handle(asset->handle());

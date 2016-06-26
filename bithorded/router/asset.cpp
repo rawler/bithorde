@@ -195,12 +195,12 @@ void bithorded::router::ForwardedAsset::updateStatus() {
 	setRepeatedPtrField(trx->mutable_ids(), requestIds);
 }
 
-size_t bithorded::router::ForwardedAsset::can_read(uint64_t offset, size_t size)
+size_t bithorded::router::ForwardedAsset::canRead(uint64_t offset, size_t size)
 {
 	return size;
 }
 
-void bithorded::router::ForwardedAsset::async_read(uint64_t offset, size_t size, uint32_t timeout, ReadCallback cb)
+void bithorded::router::ForwardedAsset::asyncRead(uint64_t offset, size_t size, uint32_t timeout, ReadCallback cb)
 {
 	if (_upstream.empty())
 		return cb(-1, bithorde::NullBuffer::instance);

@@ -33,7 +33,7 @@ class WeakMap
 	uint32_t _scrubThreshold; // Will automatically perform a complete scrubbing after this amount of changes
 	uint32_t _dirtiness; // The amount of changes made since last scrubbing
 	MutexType _m;
-	typedef boost::lock_guard<MutexType> lock_guard;
+	typedef boost::lock_guard<MutexType> LockGuard;
 public:
 	typedef std::shared_ptr<LinkType> Link;
 	WeakMap(int scrubThreshold=10000/sizeof(KeyType)) :
@@ -50,7 +50,7 @@ public:
 	 * Clears all keys
 	 */
 	void clear() {
-		lock_guard lock(_m);
+		LockGuard lock(_m);
 		_map.clear();
 	}
 
@@ -58,7 +58,7 @@ public:
 	 * Clears the given key in map
 	 */
 	void clear(const KeyType& key) {
-		lock_guard lock(_m);
+		LockGuard lock(_m);
 		_map.erase(key);
 	}
 
@@ -68,7 +68,7 @@ public:
 	 *          An invalid link otherwise.
 	 */
 	Link operator[](const KeyType& key) {
-		lock_guard lock(_m);
+		LockGuard lock(_m);
 		auto iter = _map.find(key);
 		if (iter == _map.end()) {
 			return Link();
@@ -97,7 +97,7 @@ public:
 	 * Walks through all links in the map, purging any found inactive ones.
 	 */
 	size_t scrub() {
-		lock_guard lock(_m);
+		LockGuard lock(_m);
 		doScrub();
 		return _map.size();
 	}
@@ -106,7 +106,7 @@ public:
 	 * Will store the provided link as a weak link, available through get.
 	 */
 	void set(const KeyType& key, const Link& link) {
-		lock_guard lock(_m);
+		LockGuard lock(_m);
 
 		BOOST_ASSERT(link);
 		_map[key] = link;
@@ -138,7 +138,7 @@ class WeakSet
 	uint32_t _scrubThreshold; // Will automatically perform a complete scrubbing after this amount of changes
 	uint32_t _dirtiness; // The amount of changes made since last scrubbing
 	MutexType _m;
-	typedef boost::lock_guard<MutexType> lock_guard;
+	typedef boost::lock_guard<MutexType> LockGuard;
 public:
 	typedef std::shared_ptr<LinkType> Link;
 	WeakSet(int scrubThreshold=2000) :
@@ -155,7 +155,7 @@ public:
 	 * Clears all keys
 	 */
 	void clear() {
-		lock_guard lock(_m);
+		LockGuard lock(_m);
 		_set.clear();
 	}
 
@@ -175,7 +175,7 @@ public:
 	 * Walks through all links in the map, purging any found inactive ones.
 	 */
 	size_t scrub() {
-		lock_guard lock(_m);
+		LockGuard lock(_m);
 		doScrub();
 		return _set.size();
 	}
@@ -184,7 +184,7 @@ public:
 	 * Will store the provided link as a weak link, available through get.
 	 */
 	void insert(const Link& link) {
-		lock_guard lock(_m);
+		LockGuard lock(_m);
 
 		BOOST_ASSERT(link);
 		_set.insert(link);

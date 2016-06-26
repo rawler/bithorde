@@ -42,7 +42,7 @@ Info& Info::operator=(const Info& other)
 	return *this;
 }
 
-std::ostream& Info::render_text(std::ostream& output) const
+std::ostream& Info::renderText(std::ostream& output) const
 {
 	if (child)
 		output << "@";
@@ -50,7 +50,7 @@ std::ostream& Info::render_text(std::ostream& output) const
 	return output;
 }
 
-ostream& Info::render_html(ostream& output) const
+ostream& Info::renderHTML(ostream& output) const
 {
 	output << "<tr><td>";
 	if (child)
@@ -73,7 +73,7 @@ std::string json_escape(const std::string& s) {
     return ss.str();
 }
 
-ostream& Info::render_json(ostream& output) const {
+ostream& Info::renderJSON(ostream& output) const {
 	output << '"' << json_escape(name) << "\":\"" << json_escape(str()) << '"';
 	return output;
 }
@@ -96,34 +96,34 @@ Info& InfoList::append(const string& name, const Leaf& leaf)
 	return append(name, NULL, &leaf);
 }
 
-ostream& InfoList::render_html(ostream& output) const {
+ostream& InfoList::renderHTML(ostream& output) const {
 	output << "<html><head><title>Bithorde Management</title></head><body>"
 		<< "<table><tr><th>Name</th><th>Value</th></tr>";
 
 	for (auto iter=begin(); iter != end(); iter++) {
-		iter->render_html(output);
+		iter->renderHTML(output);
 	}
 
 	output << "</table></body></html>";
 	return output;
 }
 
-ostream& InfoList::render_json(ostream& output) const {
+ostream& InfoList::renderJSON(ostream& output) const {
 	output << "{";
 	for (auto iter=begin(); iter != end(); iter++) {
 		if (iter != begin()) {
 			output << ',';
 		}
-		iter->render_json(output);
+		iter->renderJSON(output);
 	}
 	output << "}";
 
 	return output;
 }
 
-ostream& InfoList::render_text(ostream& output) const {
+ostream& InfoList::renderText(ostream& output) const {
 	for (auto iter=begin(); iter != end(); iter++) {
-		iter->render_text(output);
+		iter->renderText(output);
 	}
 
 	return output;
@@ -138,12 +138,12 @@ bool Directory::handle(const http::server::RequestRouter::path& path, const http
 		std::string type;
 
 		if (type = "application/json", req.accepts(type)) {
-			table.render_json(buf);
+			table.renderJSON(buf);
 		} else if (type = "text/html", req.accepts(type)) {
-			table.render_html(buf);
+			table.renderHTML(buf);
 		} else {
 			type = "text/plain";
-			table.render_text(buf);
+			table.renderText(buf);
 		}
 
 		reply.fill(buf.str(), type);

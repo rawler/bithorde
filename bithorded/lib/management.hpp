@@ -35,9 +35,9 @@ struct Info : public std::stringstream {
 
 	Info& operator=(const Info& other);
 
-	std::ostream& render_html(std::ostream& output) const;
-	std::ostream& render_json(std::ostream& output) const;
-	std::ostream& render_text(std::ostream& output) const;
+	std::ostream& renderHTML(std::ostream& output) const;
+	std::ostream& renderJSON(std::ostream& output) const;
+	std::ostream& renderText(std::ostream& output) const;
 };
 
 class Leaf {
@@ -51,9 +51,9 @@ struct InfoList : public std::vector<Info> {
 	Info& append(const std::string& name, const DescriptiveDirectory& dir);
 	Info& append(const std::string& name, const Leaf& leaf);
 
-	std::ostream& render_html(std::ostream& output) const;
-	std::ostream& render_json(std::ostream& output) const;
-	std::ostream& render_text(std::ostream& output) const;
+	std::ostream& renderHTML(std::ostream& output) const;
+	std::ostream& renderJSON(std::ostream& output) const;
+	std::ostream& renderText(std::ostream& output) const;
 };
 
 class Directory : public http::server::RequestRouter

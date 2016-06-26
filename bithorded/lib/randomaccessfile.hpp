@@ -89,7 +89,7 @@ public:
 	/**
 	 * See if file is currently open
 	 */
-	bool is_open() const;
+	bool isOpen() const;
 
 	/**
 	 * The number of bytes in the open file

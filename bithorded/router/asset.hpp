@@ -66,8 +66,8 @@ public:
 
 	bool hasUpstream(const std::string peername);
 
-	virtual size_t can_read(uint64_t offset, size_t size);
-	virtual void async_read(uint64_t offset, size_t size, uint32_t timeout, bithorded::IAsset::ReadCallback cb);
+	virtual size_t canRead(uint64_t offset, size_t size);
+	virtual void asyncRead(uint64_t offset, size_t size, uint32_t timeout, bithorded::IAsset::ReadCallback cb);
 	virtual uint64_t size();
 
 	virtual void inspect(management::InfoList& target) const;

@@ -24,7 +24,7 @@ BOOST_AUTO_TEST_CASE( function_test )
 
 	for (int i=1; i < 64; i++) {
 		auto ts = treesize(i);
-		auto leaves = calc_leaves(ts);
+		auto leaves = calcLeaves(ts);
 		BOOST_CHECK_EQUAL( leaves, i );
 	}
 }

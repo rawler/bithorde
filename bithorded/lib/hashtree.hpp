@@ -128,7 +128,7 @@ public:
 	HashTree(BackingStore& store, uint8_t skipLevels) :
 		_store(store),
 		_hasher(),
-		_leaves(calc_leaves(store.size())),
+		_leaves(calcLeaves(store.size())),
 		_leafSize(Hasher::ATOMSIZE << skipLevels)
 	{
 	}

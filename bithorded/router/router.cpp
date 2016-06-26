@@ -51,9 +51,9 @@ public:
 	FriendConnector(Server& server, const bithorded::Config::Friend& cfg) :
 		_server(server),
 		_f(cfg),
-		_socket(std::make_shared<boost::asio::ip::tcp::socket>(server.ioService())),
-		_resolver(server.ioService()),
-		_timer(server.ioService()),
+		_socket(std::make_shared<boost::asio::ip::tcp::socket>(server.ioSvc())),
+		_resolver(server.ioSvc()),
+		_timer(server.ioSvc()),
 		_q(cfg.addr, boost::lexical_cast<string>(cfg.port)),
 		_cancelled(false)
 	{

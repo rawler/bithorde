@@ -112,7 +112,7 @@ void Store::_addAsset(SourceAsset::WeakPtr asset_)
 {
 	auto asset = asset_.lock();
 	if (asset && asset->status->ids_size()) {
-		AssetStore::update_asset(asset->status->ids(), asset);
+		AssetStore::updateAsset(asset->status->ids(), asset);
 	}
 }
 

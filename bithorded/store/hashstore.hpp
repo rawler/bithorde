@@ -68,13 +68,13 @@ public:
 	TigerBaseNode read(size_t offset) const;
 	void write(size_t offset, const TigerBaseNode& node);
 
-	static uint64_t atoms_needed_for_content(uint64_t content_size);
-	static uint64_t leaves_needed_for_atoms(uint64_t atoms, uint8_t levelsSkipped=0);
-	static uint64_t leaves_needed_for_content(uint64_t content_size, uint8_t levelsSkipped=0);
-	static uint64_t nodes_needed_for_atoms(uint64_t atoms, uint8_t levelsSkipped=0);
-	static uint64_t nodes_needed_for_content(uint64_t content_size, uint8_t levelsSkipped=0);
-	static uint64_t size_needed_for_atoms(uint64_t atoms, uint8_t levelsSkipped=0);
-	static uint64_t size_needed_for_content(uint64_t content_size, uint8_t levelsSkipped=0);
+	static uint64_t atomsNeededForContent(uint64_t content_size);
+	static uint64_t leavesNeededForAtoms(uint64_t atoms, uint8_t levelsSkipped=0);
+	static uint64_t leavesNeededForContent(uint64_t content_size, uint8_t levelsSkipped=0);
+	static uint64_t nodesNeededForAtoms(uint64_t atoms, uint8_t levelsSkipped=0);
+	static uint64_t nodesNeededForContent(uint64_t content_size, uint8_t levelsSkipped=0);
+	static uint64_t sizeNeededForAtoms(uint64_t atoms, uint8_t levelsSkipped=0);
+	static uint64_t sizeNeededForContent(uint64_t content_size, uint8_t levelsSkipped=0);
 };
 
 } }

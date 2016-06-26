@@ -53,7 +53,7 @@ BoostAsioFilesystem_Options::BoostAsioFilesystem_Options()
 	: mountpoint(""), debug(false)
 {
 	this->insert(value_type("max_read", "65536"));
-	this->insert(value_type("async_read", ""));
+	this->insert(value_type("asyncRead", ""));
 	this->insert(value_type("allow_other", ""));
 }
 

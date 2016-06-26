@@ -65,7 +65,7 @@ struct Config
 
 	Config(int argc, char* argv[]);
 
-	static void print_usage(std::ostream& stream);
+	static void printUsage(std::ostream& stream);
 
 	std::string configPath;
 

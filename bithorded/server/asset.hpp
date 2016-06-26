@@ -127,7 +127,7 @@ public:
 	// Empty dummy Asset::Ptr, for cases when a null Ptr& is needed.
 	static IAsset::Ptr NONE;
 
-	virtual void async_read(uint64_t offset, size_t size, uint32_t timeout, ReadCallback cb) = 0;
+	virtual void asyncRead(uint64_t offset, size_t size, uint32_t timeout, ReadCallback cb) = 0;
 	virtual uint64_t size() = 0;
 
 	/**
@@ -145,7 +145,7 @@ public:
 	 * offset - 0 to size() - size
 	 * size - 1 to size()
 	 */
-	virtual size_t can_read(uint64_t offset, size_t size) = 0;
+	virtual size_t canRead(uint64_t offset, size_t size) = 0;
 
 	virtual void describe(management::Info& target) const;
 };
