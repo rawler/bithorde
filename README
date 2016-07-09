@@ -37,7 +37,6 @@ Build requirements (Ubuntu Package Names)
   libboost1.48-all-dev
   libcrypto++-dev
   libfuse-dev
-  liblog4cplus-dev
   libprotobuf-dev
   pkg-config
   protobuf-compiler

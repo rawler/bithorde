@@ -15,13 +15,11 @@
 */
 
 #include "client.hpp"
+#include "server.hpp"
 
 #include <iostream>
 
-#include <log4cplus/logger.h>
-#include <log4cplus/loggingmacros.h>
-
-#include "server.hpp"
+#include <bithorded/lib/log.hpp>
 #include <lib/magneturi.h>
 #include <lib/random.h>
 #include <lib/buffer.hpp>
@@ -35,7 +33,7 @@ namespace fs = boost::filesystem;
 using namespace bithorded;
 
 namespace bithorded {
-	log4cplus::Logger clientLogger = log4cplus::Logger::getInstance("client");
+	Logger clientLogger;
 }
 
 Client::Client( Server& server) :
@@ -99,7 +97,7 @@ void Client::onMessage( const std::shared_ptr< bithorde::MessageContext< bithord
 		setSecurity(client_config.key, (bithorde::CipherType)client_config.cipher);
 		sayHello();
 	}
-	LOG4CPLUS_INFO(clientLogger, "Connected: " << msg.name());
+	BOOST_LOG_SEV(clientLogger, bithorded::info) << "Connected: " << msg.name();
 	bithorde::Client::onMessage( msgCtx );
 }
 
@@ -114,19 +112,19 @@ void Client::onMessage( const std::shared_ptr< bithorde::MessageContext< bithord
 		fs::path path( msg.linkpath());
 		if (path.is_absolute()) {
 			if (auto asset = _server.asyncLinkAsset(path)) {
-				LOG4CPLUS_INFO(clientLogger, "Linking " << path);
+				BOOST_LOG_SEV(clientLogger, bithorded::info) << "Linking " << path;
 				assignAsset( msg.handle(), asset, BitHordeIds(), bithorde::RouteTrace(), boost::posix_time::neg_infin);
 			} else {
-				LOG4CPLUS_ERROR(clientLogger, "Upload did not match any allowed assetStore: " << path);
+				BOOST_LOG_SEV(clientLogger, bithorded::error) << "Upload did not match any allowed assetStore: " << path;
 				informAssetStatus( msg.handle(), bithorde::ERROR);
 			}
 		} else {
-			LOG4CPLUS_ERROR(clientLogger, "Relative links not supported" << path);
+			BOOST_LOG_SEV(clientLogger, bithorded::error) << "Relative links not supported" << path;
 			informAssetStatus( msg.handle(), bithorde::ERROR);
 		}
 	} else {
 		if (auto asset = _server.prepareUpload( msg.size())) {
-			LOG4CPLUS_INFO(clientLogger, "Ready for upload of size " << msg.size());
+			BOOST_LOG_SEV(clientLogger, bithorded::info) << "Ready for upload of size " << msg.size();
 			assignAsset( msg.handle(), asset, BitHordeIds(), bithorde::RouteTrace(), boost::posix_time::neg_infin);
 		} else {
 			informAssetStatus( msg.handle(), bithorde::NORESOURCES);
@@ -141,7 +139,7 @@ void Client::onMessage( const std::shared_ptr< bithorde::MessageContext< bithord
 
 	if (msg.ids_size() > 0) {
 		// Trying to open
-		LOG4CPLUS_DEBUG(clientLogger, peerName() << ':' << h << " requested: " << MagnetURI(msg));
+		BOOST_LOG_SEV(clientLogger, bithorded::debug) << peerName() << ':' << h << " requested: " << MagnetURI(msg);
 	}
 
 	if ((_assets.size() > h) && _assets[h]) {
@@ -220,10 +218,10 @@ void Client::onMessage( const std::shared_ptr< bithorde::MessageContext< bithord
 		if (asset) {
 			asset->write(msg.offset(), std::make_shared<bithorde::DataSegmentCtxBuffer>(msgCtx));
 		} else {
-			LOG4CPLUS_ERROR(clientLogger, peerName() << ':' << msg.handle() << " is not an upload-asset");
+			BOOST_LOG_SEV(clientLogger, bithorded::error) << peerName() << ':' << msg.handle() << " is not an upload-asset";
 		}
 	} else {
-		LOG4CPLUS_ERROR(clientLogger, peerName() << ':' << msg.handle() << " is not bound to any asset");
+		BOOST_LOG_SEV(clientLogger, bithorded::error) << peerName() << ':' << msg.handle() << " is not bound to any asset";
 	}
 
 	return;
@@ -233,7 +231,7 @@ void Client::setAuthenticated(const string peerName_)
 {
 	bithorde::Client::setAuthenticated(peerName_);
 	if (peerName_.empty()) {
-		LOG4CPLUS_WARN(clientLogger, peerName() << ": failed authentication");
+		BOOST_LOG_SEV(clientLogger, bithorded::warning) << peerName() << ": failed authentication";
 		close();
 	}
 }
@@ -250,7 +248,7 @@ void Client::onReadResponse(const std::shared_ptr< bithorde::MessageContext<bith
 		resp.set_status(bithorde::NOTFOUND);
 	}
 	if (!sendMessage(bithorde::Connection::ReadResponse, resp, t)) {
-		LOG4CPLUS_WARN(clientLogger, "Failed to write data chunk, (offset " << offset << ')');
+		BOOST_LOG_SEV(clientLogger, bithorded::warning) << "Failed to write data chunk, (offset " << offset << ')';
 	}
 }
 
@@ -281,14 +279,14 @@ void Client::informAssetStatusUpdate(bithorde::Asset::Handle h, const IAsset::Pt
 			&& _assets[asset_idx].assetIds().size()
 			&& !idsOverlap(_assets[asset_idx].assetIds(), status.ids())
 			) {
-		LOG4CPLUS_WARN(clientLogger, peerName() << ':' << h << " new state with mismatching asset ids (" << resp.ids() << ")");
+		BOOST_LOG_SEV(clientLogger, bithorded::warning) << peerName() << ':' << h << " new state with mismatching asset ids (" << idsToString(resp.ids()) << ")";
 		resp.set_status(bithorde::NOTFOUND);
 	}
 	if (status.size() > (static_cast<uint64_t>(1)<<60)) {
-		LOG4CPLUS_WARN(clientLogger, peerName() << ':' << h << " new state with suspiciously large size" << resp.size() << ", " << status.has_size());
+		BOOST_LOG_SEV(clientLogger, bithorded::warning) << peerName() << ':' << h << " new state with suspiciously large size" << resp.size() << ", " << status.has_size();
 	}
 
-	LOG4CPLUS_DEBUG(clientLogger, peerName() << ':' << h << " new state " << bithorde::Status_Name(resp.status()) << " (" << resp.ids() << ") availability: " << resp.availability());
+	BOOST_LOG_SEV(clientLogger, bithorded::debug) << peerName() << ':' << h << " new state " << bithorde::Status_Name(resp.status()) << " (" << idsToString(resp.ids()) << ") availability: " << resp.availability();
 
 	sendMessage(bithorde::Connection::AssetStatus, resp, bithorde::Message::NEVER, true);
 }
@@ -298,7 +296,7 @@ void Client::assignAsset(bithorde::Asset::Handle handle_, const UpstreamRequestB
 	size_t handle = handle_;
 	if (handle >= _assets.size()) {
 		if (handle >= MAX_ASSETS) {
-			LOG4CPLUS_ERROR(clientLogger, peerName() << ": handle larger than allowed limit (" << handle << " > " << MAX_ASSETS << ")");
+			BOOST_LOG_SEV(clientLogger, bithorded::error) << peerName() << ": handle larger than allowed limit (" << handle << " > " << MAX_ASSETS << ")";
 			informAssetStatus(handle_, bithorde::Status::INVALID_HANDLE);
 			return;
 		}
@@ -339,7 +337,7 @@ void Client::clearAsset(bithorde::Asset::Handle handle_)
 	if (handle < _assets.size()) {
 		if ( auto& a = _assets[handle] ) {
 			a.reset();
-			LOG4CPLUS_DEBUG(clientLogger, peerName() << ':' << handle_ << " released");
+			BOOST_LOG_SEV(clientLogger, bithorded::debug) << peerName() << ':' << handle_ << " released";
 		}
 	}
 }

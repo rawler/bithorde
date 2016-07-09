@@ -20,9 +20,7 @@
 
 #include <lib/buffer.hpp>
 #include <bithorded/lib/grandcentraldispatch.hpp>
-
-#include <log4cplus/logger.h>
-#include <log4cplus/loggingmacros.h>
+#include <bithorded/lib/log.hpp>
 
 using namespace bithorded;
 using namespace bithorded::cache;
@@ -31,7 +29,7 @@ using namespace bithorded::store;
 namespace fs = boost::filesystem;
 
 namespace bithorded { namespace cache {
-	log4cplus::Logger assetLog = log4cplus::Logger::getInstance("cacheAsset");
+	Logger assetLog;
 } }
 
 bithorded::cache::CachedAsset::CachedAsset(GrandCentralDispatch& gcd, const std::string& id, const store::HashStore::Ptr& hashStore, const IDataArray::Ptr& data) :
@@ -78,7 +76,7 @@ CachedAsset::Ptr CachedAsset::open(GrandCentralDispatch& gcd, const boost::files
 	case boost::filesystem::file_not_found:
 		return CachedAsset::Ptr();
 	default:
-		LOG4CPLUS_WARN(assetLog, "Asset of unknown type: " << path);
+		BOOST_LOG_SEV(assetLog, bithorded::warning) << "Asset of unknown type: " << path;
 		return CachedAsset::Ptr();
 	}
 
@@ -149,7 +147,7 @@ uint64_t bithorded::cache::CachingAsset::size()
 		return 0;
 }
 
-void CachingAsset::apply(const bithorded::AssetRequestParameters& old_parameters, const bithorded::AssetRequestParameters& new_parameters)
+void bithorded::cache::CachingAsset::apply(const bithorded::AssetRequestParameters& old_parameters, const bithorded::AssetRequestParameters& new_parameters)
 {
 	if (_upstream)
 		_upstream->apply(old_parameters, new_parameters);

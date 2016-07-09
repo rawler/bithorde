@@ -5,9 +5,6 @@
 #include <boost/filesystem.hpp>
 #include <boost/test/unit_test.hpp>
 
-#include <log4cplus/configurator.h>
-#include <log4cplus/hierarchy.h>
-
 #include <lib/buffer.hpp>
 #include <bithorded/cache/asset.hpp>
 #include <bithorded/lib/grandcentraldispatch.hpp>
@@ -38,9 +35,6 @@ struct TestData {
 		gcd(ioSvc, 4),
 		assets(fs::path(__FILE__).parent_path() / "data" / "assets")
 	{
-        log4cplus::BasicConfigurator config;
-        config.configure();
-        auto root = log4cplus::Logger::getDefaultHierarchy().getRoot();
 	}
 };
 

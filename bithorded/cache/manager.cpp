@@ -19,8 +19,7 @@
 
 #include <boost/filesystem.hpp>
 
-#include <log4cplus/logger.h>
-#include <log4cplus/loggingmacros.h>
+#include <bithorded/lib/log.hpp>
 
 using namespace bithorded;
 using namespace bithorded::cache;
@@ -29,7 +28,7 @@ namespace fs = boost::filesystem;
 
 namespace bithorded {
 	namespace cache {
-		log4cplus::Logger log = log4cplus::Logger::getInstance("cache");
+		Logger log;
 	}
 }
 
@@ -97,7 +96,7 @@ CachedAsset::Ptr CacheManager::prepareUpload(uint64_t size)
 			asset->status.onChange.connect([=](const bithorde::AssetStatus&, const bithorde::AssetStatus&){ linkAsset(weakAsset); });
 			return asset;
 		} catch (const std::ios::failure& e) {
-			LOG4CPLUS_ERROR(log, "Failed to create " << assetPath << " for upload (" << e.what() << "). Purging...");
+			BOOST_LOG_SEV(log, bithorded::error) << "Failed to create " << assetPath << " for upload (" << e.what() << "). Purging...";
 			AssetStore::removeAsset(assetPath);
 			return CachedAsset::Ptr();
 		}
@@ -140,7 +139,7 @@ void CacheManager::linkAsset(CachedAsset::WeakPtr asset_)
 	if (asset) {
 		auto& ids = asset->status->ids();
 		if (ids.size()) {
-			LOG4CPLUS_DEBUG(log, "Linking " << ids << " to " << asset->id());
+			BOOST_LOG_SEV(log, bithorded::debug) << "Linking " << idsToString(ids) << " to " << asset->id();
 		}
 
 		AssetStore::updateAsset(ids, asset);

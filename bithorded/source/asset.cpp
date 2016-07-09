@@ -20,17 +20,10 @@
 #include <boost/filesystem.hpp>
 #include <vector>
 
-#include <log4cplus/logger.h>
-#include <log4cplus/loggingmacros.h>
-
-#include "../lib/relativepath.hpp"
+#include <bithorded/lib/relativepath.hpp>
 
 using namespace std;
 namespace fs = boost::filesystem;
-
-namespace bithorded { namespace source {
-	log4cplus::Logger assetLog = log4cplus::Logger::getInstance("sourceAsset");
-} }
 
 using namespace bithorded;
 using namespace bithorded::source;

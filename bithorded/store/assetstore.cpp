@@ -23,14 +23,12 @@
 #include <unistd.h>
 #include <utime.h>
 
-#include <log4cplus/logger.h>
-#include <log4cplus/loggingmacros.h>
-
 #include "asset.hpp"
-#include "../../lib/hashes.h"
-#include "../../lib/random.h"
-#include "../lib/management.hpp"
-#include "../lib/relativepath.hpp"
+#include <lib/hashes.h>
+#include <lib/random.h>
+#include <bithorded/lib/log.hpp>
+#include <bithorded/lib/management.hpp>
+#include <bithorded/lib/relativepath.hpp>
 
 using namespace bithorded;
 using namespace bithorded::store;
@@ -42,7 +40,7 @@ const fs::path ASSETS_DIR = "assets";
 const fs::path TIGER_DIR = "tiger";
 
 namespace bithorded {
-	log4cplus::Logger storeLog = log4cplus::Logger::getInstance("store");
+	Logger storeLog;
 }
 
 AssetStore::AssetStore(const boost::filesystem::path& baseDir) :
@@ -96,7 +94,7 @@ void AssetStore::updateAsset(const BitHordeIds& ids, const std::shared_ptr<Store
 		// Updates with empty TigerId won't overwrite.
 		tigerId = oldTiger;
 	} else if ((!oldTiger.empty()) && (oldTiger != tigerId)) {
-		LOG4CPLUS_WARN(bithorded::storeLog, "asset " << assetId << " were linked by the wrong tthsum " << oldTiger);
+		BOOST_LOG_SEV(bithorded::storeLog, warning) << "asset " << assetId << " were linked by the wrong tthsum " << oldTiger;
 		unlink(_tigerFolder/oldTiger);
 	}
 
@@ -136,7 +134,7 @@ uint64_t AssetStore::assetDiskUsage(const boost::filesystem::path& path) const
 	uint64_t res=0;
 	struct stat res_stat;
 	if (stat(path.c_str(), &res_stat) != 0) {
-		LOG4CPLUS_WARN(bithorded::storeLog, "failed stat:ing asset " << path.native());
+		BOOST_LOG_SEV(bithorded::storeLog, warning) << "failed stat:ing asset " << path.native();
 		return 0;
 	}
 	if (S_ISREG(res_stat.st_mode)) {
@@ -147,11 +145,11 @@ uint64_t AssetStore::assetDiskUsage(const boost::filesystem::path& path) const
 			if (stat(iter->path().c_str(), &res_stat) == 0) {
 				res += res_stat.st_blocks * 512;
 			} else {
-				LOG4CPLUS_WARN(bithorded::storeLog, "failed stat:ing asset-part " << iter->path().native());
+				BOOST_LOG_SEV(bithorded::storeLog, warning) << "failed stat:ing asset-part " << iter->path().native();
 			}
 		}
 	} else {
-		LOG4CPLUS_WARN(bithorded::storeLog, "unknown type for asset " << path.native());
+		BOOST_LOG_SEV(bithorded::storeLog, warning) << "unknown type for asset " << path.native();
 	}
 	return res;
 }
@@ -173,10 +171,10 @@ uint64_t remove_file_recursive(const fs::path& path) {
 		}
 		fs::remove(path, err);
 		if (err) {
-			LOG4CPLUS_WARN(bithorded::storeLog, "error removing file " << path << "; " << err);
+			BOOST_LOG_SEV(bithorded::storeLog, warning) << "error removing file " << path << "; " << err;
 		}
 	} else {
-		LOG4CPLUS_WARN(bithorded::storeLog, "failed stat:ing file " << path.native());
+		BOOST_LOG_SEV(bithorded::storeLog, warning) << "failed stat:ing file " << path.native();
 	}
 	return size_freed;
 }
@@ -188,7 +186,7 @@ uint64_t AssetStore::removeAsset(const std::string& assetId) noexcept
 
 uint64_t AssetStore::removeAsset(const boost::filesystem::path& assetPath) noexcept
 {
-	LOG4CPLUS_INFO(bithorded::storeLog, "removing asset " << assetPath.filename());
+	BOOST_LOG_SEV(bithorded::storeLog, info) << "removing asset " << assetPath.filename();
 	auto tigerId = _index.removeAsset(assetPath.filename().native());
 	if (!tigerId.empty()) {
 		unlink(_tigerFolder / tigerId);
@@ -201,7 +199,7 @@ void AssetStore::unlink(const fs::path& linkPath) noexcept
 	boost::system::error_code err;
 	fs::remove(linkPath, err);
 	if (err && (err.value() != boost::system::errc::no_such_file_or_directory)) {
-		LOG4CPLUS_WARN(bithorded::storeLog, "error removing asset-link " << linkPath << "; " << err);
+		BOOST_LOG_SEV(bithorded::storeLog, warning) << "error removing asset-link " << linkPath << "; " << err;
 	}
 }
 
@@ -211,7 +209,7 @@ void AssetStore::loadIndex()
 	fs::directory_iterator enddir;
 	uint64_t size_cleared = 0;
 
-	LOG4CPLUS_DEBUG(bithorded::storeLog, "starting scan of " << _tigerFolder);
+	BOOST_LOG_SEV(bithorded::storeLog, debug) << "starting scan of " << _tigerFolder;
 
 	// Iterate through tigerFolder, and add any assets found matching
 	for ( auto fi = fs::directory_iterator(_tigerFolder); fi != enddir; fi++ ) {
@@ -223,7 +221,7 @@ void AssetStore::loadIndex()
 		try {
 			assetPath = fs::canonical(assetPath, _tigerFolder);
 		} catch (fs::filesystem_error) {
-			LOG4CPLUS_WARN(bithorded::storeLog, "dangling link in " << tigerLink);
+			BOOST_LOG_SEV(bithorded::storeLog, warning) << "dangling link in " << tigerLink;
 			unlink(tigerLink);
 			continue;
 		}
@@ -240,25 +238,25 @@ void AssetStore::loadIndex()
 		if (fillPercent >= 3) {
 			_index.addAsset(assetPath.filename().native(), BinId::fromBase32(tigerLink.filename().native()), assetUsed, assetAllocated, fs::last_write_time(assetPath));
 		} else {
-			LOG4CPLUS_DEBUG(bithorded::storeLog, "removing almost empty asset: urn:tree:tiger:" << tigerLink.filename());
+			BOOST_LOG_SEV(bithorded::storeLog, debug) << "removing almost empty asset: urn:tree:tiger:" << tigerLink.filename();
 			unlink(tigerLink);
 			size_cleared += remove_file_recursive(assetPath);
 		}
 	}
 
-	LOG4CPLUS_DEBUG(bithorded::storeLog, "starting scan of " << _assetsFolder);
+	BOOST_LOG_SEV(bithorded::storeLog, debug) << "starting scan of " << _assetsFolder;
 
 	// Iterate through assetFolder, and remove any assets not found in index
 	for ( auto fi = fs::directory_iterator(_assetsFolder); fi != enddir; fi++ ) {
 		auto assetPath = fi->path();
 		auto tigerId = _index.lookupAsset(assetPath.filename().native());
 		if (tigerId.empty()) {
-			LOG4CPLUS_INFO(bithorded::storeLog, "found " << assetPath << " without referencing tigerId, removing");
+			BOOST_LOG_SEV(bithorded::storeLog, info) << "found " << assetPath << " without referencing tigerId, removing";
 			size_cleared += remove_file_recursive(assetPath);
 		}
 	}
 
-	LOG4CPLUS_INFO(bithorded::storeLog, "Scan finished. " << _index.assetCount() << " assets, using " << (_index.totalDiskUsage()/1048576) << "MB. " << (size_cleared/1048576) << "MB cleared.");
+	BOOST_LOG_SEV(bithorded::storeLog, info) << "Scan finished. " << _index.assetCount() << " assets, using " << (_index.totalDiskUsage()/1048576) << "MB. " << (size_cleared/1048576) << "MB cleared.";
 }
 
 IAsset::Ptr AssetStore::openAsset(const bithorde::BindRead& req)
@@ -280,16 +278,16 @@ IAsset::Ptr AssetStore::openAsset(const bithorde::BindRead& req)
 		}
 	} catch (const boost::system::system_error& e) {
 		if (e.code().value() == bsys::errc::no_such_file_or_directory) {
-			LOG4CPLUS_ERROR(storeLog, "Linked asset " << assetPath << "broken. Purging...");
+			BOOST_LOG_SEV(storeLog, error) << "Linked asset " << assetPath << "broken. Purging...";
 			removeAsset(assetPath);
 		} else if (e.code().value() == bsys::errc::file_exists) {
-			LOG4CPLUS_ERROR(storeLog, "Linked asset " << assetPath << "exists with wrong size. Purging...");
+			BOOST_LOG_SEV(storeLog, error) << "Linked asset " << assetPath << "exists with wrong size. Purging...";
 			removeAsset(assetPath);
 		} else {
-			LOG4CPLUS_ERROR(storeLog, "Failed to open " << assetPath << " with unknown error " << e.what());
+			BOOST_LOG_SEV(storeLog, error) << "Failed to open " << assetPath << " with unknown error " << e.what();
 		}
 	} catch (const std::ios::failure& e) {
-		LOG4CPLUS_ERROR(storeLog, "Failed to open " << assetPath << " with unknown error " << e.what());
+		BOOST_LOG_SEV(storeLog, error) << "Failed to open " << assetPath << " with unknown error " << e.what();
 	}
 	return IAsset::Ptr();
 }

@@ -4,7 +4,9 @@
 #include <ostream>
 
 #include <boost/filesystem/path.hpp>
+#include <boost/log/utility/formatting_ostream.hpp>
 
+#include <crypto++/files.h>
 #include <crypto++/basecode.h>
 
 #include "bithorde.pb.h"
@@ -91,6 +93,8 @@ namespace std
 }
 
 std::ostream& operator<<(std::ostream& str, const BitHordeIds& ids);
+std::string idsToString(const BitHordeIds& ids);
+
 boost::filesystem::path operator/(const boost::filesystem::path& lhs, const BinId& rhs);
 
 BinId findBithordeId(const BitHordeIds& ids, bithorde::HashType type);

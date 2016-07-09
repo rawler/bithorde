@@ -20,11 +20,9 @@
 #include <boost/filesystem.hpp>
 #include <string>
 
-#include <log4cplus/logger.h>
-#include <log4cplus/loggingmacros.h>
-
-#include "../lib/grandcentraldispatch.hpp"
-#include "../lib/relativepath.hpp"
+#include <bithorded/lib/grandcentraldispatch.hpp>
+#include <bithorded/lib/log.hpp>
+#include <bithorded/lib/relativepath.hpp>
 
 using namespace std;
 
@@ -40,7 +38,7 @@ const fs::path META_DIR = ".bh_meta";
 
 namespace bithorded {
 	namespace source {
-		log4cplus::Logger log = log4cplus::Logger::getInstance("source");
+		Logger log;
 	}
 }
 
@@ -94,7 +92,7 @@ SourceAsset::Ptr Store::addAsset ( const boost::filesystem::path& file )
 			asset->hash();
 			return asset;
 		} catch (const std::ios::failure& e) {
-			LOG4CPLUS_ERROR(log, "Failed to create " << assetPath << " for hashing " << file << ". Purging...");
+			BOOST_LOG_SEV(log, error) << "Failed to create " << assetPath << " for hashing " << file << ". Purging...";
 			AssetStore::removeAsset(assetPath);
 			return SourceAsset::Ptr();
 		}
@@ -137,7 +135,7 @@ IAsset::Ptr Store::openAsset(const boost::filesystem::path& assetPath)
 	}
 
 	if ( fs::last_write_time(assetPath) < fs::last_write_time(dataPath) ) {
-		LOG4CPLUS_INFO(log, "Stale asset detected, hashing");
+		BOOST_LOG_SEV(log, info) << "Stale asset detected, hashing";
 		auto asset = addAsset(dataPath);
 		asset->status.change()->set_status(bithorde::Status::NONE);
 		return asset;
@@ -147,7 +145,7 @@ IAsset::Ptr Store::openAsset(const boost::filesystem::path& assetPath)
 	auto asset = std::make_shared<SourceAsset>(_gcd, assetPath.filename().native(), meta.hashStore, dataStore);
 
 	if (!asset->hasRootHash()) {
-		LOG4CPLUS_WARN(log, "Unhashed asset detected, hashing");
+		BOOST_LOG_SEV(log, warning) << "Unhashed asset detected, hashing";
 		asset->status.onChange.connect(std::bind(&Store::_addAsset, this, SourceAsset::WeakPtr(asset)));
 		asset->hash();
 		return store::StoredAsset::Ptr();

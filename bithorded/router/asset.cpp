@@ -25,8 +25,7 @@
 #include <lib/protocolmessages.hpp>
 #include <lib/random.h>
 
-#include <log4cplus/logger.h>
-#include <log4cplus/loggingmacros.h>
+#include <bithorded/lib/log.hpp>
 
 using namespace bithorded::router;
 using namespace std;
@@ -34,7 +33,7 @@ using namespace std;
 const int32_t DEFAULT_TIMEOUT_MS = 5000;
 
 namespace bithorded { namespace router {
-	log4cplus::Logger assetLogger = log4cplus::Logger::getInstance("router");
+	Logger assetLogger;
 } }
 
 void PendingRead::cancel()
@@ -138,26 +137,26 @@ void bithorded::router::ForwardedAsset::onUpstreamStatus(const string& peername,
 {
 	if (status.status() == bithorde::Status::SUCCESS) {
 		if (status.size() > (static_cast<uint64_t>(1)<<60)) {
-			LOG4CPLUS_WARN(assetLogger, _requestedIds << ':' << peername << ": new state with suspiciously large size" << status.size() << ", " << status.has_size() );
+			BOOST_LOG_SEV(assetLogger, bithorded::warning) << idsToString(_requestedIds) << ':' << peername << ": new state with suspiciously large size" << status.size() << ", " << status.has_size() ;
 		}
 		if ( overlaps(_reqParameters->requesters, status.servers().begin(), status.servers().end()) ) {
-			LOG4CPLUS_DEBUG(assetLogger, _requestedIds << " Loop detected " << peername);
+			BOOST_LOG_SEV(assetLogger, bithorded::debug) << idsToString(_requestedIds) << " Loop detected " << peername;
 			dropUpstream(peername);
 		} else {
-			LOG4CPLUS_DEBUG(assetLogger, _requestedIds << " Found upstream " << peername);
+			BOOST_LOG_SEV(assetLogger, bithorded::debug) << idsToString(_requestedIds) << " Found upstream " << peername;
 			if (status.has_size()) {
 				if (_size == -1) {
 					_size = status.size();
 				} else if (_size != (int64_t)status.size()) {
-					LOG4CPLUS_WARN(assetLogger, peername << " " << _requestedIds << " responded with mismatching size, ignoring...");
+					BOOST_LOG_SEV(assetLogger, bithorded::warning) << peername << " " << idsToString(_requestedIds) << " responded with mismatching size, ignoring...";
 					dropUpstream(peername);
 				}
 			} else if (status.ids().size()) {
-				LOG4CPLUS_WARN(assetLogger, peername << " " << _requestedIds << " SUCCESS response not accompanied with asset-size.");
+				BOOST_LOG_SEV(assetLogger, bithorded::warning) << peername << " " << idsToString(_requestedIds) << " SUCCESS response not accompanied with asset-size.";
 			}
 		}
 	} else {
-		LOG4CPLUS_DEBUG(assetLogger, _requestedIds << " Failed upstream " << peername);
+		BOOST_LOG_SEV(assetLogger, bithorded::debug) << idsToString(_requestedIds) << " Failed upstream " << peername;
 		dropUpstream(peername);
 	}
 	updateStatus();

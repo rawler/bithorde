@@ -61,7 +61,7 @@ ADD_DEFINITIONS(-D_FILE_OFFSET_BITS=64)
 set(Boost_USE_STATIC_LIBS        ON)
 set(Boost_USE_MULTITHREADED      ON)
 set(Boost_USE_STATIC_RUNTIME    OFF)
-find_package( Boost REQUIRED COMPONENTS chrono filesystem iostreams program_options random signals system thread unit_test_framework )
+find_package( Boost REQUIRED COMPONENTS chrono filesystem iostreams log program_options random signals system thread unit_test_framework )
 if(Boost_FOUND)
 	include_directories(${Boost_INCLUDE_DIRS})
 	find_library(Boost_LIBRARY_DEPENDENCIES rt)
@@ -73,10 +73,6 @@ INCLUDE_DIRECTORIES (${CMAKE_SOURCE_DIR})
 # Setup protocol buffers
 FIND_PACKAGE(Protobuf REQUIRED)
 INCLUDE_DIRECTORIES(${PROTOBUF_INCLUDE_DIRS} ${CMAKE_BINARY_DIR}/lib)
-
-# Setup the logging package
-FIND_PACKAGE(Log4cplus REQUIRED)
-INCLUDE_DIRECTORIES(${LOG4CPLUS_INCLUDE_DIRS})
 
 # Setup the crypto++ package
 FIND_PACKAGE(CryptoPP REQUIRED)

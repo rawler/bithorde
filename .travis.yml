@@ -43,7 +43,6 @@ addons:
     - libboost1.55-all-dev
     - libcrypto++-dev
     - libfuse-dev
-    - liblog4cplus-dev
     - libprotobuf-dev
     - protobuf-compiler
     - python-crypto

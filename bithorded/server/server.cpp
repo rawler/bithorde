@@ -20,12 +20,11 @@
 #include <iostream>
 #include <system_error>
 
-#include <log4cplus/logger.h>
-#include <log4cplus/loggingmacros.h>
+#include <bithorded/lib/log.hpp>
+#include <bithorded/server/client.hpp>
+#include <bithorded/server/config.hpp>
 
 #include "buildconf.hpp"
-#include "client.hpp"
-#include "config.hpp"
 
 using namespace std;
 
@@ -35,7 +34,7 @@ namespace fs = boost::filesystem;
 using namespace bithorded;
 
 namespace bithorded {
-	log4cplus::Logger serverLog = log4cplus::Logger::getInstance("server");
+	Logger serverLog;
 }
 
 BindError::BindError(bithorde::Status status):
@@ -81,7 +80,7 @@ Server::Server(asio::io_service& ioSvc, Config& cfg) :
 		_tcpListener.set_option(boost::asio::ip::tcp::acceptor::reuse_address(true));
 		_tcpListener.bind(tcpPort);
 		_tcpListener.listen();
-		LOG4CPLUS_INFO(serverLog, "Listening on tcp port " << _cfg.tcpPort);
+		BOOST_LOG_SEV(serverLog, info) << "Listening on tcp port " << _cfg.tcpPort;
 
 		waitForTCPConnection();
 	}
@@ -99,17 +98,17 @@ Server::Server(asio::io_service& ioSvc, Config& cfg) :
 		_localListener.listen(4);
 		if (chmod(localPort.path().c_str(), permissions) == -1)
 			throw std::system_error(errno, std::system_category());
-		LOG4CPLUS_INFO(serverLog, "Listening on local socket " << localPort);
+		BOOST_LOG_SEV(serverLog, info) << "Listening on local socket " << localPort;
 
 		waitForLocalConnection();
 	}
 
 	if (_cfg.inspectPort) {
 		_httpInterface.reset(new http::server::server(this->ioSvc(), "127.0.0.1", _cfg.inspectPort, *this));
-		LOG4CPLUS_INFO(serverLog, "Inspection interface listening on port " << _cfg.inspectPort);
+		BOOST_LOG_SEV(serverLog, info) << "Inspection interface listening on port " << _cfg.inspectPort;
 	}
 
-	LOG4CPLUS_INFO(serverLog, "Server started, version " << bithorde::build_version);
+	BOOST_LOG_SEV(serverLog, info) << "Server started, version " << bithorde::build_version;
 }
 
 void Server::waitForTCPConnection()
@@ -171,7 +170,7 @@ void Server::clientConnected(const bithorded::Client::Ptr& client)
 	});
 
 	client->disconnected.connect([=]{
-		LOG4CPLUS_INFO(serverLog, "Disconnected: " << client->peerName());
+		BOOST_LOG_SEV(serverLog, info) << "Disconnected: " << client->peerName();
 		_router.onDisconnected(client);
 	});
 }

@@ -1,11 +1,10 @@
 
 #include <boost/filesystem.hpp>
+#include <boost/log/utility/setup/common_attributes.hpp>
 #include <boost/program_options.hpp>
 #include <iostream>
 
 #include <crypto++/files.h>
-#include <log4cplus/configurator.h>
-#include <log4cplus/hierarchy.h>
 
 #include "buildconf.hpp"
 #include "lib/hashes.h"
@@ -19,21 +18,9 @@ namespace po = boost::program_options;
 
 using namespace bithorded;
 
-class Layout : public log4cplus::TTCCLayout {
-public:
-	Layout() : TTCCLayout() {
-		dateFormat = "%Y-%m-%d %H:%M:%S.%q";
-	}
-};
 
 int main(int argc, char* argv[]) {
-	log4cplus::BasicConfigurator config;
-	config.configure();
-	auto root = log4cplus::Logger::getDefaultHierarchy().getRoot();
-	auto layout = std::auto_ptr<log4cplus::Layout>(new Layout());
-	auto appenders = root.getAllAppenders();
-	for (auto iter = appenders.begin(); iter != appenders.end(); iter++)
-		(*iter)->setLayout(layout);
+    boost::log::add_common_attributes();
 
 	try {
 		Config cfg(argc, argv);

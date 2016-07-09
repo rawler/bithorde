@@ -3,6 +3,7 @@
 // base32.cpp - written and placed in the public domain by Frank Palazzolo, based on hex.cpp by Wei Dai
 // imported to bithorde from http://www.cryptopp.com/wiki/File:RFC4648-Base32.zip by Ulrik Mikaelsson
 
+#include <sstream>
 #include <crypto++/pch.h>
 #include <crypto++/files.h>
 
@@ -76,6 +77,12 @@ std::ostream& operator<<(std::ostream& str, const BitHordeIds& ids)
 		str << ",";
 	}
 	return str;
+}
+
+std::string idsToString(const BitHordeIds& ids) {
+	std::ostringstream o;
+	o << ids;
+	return o.str();
 }
 
 boost::filesystem::path operator/(const boost::filesystem::path& lhs, const BinId& rhs)
