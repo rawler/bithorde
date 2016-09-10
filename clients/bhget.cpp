@@ -235,7 +235,7 @@ int main(int argc, char *argv[]) {
 			"Bithorde-name of this client")
 		("quiet,q",
 			"Don't show progressbar")
-		("url,u", po::value< string >()->default_value("/tmp/bithorde"),
+		("url,u", po::value< string >()->default_value(BITHORDED_DEFAULT_UNIX_SOCKET),
 			"Where to connect to bithorde. Either host:port, or /path/socket")
 		("magnet-url", po::value< vector<string> >(), "magnet url(s) to fetch")
 	;

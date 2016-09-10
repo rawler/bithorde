@@ -30,6 +30,7 @@
 #include <crypto++/base64.h>
 
 #include "buildconf.hpp"
+#include "../../lib/bithorde.h"
 
 using namespace std;
 
@@ -155,11 +156,11 @@ bithorded::Config::Config(int argc, char* argv[])
 	server_options.add_options()
 		("server.name", po::value<string>(&nodeName)->default_value(head(asio::ip::host_name(),'.')),
 			"Name of this node, defaults to hostname")
-		("server.tcpPort", po::value<uint16_t>(&tcpPort)->default_value(1337),
+		("server.tcpPort", po::value<uint16_t>(&tcpPort)->default_value(BITHORDED_DEFAULT_TCP_PORT),
 			"TCP port to listen on for incoming connections")
-		("server.inspectPort", po::value<uint16_t>(&inspectPort)->default_value(5000),
+		("server.inspectPort", po::value<uint16_t>(&inspectPort)->default_value(BITHORDED_DEFAULT_INSPECT_PORT),
 			"HTTP port to serve up inspection interface on")
-		("server.unixSocket", po::value<string>(&unixSocket)->default_value("/tmp/bithorde"),
+		("server.unixSocket", po::value<string>(&unixSocket)->default_value(BITHORDED_DEFAULT_UNIX_SOCKET),
 			"Path to UNIX-socket to listen on")
 		("server.unixPerms", po::value<string>(&unixPerms)->default_value("0666"),
 			"Permissions for the created UNIX-socket.")

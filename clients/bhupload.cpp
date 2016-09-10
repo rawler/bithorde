@@ -186,7 +186,7 @@ int main(int argc, char *argv[]) {
 			"How many seconds to wait for server to acknowledge bind")
 		("quiet,q",
 			"Don't show progressbar")
-		("url,u", po::value< string >()->default_value("/tmp/bithorde"),
+		("url,u", po::value< string >()->default_value(BITHORDED_DEFAULT_UNIX_SOCKET),
 			"Where to connect to bithorde. Either host:port, or /path/socket")
 		("link,l",
 			"Add asset-link, instead of uploading asset data")

@@ -8,6 +8,7 @@
 #include <fuse/fuse_common.h>
 
 #include "buildconf.hpp"
+#include "lib/bithorde.h"
 
 const int RECONNECT_ATTEMPTS = 30;
 const int RECONNECT_INTERVAL_MS = 500;
@@ -51,7 +52,7 @@ int main(int argc, char *argv[])
 			"Bithorde-name of this client")
 		("debug,d",
 			"Show fuse-commands, for debugging purposes")
-		("url,u", po::value< string >()->default_value("/tmp/bithorde"),
+		("url,u", po::value< string >()->default_value(BITHORDED_DEFAULT_UNIX_SOCKET),
 			"Where to connect to bithorde. Either host:port, or /path/socket")
 		("mountpoint", po::value< string >(&opts.mountpoint),
 			"Where to mount filesystem")

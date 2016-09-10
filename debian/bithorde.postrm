@@ -2,6 +2,6 @@
 
 dpkg-statoverride --remove /var/lib/bithorde 2>/dev/null
 userdel bithorde 2>/dev/null
-rm /tmp/bithorde 2>/dev/null
+rm /var/run/bithorde/sock 2>/dev/null
 
 exit 0
