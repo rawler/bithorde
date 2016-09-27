@@ -1,0 +1,2 @@
+def add_info(report, ui):
+    report['CrashDB'] = '{ "impl": "launchpad", "project": "bithorde" }'

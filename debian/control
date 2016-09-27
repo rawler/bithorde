@@ -4,6 +4,7 @@ Priority: extra
 Maintainer: Ulrik Mikaelsson <ulrik.mikaelsson@gmail.com>
 Build-Depends: debhelper (>= 7),
                cmake,
+               dh-apport,
                dh-systemd,
                libboost-all-dev,
                libcrypto++-dev,
