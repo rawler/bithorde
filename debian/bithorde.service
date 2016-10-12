@@ -1,7 +1,9 @@
 [Unit]
 Description=BitHorde daemon
+Wants=network.target
 
 [Service]
+ExecStartPre=/usr/bin/install -d -obithorde -gnogroup -m755 /var/run/bithorde
 ExecStart=/usr/bin/bithorded -c/etc/bithorde.conf
 
 [Install]

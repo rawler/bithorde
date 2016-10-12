@@ -1,7 +1,7 @@
 
 start on (filesystem and net-device-up IFACE!=lo)
 
-setuid nobody
+setuid bithorde
 console log
 
 exec /usr/bin/bithorded -c/etc/bithorde.conf

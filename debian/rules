@@ -20,6 +20,10 @@ override_dh_auto_configure:
 override_dh_installinit:
 	dh_installinit --name=bhfuse
 	dh_installinit --name=bithorde
+	dh_systemd_enable --name=bhfuse
+	dh_systemd_start --name=bhfuse
+	dh_systemd_enable --name=bithorde
+	dh_systemd_start --name=bithorde
 
 override_dh_auto_test:
 	dh_auto_test -- 'ARGS=-V'
