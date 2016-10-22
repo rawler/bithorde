@@ -1,0 +1,10 @@
+[Socket]
+ListenStream=/var/run/bithorde/socket
+FileDescriptorName=unix
+
+[Socket]
+ListenStream=1337
+FileDescriptorName=tcp
+
+[Install]
+WantedBy=sockets.target

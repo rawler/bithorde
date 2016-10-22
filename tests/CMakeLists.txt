@@ -9,6 +9,7 @@ ADD_EXECUTABLE( unittests
 	../lib/connection.cpp test_message_queue.cpp
 	../bithorded/lib/treestore.cpp test_treestore.cpp
 	../bithorded/store/hashstore.cpp test_hashstore.cpp
+	../bithorded/server/listen.cpp test_listen.cpp
 
 	../bithorded/lib/assetsessions.cpp ../bithorded/lib/relativepath.cpp
 	../bithorded/lib/grandcentraldispatch.cpp

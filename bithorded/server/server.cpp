@@ -15,6 +15,7 @@
 */
 
 #include "server.hpp"
+#include "listen.hpp"
 
 #include <boost/filesystem.hpp>
 #include <iostream>
@@ -74,10 +75,15 @@ Server::Server(asio::io_service& ioSvc, Config& cfg) :
 	for (auto iter=_cfg.friends.begin(); iter != _cfg.friends.end(); iter++)
 		_router.addFriend(*iter);
 
-	if (_cfg.tcpPort) {
-		auto tcpPort = asio::ip::tcp::endpoint(boost::asio::ip::tcp::v4(), _cfg.tcpPort);
+	if (auto fd = sd_get_named_socket("tcp")) {
+		_tcpListener.assign(asio::ip::tcp::v4(), fd);
+		BOOST_LOG_SEV(serverLog, info) << "TCP socket given from environment " << _tcpListener.local_endpoint().port();
+
+		waitForTCPConnection();
+	} else if (_cfg.tcpPort) {
+		auto tcpPort = asio::ip::tcp::endpoint(asio::ip::tcp::v4(), _cfg.tcpPort);
 		_tcpListener.open(tcpPort.protocol());
-		_tcpListener.set_option(boost::asio::ip::tcp::acceptor::reuse_address(true));
+		_tcpListener.set_option(asio::ip::tcp::acceptor::reuse_address(true));
 		_tcpListener.bind(tcpPort);
 		_tcpListener.listen();
 		BOOST_LOG_SEV(serverLog, info) << "Listening on tcp port " << _cfg.tcpPort;
@@ -85,7 +91,12 @@ Server::Server(asio::io_service& ioSvc, Config& cfg) :
 		waitForTCPConnection();
 	}
 
-	if (!_cfg.unixSocket.empty()) {
+	if (auto fd = sd_get_named_socket("unix")) {
+		_localListener.assign(asio::local::stream_protocol(), fd);
+		BOOST_LOG_SEV(serverLog, info) << "Local socket given from environment " << _localListener.local_endpoint().path();
+
+		waitForLocalConnection();
+	} else if (!_cfg.unixSocket.empty()) {
 		if (fs::exists(_cfg.unixSocket))
 			fs::remove(_cfg.unixSocket);
 		mode_t permissions = strtol(_cfg.unixPerms.c_str(), NULL, 0);
@@ -93,7 +104,7 @@ Server::Server(asio::io_service& ioSvc, Config& cfg) :
 			throw std::runtime_error("Failed to parse permissions for UNIX-socket");
 		auto localPort = asio::local::stream_protocol::endpoint(_cfg.unixSocket);
 		_localListener.open(localPort.protocol());
-		_localListener.set_option(boost::asio::local::stream_protocol::acceptor::reuse_address(true));
+		_localListener.set_option(asio::local::stream_protocol::acceptor::reuse_address(true));
 		_localListener.bind(localPort);
 		_localListener.listen(4);
 		if (chmod(localPort.path().c_str(), permissions) == -1)

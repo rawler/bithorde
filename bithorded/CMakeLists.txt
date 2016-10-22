@@ -28,6 +28,7 @@ ADD_EXECUTABLE(bithorded
 	server/asset.cpp
 	server/client.cpp
 	server/config.cpp
+	server/listen.cpp
 	server/server.cpp
 
 	source/asset.cpp
