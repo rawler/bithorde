@@ -5,6 +5,8 @@ Wants=network.target
 [Service]
 ExecStartPre=/usr/bin/install -d -obithorde -gnogroup -m755 /var/run/bithorde
 ExecStart=/usr/bin/bithorded -c/etc/bithorde.conf
+Restart=always
+RestartSec=2
 
 [Install]
 WantedBy=multi-user.target

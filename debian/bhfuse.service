@@ -1,13 +1,16 @@
 [Unit]
 Description=BHFuse daemon
 Wants=network.target
-Wants=bithorde.service
-After=bithorde.service
+Wants=bithorded.service
+After=bithorded.service
 
 [Service]
-ExecStartPre=/bin/bash -c '(mount | grep -c /tmp/bhfuse) && /bin/umount -lf /tmp/bhfuse; test -d /tmp/bhfuse || install -d -onobody -gnogroup -m755 /tmp/bhfuse'
+ExecStartPre=/usr/lib/bhfuse/bhfuse.umount
+ExecStartPre=-/usr/bin/install -d -onobody -gnogroup -m755 /tmp/bhfuse
 ExecStart=/usr/bin/bhfuse --timeout=500 /tmp/bhfuse
-ExecStartPost=/bin/bash -c '(mount | grep -c /tmp/bhfuse) && /bin/umount -lf /tmp/bhfuse; true'
+ExecStopPost=/usr/lib/bhfuse/bhfuse.umount
+Restart=always
+RestartSec=2
 
 [Install]
 WantedBy=multi-user.target

@@ -1,0 +1,3 @@
+/usr/bin/bhfuse
+
+debian/bhfuse.umount /usr/lib/bhfuse

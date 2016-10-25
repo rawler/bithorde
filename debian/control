@@ -19,8 +19,23 @@ Homepage: http://www.bithorde.org/
 
 Package: bithorde
 Architecture: any
-Depends: debconf, python-protobuf, ${shlibs:Depends}, ${misc:Depends}
+Depends: bithorded, bithorde-utils, bhfuse
 Description: A fast and light caching-graph content distribution system.
  A fast and light content distribution system, aimed for high-performance de-centralized
  content distribution. Key design goals is; caching graph, low footprint, direct access
  and id-by-content. WARNING: BitHorde is still experimental. Beware of Gremlins
+
+Package: bithorded
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: The bithorde daemon. The central service of bithorde
+
+Package: bhfuse
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: The FUSE connector for bithorde
+
+Package: bithorde-utils
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: The FUSE connector for bithorde

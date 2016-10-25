@@ -1,0 +1,14 @@
+#!/bin/sh
+
+if [ -n "$1" ]; then
+  mountdir="$1"
+else
+  set -- $(mount | grep '^bhfuse on')
+  mountdir=$3
+fi
+
+if [ -n "$mountdir" ]; then
+  exec /bin/umount -lf "$mountdir"
+else
+  exit 0
+fi

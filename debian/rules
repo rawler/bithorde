@@ -18,12 +18,12 @@ override_dh_auto_configure:
 	dh_auto_configure -- -DCONF_INSTALL_DIR="/etc" -DPyHorde_INSTALL_DIR="/usr/share/pyshared"
 
 override_dh_installinit:
-	dh_installinit --name=bhfuse
-	dh_installinit --name=bithorde
-	dh_systemd_enable --name=bhfuse
-	dh_systemd_start --name=bhfuse
-	dh_systemd_enable --name=bithorde
-	dh_systemd_start --name=bithorde
+	dh_installinit -p bithorded --restart-after-upgrade --name bithorded
+	dh_installinit -p bhfuse --no-restart-on-upgrade --name bhfuse
+
+override_dh_systemd_start:
+	dh_systemd_start -p bithorded --restart-after-upgrade --name bithorded
+	dh_systemd_start -p bhfuse --no-restart-on-upgrade --name bhfuse
 
 override_dh_auto_test:
 	dh_auto_test -- 'ARGS=-V'
