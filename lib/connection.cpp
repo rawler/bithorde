@@ -330,8 +330,9 @@ bool Connection::dequeue(MessageType type, ::google::protobuf::io::CodedInputStr
 	uint32_t length;
 	if (!stream.ReadVarint32(&length)) return false;
 
-	uint32_t bytesLeft = stream.BytesUntilLimit();
-	int32_t leftInBuffer = bytesLeft-length;
+	int bytesLeft = stream.BytesUntilLimit();
+	BOOST_ASSERT(bytesLeft >= 0);
+	int leftInBuffer = bytesLeft-length;
 	if (leftInBuffer < 0) return false;
 
 	_stats->incomingMessages += 1;
