@@ -180,9 +180,13 @@ void Server::clientConnected(const bithorded::Client::Ptr& client)
 		}
 	});
 
-	client->disconnected.connect([=]{
-		BOOST_LOG_SEV(serverLog, info) << "Disconnected: " << client->peerName();
-		_router.onDisconnected(client);
+	auto mut = client;
+	client->disconnected.connect([=]() mutable {
+		if (mut) {
+			BOOST_LOG_SEV(serverLog, info) << "Disconnected: " << mut->peerName();
+			_router.onDisconnected(mut);
+			mut.reset();
+		}
 	});
 }
 
