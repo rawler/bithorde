@@ -1,8 +1,8 @@
 [Unit]
 Description=BHFuse daemon
 Wants=network.target
-Wants=bithorded.service
-After=bithorded.service
+Wants=bithorded.socket
+After=bithorded.socket
 
 [Service]
 ExecStartPre=/usr/lib/bhfuse/bhfuse.umount
