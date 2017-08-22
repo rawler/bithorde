@@ -84,7 +84,7 @@ double AssetIndexEntry::score() const {
 	return _score;
 }
 
-double AssetIndexEntry::addScore(float amount) {
+double AssetIndexEntry::addScore(double amount) {
 	unsigned long milliseconds_since_epoch =
     std::chrono::system_clock::now().time_since_epoch() /
     std::chrono::milliseconds(1);
@@ -148,12 +148,12 @@ double AssetIndex::updateAsset(const std::string& assetId, uint64_t diskUsage) {
             diskUsage = oldSize;
         }
         auto diff = oldSize - diskUsage;
-        auto addition = static_cast<float>(diff) / diskUsage;
-        addition = std::max(addition, 0.01f);
-        addition = std::min(addition, 0.5f);
+        auto addition = static_cast<double>(diff) / diskUsage;
+        addition = std::max(addition, 0.01);
+        addition = std::min(addition, 0.5);
         return assetPtr->addScore(addition);
     } else {
-        return 0.0f;
+        return 0.0;
     }
 }
 
@@ -196,7 +196,7 @@ const BinId& AssetIndex::lookupAsset( const std::string& assetId ) const {
 /** Returns the assetId for the asset in index with lowest score*/
 std::string AssetIndex::pickLooser() const {
     std::string resultId;
-    double resultScore = std::numeric_limits<float>::max();
+    double resultScore = std::numeric_limits<double>::max();
     for (auto& kv : _assetMap) {
         const auto& entry = kv.second;
         if (entry->score() < resultScore) {

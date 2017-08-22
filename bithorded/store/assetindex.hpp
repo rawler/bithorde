@@ -51,7 +51,7 @@ public:
     uint fillPercent() const;
 
     double score() const;
-    double addScore(float amount);
+    double addScore(double amount);
 };
 
 class AssetIndex {
