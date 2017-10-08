@@ -29,7 +29,6 @@ const size_t SEND_BUF_LOW_WATER_MARK = SEND_BUF/4;
 const size_t SEND_CHUNK_MS = 50;
 
 namespace asio = boost::asio;
-namespace chrono = boost::chrono;
 using namespace std;
 
 using namespace bithorde;
@@ -166,7 +165,7 @@ public:
 Message::Deadline Message::NEVER(Message::Deadline::max());
 Message::Deadline Message::in(int msec)
 {
-	return Clock::now()+chrono::milliseconds(msec);
+	return Clock::now() + std::chrono::milliseconds(msec);
 }
 
 Message::Message(Deadline expires) :
@@ -193,7 +192,7 @@ MessageQueue::MessageList MessageQueue::dequeue(size_t bytes_per_sec, ushort mil
 {
 	bytes_per_sec = std::max(bytes_per_sec, 1*K);
 	int32_t wanted(std::max(((bytes_per_sec*millis)/1000), static_cast<size_t>(1)));
-	auto now = chrono::steady_clock::now();
+	auto now = std::chrono::steady_clock::now();
 	MessageList res;
 	res.reserve(_size);
 	while ((wanted > 0) && !_queue.empty()) {

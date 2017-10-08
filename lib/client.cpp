@@ -7,6 +7,7 @@
 #include <boost/assert.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/lexical_cast.hpp>
+#include <chrono>
 #include <functional>
 #include <iostream>
 #include <memory>
@@ -470,7 +471,7 @@ void Client::onMessage( const std::shared_ptr< MessageContext< HandShakeConfirme
 void Client::onMessage( const std::shared_ptr< MessageContext< Ping > >& msgCtx ) {
 	if (msgCtx->message().timeout()) {
 		bithorde::Ping reply;
-		auto deadline =  boost::chrono::steady_clock::now() + boost::chrono::milliseconds(msgCtx->message().timeout());
+		auto deadline =  std::chrono::steady_clock::now() + std::chrono::milliseconds(msgCtx->message().timeout());
 		sendMessage(Connection::MessageType::Ping, reply, deadline, false);
 	}
 }

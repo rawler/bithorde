@@ -5,8 +5,8 @@
 #include <boost/asio/io_service.hpp>
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/local/stream_protocol.hpp>
-#include <boost/chrono/system_clocks.hpp>
 #include <boost/signals2.hpp>
+#include <chrono>
 #include <functional>
 #include <memory>
 #include <list>
@@ -21,14 +21,14 @@ namespace bithorde {
 class Keepalive;
 
 struct Message {
-	typedef boost::chrono::steady_clock Clock;
+	typedef std::chrono::steady_clock Clock;
 	typedef Clock::time_point Deadline;
 	static Deadline NEVER;
 	static Deadline in(int msec);
 
 	Message(Deadline expires);
 	std::string buf; // TODO: test if ostringstream faster
-	boost::chrono::steady_clock::time_point expires;
+	std::chrono::steady_clock::time_point expires;
 };
 
 class MessageQueue {

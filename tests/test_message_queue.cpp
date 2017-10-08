@@ -1,3 +1,4 @@
+#include <chrono>
 #include <vector>
 
 #include <boost/test/unit_test.hpp>
@@ -13,13 +14,13 @@ BOOST_AUTO_TEST_CASE( message_queue )
 	BOOST_ASSERT( mq.empty() );
 	BOOST_CHECK_EQUAL( mq.size(), 0 );
 
-	auto now = boost::chrono::steady_clock::now();
+	auto now = std::chrono::steady_clock::now();
 	for (auto i = 0; i < 32; i++ ) {
 		std::shared_ptr<bithorde::Message> msg(new bithorde::Message(now));
 		msg->buf.insert(0, 1024, 'X');
 		mq.enqueue(msg);
 	}
-	auto later = now + boost::chrono::seconds(15);
+	auto later = now + std::chrono::seconds(15);
 	for (auto i = 0; i < 32; i++ ) {
 		std::shared_ptr<bithorde::Message> msg(new bithorde::Message(later));
 		msg->buf.insert(0, 1024, 'X');
