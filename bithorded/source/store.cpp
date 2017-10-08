@@ -75,7 +75,7 @@ SourceAsset::Ptr Store::addAsset ( const boost::filesystem::path& file )
 	auto target = fs::canonical( file );
 	if (fs::path_is_in(target, _baseDir)) {
 		auto assetPath(AssetStore::newAsset());
-		auto relativepath = fs::relative(target, _baseDir).native();
+		auto relativepath = fs::_relative(target, _baseDir).native();
 
 		try {
 			auto asset_data = std::make_shared<RandomAccessFile>(target);

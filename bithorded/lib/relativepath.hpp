@@ -22,7 +22,7 @@
 #include <boost/filesystem/operations.hpp>
 
 namespace boost { namespace filesystem {
-	boost::filesystem::path relative(const boost::filesystem::path& path, const boost::filesystem::path& relative_to = boost::filesystem::current_path());
+	boost::filesystem::path _relative(const boost::filesystem::path& path, const boost::filesystem::path& relative_to = boost::filesystem::current_path());
 	void create_relative_symlink( const boost::filesystem::path& to, const boost::filesystem::path& new_symlink );
 	bool path_is_in(const boost::filesystem::path& path, const boost::filesystem::path& folder);
 }}

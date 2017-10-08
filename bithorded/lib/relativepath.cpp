@@ -22,7 +22,7 @@
 
 namespace fs = boost::filesystem;
 
-fs::path fs::relative(const fs::path &path, const fs::path &relative_to )
+fs::path fs::_relative(const fs::path &path, const fs::path &relative_to )
 {
 	// create absolute paths
 	fs::path p = fs::absolute(path);
@@ -60,7 +60,7 @@ fs::path fs::relative(const fs::path &path, const fs::path &relative_to )
 
 void fs::create_relative_symlink(const fs::path& to, const fs::path& new_symlink)
 {
-	fs::create_symlink(fs::relative(to, new_symlink.parent_path()), new_symlink);
+	fs::create_symlink(fs::_relative(to, new_symlink.parent_path()), new_symlink);
 }
 
 bool fs::path_is_in ( const fs::path& path, const fs::path& folder ) {
