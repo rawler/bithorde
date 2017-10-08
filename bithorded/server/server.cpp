@@ -78,8 +78,6 @@ Server::Server(asio::io_service& ioSvc, Config& cfg) :
 	if (auto fd = sd_get_named_socket("tcp")) {
 		_tcpListener.assign(asio::ip::tcp::v4(), fd);
 		BOOST_LOG_SEV(serverLog, info) << "TCP socket given from environment " << _tcpListener.local_endpoint().port();
-
-		waitForTCPConnection();
 	} else if (_cfg.tcpPort) {
 		auto tcpPort = asio::ip::tcp::endpoint(asio::ip::tcp::v4(), _cfg.tcpPort);
 		_tcpListener.open(tcpPort.protocol());
@@ -87,15 +85,12 @@ Server::Server(asio::io_service& ioSvc, Config& cfg) :
 		_tcpListener.bind(tcpPort);
 		_tcpListener.listen();
 		BOOST_LOG_SEV(serverLog, info) << "Listening on tcp port " << _cfg.tcpPort;
-
-		waitForTCPConnection();
 	}
+	waitForTCPConnection();
 
 	if (auto fd = sd_get_named_socket("unix")) {
 		_localListener.assign(asio::local::stream_protocol(), fd);
 		BOOST_LOG_SEV(serverLog, info) << "Local socket given from environment " << _localListener.local_endpoint().path();
-
-		waitForLocalConnection();
 	} else if (!_cfg.unixSocket.empty()) {
 		if (fs::exists(_cfg.unixSocket))
 			fs::remove(_cfg.unixSocket);
@@ -110,9 +105,8 @@ Server::Server(asio::io_service& ioSvc, Config& cfg) :
 		if (chmod(localPort.path().c_str(), permissions) == -1)
 			throw std::system_error(errno, std::system_category());
 		BOOST_LOG_SEV(serverLog, info) << "Listening on local socket " << localPort;
-
-		waitForLocalConnection();
 	}
+	waitForLocalConnection();
 
 	if (_cfg.inspectPort) {
 		_httpInterface.reset(new http::server::server(this->ioSvc(), "127.0.0.1", _cfg.inspectPort, *this));

@@ -21,8 +21,13 @@ override_dh_installinit:
 	dh_installinit -p bithorded --restart-after-upgrade
 	dh_installinit -p bhfuse --no-restart-on-upgrade
 
+override_dh_systemd_enable:
+	dh_systemd_enable -p bithorded --no-enable bithorded.service
+	dh_systemd_enable -p bithorded bithorded.socket
+	dh_systemd_enable -p bhfuse bhfuse.service
+
 override_dh_systemd_start:
-	dh_systemd_start -p bithorded --restart-after-upgrade
+	# bithorded is started by socket activation
 	dh_systemd_start -p bhfuse --no-restart-on-upgrade
 
 override_dh_auto_test:
