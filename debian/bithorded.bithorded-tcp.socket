@@ -1,0 +1,7 @@
+[Socket]
+ListenStream=1337
+FileDescriptorName=tcp
+Service=bithorded.service
+
+[Install]
+WantedBy=sockets.target
