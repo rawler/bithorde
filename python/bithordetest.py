@@ -4,13 +4,13 @@ import base64
 import os
 import socket
 from time import time
-from cStringIO import StringIO
 from threading import Condition, Thread
 
 from bithorde import decodeMessage, encoder, MSG_REV_MAP, message
 
 from subprocess import Popen, PIPE, STDOUT
 from google.protobuf.message import Message
+
 
 class TestConnection:
     def __init__(self, tgt, name=None):
@@ -162,7 +162,8 @@ class LineBuffer(object):
 
 class BithordeD(Popen):
     def __init__(self, label='bithorded', bithorded=os.environ.get('BITHORDED', 'bithorded'), config={}):
-        Popen.__init__(self, ['stdbuf', '-o0', '-e0', bithorded, '-c', '/dev/stdin'], stderr=STDOUT, stdout=PIPE, stdin=PIPE)
+        cmd = ['stdbuf', '-o0', '-e0', bithorded, '-c', '/dev/stdin', '--log.level=TRACE']
+        Popen.__init__(self, cmd, stderr=STDOUT, stdout=PIPE, stdin=PIPE)
         self._cleanup = list()
         if hasattr(config, 'setdefault'):
             suffix = (time(), os.getpid())
@@ -238,6 +239,7 @@ def TigerId(base32):
     padding = (((len(base32) + 7) / 8) * 8 - len(base32))
     base32 = base32 + '=' * padding  # Pad up to even multiple of 8
     return message.Identifier(type=message.TREE_TIGER, id=base64.b32decode(base32))
+
 
 if __name__ == '__main__':
     from os import path

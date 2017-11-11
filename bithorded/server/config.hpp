@@ -68,6 +68,8 @@ struct Config
 	static void printUsage(std::ostream& stream);
 
 	std::string configPath;
+	std::string logFormat;
+	std::string logLevel;
 
 	std::string nodeName;
 	uint16_t parallel;

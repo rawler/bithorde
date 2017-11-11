@@ -1,5 +1,5 @@
 /*
-    Copyright 2016 Ulrik Mikaelsson <ulrik.mikaelsson@gmail.com>
+    Copyright 2017 Ulrik Mikaelsson <ulrik.mikaelsson@gmail.com>
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -26,6 +26,7 @@ namespace bithorded {
 
     // We define our own severity levels
     enum log_severity_level {
+        null,
         trace,
         debug,
         info,
@@ -34,8 +35,13 @@ namespace bithorded {
         fatal,
     };
 
-    typedef log::sources::severity_logger< bithorded::log_severity_level > Logger;
+    typedef log::sources::severity_logger< log_severity_level > Logger;
 
+    const char * log_severity_name(log_severity_level);
+    log_severity_level log_severity_by_name(const std::string&);
+
+    std::ostream& operator<< (std::ostream& strm, log_severity_level lvl);
+    std::istream& operator>> (std::istream& strm, log_severity_level &lvl);
 }
 
 #endif //BITHORDED_LOG_H

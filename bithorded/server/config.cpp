@@ -152,6 +152,14 @@ bithorded::Config::Config(int argc, char* argv[])
 			"Path to config-file")
 	;
 
+	po::options_description log_options("Logging Options");
+	log_options.add_options()
+		("log.format", po::value<string>(&logFormat)->default_value("[%Severity%] %Message%"),
+			"Set log-format. See boost::log for examples")
+		("log.level", po::value<string>(&logLevel)->default_value("INFO"),
+			"Filter logs by given level (TRACE|DEBUG|INFO|WARNING|ERROR)")
+	;
+
 	po::options_description server_options("Server Options");
 	server_options.add_options()
 		("server.name", po::value<string>(&nodeName)->default_value(head(asio::ip::host_name(),'.')),
@@ -176,7 +184,7 @@ bithorded::Config::Config(int argc, char* argv[])
 			"Max size of the cache, in MB.")
 	;
 
-	cli_options.add(server_options).add(cache_options);
+	cli_options.add(log_options).add(server_options).add(cache_options);
 
 	DynamicMap vm;
 	vm.store(po::parse_command_line(argc, argv, cli_options));
@@ -187,7 +195,7 @@ bithorded::Config::Config(int argc, char* argv[])
 
 	if (!configPath.empty()) {
 		po::options_description config_options;
-		config_options.add(server_options).add(cache_options);
+		config_options.add(log_options).add(server_options).add(cache_options);
 		std::ifstream cfg(configPath);
 		if (!cfg.is_open())
 			throw ArgumentError("Failed to open config-file");
