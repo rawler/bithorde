@@ -35,7 +35,7 @@ bithorded::UpstreamRequestBinding::Ptr bithorded::AssetSessions::findAsset(const
 	return res;
 }
 
-void bithorded::AssetSessions::add(const BinId& tigerId, const UpstreamRequestBinding::Ptr& asset)
+void bithorded::AssetSessions::add(const bithorde::Id& tigerId, const UpstreamRequestBinding::Ptr& asset)
 {
 	if (asset)
 		_tigerCache.set(tigerId, asset);

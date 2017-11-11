@@ -30,7 +30,7 @@ static boost::arg<1> ASSET_ARG_STATUS;
 /**
  * Tests if any of the ids in a matches any of the ids in b
  */
-bool idsOverlap(const BitHordeIds& a, const BitHordeIds& b);
+bool idsOverlap(const bithorde::Ids& a, const bithorde::Ids& b);
 
 class Asset
 {
@@ -101,13 +101,13 @@ public:
 
 	typedef std::pair<bithorde::HashType, std::string> Identifier;
 
-	explicit ReadAsset(const bithorde::ReadAsset::ClientPointer& client, const BitHordeIds& requestIds);
+	explicit ReadAsset(const bithorde::ReadAsset::ClientPointer& client, const bithorde::Ids& requestIds);
 	virtual ~ReadAsset();
 	void cancelRequests();
 
 	int aSyncRead(off_t offset, ssize_t size, int32_t timeout=10000);
-	const BitHordeIds & requestIds() const;
-	const BitHordeIds & confirmedIds() const;
+	const bithorde::Ids & requestIds() const;
+	const bithorde::Ids & confirmedIds() const;
 
 	typedef boost::signals2::signal<void (off_t offset, const std::shared_ptr<IBuffer>& data, int tag)> DataSignal;
 	DataSignal dataArrived;
@@ -119,8 +119,8 @@ protected:
 	void clearOffset(off_t offset, uint32_t reqid);
 
 private:
-	BitHordeIds _requestIds;
-	BitHordeIds _confirmedIds;
+	bithorde::Ids _requestIds;
+	bithorde::Ids _confirmedIds;
 	typedef std::multimap<off_t, ReadRequestContext::Ptr> RequestMap;
 	RequestMap _requestMap;
 };

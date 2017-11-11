@@ -20,7 +20,7 @@ class Lookup
 	std::shared_ptr<bithorde::ReadAsset> asset;
 	boost::signals2::scoped_connection statusConnection;
 public:
-	explicit Lookup(BHFuse * fs, fuse_req_t req, const BitHordeIds& ids);
+	explicit Lookup(BHFuse * fs, fuse_req_t req, const bithorde::Ids& ids);
 	explicit Lookup(BHFuse* fs, std::shared_ptr< FUSEAsset >& asset, fuse_req_t req);
 
 	void perform(bithorde::Client::Pointer& c);

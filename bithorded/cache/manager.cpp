@@ -21,6 +21,7 @@
 
 #include <bithorded/lib/log.hpp>
 
+using namespace bithorde;
 using namespace bithorded;
 using namespace bithorded::cache;
 
@@ -105,7 +106,7 @@ CachedAsset::Ptr CacheManager::prepareUpload(uint64_t size)
 	}
 }
 
-CachedAsset::Ptr CacheManager::prepareUpload(uint64_t size, const BitHordeIds& ids)
+CachedAsset::Ptr CacheManager::prepareUpload(uint64_t size, const bithorde::Ids& ids)
 {
 	auto res = prepareUpload(size);
 	if (res)

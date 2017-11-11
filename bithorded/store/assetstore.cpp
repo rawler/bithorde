@@ -79,11 +79,11 @@ boost::filesystem::path AssetStore::newAsset()
 		assetId = randomAlphaNumeric(20);
 		assetPath = _assetsFolder / assetId;
 	} while (fs::exists( assetPath ));
-	_index.addAsset(assetId, BinId::EMPTY, 0, 0, time(NULL));
+	_index.addAsset(assetId, bithorde::Id::EMPTY, 0, 0, time(NULL));
 	return assetPath;
 }
 
-void AssetStore::updateAsset(const BitHordeIds& ids, const std::shared_ptr<StoredAsset>& asset)
+void AssetStore::updateAsset(const bithorde::Ids& ids, const std::shared_ptr<StoredAsset>& asset)
 {
 	auto tigerId = findBithordeId(ids, bithorde::HashType::TREE_TIGER);
 
@@ -236,7 +236,7 @@ void AssetStore::loadIndex()
 		auto fillPercent = (assetUsed * 100) / assetAllocated;
 
 		if (fillPercent >= 3) {
-			_index.addAsset(assetPath.filename().native(), BinId::fromBase32(tigerLink.filename().native()), assetUsed, assetAllocated, fs::last_write_time(assetPath));
+			_index.addAsset(assetPath.filename().native(), bithorde::Id::fromBase32(tigerLink.filename().native()), assetUsed, assetAllocated, fs::last_write_time(assetPath));
 		} else {
 			BOOST_LOG_SEV(bithorded::storeLog, debug) << "removing almost empty asset: urn:tree:tiger:" << tigerLink.filename();
 			unlink(tigerLink);

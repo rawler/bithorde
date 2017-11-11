@@ -8,6 +8,7 @@
 const static std::string MAGNET_PREFIX = "magnet:?";
 
 using namespace std;
+using namespace bithorde;
 
 ExactIdentifier::ExactIdentifier()
 {}
@@ -91,9 +92,9 @@ bool MagnetURI::parse(const string& uri_)
 	return true;
 }
 
-BitHordeIds MagnetURI::toIdList ()
+bithorde::Ids MagnetURI::toIdList ()
 {
-	BitHordeIds ids;
+	bithorde::Ids ids;
 
 	vector<ExactIdentifier>::iterator iter;
 	for (iter=xtIds.begin(); iter != xtIds.end(); iter++) {

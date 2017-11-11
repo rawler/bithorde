@@ -134,7 +134,7 @@ bool BHGet::queueAsset(const std::string& _uri) {
 }
 
 void BHGet::nextAsset() {
-	BitHordeIds ids;
+	bithorde::Ids ids;
 	while ((!ids.size()) && (!_assets.empty())) {
 		MagnetURI nextUri = _assets.front();
 		_assets.pop_front();

@@ -14,7 +14,7 @@ namespace ptime = boost::posix_time;
 
 using namespace bithorde;
 
-bool bithorde::idsOverlap(const BitHordeIds& a, const BitHordeIds& b) {
+bool bithorde::idsOverlap(const bithorde::Ids& a, const bithorde::Ids& b) {
 	for (auto aiter=a.begin(); aiter != a.end(); aiter++) {
 		for (auto biter=b.begin(); biter != b.end(); biter++) {
 			if ((aiter->id() == biter->id()) && (aiter->type() == biter->type()))
@@ -157,7 +157,7 @@ void ReadRequestContext::timer_callback(const boost::system::error_code& error)
 	}
 }
 
-ReadAsset::ReadAsset(const bithorde::ReadAsset::ClientPointer& client, const BitHordeIds& requestIds) :
+ReadAsset::ReadAsset(const bithorde::ReadAsset::ClientPointer& client, const bithorde::Ids& requestIds) :
 	Asset(client),
 	readResponseTime(0.95, "ms"),
 	_requestIds(requestIds)
@@ -175,12 +175,12 @@ void ReadAsset::cancelRequests() {
 	_requestMap.clear();
 }
 
-const BitHordeIds& ReadAsset::requestIds() const
+const bithorde::Ids& ReadAsset::requestIds() const
 {
 	return _requestIds;
 }
 
-const BitHordeIds& ReadAsset::confirmedIds() const
+const bithorde::Ids& ReadAsset::confirmedIds() const
 {
 	return _confirmedIds;
 }

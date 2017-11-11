@@ -27,6 +27,7 @@
 
 #include <bithorded/lib/log.hpp>
 
+using namespace bithorde;
 using namespace bithorded::router;
 using namespace std;
 
@@ -41,7 +42,7 @@ void PendingRead::cancel()
 	cb(offset, bithorde::NullBuffer::instance);
 }
 
-UpstreamBinding::UpstreamBinding(std::shared_ptr<ForwardedAsset> parent, std::string peerName, bithorded::Client::Ptr f, BitHordeIds ids) :
+UpstreamBinding::UpstreamBinding(std::shared_ptr<ForwardedAsset> parent, std::string peerName, bithorded::Client::Ptr f, bithorde::Ids ids) :
 	ReadAsset(f, ids)
 {
 	auto parent_ = std::weak_ptr<ForwardedAsset>(parent);
@@ -54,7 +55,7 @@ UpstreamBinding::UpstreamBinding(std::shared_ptr<ForwardedAsset> parent, std::st
 	});
 }
 
-ForwardedAsset::ForwardedAsset(Router& router, const BitHordeIds& ids) :
+ForwardedAsset::ForwardedAsset(Router& router, const bithorde::Ids& ids) :
 	_router(router),
 	_requestedIds(ids),
 	_reqParameters(NULL),

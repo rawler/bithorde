@@ -13,6 +13,7 @@ static const byte s_vecUpper[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
 static const byte s_vecLower[] = "abcdefghijklmnopqrstuvwxyz234567";
 
 using namespace CryptoPP;
+using namespace bithorde;
 
 void RFC4648Base32Encoder::IsolatedInitialize(const NameValuePairs &parameters)
 {
@@ -51,7 +52,7 @@ const int *RFC4648Base32Decoder::GetDefaultDecodingLookupArray()
 	return s_array;
 }
 
-void BinId::writeBase32(std::ostream& str) const {
+void bithorde::Id::writeBase32(std::ostream& str) const {
 	CryptoPP::StringSource(_raw, true,
 		new RFC4648Base32Encoder(
 			new CryptoPP::FileSink(str)
@@ -59,13 +60,13 @@ void BinId::writeBase32(std::ostream& str) const {
 	);
 }
 
-std::ostream& operator<<(std::ostream& str, const BinId& id)
+std::ostream& bithorde::operator<<(std::ostream& str, const bithorde::Id& id)
 {
 	id.writeBase32(str);
 	return str;
 }
 
-std::ostream& operator<<(std::ostream& str, const BitHordeIds& ids)
+std::ostream& bithorde::operator<<(std::ostream& str, const bithorde::Ids& ids)
 {
 	for (auto iter = ids.begin(); iter != ids.end(); iter++) {
 		str << bithorde::HashType_Name(iter->type()) << "=";
@@ -79,23 +80,23 @@ std::ostream& operator<<(std::ostream& str, const BitHordeIds& ids)
 	return str;
 }
 
-std::string idsToString(const BitHordeIds& ids) {
+std::string bithorde::idsToString(const bithorde::Ids& ids) {
 	std::ostringstream o;
 	o << ids;
 	return o.str();
 }
 
-boost::filesystem::path operator/(const boost::filesystem::path& lhs, const BinId& rhs)
+boost::filesystem::path bithorde::operator/(const boost::filesystem::path& lhs, const bithorde::Id& rhs)
 {
 	return lhs / rhs.base32();
 }
 
-const BinId BinId::EMPTY;
+const bithorde::Id bithorde::Id::EMPTY;
 
-BinId findBithordeId(const BitHordeIds& ids, bithorde::HashType type) {
+bithorde::Id bithorde::findBithordeId(const bithorde::Ids& ids, bithorde::HashType type) {
 	for (auto iter=ids.begin(); iter != ids.end(); iter++) {
 		if (iter->type() == type)
-			return BinId::fromRaw(iter->id());
+			return bithorde::Id::fromRaw(iter->id());
 	}
-	return BinId::fromRaw("");
+	return bithorde::Id::fromRaw("");
 }

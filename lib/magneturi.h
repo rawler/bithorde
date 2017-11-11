@@ -30,7 +30,7 @@ struct MagnetURI
 	std::vector<ExactIdentifier> xtIds;
 	uint64_t size;
 
-	BitHordeIds toIdList();
+	bithorde::Ids toIdList();
 
 	friend std::ostream & operator<<(std::ostream&, const MagnetURI&);
 };

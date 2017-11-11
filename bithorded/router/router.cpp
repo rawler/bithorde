@@ -189,7 +189,7 @@ bithorded::IAsset::Ptr bithorded::router::Router::openAsset(const bithorde::Bind
 	if (_isBlacklisted(now, req.requesters()))
 		throw bithorded::BindError(bithorde::WOULD_LOOP);
 
-	auto asset = std::make_shared<ForwardedAsset, Router&, const BitHordeIds&>(*this, req.ids());
+	auto asset = std::make_shared<ForwardedAsset, Router&, const bithorde::Ids&>(*this, req.ids());
 	_openAssets.insert(asset);
 
 	ptime::ptime deadline;

@@ -90,7 +90,7 @@ int main(int argc, char *argv[])
 	return ioSvc.run();
 }
 
-FUSEAsset::Ptr INodeCache::lookup(const BitHordeIds& ids)
+FUSEAsset::Ptr INodeCache::lookup(const bithorde::Ids& ids)
 {
 	for (auto iter=begin(); iter != end(); iter++) {
 		if (auto asset=dynamic_pointer_cast<FUSEAsset>(iter->second)) {

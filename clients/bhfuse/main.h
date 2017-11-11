@@ -11,7 +11,7 @@
 
 class INodeCache : public std::map<fuse_ino_t, INode::Ptr> {
 public:
-	FUSEAsset::Ptr lookup(const BitHordeIds& ids);
+	FUSEAsset::Ptr lookup(const bithorde::Ids& ids);
 };
 
 struct BHFuseOptions : public BoostAsioFilesystem_Options {

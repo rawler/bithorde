@@ -60,10 +60,10 @@ Client* AssetBinding::client() const
 
 bool AssetBinding::bind(const bithorde::RouteTrace& requesters)
 {
-	return bind(_ptr, BitHordeIds(), requesters, boost::posix_time::neg_infin);
+	return bind(_ptr, bithorde::Ids(), requesters, boost::posix_time::neg_infin);
 }
 
-bool AssetBinding::bind( const std::shared_ptr< UpstreamRequestBinding >& asset, const BitHordeIds& assetIds, const bithorde::RouteTrace& requesters, const boost::posix_time::ptime& deadline )
+bool AssetBinding::bind( const std::shared_ptr< UpstreamRequestBinding >& asset, const bithorde::Ids& assetIds, const bithorde::RouteTrace& requesters, const boost::posix_time::ptime& deadline )
 {
 	if (_ptr) {
 		if (asset != _ptr)
@@ -84,7 +84,7 @@ bool AssetBinding::bind( const std::shared_ptr< UpstreamRequestBinding >& asset,
 	}
 }
 
-bool AssetBinding::bind( const std::shared_ptr< UpstreamRequestBinding >& asset, const BitHordeIds& assetIds, const bithorde::RouteTrace& requesters, const boost::posix_time::ptime& deadline, StatusFunc statusUpdate )
+bool AssetBinding::bind( const std::shared_ptr< UpstreamRequestBinding >& asset, const bithorde::Ids& assetIds, const bithorde::RouteTrace& requesters, const boost::posix_time::ptime& deadline, StatusFunc statusUpdate )
 {
 	auto res = bind(asset, assetIds, requesters, deadline);
 

@@ -52,7 +52,7 @@ public:
 	/**
 	 * Version of prepareUpload which also links up the given ids to it.
 	 */
-	CachedAsset::Ptr prepareUpload(uint64_t size, const BitHordeIds& ids);
+	CachedAsset::Ptr prepareUpload(uint64_t size, const bithorde::Ids& ids);
 
 	/**
 	 * Finds an asset by bithorde HashId. (Only the tiger-hash is actually used)

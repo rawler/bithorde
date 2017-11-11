@@ -34,7 +34,7 @@ using namespace bithorded::store;
 
 AssetIndexEntry::AssetIndexEntry(
 	const std::string& assetId,
-	const BinId& tigerId,
+	const bithorde::Id& tigerId,
 	uint64_t diskUsage,
     uint64_t diskAllocation,
 	double score) :
@@ -49,11 +49,11 @@ const std::string& AssetIndexEntry::assetId() const {
     return _assetId;
 }
 
-const BinId& AssetIndexEntry::tigerId() const {
+const bithorde::Id& AssetIndexEntry::tigerId() const {
 	return _tigerId;
 }
 
-AssetIndexEntry& AssetIndexEntry::tigerId(const BinId& newTigerId) {
+AssetIndexEntry& AssetIndexEntry::tigerId(const bithorde::Id& newTigerId) {
 	_tigerId = newTigerId;
 	return *this;
 }
@@ -115,7 +115,7 @@ size_t AssetIndex::assetCount() const {
     return _assetMap.size();
 }
 
-void AssetIndex::addAsset(const std::string& assetId, const BinId& tigerId, uint64_t diskUsage, uint64_t diskAllocation, double score) {
+void AssetIndex::addAsset(const std::string& assetId, const bithorde::Id& tigerId, uint64_t diskUsage, uint64_t diskAllocation, double score) {
     auto ptr = new AssetIndexEntry(assetId, tigerId, diskUsage, diskAllocation, score);
     auto& slot = _assetMap[assetId];
     if (slot) {
@@ -128,8 +128,8 @@ void AssetIndex::addAsset(const std::string& assetId, const BinId& tigerId, uint
 }
 
 /** Returns the tigerId the asset had, if any. */
-BinId AssetIndex::removeAsset(const std::string& assetId) {
-    BinId tigerId;
+bithorde::Id AssetIndex::removeAsset(const std::string& assetId) {
+    bithorde::Id tigerId;
     auto iter = _assetMap.find(assetId);
     if ( iter != _assetMap.end() ) {
         tigerId = iter->second->tigerId();
@@ -174,7 +174,7 @@ uint64_t AssetIndex::totalDiskAllocation() const {
 }
 
 /** Returns assetId for asset */
-std::string AssetIndex::lookupTiger( const BinId& tigerId ) const {
+std::string AssetIndex::lookupTiger( const bithorde::Id& tigerId ) const {
     auto res = _tigerMap.find(tigerId);
     if ( res != _tigerMap.end() ) {
         return res->second->assetId();
@@ -184,12 +184,12 @@ std::string AssetIndex::lookupTiger( const BinId& tigerId ) const {
 }
 
 /** Returns tigerId for asset */
-const BinId& AssetIndex::lookupAsset( const std::string& assetId ) const {
+const bithorde::Id& AssetIndex::lookupAsset( const std::string& assetId ) const {
     auto res = _assetMap.find(assetId);
     if ( res != _assetMap.end() ) {
         return res->second->tigerId();
     } else {
-        return BinId::EMPTY;
+        return bithorde::Id::EMPTY;
     }
 }
 

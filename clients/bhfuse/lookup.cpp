@@ -8,7 +8,7 @@ using namespace std;
 
 using namespace bithorde;
 
-Lookup::Lookup(BHFuse* fs, fuse_req_t req, const BitHordeIds& ids) :
+Lookup::Lookup(BHFuse* fs, fuse_req_t req, const bithorde::Ids& ids) :
 	fs(fs),
 	req(req)
 {

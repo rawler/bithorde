@@ -11,8 +11,6 @@
 
 #include "bithorde.pb.h"
 
-typedef google::protobuf::RepeatedPtrField< bithorde::Identifier > BitHordeIds;
-
 //! Converts given data to base 32, the code is based on http://www.faqs.org/rfcs/rfc4648.html.
 class RFC4648Base32Encoder : public CryptoPP::SimpleProxyFilter
 {
@@ -30,8 +28,6 @@ public:
 	void IsolatedInitialize(const CryptoPP::NameValuePairs &parameters);
 };
 
-std::string base32encode(const std::string& s);
-
 //! Decode base 32 data back to bytes, the code is based on http://www.faqs.org/rfcs/rfc4648.html.
 class RFC4648Base32Decoder : public CryptoPP::BaseN_Decoder
 {
@@ -44,21 +40,25 @@ private:
 	static const int * CRYPTOPP_API GetDefaultDecodingLookupArray();
 };
 
-class BinId {
+std::string base32encode(const std::string& s);
+
+namespace bithorde {
+
+class Id {
 	std::string _raw;
 public:
-	const static BinId EMPTY;
+	const static Id EMPTY;
 
-	BinId() {}
+	Id() {}
 
-	static BinId fromRaw(const std::string& raw) {
-		BinId res;
+	static Id fromRaw(const std::string& raw) {
+		Id res;
 		res._raw = raw;
 		return res;
 	}
 
-	static BinId fromBase32(const std::string& base32) {
-		BinId res;
+	static Id fromBase32(const std::string& base32) {
+		Id res;
 		CryptoPP::StringSource(base32, true,
 			new RFC4648Base32Decoder(
 				new CryptoPP::StringSink(res._raw)));
@@ -70,33 +70,38 @@ public:
 	const std::string& raw() const { return _raw; }
 
 	bool empty() const { return _raw.empty(); }
-	bool operator==(const BinId &other) const {
+	bool operator==(const Id &other) const {
 		return other._raw == _raw;
 	}
-	bool operator!=(const BinId &other) const {
+	bool operator!=(const Id &other) const {
 		return other._raw != _raw;
 	}
 };
+boost::filesystem::path operator/(const boost::filesystem::path& lhs, const Id& rhs);
 
-std::ostream& operator<<(std::ostream& str, const BinId& id);
+typedef google::protobuf::RepeatedPtrField< bithorde::Identifier > Ids;
+
+std::ostream& operator<<(std::ostream& str, const Id& id);
+
+std::ostream& operator<<(std::ostream& str, const Ids& ids);
+std::string idsToString(const Ids& ids);
+
+
+Id findBithordeId(const Ids& ids, bithorde::HashType type);
+}
 
 namespace std
 {
 	template <>
-	struct hash<BinId>
+	struct hash<bithorde::Id>
 	{
-	    std::size_t operator()(const BinId& c) const
-	    {
-	        return std::hash<std::string>()(c.raw());
-	    }
+		std::size_t operator()(const bithorde::Id& c) const
+		{
+			return std::hash<std::string>()(c.raw());
+		}
 	};
 }
 
-std::ostream& operator<<(std::ostream& str, const BitHordeIds& ids);
-std::string idsToString(const BitHordeIds& ids);
 
-boost::filesystem::path operator/(const boost::filesystem::path& lhs, const BinId& rhs);
-
-BinId findBithordeId(const BitHordeIds& ids, bithorde::HashType type);
 
 #endif // BITHORDE_HASHES_H

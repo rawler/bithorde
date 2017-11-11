@@ -20,9 +20,10 @@
 #include <iostream>
 
 #include <bithorded/lib/log.hpp>
+#include <lib/buffer.hpp>
+#include <lib/hashes.h>
 #include <lib/magneturi.h>
 #include <lib/random.h>
-#include <lib/buffer.hpp>
 
 const size_t MAX_ASSETS = 1024;
 const size_t MAX_CHUNK = 128*1024;
@@ -113,7 +114,7 @@ void Client::onMessage( const std::shared_ptr< bithorde::MessageContext< bithord
 		if (path.is_absolute()) {
 			if (auto asset = _server.asyncLinkAsset(path)) {
 				BOOST_LOG_SEV(clientLogger, bithorded::info) << "Linking " << path;
-				assignAsset( msg.handle(), asset, BitHordeIds(), bithorde::RouteTrace(), boost::posix_time::neg_infin);
+				assignAsset( msg.handle(), asset, bithorde::Ids(), bithorde::RouteTrace(), boost::posix_time::neg_infin);
 			} else {
 				BOOST_LOG_SEV(clientLogger, bithorded::error) << "Upload did not match any allowed assetStore: " << path;
 				informAssetStatus( msg.handle(), bithorde::ERROR);
@@ -125,7 +126,7 @@ void Client::onMessage( const std::shared_ptr< bithorde::MessageContext< bithord
 	} else {
 		if (auto asset = _server.prepareUpload( msg.size())) {
 			BOOST_LOG_SEV(clientLogger, bithorded::info) << "Ready for upload of size " << msg.size();
-			assignAsset( msg.handle(), asset, BitHordeIds(), bithorde::RouteTrace(), boost::posix_time::neg_infin);
+			assignAsset( msg.handle(), asset, bithorde::Ids(), bithorde::RouteTrace(), boost::posix_time::neg_infin);
 		} else {
 			informAssetStatus( msg.handle(), bithorde::NORESOURCES);
 		}
@@ -291,7 +292,7 @@ void Client::informAssetStatusUpdate(bithorde::Asset::Handle h, const IAsset::Pt
 	sendMessage(bithorde::Connection::AssetStatus, resp, bithorde::Message::NEVER, true);
 }
 
-void Client::assignAsset(bithorde::Asset::Handle handle_, const UpstreamRequestBinding::Ptr& a, const BitHordeIds& assetIds, const bithorde::RouteTrace& requesters, const boost::posix_time::ptime& deadline)
+void Client::assignAsset(bithorde::Asset::Handle handle_, const UpstreamRequestBinding::Ptr& a, const bithorde::Ids& assetIds, const bithorde::RouteTrace& requesters, const boost::posix_time::ptime& deadline)
 {
 	size_t handle = handle_;
 	if (handle >= _assets.size()) {

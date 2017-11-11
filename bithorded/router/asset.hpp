@@ -44,14 +44,14 @@ class UpstreamBinding : public bithorde::ReadAsset {
     boost::signals2::scoped_connection _statusConnection;
     boost::signals2::scoped_connection _dataConnection;
 public:
-    UpstreamBinding(std::shared_ptr<ForwardedAsset>, std::string, bithorded::Client::Ptr, BitHordeIds);
+    UpstreamBinding(std::shared_ptr<ForwardedAsset>, std::string, bithorded::Client::Ptr, bithorde::Ids);
 };
 
 class ForwardedAsset : public bithorded::IAsset, public boost::noncopyable, public std::enable_shared_from_this<ForwardedAsset>
 {
     friend class UpstreamBinding;
 	Router& _router;
-	BitHordeIds _requestedIds;
+	bithorde::Ids _requestedIds;
 	const AssetRequestParameters* _reqParameters;
 	int64_t _size;
 	std::map<std::string, UpstreamBinding> _upstream;
@@ -61,7 +61,7 @@ public:
 	typedef std::weak_ptr<ForwardedAsset> WeakPtr;
 	typedef std::unordered_set<uint64_t> Requesters;
 
-	ForwardedAsset(Router& router, const BitHordeIds& ids);
+	ForwardedAsset(Router& router, const bithorde::Ids& ids);
 	virtual ~ForwardedAsset();
 
 	bool hasUpstream(const std::string peername);
