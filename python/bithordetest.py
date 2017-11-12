@@ -6,7 +6,7 @@ import socket
 from time import time
 from threading import Condition, Thread
 
-from bithorde import decodeMessage, encoder, MSG_REV_MAP, message
+from bithorde import decodeMessage, encodeMessage, message
 
 from subprocess import Popen, PIPE, STDOUT
 from google.protobuf.message import Message
@@ -35,8 +35,10 @@ class TestConnection:
         self._socket.connect(tgt)
 
     def send(self, msg):
-        enc = encoder.MessageEncoder(MSG_REV_MAP[type(msg)], False, False)
-        enc(self.push, msg)
+        return encodeMessage(msg, self.push)
+
+    def push(self, str):
+        self._socket.sendall(str)
 
     def close(self):
         self._socket.shutdown(socket.SHUT_RDWR)
@@ -59,9 +61,6 @@ class TestConnection:
         if not new:
             raise StopIteration
         return new
-
-    def push(self, str):
-        self._socket.send(str)
 
     @staticmethod
     def _crit_str(crit):
