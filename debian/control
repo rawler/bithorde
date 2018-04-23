@@ -38,4 +38,4 @@ Description: The FUSE connector for bithorde
 Package: bithorde-utils
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}
-Description: The FUSE connector for bithorde
+Description: Clients for bithorde
