@@ -98,9 +98,9 @@ void AssetBinding::onTimeout()
 	}
 }
 
-Client::Client(asio::io_service& ioSvc, string myName) :
-	_ioSvc(ioSvc),
-	_timerSvc(new TimerService(ioSvc)),
+Client::Client(asio::io_context& ioCtx, string myName) :
+	_ioCtx(ioCtx),
+	_timerSvc(new TimerService(ioCtx)),
 	_state(Connecting),
 	_myName(myName),
 	_handleAllocator(1),
@@ -161,12 +161,12 @@ void Client::connect(Connection::Pointer newConn, const std::string& expectedPee
 
 void Client::connect(asio::ip::tcp::endpoint& ep) {
 	stats.reset(new ConnectionStats(_timerSvc));
-	connect(Connection::create(_ioSvc, stats, ep));
+	connect(Connection::create(_ioCtx, stats, ep));
 }
 
 void Client::connect(asio::local::stream_protocol::endpoint& ep) {
 	stats.reset(new ConnectionStats(_timerSvc));
-	connect(Connection::create(_ioSvc, stats, ep));
+	connect(Connection::create(_ioCtx, stats, ep));
 }
 
 void Client::connect(const string& spec) {
@@ -175,7 +175,7 @@ void Client::connect(const string& spec) {
 		asio::local::stream_protocol::endpoint ep(spec);
 		connect(ep);
 	} else if (boost::algorithm::split(host_port, spec, boost::algorithm::is_any_of(":"), boost::algorithm::token_compress_on).size() == 2) {
-		asio::ip::tcp::resolver resolver(_ioSvc);
+		asio::ip::tcp::resolver resolver(_ioCtx);
 		asio::ip::tcp::resolver::query q(host_port[0], host_port[1]);
 		asio::ip::tcp::resolver::iterator iter = resolver.resolve(q);
 		if (iter != asio::ip::tcp::resolver::iterator()) {
@@ -238,12 +238,12 @@ bool Client::sendMessage(Connection::MessageType type, const google::protobuf::M
 
 void Client::allocateBytes ( size_t bytes ) {
 	Client::WeakPtr self(shared_from_this());
-	_ioSvc.post(std::bind(boost::weak_fn(&Client::trackAllocation, self), bytes));
+	_ioCtx.post(std::bind(boost::weak_fn(&Client::trackAllocation, self), bytes));
 }
 
 void Client::freeBytes ( size_t bytes ) {
 	Client::WeakPtr self(shared_from_this());
-	_ioSvc.post(std::bind(boost::weak_fn(&Client::trackAllocation, self), -bytes));
+	_ioCtx.post(std::bind(boost::weak_fn(&Client::trackAllocation, self), -bytes));
 }
 
 void Client::trackAllocation ( ssize_t change ) {

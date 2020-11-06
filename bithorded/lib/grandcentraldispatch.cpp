@@ -21,7 +21,7 @@
 
 using namespace bithorded;
 
-GrandCentralDispatch::GrandCentralDispatch(boost::asio::io_service& controller, int parallel)
+GrandCentralDispatch::GrandCentralDispatch(boost::asio::io_context& controller, int parallel)
 	: _controller(controller), _work(_jobService)
 {
 	for (int i = 0; i < parallel; ++i)

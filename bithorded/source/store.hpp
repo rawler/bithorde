@@ -18,7 +18,7 @@
 #ifndef BITHORDED_SOURCE_STORE_HPP
 #define BITHORDED_SOURCE_STORE_HPP
 
-#include <boost/asio/io_service.hpp>
+#include <boost/asio/io_context.hpp>
 #include <boost/filesystem/path.hpp>
 #include <map>
 
@@ -48,7 +48,7 @@ public:
 	 * Add an asset to the idx, creating a hash in the background. When hashing is done,
 	 * the status of the asset will be updated to reflect it.
 	 *
-	 * If function returns true, /handler/ will be called on a thread running ioSvc.run()
+	 * If function returns true, /handler/ will be called on a thread running ioCtx.run()
 	 *
 	 * @returns a valid asset if file is within acceptable path, NULL otherwise
 	 */

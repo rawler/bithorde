@@ -81,7 +81,7 @@ private:
 	typedef std::shared_ptr<AssetBinding> AssetPtr;
 	typedef std::map<Asset::Handle, AssetPtr> AssetMap;
 
-	boost::asio::io_service& _ioSvc;
+	boost::asio::io_context& _ioCtx;
 	TimerService::Ptr _timerSvc;
 	Connection::Pointer _connection;
 
@@ -102,8 +102,8 @@ public:
 	typedef std::shared_ptr<Client> Pointer;
 	typedef std::weak_ptr<Client> WeakPtr;
 
-	static Pointer create(boost::asio::io_service& ioSvc, std::string myName) {
-		return Pointer(new Client(ioSvc, myName));
+	static Pointer create(boost::asio::io_context& ioCtx, std::string myName) {
+		return Pointer(new Client(ioCtx, myName));
 	}
 	virtual ~Client();
 
@@ -152,7 +152,7 @@ public:
 	InertialValue assetResponseTime;
 
 protected:
-	Client(boost::asio::io_service& ioSvc, std::string myName);
+	Client(boost::asio::io_context& ioCtx, std::string myName);
 
 	void sayHello();
 

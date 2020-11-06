@@ -22,7 +22,7 @@ struct BHFuseOptions : public BoostAsioFilesystem_Options {
 
 class BHFuse : public BoostAsioFilesystem {
 public:
-	BHFuse(boost::asio::io_service & ioSvc, std::string bithorded, const BHFuseOptions & opts);
+	BHFuse(boost::asio::io_context & ioCtx, std::string bithorded, const BHFuseOptions & opts);
 
     virtual void fuse_init(fuse_conn_info* conn);
 	virtual int fuse_lookup(fuse_req_t req, fuse_ino_t parent, const char *name);
@@ -33,7 +33,7 @@ public:
 	virtual int fuse_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, fuse_file_info *fi);
 
 	bithorde::Client::Pointer client;
-	boost::asio::io_service& ioSvc;
+	boost::asio::io_context& ioCtx;
 	std::string bithorded;
 	const BHFuseOptions opts;
 

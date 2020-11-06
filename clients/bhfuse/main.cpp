@@ -17,7 +17,7 @@ using namespace std;
 namespace asio = boost::asio;
 namespace po = boost::program_options;
 
-static asio::io_service ioSvc;
+static asio::io_context ioCtx;
 
 using namespace bithorde;
 
@@ -31,7 +31,7 @@ void sigint(int sig) {
 		} else {
 			terminating = true;
 			BOOST_LOG_TRIVIAL(info) << "Cleanly Exiting...";
-			ioSvc.stop();
+			ioCtx.stop();
 		}
 	}
 }
@@ -85,9 +85,9 @@ int main(int argc, char *argv[])
 	if (vm.count("debug"))
 		opts.debug = true;
 
-	BHFuse fs(ioSvc, vm["url"].as<string>(), opts);
+	BHFuse fs(ioCtx, vm["url"].as<string>(), opts);
 
-	return ioSvc.run();
+	return ioCtx.run();
 }
 
 FUSEAsset::Ptr INodeCache::lookup(const bithorde::Ids& ids)
@@ -102,20 +102,20 @@ FUSEAsset::Ptr INodeCache::lookup(const bithorde::Ids& ids)
 	return FUSEAsset::Ptr();
 }
 
-BHFuse::BHFuse(asio::io_service& ioSvc, string bithorded, const BHFuseOptions& opts) :
-	BoostAsioFilesystem(ioSvc, opts),
-	ioSvc(ioSvc),
+BHFuse::BHFuse(asio::io_context& ioCtx, string bithorded, const BHFuseOptions& opts) :
+	BoostAsioFilesystem(ioCtx, opts),
+	ioCtx(ioCtx),
 	bithorded(bithorded),
 	opts(opts),
-	_timerSvc(std::make_shared<TimerService>(ioSvc)),
+	_timerSvc(std::make_shared<TimerService>(ioCtx)),
 	_ino_allocator(2)
 {
-	client = Client::create(ioSvc, "bhfuse");
+	client = Client::create(ioCtx, "bhfuse");
 
 	client->authenticated.connect([=](bithorde::Client& c, std::string remoteName) {
 		if (remoteName.empty()) {
 			(cerr << "Failed authentication" << endl).flush();
-			this->ioSvc.stop();
+			this->ioCtx.stop();
 		} else {
 			(cerr << "Connected to " << remoteName << endl).flush();
 		}
@@ -136,12 +136,12 @@ void BHFuse::reconnect()
 		try {
 			client->connect(bithorded);
 			return;
-		} catch (boost::system::system_error e) {
+		} catch (boost::system::system_error& e) {
 			cerr << "Failed to reconnect, retrying..." << endl;
 		}
 	}
 	cerr << "Giving up." << endl;
-	ioSvc.stop();
+	ioCtx.stop();
 }
 
 void BHFuse::onConnected(bithorde::Client&, std::string remoteName) {

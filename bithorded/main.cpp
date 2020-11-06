@@ -29,9 +29,9 @@ int main(int argc, char* argv[]) {
 	try {
 		Config cfg(argc, argv);
 		boost::log::add_console_log(std::clog, keywords::format = cfg.logFormat, keywords::filter = "%Severity% >= " + cfg.logLevel);
-		asio::io_service ioSvc;
-		Server server(ioSvc, cfg);
-		ioSvc.run();
+		asio::io_context ioCtx;
+		Server server(ioCtx, cfg);
+		ioCtx.run();
 		return 0;
 	} catch (VersionExit& e) {
 		return bithorde::exit_version();

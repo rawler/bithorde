@@ -18,7 +18,8 @@
 #ifndef BITHORDED_GRANDCENTRALDISPATCH_HPP
 #define BITHORDED_GRANDCENTRALDISPATCH_HPP
 
-#include <boost/asio/io_service.hpp>
+#include <boost/asio/io_context.hpp>
+#include <boost/core/noncopyable.hpp>
 #include <boost/thread.hpp>
 
 namespace bithorded {
@@ -30,15 +31,15 @@ namespace bithorded {
  */
 class GrandCentralDispatch : boost::noncopyable
 {
-	boost::asio::io_service& _controller;
-	boost::asio::io_service _jobService;
-	boost::asio::io_service::work _work;
+	boost::asio::io_context& _controller;
+	boost::asio::io_context _jobService;
+	boost::asio::io_context::work _work;
 	boost::thread_group _workers;
 public:
-	GrandCentralDispatch(boost::asio::io_service& controller, int parallel);
+	GrandCentralDispatch(boost::asio::io_context& controller, int parallel);
 	virtual ~GrandCentralDispatch();
 
-	boost::asio::io_service& ioSvc() const { return _controller; }
+	boost::asio::io_context& ioCtx() const { return _controller; }
 
 	template<typename Job, typename CompletionHandler>
 	void submit(Job job, CompletionHandler handler) {

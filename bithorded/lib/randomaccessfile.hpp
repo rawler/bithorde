@@ -18,6 +18,7 @@
 #ifndef BITHORDED_RANDOMACCESSFILE_H
 #define BITHORDED_RANDOMACCESSFILE_H
 
+#include <boost/core/noncopyable.hpp>
 #include <boost/filesystem/path.hpp>
 
 #include "lib/types.h"

@@ -43,7 +43,7 @@ public:
 	 * Add an asset to the idx, allocating space for
 	 * the status of the asset will be updated to reflect it.
 	 *
-	 * If function returns true, /handler/ will be called on a thread running ioSvc.run()
+	 * If function returns true, /handler/ will be called on a thread running ioCtx.run()
 	 *
 	 * @returns a valid asset if file is within acceptable path, NULL otherwise
 	 */

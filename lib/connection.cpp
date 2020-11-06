@@ -44,8 +44,8 @@ class ConnectionImpl : public Connection {
 
 	std::shared_ptr<CryptoPP::SymmetricCipher> _encryptor, _decryptor;
 public:
-	ConnectionImpl(boost::asio::io_service& ioSvc, const ConnectionStats::Ptr& stats, const EndPoint& addr)
-		: Connection(ioSvc, stats), _socket(new Socket(ioSvc))
+	ConnectionImpl(boost::asio::io_context& ioCtx, const ConnectionStats::Ptr& stats, const EndPoint& addr)
+		: Connection(ioCtx, stats), _socket(new Socket(ioCtx))
 	{
 		std::ostringstream buf;
 		buf << addr;
@@ -54,8 +54,8 @@ public:
 		_socket->connect(addr);
 	}
 
-	ConnectionImpl(boost::asio::io_service& ioSvc, const ConnectionStats::Ptr& stats, const std::shared_ptr<Socket>& socket)
-		: Connection(ioSvc, stats)
+	ConnectionImpl(boost::asio::io_context& ioCtx, const ConnectionStats::Ptr& stats, const std::shared_ptr<Socket>& socket)
+		: Connection(ioCtx, stats)
 	{
 		std::ostringstream buf;
 		buf << socket->remote_endpoint();
@@ -226,8 +226,8 @@ ConnectionStats::ConnectionStats(const TimerService::Ptr& ts) :
 {
 }
 
-Connection::Connection(asio::io_service & ioSvc, const ConnectionStats::Ptr& stats) :
-	_ioSvc(ioSvc),
+Connection::Connection(asio::io_context & ioCtx, const ConnectionStats::Ptr& stats) :
+	_ioCtx(ioCtx),
 	_stats(stats),
 	_listening(true),
 	_readWindow(NULL),
@@ -236,28 +236,28 @@ Connection::Connection(asio::io_service & ioSvc, const ConnectionStats::Ptr& sta
 {
 }
 
-Connection::Pointer Connection::create(asio::io_service& ioSvc, const ConnectionStats::Ptr& stats, const asio::ip::tcp::endpoint& addr)  {
-	Pointer c(new ConnectionImpl<asio::ip::tcp>(ioSvc, stats, addr));
+Connection::Pointer Connection::create(asio::io_context& ioCtx, const ConnectionStats::Ptr& stats, const asio::ip::tcp::endpoint& addr)  {
+	Pointer c(new ConnectionImpl<asio::ip::tcp>(ioCtx, stats, addr));
 	c->tryRead();
 	return c;
 }
 
-Connection::Pointer Connection::create(asio::io_service& ioSvc, const ConnectionStats::Ptr& stats, const std::shared_ptr< asio::ip::tcp::socket >& socket)
+Connection::Pointer Connection::create(asio::io_context& ioCtx, const ConnectionStats::Ptr& stats, const std::shared_ptr< asio::ip::tcp::socket >& socket)
 {
-	Pointer c(new ConnectionImpl<asio::ip::tcp>(ioSvc, stats, socket));
+	Pointer c(new ConnectionImpl<asio::ip::tcp>(ioCtx, stats, socket));
 	c->tryRead();
 	return c;
 }
 
-Connection::Pointer Connection::create(asio::io_service& ioSvc, const ConnectionStats::Ptr& stats, const asio::local::stream_protocol::endpoint& addr)  {
-	Pointer c(new ConnectionImpl<asio::local::stream_protocol>(ioSvc, stats, addr));
+Connection::Pointer Connection::create(asio::io_context& ioCtx, const ConnectionStats::Ptr& stats, const asio::local::stream_protocol::endpoint& addr)  {
+	Pointer c(new ConnectionImpl<asio::local::stream_protocol>(ioCtx, stats, addr));
 	c->tryRead();
 	return c;
 }
 
-Connection::Pointer Connection::create(asio::io_service& ioSvc, const ConnectionStats::Ptr& stats, const std::shared_ptr< asio::local::stream_protocol::socket >& socket)
+Connection::Pointer Connection::create(asio::io_context& ioCtx, const ConnectionStats::Ptr& stats, const std::shared_ptr< asio::local::stream_protocol::socket >& socket)
 {
-	Pointer c(new ConnectionImpl<asio::local::stream_protocol>(ioSvc, stats, socket));
+	Pointer c(new ConnectionImpl<asio::local::stream_protocol>(ioCtx, stats, socket));
 	c->tryRead();
 	return c;
 }

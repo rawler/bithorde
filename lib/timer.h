@@ -19,6 +19,7 @@
 #define TIMER_H
 
 #include <boost/asio/deadline_timer.hpp>
+#include <boost/core/noncopyable.hpp>
 #include <functional>
 #include <map>
 
@@ -30,7 +31,7 @@ friend class Timer;
 	boost::asio::deadline_timer _timer;
 public:
 	typedef std::shared_ptr<TimerService> Ptr;
-	TimerService(boost::asio::io_service& ioSvc);
+	TimerService(boost::asio::io_context& ioCtx);
 protected:
 	void arm(boost::posix_time::ptime deadline, Timer* t);
 	void clear(const Timer* t);

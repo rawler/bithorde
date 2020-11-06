@@ -18,7 +18,7 @@
 #ifndef BITHORDED_ROUTER_ROUTER_HPP
 #define BITHORDED_ROUTER_ROUTER_HPP
 
-#include <boost/asio/io_service.hpp>
+#include <boost/asio/io_context.hpp>
 #include <map>
 #include <memory>
 #include <unordered_set>

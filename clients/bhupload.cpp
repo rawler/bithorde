@@ -39,12 +39,12 @@ int BHUpload::main(const std::vector<std::string>& args) {
 			return -1;
 	}
 
-	_client = Client::create(_ioSvc, optMyName);
+	_client = Client::create(_ioCtx, optMyName);
 
 	_client->authenticated.connect([=](bithorde::Client& c, std::string peerName) {
 		if (peerName.empty()) {
 			cerr << "Failed authentication" << endl;
-			_ioSvc.stop();
+			_ioCtx.stop();
 		}
 		if (optDebug)
 			cerr << "DEBUG: Connected to " << peerName << endl;
@@ -57,14 +57,14 @@ int BHUpload::main(const std::vector<std::string>& args) {
 
 	_client->connect(optConnectUrl);
 
-	_ioSvc.run();
+	_ioCtx.run();
 
 	return _res;
 }
 
 void BHUpload::onDisconnected() {
 	_res = -1;
-	_ioSvc.stop();
+	_ioCtx.stop();
 }
 
 bool BHUpload::queueFile(const std::string& path) {
@@ -91,7 +91,7 @@ void BHUpload::nextAsset() {
 	BOOST_ASSERT(!_currentFile.is_open());
 
 	if (_files.empty()) {
-		_ioSvc.stop();
+		_ioCtx.stop();
 	} else {
 		fs::path& p = _files.front();
 		if (optLink) {

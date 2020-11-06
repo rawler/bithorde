@@ -29,8 +29,8 @@ class connection
 : public std::enable_shared_from_this<connection>
 {
 	public:
-	/// Construct a connection with the given io_service.
-	explicit connection(boost::asio::io_service& io_service, connection_manager& manager, request_handler& handler);
+	/// Construct a connection with the given io_context.
+	explicit connection(boost::asio::io_context& io_context, connection_manager& manager, request_handler& handler);
 	connection( const connection& ) = delete;
 
 	/// Get the socket associated with the connection.

@@ -27,7 +27,7 @@ bool bithorde::idsOverlap(const bithorde::Ids& a, const bithorde::Ids& b) {
 Asset::Asset(const bithorde::Asset::ClientPointer& client) :
 	status(Status::NONE),
 	_client(client),
-	_ioSvc(client->_ioSvc),
+	_ioCtx(client->_ioCtx),
 	_handle(-1),
 	_size(-1)
 {}
@@ -42,9 +42,9 @@ const Asset::ClientPointer& Asset::client()
 	return _client;
 }
 
-boost::asio::io_service& Asset::ioSvc()
+boost::asio::io_context& Asset::ioCtx()
 {
-	return _ioSvc;
+	return _ioCtx;
 }
 
 bool Asset::isBound()
@@ -94,7 +94,7 @@ void Asset::handleMessage(const bithorde::AssetStatus & msg)
 ReadRequestContext::ReadRequestContext(ReadAsset* asset, uint64_t offset, size_t size, int32_t timeout) :
 	_asset(asset),
 	_client(asset->client()),
-	_timer(asset->ioSvc()),
+	_timer(asset->ioCtx()),
 	_requested_at(ptime::microsec_clock::universal_time())
 {
 	set_handle(asset->handle());

@@ -44,7 +44,7 @@ public:
 	virtual ~Asset();
 
 	const ClientPointer& client();
-	boost::asio::io_service& ioSvc();
+	boost::asio::io_context& ioCtx();
 	bool isBound();
 	Handle handle();
 	std::string label();
@@ -61,7 +61,7 @@ public:
 	void close();
 protected:
 	ClientPointer _client;
-	boost::asio::io_service& _ioSvc;
+	boost::asio::io_context& _ioCtx;
 	Handle _handle;
 	int64_t _size;
 	std::unordered_set<uint64_t> _servers;

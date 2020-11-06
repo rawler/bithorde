@@ -22,7 +22,7 @@
 #include <memory>
 #include <vector>
 
-#include <boost/asio/io_service.hpp>
+#include <boost/asio/io_context.hpp>
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/local/stream_protocol.hpp>
 #include <boost/filesystem/path.hpp>
@@ -66,7 +66,7 @@ class Server : public GrandCentralDispatch, public management::Directory
 	cache::CacheManager _cache;
 	std::unique_ptr<http::server::server> _httpInterface;
 public:
-	Server(boost::asio::io_service& ioSvc, Config& cfg);
+	Server(boost::asio::io_context& ioCtx, Config& cfg);
 
 	std::string name() { return _cfg.nodeName; }
 	const Config::Client& getClientConfig(const std::string& name);

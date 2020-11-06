@@ -2,14 +2,14 @@
 
 #include <boost/test/unit_test.hpp>
 
-#include <boost/asio/io_service.hpp>
+#include <boost/asio/io_context.hpp>
 #include <boost/date_time/posix_time/posix_time_types.hpp>
 
 namespace ptime = boost::posix_time;
 
 ptime::ptime deadline(ptime::microsec_clock::universal_time()+ptime::hours(24));
 
-boost::asio::io_service IO_SVC;
+boost::asio::io_context IO_SVC;
 std::shared_ptr<TimerService> TSVC(new TimerService(IO_SVC));
 std::size_t BIG_FAT_COUNTER(0);
 std::vector<Timer> TIMERS;

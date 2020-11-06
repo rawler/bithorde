@@ -60,12 +60,12 @@ void ConnectionList::describe(management::Info& target) const
 
 bithorded::Config::Client null_client;
 
-Server::Server(asio::io_service& ioSvc, Config& cfg) :
-	GrandCentralDispatch(ioSvc, cfg.parallel),
+Server::Server(asio::io_context& ioCtx, Config& cfg) :
+	GrandCentralDispatch(ioCtx, cfg.parallel),
 	_cfg(cfg),
-	_timerSvc(new TimerService(ioSvc)),
-	_tcpListener(ioSvc),
-	_localListener(ioSvc),
+	_timerSvc(new TimerService(ioCtx)),
+	_tcpListener(ioCtx),
+	_localListener(ioCtx),
 	_router(*this),
 	_cache(*this, _router, cfg.cacheDir, static_cast<intmax_t>(cfg.cacheSizeMB)*1024*1024)
 {
@@ -109,7 +109,7 @@ Server::Server(asio::io_service& ioSvc, Config& cfg) :
 	waitForLocalConnection();
 
 	if (_cfg.inspectPort) {
-		_httpInterface.reset(new http::server::server(this->ioSvc(), "127.0.0.1", _cfg.inspectPort, *this));
+		_httpInterface.reset(new http::server::server(this->ioCtx(), "127.0.0.1", _cfg.inspectPort, *this));
 		BOOST_LOG_SEV(serverLog, info) << "Inspection interface listening on port " << _cfg.inspectPort;
 	}
 
@@ -118,7 +118,7 @@ Server::Server(asio::io_service& ioSvc, Config& cfg) :
 
 void Server::waitForTCPConnection()
 {
-	std::shared_ptr<asio::ip::tcp::socket> sock = std::make_shared<asio::ip::tcp::socket>(ioSvc());
+	std::shared_ptr<asio::ip::tcp::socket> sock = std::make_shared<asio::ip::tcp::socket>(ioCtx());
 	_tcpListener.async_accept(*sock, [=](const boost::system::error_code& error) {
 		if (!error) {
 			hookup(sock, null_client);
@@ -130,7 +130,7 @@ void Server::waitForTCPConnection()
 void Server::hookup ( const std::shared_ptr< asio::ip::tcp::socket >& socket, const Config::Client& client)
 {
 	bithorded::Client::Ptr c = bithorded::Client::create(*this);
-	auto conn = bithorde::Connection::create(ioSvc(), std::make_shared<bithorde::ConnectionStats>(_timerSvc), socket);
+	auto conn = bithorde::Connection::create(ioCtx(), std::make_shared<bithorde::ConnectionStats>(_timerSvc), socket);
 	c->setSecurity(client.key, (bithorde::CipherType)client.cipher);
 	if (client.name.empty())
 		c->hookup(conn);
@@ -141,11 +141,11 @@ void Server::hookup ( const std::shared_ptr< asio::ip::tcp::socket >& socket, co
 
 void Server::waitForLocalConnection()
 {
-	std::shared_ptr<asio::local::stream_protocol::socket> sock = std::make_shared<asio::local::stream_protocol::socket>(ioSvc());
+	std::shared_ptr<asio::local::stream_protocol::socket> sock = std::make_shared<asio::local::stream_protocol::socket>(ioCtx());
 	_localListener.async_accept(*sock, [=](const boost::system::error_code& error) {
 		if (!error) {
 			bithorded::Client::Ptr c = bithorded::Client::create(*this);
-			c->hookup(bithorde::Connection::create(ioSvc(), std::make_shared<bithorde::ConnectionStats>(_timerSvc), sock));
+			c->hookup(bithorde::Connection::create(ioCtx(), std::make_shared<bithorde::ConnectionStats>(_timerSvc), sock));
 			clientConnected(c);
 			waitForLocalConnection();
 		}
@@ -226,4 +226,3 @@ UpstreamRequestBinding::Ptr Server::prepareUpload(uint64_t size)
 		res = make_shared<UpstreamRequestBinding>(asset);
 	return res;
 }
-

@@ -23,7 +23,7 @@ class BHUpload {
 	int optBindTimeoutMs;
 
 	// Internal items
-	boost::asio::io_service _ioSvc;
+	boost::asio::io_context _ioCtx;
 	boost::signals2::connection _writeConnection;
 	std::list<boost::filesystem::path> _files;
 	bithorde::Client::Pointer _client;
@@ -51,4 +51,3 @@ private:
 };
 
 #endif
-

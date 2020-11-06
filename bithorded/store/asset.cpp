@@ -164,7 +164,7 @@ struct HashTail : public std::enable_shared_from_this<HashTail> {
 	~HashTail() {
 		auto& asset(this->asset);
 		auto& whenDone(this->whenDone);
-		gcd.ioSvc().post([asset, whenDone]{
+		gcd.ioCtx().post([asset, whenDone]{
 			asset->updateStatus();
 			if (whenDone) {
 				whenDone();

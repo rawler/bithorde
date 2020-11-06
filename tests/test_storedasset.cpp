@@ -27,12 +27,12 @@ namespace fs = boost::filesystem;
 using namespace bithorded;
 
 struct TestData {
-	boost::asio::io_service ioSvc;
+	boost::asio::io_context ioCtx;
 	GrandCentralDispatch gcd;
 	fs::path assets;
 
 	TestData() :
-		gcd(ioSvc, 4),
+		gcd(ioCtx, 4),
 		assets(fs::path(__FILE__).parent_path() / "data" / "assets")
 	{
 	}
@@ -51,9 +51,9 @@ BOOST_FIXTURE_TEST_CASE( open_partial_v1_asset, TestData )
 	BOOST_CHECK_EQUAL(asset->hasRootHash(), false);
 	BOOST_CHECK_EQUAL(asset->canRead(asset->size()-1024, 1024), 0);
 
-	boost::asio::io_service::work work(ioSvc);
-	asset->write(0, std::make_shared<bithorde::MemoryBuffer>(asset->size()), std::bind(&boost::asio::io_service::stop, &ioSvc)); // Yikes I want C++11 lambdas
-	ioSvc.run();
+	boost::asio::io_context::work work(ioCtx);
+	asset->write(0, std::make_shared<bithorde::MemoryBuffer>(asset->size()), std::bind(&boost::asio::io_context::stop, &ioCtx)); // Yikes I want C++11 lambdas
+	ioCtx.run();
 	BOOST_CHECK_EQUAL(asset->hasRootHash(), true);
 	fs::remove_all(temp);
 }

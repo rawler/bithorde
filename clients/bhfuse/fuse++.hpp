@@ -31,7 +31,7 @@ class BoostAsioFilesystem
 	* method.
 	***************************************************************************************/
 public:
-	BoostAsioFilesystem(boost::asio::io_service& ioSvc, const BoostAsioFilesystem_Options& options);
+	BoostAsioFilesystem(boost::asio::io_context& ioCtx, const BoostAsioFilesystem_Options& options);
 	~BoostAsioFilesystem();
 
 	/************************************************************************************

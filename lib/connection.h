@@ -2,7 +2,7 @@
 #define BITHORDE_CONNECTION_H
 
 
-#include <boost/asio/io_service.hpp>
+#include <boost/asio/io_context.hpp>
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/local/stream_protocol.hpp>
 #include <boost/signals2.hpp>
@@ -87,10 +87,10 @@ public:
 	typedef std::shared_ptr<Connection> Pointer;
 	typedef std::function<void(MessageType, const ::google::protobuf::Message&)> Callback;
 
-	static Pointer create(boost::asio::io_service& ioSvc, const bithorde::ConnectionStats::Ptr& stats, const boost::asio::ip::tcp::endpoint& addr);
-	static Pointer create(boost::asio::io_service& ioSvc, const bithorde::ConnectionStats::Ptr& stats, const std::shared_ptr< boost::asio::ip::tcp::socket >& socket);
-	static Pointer create(boost::asio::io_service& ioSvc, const bithorde::ConnectionStats::Ptr& stats, const boost::asio::local::stream_protocol::endpoint& addr);
-	static Pointer create(boost::asio::io_service& ioSvc, const bithorde::ConnectionStats::Ptr& stats, const std::shared_ptr< boost::asio::local::stream_protocol::socket >& socket);
+	static Pointer create(boost::asio::io_context& ioCtx, const bithorde::ConnectionStats::Ptr& stats, const boost::asio::ip::tcp::endpoint& addr);
+	static Pointer create(boost::asio::io_context& ioCtx, const bithorde::ConnectionStats::Ptr& stats, const std::shared_ptr< boost::asio::ip::tcp::socket >& socket);
+	static Pointer create(boost::asio::io_context& ioCtx, const bithorde::ConnectionStats::Ptr& stats, const boost::asio::local::stream_protocol::endpoint& addr);
+	static Pointer create(boost::asio::io_context& ioCtx, const bithorde::ConnectionStats::Ptr& stats, const std::shared_ptr< boost::asio::local::stream_protocol::socket >& socket);
 
 	virtual void setEncryption(bithorde::CipherType t, const std::string& key, const std::string& iv) = 0;
 	virtual void setDecryption(bithorde::CipherType t, const std::string& key, const std::string& iv) = 0;
@@ -114,14 +114,14 @@ public:
 	void onWritten(const boost::system::error_code& err, std::size_t written, const MessageQueue::MessageList& queued);
 
 protected:
-	Connection(boost::asio::io_service& ioSvc, const bithorde::ConnectionStats::Ptr& stats);
+	Connection(boost::asio::io_context& ioCtx, const bithorde::ConnectionStats::Ptr& stats);
 
 	virtual void trySend() = 0;
 	virtual void tryRead() = 0;
 	virtual void decrypt(byte* buf, size_t size) = 0;
 
 protected:
-	boost::asio::io_service& _ioSvc;
+	boost::asio::io_context& _ioCtx;
 	Callback _dispatch;
 	ConnectionStats::Ptr _stats;
 	std::unique_ptr<Keepalive> _keepAlive;

@@ -74,8 +74,8 @@ void BoostAsioFilesystem_Options::format_ll_opts(vector< string >& target) const
 	target.insert(target.end(), args.begin(), args.end());
 }
 
-BoostAsioFilesystem::BoostAsioFilesystem(asio::io_service& ioSvc, const BoostAsioFilesystem_Options& options)
-	: _channel(ioSvc), _mountpoint(options.mountpoint), _fuse_chan(0), _fuse_session(0)
+BoostAsioFilesystem::BoostAsioFilesystem(asio::io_context& ioCtx, const BoostAsioFilesystem_Options& options)
+	: _channel(ioCtx), _mountpoint(options.mountpoint), _fuse_chan(0), _fuse_session(0)
 {
 	vector<string> opts;
 	options.format_ll_opts(opts);
@@ -136,4 +136,3 @@ void BoostAsioFilesystem::readNext()
         }
 	);
 }
-

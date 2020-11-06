@@ -20,7 +20,7 @@ const static size_t BLOCK_SIZE = (64*1024);
 const static size_t PARALLELL_BLOCKS = (4);
 const static size_t BLOCK_RETRIES = 5;
 
-asio::io_service ioSvc;
+asio::io_context ioCtx;
 
 struct OutQueue {
 	typedef pair<uint64_t, string> Chunk;
@@ -87,11 +87,11 @@ int BHGet::main(const std::vector<std::string>& args) {
 			return 1;
 	}
 
-	_client = Client::create(ioSvc, optMyName);
+	_client = Client::create(ioCtx, optMyName);
 	_client->authenticated.connect([=](bithorde::Client& c, const std::string& peerName) {
 		if (peerName.empty()) {
 			cerr << "Failed authentication" << endl;
-			ioSvc.stop();
+			ioCtx.stop();
 		}
 		if (optDebug)
 			cerr << "DEBUG: Connected to " << peerName << endl;
@@ -101,7 +101,7 @@ int BHGet::main(const std::vector<std::string>& args) {
 
 	_client->connect(optConnectUrl);
 
-	ioSvc.run();
+	ioCtx.run();
 
 	return _res;
 }
@@ -141,7 +141,7 @@ void BHGet::nextAsset() {
 		ids = nextUri.toIdList();
 	}
 	if (!ids.size()) {
-		ioSvc.stop();
+		ioCtx.stop();
 		return;
 	}
 

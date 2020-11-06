@@ -38,7 +38,7 @@ namespace bithorded {
 }
 
 Client::Client( Server& server) :
-	bithorde::Client(server.ioSvc(), server.name()),
+	bithorde::Client(server.ioCtx(), server.name()),
 	_server(server)
 {
 }
@@ -171,7 +171,7 @@ void Client::onMessage( const std::shared_ptr< bithorde::MessageContext< bithord
 			} else {
 				informAssetStatus(h, bithorde::NOTFOUND);
 			}
-		} catch (bithorded::BindError e) {
+		} catch (bithorded::BindError& e) {
 			informAssetStatus(h, e.status);
 		}
 	} else {

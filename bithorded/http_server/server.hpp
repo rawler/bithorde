@@ -27,7 +27,7 @@ class server
 public:
   /// Construct the server to listen on the specified TCP address and port, and
   /// serve up files from the given directory.
-  explicit server(boost::asio::io_service& ioSvc, const std::string& address, const uint16_t& port,
+  explicit server(boost::asio::io_context& ioCtx, const std::string& address, const uint16_t& port,
       const RequestRouter& root);
   server( const server& ) = delete;
 
@@ -42,8 +42,8 @@ private:
   /// Handle a request to stop the server.
   void handle_stop();
 
-  /// The io_service used to perform asynchronous operations.
-  boost::asio::io_service& io_service_;
+  /// The io_context used to perform asynchronous operations.
+  boost::asio::io_context& io_context_;
 
   /// Acceptor used to listen for incoming connections.
   boost::asio::ip::tcp::acceptor acceptor_;

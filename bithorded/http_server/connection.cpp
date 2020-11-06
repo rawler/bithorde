@@ -15,8 +15,8 @@
 namespace http {
 namespace server {
 
-connection::connection(boost::asio::io_service& io_service, connection_manager& manager, request_handler& handler) :
-	socket_(io_service),
+connection::connection(boost::asio::io_context& io_context, connection_manager& manager, request_handler& handler) :
+	socket_(io_context),
 	connection_manager_(manager),
 	request_handler_(handler)
 {}

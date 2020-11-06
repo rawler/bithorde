@@ -17,8 +17,8 @@
 
 #include "timer.h"
 
-TimerService::TimerService(boost::asio::io_service& ioSvc)
-	: _timer(ioSvc)
+TimerService::TimerService(boost::asio::io_context& ioCtx)
+	: _timer(ioCtx)
 {
 }
 
@@ -136,6 +136,3 @@ void PeriodicTimer::invoke(const boost::posix_time::ptime& scheduled_at, const b
 	arm(scheduled_at+_interval);
 	Timer::invoke(scheduled_at, now);
 }
-
-
-

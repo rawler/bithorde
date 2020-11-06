@@ -48,7 +48,7 @@ void bithorde::Keepalive::run()
 		if (_client.sendMessage(Connection::Ping, ping, Message::NEVER, true)) {
 			_stale = true;
 			_timer.clear();
-			_timer.arm(boost::posix_time::seconds(MAX_PING_RESPONSE_TIME.total_seconds() * 1.5));
+			_timer.arm(boost::posix_time::milliseconds((int)(MAX_PING_RESPONSE_TIME.total_milliseconds() * 1.5)));
 		} else {
 			cerr << "WARNING: " << _client.peerName() << " without input, failed to send prioritized ping. Disconnecting..." << endl;
 			return _client.close();

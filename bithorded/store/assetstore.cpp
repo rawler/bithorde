@@ -220,7 +220,7 @@ void AssetStore::loadIndex()
 		}
 		try {
 			assetPath = fs::canonical(assetPath, _tigerFolder);
-		} catch (fs::filesystem_error) {
+		} catch (fs::filesystem_error&) {
 			BOOST_LOG_SEV(bithorded::storeLog, warning) << "dangling link in " << tigerLink;
 			unlink(tigerLink);
 			continue;
