@@ -1,5 +1,5 @@
 sudo: required
-dist: trusty
+dist: focal
 language: cpp
 compiler:
 - gcc
@@ -37,16 +37,15 @@ addons:
     sources:
     - ubuntu-toolchain-r-test
     packages:
-    - clang-3.6
-    - gcc-4.8
-    - g++-4.8
-    - libboost1.55-all-dev
+    - clang
+    - gcc
+    - g++
+    - libboost-all-dev
     - libcrypto++-dev
     - libfuse-dev
     - libprotobuf-dev
     - protobuf-compiler
     - python-crypto
-    - python-eventlet
     - python-protobuf
 script:
 - cmake .
