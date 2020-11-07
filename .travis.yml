@@ -31,7 +31,7 @@ env:
   - secure: Kub72/NfR8BcmtI/QDxpt2EbcA1vVEG3qiUAHEnXRcfRD2HaKdAtghyN1lk6mMQ47dqGL7KdLPWhseFLZzBouPZXv+9bSVrz+/P2DXjkz9bAW5TGf3fEVTx7ZjaU4hn/jmtTUwTn0/RgV8lnFeWftDD1gFgmMjoeBfdJGn0h+cM=
 before_script: .travis/before_script.sh
 install:
-- if [ "$CXX" = "g++" ]; then export CXX="g++-4.8" CC="gcc-4.8"; fi
+- if [ "$CXX" = "g++" ]; then export CXX="g++" CC="gcc"; fi
 addons:
   apt:
     sources:
